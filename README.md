@@ -1,0 +1,2 @@
+# Katuro.ai
+Teachers Copilot
