@@ -1,9 +1,12 @@
 // ── Gemini configuration ─────────────────────────────────────────────────────
-const GEMINI_KEY   = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
+import { getGeminiKey } from './geminiConfig';
 
-export const AI_ENABLED = !!GEMINI_KEY;
+const GEMINI_MODEL = "gemini-2.5-flash";
+function geminiUrl(key) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+}
+
+export const AI_ENABLED = true; // key is fetched dynamically from Firestore
 
 // thinkingBudget:0 prevents Gemini 2.5 Flash from consuming the output token budget
 // on internal reasoning — for structured JSON tasks we only need the output.
@@ -20,7 +23,8 @@ function langInstruction(subject) {
 }
 
 async function call(prompt, opts = {}) {
-  const res = await fetch(GEMINI_URL, {
+  const key = await getGeminiKey();
+  const res = await fetch(geminiUrl(key), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,8 +148,6 @@ Return ONLY JSON (no markdown fences):
  * Returns { competencyCeiling, fullLadder, sessions: [{ day, date, bloomsLevel, objective }] }
  */
 export async function unpackCompetency({ competencyText, content, contentStandards, learningContext = '', subject, gradeLevel, term, numberOfDays, selectedDates }) {
-  if (!GEMINI_KEY) throw new Error('API key not found — restart the dev server after updating .env');
-
   const prompt = `You are a Filipino DepEd MATATAG curriculum expert and master teacher.
 
 A teacher has provided this learning competency:
@@ -267,7 +269,8 @@ Just the raw JSON object:
   ]
 }`;
 
-  const res = await fetch(GEMINI_URL, {
+  const key = await getGeminiKey();
+  const res = await fetch(geminiUrl(key), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -315,8 +318,6 @@ Just the raw JSON object:
  * formativeAssessment, extendedLearning, reflection
  */
 export async function generateIlawSession(session, context) {
-  if (!GEMINI_KEY) throw new Error('API key not found — restart the dev server after updating .env');
-
   const {
     subject, gradeLevel, term, weekNumber, lessonName,
     competencyText, content, contentStandards, learningContext = '',
@@ -391,7 +392,8 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
   "extendedLearning": "..."
 }`;
 
-  const res = await fetch(GEMINI_URL, {
+  const key2 = await getGeminiKey();
+  const res = await fetch(geminiUrl(key2), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

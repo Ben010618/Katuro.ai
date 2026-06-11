@@ -25,6 +25,11 @@ import Step2            from './pages/lessonGen/Step2';
 import Step3            from './pages/lessonGen/Step3';
 import OutputPage       from './pages/lessonGen/OutputPage';
 
+// DLL Gen
+import DLLStep1      from './pages/dllGen/DLLStep1';
+import DLLStep2      from './pages/dllGen/DLLStep2';
+import DLLOutputPage from './pages/dllGen/DLLOutputPage';
+
 function LoadingScreen() {
   return (
     <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
@@ -105,6 +110,13 @@ export default function App() {
                 <Route path="step-3" element={<Step3 />} />
               </Route>
               <Route path="output/:id" element={<OutputPage />} />
+            </Route>
+
+            {/* DLL Gen */}
+            <Route path="dll-gen">
+              <Route path="step-1" element={<DLLStep1 />} />
+              <Route path="step-2" element={<DLLStep2 />} />
+              <Route path="output" element={<DLLOutputPage />} />
             </Route>
           </Route>
 

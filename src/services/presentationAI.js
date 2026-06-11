@@ -1,173 +1,202 @@
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
-
 /**
- * Generate fully-explained, DepEd-module-grounded slides via Gemini + Google Search.
+ * Presentation AI — calls Gemini directly from the client.
  *
- * Returns:
- *   slides:     Array<{ layout, title, bullets, notes }>
- *   references: string[]   — sources Gemini used (DepEd URLs / module titles)
- *
- * Each bullet is a full explanatory sentence (not a keyword), strictly sourced
- * from the DepEd MATATAG Learner's Module / Curriculum Guide found by search.
+ * NOTE: Once Firebase Functions are deployed, swap generateOutline and
+ * expandSlides back to httpsCallable wrappers for full server-side security.
+ * The functions/index.js is already written and ready to deploy:
+ *   cd functions && npm install
+ *   cd .. && firebase functions:secrets:set GEMINI_API_KEY
+ *   firebase deploy --only functions
  */
-export async function generateSlides({
-  title, subject, gradeLevel, numSlides, style,
-  competencyText = '', sessions = [], objectives = '',
-}) {
-  if (!GEMINI_KEY) throw new Error('VITE_GEMINI_API_KEY is not set — add it to .env');
 
-  const sessionBlock = sessions.length
-    ? sessions.map(s => [
-        `Session ${s.day} — ${s.bloomsLevel}: ${s.objective}`,
-        s.prelesson           ? `Hook: ${s.prelesson}`                     : '',
-        s.flow                ? `Activities:\n${s.flow}`                   : '',
-        s.formativeAssessment ? `Assessment: ${s.formativeAssessment}`     : '',
-        s.extendedLearning    ? `Extended: ${s.extendedLearning}`          : '',
-      ].filter(Boolean).join('\n')).join('\n\n')
-    : objectives ? `Objectives: ${objectives}` : '';
+import { getGeminiKey } from './geminiConfig';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
-  const styleGuide = {
-    Academic:  'formal academic language; define terms precisely; include examples from the module',
-    Modern:    'clear direct sentences; bold key terms; professional but readable',
-    Engaging:  'conversational explanations; connect to student experience; use examples and analogies',
-  }[style] ?? 'clear and informative';
+const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
+function isTagalog(subject) {
+  return TAGALOG_SUBJECTS.some(t => (subject || '').toLowerCase().includes(t));
+}
 
-  const prompt = `You are a Filipino DepEd MATATAG curriculum expert building a detailed classroom PowerPoint.
-
-STEP 1 — RESEARCH USING GOOGLE SEARCH
-Search the web for the official DepEd Philippines MATATAG materials for this lesson:
-• Subject: ${subject}
-• Grade Level: ${gradeLevel}
-${competencyText ? `• Competency: ${competencyText}` : ''}
-
-Specifically search for:
-1. DepEd MATATAG Learner's Module for ${subject} ${gradeLevel} — the exact content, definitions, illustrations, and examples in that module
-2. DepEd Curriculum Guide for ${subject} ${gradeLevel} — the learning competency details and content standards
-3. Any official DepEd learning materials portal (lrmds.deped.gov.ph, depedresources.com, or deped.gov.ph)
-
-Record every URL and source title you find — you will list them in the references field.
-
-STEP 2 — WRITE THE PRESENTATION
-Using ONLY what you found in Step 1, generate a detailed classroom presentation.
-
-LESSON DETAILS
-Title: "${title}"
-Subject: ${subject} | Grade Level: ${gradeLevel}
-Style: ${style} — ${styleGuide}
-${competencyText ? `\nLearning Competency: ${competencyText}` : ''}
-${sessionBlock ? `\nTeacher's ILAW Plan:\n${sessionBlock}` : ''}
-
-SLIDE COUNT: Generate exactly ${numSlides} slides (not counting title or closing — those are automatic).
-
-SLIDE TYPES
-"content" — has title + 4 to 6 bullets. Use for most slides.
-"section" — has only a bold title, bullets = []. Use 2–3 times to separate major parts.
-
-BULLET FORMAT (CRITICAL — read carefully)
-Every bullet in a "content" slide MUST:
-• Be a complete sentence (15–30 words) that fully explains the concept
-• Come directly from the DepEd module content found in Step 1
-• Include a key term in bold using **asterisks** if it is a definition: e.g. "**Photosynthesis** is the process by which…"
-• Give an example or illustration from the module where relevant
-• NOT be a vague keyword like "Definition of cell" — expand it fully
-
-CONTENT STRUCTURE
-1. Open with a "section" slide: Learning Competency / Lesson Overview
-2. State the specific competency and objectives (content slide)
-3. Cover all key concepts from the DepEd module — definitions, explanations, examples
-4. Include a practical activity or application slide based on the module
-5. Formative assessment or check-for-understanding slide
-6. Summary / key takeaways slide
-7. Distribute remaining slides across the module's topic sequence
-
-SPEAKER NOTES
-Each content slide: write 2 sentences the teacher says aloud — what to emphasize and a classroom connection.
-
-REFERENCES FIELD
-List every source you actually used:
-• Full title of DepEd module (e.g. "Science 8 Learner's Module, Quarter 1, Module 2 — pp. 5–18")
-• Curriculum Guide citation (e.g. "DepEd MATATAG CG — Science Grade 8, 2023")
-• Any URL from lrmds.deped.gov.ph or official DepEd sites
-
-RETURN FORMAT
-Return ONLY the JSON below. No markdown fences, no extra text, nothing outside the JSON object.
-
-{
-  "slides": [
-    {
-      "layout": "section",
-      "title": "...",
-      "bullets": [],
-      "notes": ""
-    },
-    {
-      "layout": "content",
-      "title": "...",
-      "bullets": [
-        "**Key Term** is a complete explanatory sentence from the DepEd module.",
-        "Another full sentence with explanation, example, or illustration.",
-        "Another full sentence."
-      ],
-      "notes": "Teacher says this aloud. And a classroom connection."
-    }
-  ],
-  "references": [
-    "DepEd MATATAG Learner's Module — ${subject} ${gradeLevel}, Quarter X, Module Y",
-    "DepEd Curriculum Guide — ${subject} ${gradeLevel} (2023)",
-    "https://lrmds.deped.gov.ph/..."
-  ]
-}`;
-
-  const res = await fetch(GEMINI_URL, {
-    method:  'POST',
+async function callGemini(prompt, { temperature = 0.5, maxTokens = 2048 } = {}) {
+  const key = await getGeminiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
       generationConfig: {
-        temperature:     0.4,
-        maxOutputTokens: 8192,
-        thinkingConfig:  { thinkingBudget: 2048 },
+        temperature,
+        maxOutputTokens: maxTokens,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`Gemini error ${res.status}: ${err?.error?.message ?? res.statusText}`);
+    throw new Error(`Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`);
   }
-
-  const data = await res.json();
-
-  // Gemini with search grounding may return multiple parts — join them
+  const data  = await res.json();
   const parts = data.candidates?.[0]?.content?.parts ?? [];
-  const text  = parts.map(p => p.text ?? '').join('');
+  return parts.map(p => p.text ?? '').join('');
+}
 
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('AI did not return JSON — please try again.');
+function parseJSON(text, label) {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error(`AI returned no JSON for ${label} — please try again.`);
+  try   { return JSON.parse(m[0]); }
+  catch { throw new Error(`AI returned malformed JSON for ${label} — please try again.`); }
+}
 
-  let parsed;
-  try { parsed = JSON.parse(match[0]); }
-  catch {
-    // Try to recover from truncation
-    const partial = match[0].replace(/,\s*$/, '') + '}}';
-    try { parsed = JSON.parse(partial); }
-    catch { throw new Error('AI returned malformed JSON — please try again.'); }
-  }
+// ── Stage 1: Generate outline (free, ~1 API call) ─────────────────────────────
+export async function generateOutline({ subject, gradeLevel, melcCode, topic, slideCount = 12 }) {
+  const lang = isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
 
-  if (!Array.isArray(parsed.slides)) throw new Error('AI response missing slides array.');
+  const prompt = `You are kaTuro, an AI lesson outline planner for Philippine public school teachers following the K–12 MELC curriculum.
+Generate a structured slide OUTLINE only — not full content. Output ONLY valid JSON, no markdown, no explanation.
 
-  const slides = parsed.slides.slice(0, numSlides).map(s => ({
-    layout:  s.layout === 'section' ? 'section' : 'content',
-    title:   String(s.title   ?? ''),
-    bullets: Array.isArray(s.bullets) ? s.bullets.map(String) : [],
-    notes:   String(s.notes   ?? ''),
+Rules:
+- Start with a title slide and an objectives slide (expand: false for both)
+- End with a summary slide and an activity or assessment slide
+- Middle slides cover topic content based on the MELC competency
+- Slide types: title | objectives | concept | example | illustration | activity | assessment | summary
+- title, objectives, summary → expand: false (template, no AI expansion needed)
+- All others → expand: true
+- keyPoints: 2–3 short phrases hinting at the slide content
+- Total slides: exactly ${slideCount}
+- Language: ALL text output in ${lang}
+
+Subject: ${subject}
+Grade Level: ${gradeLevel}
+MELC Code: ${melcCode || 'N/A'}
+Topic: ${topic}
+Number of slides: ${slideCount}
+
+Return ONLY this JSON structure:
+{
+  "lesson": { "subject": "", "gradeLevel": "", "melcCode": "", "topic": "" },
+  "slides": [
+    { "id": 1, "type": "title", "title": "", "keyPoints": [], "expand": false }
+  ]
+}`;
+
+  const text   = await callGemini(prompt, { temperature: 0.3, maxTokens: 2048 });
+  const parsed = parseJSON(text, 'outline');
+
+  if (!Array.isArray(parsed.slides)) throw new Error('Outline missing slides array.');
+
+  const outline = parsed.slides.map((s, i) => ({
+    id:        s.id        ?? i + 1,
+    type:      s.type      ?? 'concept',
+    title:     String(s.title ?? ''),
+    keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints.map(String) : [],
+    expand:    s.expand !== false,
   }));
 
-  const references = Array.isArray(parsed.references)
-    ? parsed.references.map(String).filter(Boolean)
-    : [];
+  return { outline, cached: false };
+}
 
-  return { slides, references };
+// ── Stage 2: Expand slides in parallel (~N API calls) ─────────────────────────
+export async function expandSlides({ subject, gradeLevel, melcCode, topic, slides, style = 'Academic' }) {
+  const lang      = isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
+  const styleGuide = {
+    Academic:  'formal, define terms precisely, include DepEd module examples',
+    Modern:    'clear direct sentences, bold key terms, professional and readable',
+    Engaging:  'conversational, connect to student experience, use analogies and questions',
+  }[style] ?? 'clear and informative';
+
+  const needsExpansion = slides.filter(s => s.expand !== false);
+  const templateSlides = slides.filter(s => s.expand === false);
+
+  async function expandOne(slide) {
+    const useBody = ['example', 'illustration', 'activity', 'assessment'].includes(slide.type);
+
+    const prompt = `You are kaTuro, an AI lesson content writer for Philippine DepEd K–12 MELC curriculum.
+Expand this ${slide.type} slide for a lesson on "${topic}", ${gradeLevel}, ${subject}${melcCode ? `, MELC: ${melcCode}` : ''}.
+Style: ${style} — ${styleGuide}
+Language: Write ALL content in ${lang}.
+
+Slide scaffold: ${JSON.stringify(slide)}
+
+Rules:
+- Body/bullets combined: 60–120 words maximum (this is a presentation, not a module)
+- Short declarative sentences only
+${useBody
+  ? '- body: short paragraph (3–5 sentences explaining the concept/activity)\n- bullets: leave as []'
+  : '- bullets: 3–5 items, each a complete explanatory sentence (15–25 words)\n- body: leave as ""'}
+- teacherNote: 1–2 sentences the teacher says aloud while showing this slide
+- suggestedVisual: brief description of a helpful diagram or image
+- headline: 5–8 word subtitle reinforcing the slide title
+
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "id": ${slide.id},
+  "type": "${slide.type}",
+  "title": "",
+  "headline": "",
+  "body": "",
+  "bullets": [],
+  "teacherNote": "",
+  "suggestedVisual": ""
+}`;
+
+    const text     = await callGemini(prompt, { temperature: 0.6, maxTokens: 1024 });
+    const expanded = parseJSON(text, `slide ${slide.id}`);
+
+    return {
+      id:              slide.id,
+      type:            String(expanded.type            ?? slide.type),
+      title:           String(expanded.title           ?? slide.title),
+      headline:        String(expanded.headline        ?? ''),
+      body:            String(expanded.body            ?? ''),
+      bullets:         Array.isArray(expanded.bullets) ? expanded.bullets.map(String) : [],
+      teacherNote:     String(expanded.teacherNote     ?? ''),
+      suggestedVisual: String(expanded.suggestedVisual ?? ''),
+    };
+  }
+
+  // All content slides expand simultaneously
+  const results = await Promise.allSettled(needsExpansion.map(expandOne));
+
+  const expanded = results.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    // Graceful fallback — use key points as bullets
+    return {
+      id:              needsExpansion[i].id,
+      type:            needsExpansion[i].type,
+      title:           needsExpansion[i].title,
+      headline:        '',
+      body:            '',
+      bullets:         needsExpansion[i].keyPoints ?? [],
+      teacherNote:     '',
+      suggestedVisual: '',
+    };
+  });
+
+  // Fill template slides without AI
+  const filled = templateSlides.map(s => ({
+    id:              s.id,
+    type:            s.type,
+    title:           s.title,
+    headline:        s.type === 'objectives' ? `MELC: ${melcCode || 'See competency'}` : '',
+    body:            '',
+    bullets:         s.keyPoints ?? [],
+    teacherNote:     '',
+    suggestedVisual: '',
+  }));
+
+  return { slides: [...expanded, ...filled].sort((a, b) => a.id - b.id) };
+}
+
+// ── Map expanded slides → pptxExport format ───────────────────────────────────
+export function toExportSlides(expandedSlides) {
+  return expandedSlides.map(s => {
+    const isSection = ['title', 'objectives', 'summary'].includes(s.type);
+    return {
+      layout:  isSection ? 'section' : 'content',
+      title:   s.title,
+      bullets: s.bullets?.length ? s.bullets : (s.body ? [s.body] : []),
+      notes:   s.teacherNote || '',
+    };
+  });
 }

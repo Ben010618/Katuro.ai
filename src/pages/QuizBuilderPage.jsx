@@ -132,7 +132,9 @@ export default function QuizBuilderPage() {
       return;
     }
 
-    /* build AI context from the ILAW plan */
+    /* build AI context from the selected plan */
+    const isDLL = selectedLesson.type === 'dll';
+
     const objectives = (selectedLesson.sessions || [])
       .map(s => s.objective)
       .filter(Boolean);
@@ -143,6 +145,13 @@ export default function QuizBuilderPage() {
       .filter(s => s.trim().length > 20)
       .join('\n');
 
+    const dllHint = isDLL && selectedLesson.dailyContent
+      ? 'Daily topics:\n' + Object.entries(selectedLesson.dailyContent)
+          .filter(([, v]) => v)
+          .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`)
+          .join('\n')
+      : '';
+
     const context = {
       subject:       selectedLesson.subject     || 'Science',
       gradeLevel:    selectedLesson.gradeLevel   || selectedLesson.grade || 'Grade 7',
@@ -152,12 +161,10 @@ export default function QuizBuilderPage() {
     };
 
     if (objectives.length === 0 && !selectedLesson.competencyText) {
-      addToast('Limited lesson content — quiz may be generic. Add competency data in Lesson Gen for richer questions.', 'warning');
+      addToast('Limited lesson content — quiz may be generic.', 'warning');
     }
 
-    const customHint = sessionSummary
-      ? `Session breakdown:\n${sessionSummary}`
-      : '';
+    const customHint = sessionSummary || dllHint;
 
     /* attempt 1 */
     try {
@@ -330,17 +337,23 @@ export default function QuizBuilderPage() {
                       onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.14)'; e.currentTarget.style.background = '#fff'; }}
                     >
                       {/* Icon */}
-                      <div style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: '#d8f3dc', display: 'grid', placeItems: 'center' }}>
-                        <BookOpen size={18} color="#2d6a4f" />
+                      <div style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: lesson.type === 'dll' ? '#ede9fe' : '#d8f3dc', display: 'grid', placeItems: 'center' }}>
+                        <BookOpen size={18} color={lesson.type === 'dll' ? '#4f46e5' : '#2d6a4f'} />
                       </div>
 
                       {/* Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {title}
-                        </p>
-                        <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4a6357' }}>
-                          {meta.subject} {meta.grade} · {meta.term} · {meta.week} · {meta.sessions} session{meta.sessions !== 1 ? 's' : ''}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '1px 6px', background: lesson.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: lesson.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
+                            {lesson.type === 'dll' ? 'DLL' : 'ILAW'}
+                          </span>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {title}
+                          </p>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
+                          {meta.subject} {meta.grade} · {meta.term}
+                          {lesson.type === 'dll' ? (lesson.teachingDates ? ` · ${lesson.teachingDates}` : '') : ` · Wk ${meta.week}`}
                         </p>
                       </div>
 

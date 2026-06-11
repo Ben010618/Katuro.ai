@@ -1,5 +1,5 @@
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+import { getGeminiKey } from './geminiConfig';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function buildCtx(lesson) {
   const objs = (lesson.sessions || []).slice(0, 4).map(s => s.objective).filter(Boolean).join('; ');
@@ -9,8 +9,9 @@ Objectives: ${objs || 'Not specified'}`;
 }
 
 async function callGemini(prompt) {
-  if (!GEMINI_KEY) throw new Error('Add VITE_GEMINI_API_KEY to .env');
-  const res = await fetch(GEMINI_URL, {
+  const key = await getGeminiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

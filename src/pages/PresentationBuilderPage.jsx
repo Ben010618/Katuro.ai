@@ -1,162 +1,291 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
   BookOpen, Plus, Sparkles, Download, ChevronLeft, ChevronRight,
-  Loader2, Search, CheckCircle2, AlertCircle, X, RefreshCw, Projector,
+  Loader2, Search, CheckCircle2, AlertCircle, X, RefreshCw,
+  Projector, Trash2, FileText, Cpu,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
-import { generateSlides } from '../services/presentationAI';
+import { generateOutline, expandSlides, toExportSlides } from '../services/presentationAI';
 import { exportToPptx } from '../services/pptxExport';
 import { deductTokens } from '../services/db';
+import { usePresentationStore } from '../store/presentationStore';
+import { useToast } from '../context/ToastContext';
+import { useState } from 'react';
 
 const STYLES = ['Academic', 'Modern', 'Engaging'];
-
 const STYLE_DESC = {
-  Academic:  'Formal, structured language suited for academic review',
-  Modern:    'Concise bullets, minimal text, professional tone',
-  Engaging:  'Conversational, student-friendly, includes questions',
+  Academic: 'Formal, structured — precise definitions and module examples',
+  Modern:   'Concise bullets, bold key terms, professional tone',
+  Engaging: 'Conversational, student-friendly, uses analogies and questions',
 };
 
-// ── Shared style tokens ────────────────────────────────────────────────────────
+const SUBJECTS = [
+  'Science','Mathematics','English','Filipino','Araling Panlipunan',
+  'MAPEH','GMRC','Makabansa','Reading & Literacy','Language','TLE','EPP','ESP',
+];
+const GRADES = [
+  'Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4',
+  'Grade 5','Grade 6','Grade 7','Grade 8','Grade 9',
+  'Grade 10','Grade 11','Grade 12',
+];
+
+const TYPE_META = {
+  title:        { bg: '#163828', fg: '#fff',    label: 'Title'        },
+  objectives:   { bg: '#1565c0', fg: '#fff',    label: 'Objectives'   },
+  concept:      { bg: '#7c3aed', fg: '#fff',    label: 'Concept'      },
+  example:      { bg: '#d97706', fg: '#fff',    label: 'Example'      },
+  illustration: { bg: '#0891b2', fg: '#fff',    label: 'Illustration' },
+  activity:     { bg: '#059669', fg: '#fff',    label: 'Activity'     },
+  assessment:   { bg: '#dc2626', fg: '#fff',    label: 'Assessment'   },
+  summary:      { bg: '#374151', fg: '#fff',    label: 'Summary'      },
+};
+const typeMeta = t => TYPE_META[t] ?? { bg: '#9BB8A5', fg: '#fff', label: t };
+
 const card = {
   background: '#fff', borderRadius: 14,
   border: '1px solid rgba(45,106,79,0.12)', padding: '18px 20px',
 };
-
 const labelStyle = {
   display: 'block', fontSize: 11, fontWeight: 700,
   color: '#4a6357', textTransform: 'uppercase',
   letterSpacing: '0.07em', marginBottom: 6,
 };
-
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   padding: '10px 12px', border: '1.5px solid rgba(45,106,79,0.2)',
   borderRadius: 8, fontSize: 14, background: '#f5faf7',
   color: '#163828', outline: 'none', fontFamily: '"Plus Jakarta Sans", sans-serif',
 };
+const selectStyle = { ...inputStyle, cursor: 'pointer', appearance: 'none' };
 
-// ── Slide type badge ──────────────────────────────────────────────────────────
-function LayoutBadge({ layout }) {
+// ── Outline slide card ────────────────────────────────────────────────────────
+function OutlineCard({ slide, index, total, onTitleChange, onRemove }) {
+  const meta = typeMeta(slide.type);
+  const canRemove = !['title', 'summary'].includes(slide.type);
+
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-      letterSpacing: '0.07em', padding: '2px 7px', borderRadius: 20,
-      background: layout === 'section' ? '#d8f3dc' : '#f0f4f2',
-      color:      layout === 'section' ? '#163828' : '#4a6357',
+    <div style={{
+      ...card, padding: '12px 16px',
+      display: 'flex', gap: 12, alignItems: 'flex-start',
+      borderLeft: `3px solid ${meta.bg}`,
     }}>
-      {layout === 'section' ? 'Section' : 'Content'}
-    </span>
+      {/* Slide # + type */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 48, paddingTop: 2 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#9BB8A5' }}>#{index + 1}</span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+          background: meta.bg, color: meta.fg,
+          borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap',
+        }}>{meta.label}</span>
+        {slide.expand
+          ? <Cpu size={11} color="#7c3aed" title="AI will expand" />
+          : <FileText size={11} color="#9BB8A5" title="Template slide" />
+        }
+      </div>
+
+      {/* Title + key points */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <input
+          value={slide.title}
+          onChange={e => onTitleChange(slide.id, e.target.value)}
+          style={{
+            ...inputStyle, padding: '6px 10px', fontSize: 13, fontWeight: 600,
+            background: '#f8fbf9', marginBottom: 6,
+          }}
+        />
+        {slide.keyPoints?.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {slide.keyPoints.map((kp, i) => (
+              <span key={i} style={{
+                fontSize: 10, background: '#f0f4f2', color: '#4a6357',
+                borderRadius: 4, padding: '2px 7px',
+              }}>{kp}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Remove button */}
+      {canRemove && (
+        <button
+          onClick={() => onRemove(slide.id)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#e05c5c', padding: 4, borderRadius: 6, flexShrink: 0,
+            display: 'flex', alignItems: 'center',
+          }}
+          title="Remove slide"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+    </div>
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Preview slide card ────────────────────────────────────────────────────────
+function PreviewCard({ slide, index, includeNotes }) {
+  const meta      = typeMeta(slide.type);
+  const isSection = ['title', 'objectives', 'summary'].includes(slide.type);
+
+  return (
+    <div style={{
+      ...card, padding: '12px 16px',
+      borderLeft: `3px solid ${meta.bg}`,
+      display: 'flex', gap: 12, alignItems: 'flex-start',
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 48, paddingTop: 2 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#9BB8A5' }}>#{index + 1}</span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+          background: meta.bg, color: meta.fg,
+          borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap',
+        }}>{meta.label}</span>
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>{slide.title}</p>
+        {slide.headline && (
+          <p style={{ margin: '0 0 6px', fontSize: 12, color: '#4a6357', fontStyle: 'italic' }}>{slide.headline}</p>
+        )}
+
+        {isSection ? (
+          slide.bullets?.length > 0 && slide.bullets.map((b, i) => (
+            <p key={i} style={{ margin: '2px 0', fontSize: 12, color: '#4a6357' }}>• {b}</p>
+          ))
+        ) : (
+          <>
+            {slide.body && (
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#163828', lineHeight: 1.5 }}>
+                {slide.body.slice(0, 140)}{slide.body.length > 140 ? '…' : ''}
+              </p>
+            )}
+            {slide.bullets?.slice(0, 3).map((b, i) => (
+              <p key={i} style={{ margin: '2px 0', fontSize: 12, color: '#4a6357' }}>• {b.slice(0, 90)}{b.length > 90 ? '…' : ''}</p>
+            ))}
+            {slide.bullets?.length > 3 && (
+              <p style={{ margin: '2px 0', fontSize: 11, color: '#9BB8A5' }}>+{slide.bullets.length - 3} more bullets</p>
+            )}
+          </>
+        )}
+
+        {includeNotes && slide.teacherNote && (
+          <p style={{
+            margin: '6px 0 0', fontSize: 11, color: '#9BB8A5', fontStyle: 'italic',
+            borderTop: '1px solid rgba(45,106,79,0.1)', paddingTop: 6,
+          }}>
+            Teacher note: {slide.teacherNote.slice(0, 100)}{slide.teacherNote.length > 100 ? '…' : ''}
+          </p>
+        )}
+
+        {slide.suggestedVisual && (
+          <p style={{ margin: '4px 0 0', fontSize: 10, color: '#7c3aed' }}>
+            Visual: {slide.suggestedVisual.slice(0, 80)}{slide.suggestedVisual.length > 80 ? '…' : ''}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function PresentationBuilderPage() {
-  const { user } = useAuth();
+  const { user }      = useAuth();
+  const { addToast }  = useToast();
   const { lessonPlans, loading: plansLoading } = useLessonPlans(user?.uid);
-
-  const [source,      setSource]      = useState(null);   // 'lesson' | 'scratch'
-  const [lesson,      setLesson]      = useState(null);   // selected lesson plan
-  const [search,      setSearch]      = useState('');
-  const [config,      setConfig]      = useState(() => ({
-    title: '', subject: '', gradeLevel: '', competencyText: '',
-    numSlides: 10, style: 'Academic', includeNotes: true,
-    schoolName:  localStorage.getItem('pptSchoolName')  ?? '',
-    schoolEmail: localStorage.getItem('pptSchoolEmail') ?? '',
-  }));
-  const [generating,  setGenerating]  = useState(false);
+  const store         = usePresentationStore();
+  const [search, setSearch] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const [slides,      setSlides]      = useState(null);
-  const [references,  setReferences]  = useState([]);
-  const [error,       setError]       = useState('');
 
-  // Persist school info so teachers don't re-type it every time
-  useEffect(() => {
-    localStorage.setItem('pptSchoolName',  config.schoolName);
-    localStorage.setItem('pptSchoolEmail', config.schoolEmail);
-  }, [config.schoolName, config.schoolEmail]);
-
-  // Derived step
-  const step = !source                          ? 'source'
-    : source === 'lesson' && !lesson            ? 'pick'
-    : !slides                                   ? 'config'
-    : 'preview';
-
-  function pickLesson(plan) {
-    setLesson(plan);
-    setConfig(c => ({
-      ...c,
-      title:          plan.lessonName     || '',
-      subject:        plan.subject        || '',
-      gradeLevel:     plan.gradeLevel     || '',
-      competencyText: plan.competencyText || '',
-    }));
-  }
-
-  function reset() {
-    setSource(null); setLesson(null); setSlides(null); setReferences([]);
-    setSearch(''); setError('');
-    setConfig(c => ({ title: '', subject: '', gradeLevel: '', competencyText: '', numSlides: 10, style: 'Academic', includeNotes: true, schoolName: c.schoolName, schoolEmail: c.schoolEmail }));
-  }
+  // Derive current step from store state
+  const step =
+    store.source === null                                                 ? 'source'
+    : store.source === 'lesson' && !store.lesson                         ? 'pick'
+    : store.status === 'idle' || store.status === 'generating-outline'
+      || store.status === 'error'                                        ? 'input'
+    : store.status === 'outline-ready' || store.status === 'expanding'   ? 'outline'
+    : /* done */                                                           'preview';
 
   function goBack() {
-    setError('');
-    if (step === 'preview') { setSlides(null); setReferences([]); return; }
-    if (step === 'config')  { source === 'lesson' ? setLesson(null) : reset(); return; }
-    if (step === 'pick')    { reset(); return; }
-    reset();
+    if (step === 'preview') { store.setStatus('outline-ready'); return; }
+    if (step === 'outline') { store.setStatus('idle'); return; }
+    if (step === 'input')   {
+      store.source === 'lesson' ? store.setField('lesson', null) && store.setStatus('idle')
+                                : store.reset();
+      store.reset();
+      return;
+    }
+    if (step === 'pick') { store.reset(); return; }
+    store.reset();
   }
 
-  async function handleGenerate() {
-    if (!config.title.trim()) { setError('Please enter a presentation title.'); return; }
-    setGenerating(true);
-    setError('');
+  // ── Stage 1: Generate outline ──────────────────────────────────────────────
+  async function handleGenerateOutline() {
+    if (!store.subject || !store.gradeLevel || !store.topic) {
+      store.setError('Subject, Grade Level, and Topic are required.');
+      return;
+    }
+    store.setStatus('generating-outline');
+    try {
+      const { outline, cached } = await generateOutline({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode:   store.melcCode,
+        topic:      store.topic,
+        slideCount: store.slideCount,
+      });
+      store.setOutline(outline);
+      if (cached) addToast('Outline loaded from cache — instant!', 'info');
+    } catch (err) {
+      store.setError(err.message ?? 'Could not generate outline. Please try again.');
+    }
+  }
+
+  // ── Stage 2: Expand slides ─────────────────────────────────────────────────
+  async function handleExpandSlides() {
+    if (!store.outline?.length) return;
+    store.setStatus('expanding');
 
     try {
-      await deductTokens(user.uid, 'presentation');
+      await deductTokens(user.uid, 'presentation', 3);
     } catch (err) {
-      setError(err.message);
-      setGenerating(false);
+      store.setError(err.message);
       return;
     }
 
     try {
-      const { slides: generated, references: refs } = await generateSlides({
-        title:          config.title,
-        subject:        config.subject,
-        gradeLevel:     config.gradeLevel,
-        competencyText: config.competencyText,
-        numSlides:      config.numSlides,
-        style:          config.style,
-        sessions:       lesson?.sessions ?? [],
-        objectives:     lesson?.sessions?.map(s => s.objective).filter(Boolean).join('; ') ?? '',
+      const { slides } = await expandSlides({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode:   store.melcCode,
+        topic:      store.topic,
+        slides:     store.outline,
+        style:      store.style,
       });
-      setSlides(generated);
-      setReferences(refs ?? []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setGenerating(false);
+      store.setExpandedSlides(slides);
+    } catch (err) {
+      store.setError(err.message ?? 'Could not expand slides. Please try again.');
     }
   }
 
+  // ── Download PPTX ──────────────────────────────────────────────────────────
   async function handleDownload() {
-    if (!slides) return;
+    if (!store.expandedSlides) return;
     setDownloading(true);
-    setError('');
     try {
       await exportToPptx({
-        title:        config.title,
-        subject:      config.subject,
-        gradeLevel:   config.gradeLevel,
-        schoolName:   config.schoolName,
-        schoolEmail:  config.schoolEmail,
-        slides,
-        references,
-        includeNotes: config.includeNotes,
+        title:        store.topic,
+        subject:      store.subject,
+        gradeLevel:   store.gradeLevel,
+        schoolName:   store.schoolName,
+        schoolEmail:  store.schoolEmail,
+        slides:       toExportSlides(store.expandedSlides),
+        references:   [],
+        includeNotes: store.includeNotes,
       });
     } catch (e) {
-      setError('Download failed: ' + e.message);
+      addToast('Download failed: ' + e.message, 'error');
     } finally {
       setDownloading(false);
     }
@@ -169,14 +298,16 @@ export default function PresentationBuilderPage() {
     (p.gradeLevel || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalSlides = slides ? slides.length + 2 + (references.length ? 1 : 0) : 0;
+  const isGeneratingOutline = store.status === 'generating-outline';
+  const isExpanding         = store.status === 'expanding';
+  const expandCount         = store.outline?.filter(s => s.expand).length ?? 0;
 
   return (
     <div style={{ padding: '20px 16px', maxWidth: 680, margin: '0 auto', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
 
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        {source && (
+        {store.source && (
           <button onClick={goBack} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: '#4a6357', display: 'flex', alignItems: 'center', gap: 4,
@@ -192,78 +323,66 @@ export default function PresentationBuilderPage() {
           <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4a6357' }}>
             {step === 'source'  && 'Create an AI-powered lesson presentation'}
             {step === 'pick'    && 'Select a lesson to use as the content base'}
-            {step === 'config'  && 'Configure your presentation'}
-            {step === 'preview' && `${totalSlides} slides ready — review and download`}
+            {step === 'input'   && 'Set lesson details — outline generation is free'}
+            {step === 'outline' && `${store.outline?.length ?? 0} slides · review and edit before expanding`}
+            {step === 'preview' && `${store.expandedSlides?.length ?? 0} slides ready — review and download`}
           </p>
         </div>
       </div>
 
-      {/* ── Error banner ── */}
-      {error && (
+      {/* Error banner */}
+      {store.error && (
         <div style={{
           display: 'flex', gap: 10, background: '#fde8e8',
           border: '1px solid rgba(224,92,92,0.25)', borderRadius: 10,
           padding: '10px 14px', marginBottom: 14,
         }}>
           <AlertCircle size={15} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ margin: 0, fontSize: 13, color: '#e05c5c', flex: 1 }}>{error}</p>
-          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e05c5c' }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#e05c5c', flex: 1 }}>{store.error}</p>
+          <button onClick={() => store.setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e05c5c' }}>
             <X size={14} />
           </button>
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-          STEP 1 — Source picker
-      ════════════════════════════════════════════════════════════════ */}
+      {/* ── STEP: source ─────────────────────────────────────────────────────── */}
       {step === 'source' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* From My Lessons */}
-          <button
-            onClick={() => setSource('lesson')}
-            style={{ ...card, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16, border: '1px solid rgba(45,106,79,0.12)' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 18px rgba(22,56,40,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-          >
-            <div style={{ width: 50, height: 50, borderRadius: 12, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <BookOpen size={22} color="#163828" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>From My Lessons</p>
-              <p style={{ margin: '3px 0 0', fontSize: 13, color: '#4a6357', lineHeight: 1.4 }}>
-                Use a saved lesson plan — objectives, activities, and flow are loaded automatically.
-              </p>
-            </div>
-            <ChevronRight size={18} color="#9BB8A5" style={{ flexShrink: 0 }} />
-          </button>
-
-          {/* Start from scratch */}
-          <button
-            onClick={() => setSource('scratch')}
-            style={{ ...card, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16, border: '1px solid rgba(45,106,79,0.12)' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 18px rgba(22,56,40,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-          >
-            <div style={{ width: 50, height: 50, borderRadius: 12, background: '#e8f5e9', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <Plus size={22} color="#163828" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Start from Scratch</p>
-              <p style={{ margin: '3px 0 0', fontSize: 13, color: '#4a6357', lineHeight: 1.4 }}>
-                Enter topic, grade level, and subject — AI builds the full slide deck for you.
-              </p>
-            </div>
-            <ChevronRight size={18} color="#9BB8A5" style={{ flexShrink: 0 }} />
-          </button>
+          {[
+            {
+              icon: BookOpen, bg: '#d8f3dc', title: 'From My Lessons',
+              desc: 'Use a saved ILAW or DLL — subject, grade, and MELC are pre-filled.',
+              action: () => store.setSource('lesson'),
+            },
+            {
+              icon: Plus, bg: '#e8f5e9', title: 'Start from Scratch',
+              desc: 'Enter your own topic, grade, and MELC code to build a new presentation.',
+              action: () => { store.setSource('scratch'); store.setStatus('idle'); },
+            },
+          ].map(({ icon: Icon, bg, title, desc, action }) => (
+            <button
+              key={title}
+              onClick={action}
+              style={{ ...card, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16 }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 18px rgba(22,56,40,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            >
+              <div style={{ width: 50, height: 50, borderRadius: 12, background: bg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Icon size={22} color="#163828" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>{title}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 13, color: '#4a6357', lineHeight: 1.4 }}>{desc}</p>
+              </div>
+              <ChevronRight size={18} color="#9BB8A5" style={{ flexShrink: 0 }} />
+            </button>
+          ))}
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-          STEP 2 — Lesson picker
-      ════════════════════════════════════════════════════════════════ */}
+      {/* ── STEP: pick ───────────────────────────────────────────────────────── */}
       {step === 'pick' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Search box */}
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9BB8A5', pointerEvents: 'none' }} />
             <input
@@ -282,129 +401,159 @@ export default function PresentationBuilderPage() {
             <div style={{ ...card, textAlign: 'center', padding: '36px 20px' }}>
               <BookOpen size={30} color="#9BB8A5" style={{ marginBottom: 10 }} />
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#4a6357' }}>
-                {lessonPlans.length === 0
-                  ? 'No saved lessons yet.'
-                  : 'No lessons match your search.'}
+                {lessonPlans.length === 0 ? 'No saved lessons yet.' : 'No lessons match your search.'}
               </p>
-              {lessonPlans.length === 0 && (
-                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#9BB8A5' }}>
-                  Build one in Lesson Gen first, then come back here.
-                </p>
-              )}
             </div>
-          ) : (
-            filteredPlans.map(plan => (
-              <button
-                key={plan.id}
-                onClick={() => pickLesson(plan)}
-                style={{ ...card, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14 }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 18px rgba(22,56,40,0.1)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-              >
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <Projector size={18} color="#163828" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          ) : filteredPlans.map(plan => (
+            <button
+              key={plan.id}
+              onClick={() => { store.setLesson(plan); store.setStatus('idle'); }}
+              style={{ ...card, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14 }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 18px rgba(22,56,40,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            >
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Projector size={18} color="#163828" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', flexShrink: 0, background: plan.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: plan.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
+                    {plan.type === 'dll' ? 'DLL' : 'ILAW'}
+                  </span>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {plan.lessonName || 'Untitled Lesson'}
                   </p>
-                  <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4a6357' }}>
-                    {[plan.gradeLevel, plan.subject, plan.sessions?.length && `${plan.sessions.length} sessions`].filter(Boolean).join(' · ')}
-                  </p>
                 </div>
-                <ChevronRight size={16} color="#9BB8A5" style={{ flexShrink: 0 }} />
-              </button>
-            ))
-          )}
+                <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
+                  {[plan.gradeLevel, plan.subject].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <ChevronRight size={16} color="#9BB8A5" style={{ flexShrink: 0 }} />
+            </button>
+          ))}
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-          STEP 3 — Configure
-      ════════════════════════════════════════════════════════════════ */}
-      {step === 'config' && (
+      {/* ── STEP: input ──────────────────────────────────────────────────────── */}
+      {step === 'input' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Lesson source banner */}
-          {lesson && (
+          {store.lesson && (
             <div style={{ background: '#d8f3dc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0 }} />
               <p style={{ margin: 0, fontSize: 13, color: '#163828', fontWeight: 600 }}>
-                Using: {lesson.lessonName}
+                Using: {store.lesson.lessonName}
               </p>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4a6357' }}>
-                {lesson.sessions?.length ?? 0} sessions
-              </span>
             </div>
           )}
 
           <div style={card}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* Title */}
+              {/* Topic */}
               <div>
-                <label style={labelStyle}>Presentation Title</label>
+                <label style={labelStyle}>Topic / Lesson Title</label>
                 <input
-                  value={config.title}
-                  onChange={e => setConfig(c => ({ ...c, title: e.target.value }))}
-                  placeholder="e.g. Photosynthesis"
+                  value={store.topic}
+                  onChange={e => store.setField('topic', e.target.value)}
+                  placeholder="e.g. Photosynthesis and Cellular Respiration"
                   style={inputStyle}
                 />
               </div>
 
-              {/* Grade + Subject */}
+              {/* Subject + Grade */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={labelStyle}>Grade Level</label>
-                  <input
-                    value={config.gradeLevel}
-                    onChange={e => setConfig(c => ({ ...c, gradeLevel: e.target.value }))}
-                    placeholder="e.g. Grade 7"
-                    style={inputStyle}
-                  />
+                  <label style={labelStyle}>Subject</label>
+                  <select
+                    value={store.subject}
+                    onChange={e => store.setField('subject', e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Select subject…</option>
+                    {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Subject</label>
-                  <input
-                    value={config.subject}
-                    onChange={e => setConfig(c => ({ ...c, subject: e.target.value }))}
-                    placeholder="e.g. Science"
-                    style={inputStyle}
-                  />
+                  <label style={labelStyle}>Grade Level</label>
+                  <select
+                    value={store.gradeLevel}
+                    onChange={e => store.setField('gradeLevel', e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Select grade…</option>
+                    {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
                 </div>
               </div>
 
-              {/* Learning Competency */}
+              {/* MELC Code */}
               <div>
                 <label style={labelStyle}>
-                  Learning Competency
+                  MELC Code / Learning Competency
                   <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6, color: '#9BB8A5', fontSize: 10 }}>
-                    — DepEd MELC · AI will search the web for aligned module content
+                    — e.g. S8LT-Ia-b-26 or full competency statement
                   </span>
                 </label>
                 <textarea
-                  value={config.competencyText}
-                  onChange={e => setConfig(c => ({ ...c, competencyText: e.target.value }))}
-                  placeholder="e.g. Describe the structure and function of the cell membrane…"
+                  value={store.melcCode}
+                  onChange={e => store.setField('melcCode', e.target.value)}
+                  placeholder="Paste the MELC code or full competency statement here…"
                   rows={2}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
                 />
               </div>
 
-              {/* School branding (footer on every slide) */}
+              {/* Slide count */}
+              <div>
+                <label style={labelStyle}>
+                  Number of Slides —{' '}
+                  <span style={{ color: '#163828', fontWeight: 800 }}>{store.slideCount}</span>
+                  <span style={{ color: '#9BB8A5', fontWeight: 600 }}> (+ auto title & closing)</span>
+                </label>
+                <input
+                  type="range" min={6} max={20} value={store.slideCount}
+                  onChange={e => store.setField('slideCount', Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#163828', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9BB8A5', marginTop: 2 }}>
+                  <span>6 min</span><span>20 max</span>
+                </div>
+              </div>
+
+              {/* Style */}
+              <div>
+                <label style={labelStyle}>Presentation Style</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {STYLES.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => store.setField('style', s)}
+                      title={STYLE_DESC[s]}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                        border: store.style === s ? '2px solid #163828' : '1.5px solid rgba(45,106,79,0.2)',
+                        background: store.style === s ? '#163828' : '#f5faf7',
+                        color: store.style === s ? '#fff' : '#4a6357',
+                        cursor: 'pointer', fontFamily: '"Plus Jakarta Sans", sans-serif',
+                      }}
+                    >{s}</button>
+                  ))}
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#9BB8A5' }}>{STYLE_DESC[store.style]}</p>
+              </div>
+
+              {/* School footer */}
               <div style={{ borderTop: '1px solid rgba(45,106,79,0.1)', paddingTop: 14 }}>
-                <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  Slide Footer
-                </p>
-                <p style={{ margin: '0 0 10px', fontSize: 11, color: '#9BB8A5' }}>
-                  Appears on every slide — set it once and it's saved automatically.
+                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Slide Footer (saved automatically)
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={labelStyle}>School Name</label>
                     <input
-                      value={config.schoolName}
-                      onChange={e => setConfig(c => ({ ...c, schoolName: e.target.value }))}
+                      value={store.schoolName}
+                      onChange={e => store.setField('schoolName', e.target.value)}
                       placeholder="e.g. Dayap National High School"
                       style={inputStyle}
                     />
@@ -412,8 +561,8 @@ export default function PresentationBuilderPage() {
                   <div>
                     <label style={labelStyle}>School Email</label>
                     <input
-                      value={config.schoolEmail}
-                      onChange={e => setConfig(c => ({ ...c, schoolEmail: e.target.value }))}
+                      value={store.schoolEmail}
+                      onChange={e => store.setField('schoolEmail', e.target.value)}
                       placeholder="e.g. 301238@deped.gov.ph"
                       style={inputStyle}
                     />
@@ -421,109 +570,150 @@ export default function PresentationBuilderPage() {
                 </div>
               </div>
 
-              {/* Slide count slider */}
-              <div>
-                <label style={labelStyle}>
-                  Number of Slides —{' '}
-                  <span style={{ color: '#163828', fontWeight: 800 }}>{config.numSlides}</span>
-                  <span style={{ color: '#9BB8A5', fontWeight: 600 }}> (+ title & closing)</span>
-                </label>
-                <input
-                  type="range" min={6} max={20} value={config.numSlides}
-                  onChange={e => setConfig(c => ({ ...c, numSlides: Number(e.target.value) }))}
-                  style={{ width: '100%', accentColor: '#163828', cursor: 'pointer' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9BB8A5', marginTop: 2 }}>
-                  <span>6 min</span>
-                  <span>20 max</span>
-                </div>
-              </div>
-
-              {/* Style selector */}
-              <div>
-                <label style={labelStyle}>Presentation Style</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {STYLES.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setConfig(c => ({ ...c, style: s }))}
-                      title={STYLE_DESC[s]}
-                      style={{
-                        flex: 1, padding: '10px 0', borderRadius: 9, fontSize: 13, fontWeight: 600,
-                        border: config.style === s ? '2px solid #163828' : '1.5px solid rgba(45,106,79,0.2)',
-                        background: config.style === s ? '#163828' : '#f5faf7',
-                        color: config.style === s ? '#fff' : '#4a6357',
-                        cursor: 'pointer', fontFamily: '"Plus Jakarta Sans", sans-serif',
-                        transition: 'background 0.15s, color 0.15s',
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#9BB8A5' }}>
-                  {STYLE_DESC[config.style]}
-                </p>
-              </div>
-
               {/* Speaker notes toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={config.includeNotes}
-                  onChange={e => setConfig(c => ({ ...c, includeNotes: e.target.checked }))}
+                  checked={store.includeNotes}
+                  onChange={e => store.setField('includeNotes', e.target.checked)}
                   style={{ width: 16, height: 16, accentColor: '#163828', cursor: 'pointer' }}
                 />
                 <div>
                   <span style={{ fontSize: 13, color: '#163828', fontWeight: 600 }}>Include speaker notes</span>
                   <p style={{ margin: '1px 0 0', fontSize: 11, color: '#9BB8A5' }}>
-                    AI writes what the teacher says for each slide
+                    kaTuro writes what the teacher says for each slide
                   </p>
                 </div>
               </label>
             </div>
           </div>
 
-          {/* Generate button */}
+          {/* Info chip */}
+          <div style={{ background: '#f0f4ff', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 8 }}>
+            <Sparkles size={14} color="#6366f1" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ margin: 0, fontSize: 12, color: '#4338ca' }}>
+              Generating the outline is <strong>free</strong>. You&apos;ll spend <strong>3 tokens</strong> only when you confirm and expand the slides.
+            </p>
+          </div>
+
+          {/* Generate Outline button */}
           <button
-            onClick={handleGenerate}
-            disabled={generating || !config.title.trim()}
+            onClick={handleGenerateOutline}
+            disabled={isGeneratingOutline || !store.subject || !store.gradeLevel || !store.topic}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               width: '100%', padding: '15px 0', borderRadius: 12, border: 'none',
-              background: (!config.title.trim() || generating) ? '#9BB8A5' : '#163828',
-              color: '#fff', fontSize: 16, fontWeight: 700,
-              cursor: (!config.title.trim() || generating) ? 'not-allowed' : 'pointer',
+              background: (isGeneratingOutline || !store.subject || !store.gradeLevel || !store.topic)
+                ? '#9BB8A5' : '#163828',
+              color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer',
               fontFamily: '"Plus Jakarta Sans", sans-serif',
             }}
           >
-            {generating
-              ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Generating slides…</>
-              : <><Sparkles size={18} /> Generate Presentation</>
+            {isGeneratingOutline
+              ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Generating outline…</>
+              : <><Sparkles size={18} /> Generate Slide Outline</>
             }
           </button>
-          {generating && (
-            <p style={{ margin: 0, fontSize: 12, color: '#4a6357', textAlign: 'center' }}>
-              Gemini is building {config.numSlides} slides — usually takes 10–20 seconds
-            </p>
-          )}
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-          STEP 4 — Preview + Download
-      ════════════════════════════════════════════════════════════════ */}
-      {step === 'preview' && slides && (
+      {/* ── STEP: outline ────────────────────────────────────────────────────── */}
+      {step === 'outline' && store.outline && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Info bar */}
+          <div style={{ ...card, padding: '12px 16px', background: '#f8fbf9', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>
+                {store.topic} · {store.gradeLevel} · {store.subject}
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>
+                {store.outline.length} slides · {expandCount} need AI expansion · {store.outline.length - expandCount} template
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, background: '#ede9fe', color: '#6d28d9', borderRadius: 6, padding: '3px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Cpu size={10} /> {expandCount} AI slides
+              </span>
+              <span style={{ fontSize: 10, background: '#f0f4f2', color: '#4a6357', borderRadius: 6, padding: '3px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <FileText size={10} /> {store.outline.length - expandCount} template
+              </span>
+            </div>
+          </div>
+
+          {/* Outline cards */}
+          {store.outline.map((slide, i) => (
+            <OutlineCard
+              key={slide.id}
+              slide={slide}
+              index={i}
+              total={store.outline.length}
+              onTitleChange={store.updateOutlineSlide}
+              onRemove={store.removeOutlineSlide}
+            />
+          ))}
+
+          {/* Cost notice */}
+          <div style={{ background: '#fff8e1', border: '1px solid rgba(232,163,32,0.3)', borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 8 }}>
+            <AlertCircle size={14} color="#b47a10" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ margin: 0, fontSize: 12, color: '#7a5200' }}>
+              Expanding {expandCount} AI slides will cost <strong>3 tokens</strong>. Template slides are free.
+            </p>
+          </div>
+
+          {/* Expand button */}
+          <button
+            onClick={handleExpandSlides}
+            disabled={isExpanding}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '15px 0', borderRadius: 12, border: 'none',
+              background: isExpanding ? '#9BB8A5' : '#163828',
+              color: '#fff', fontSize: 16, fontWeight: 700,
+              cursor: isExpanding ? 'not-allowed' : 'pointer',
+              fontFamily: '"Plus Jakarta Sans", sans-serif',
+            }}
+          >
+            {isExpanding
+              ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Expanding slides in parallel…</>
+              : <><Sparkles size={18} /> Expand All Slides · 3 tokens</>
+            }
+          </button>
+          {isExpanding && (
+            <p style={{ margin: 0, fontSize: 12, color: '#4a6357', textAlign: 'center' }}>
+              kaTuro is expanding {expandCount} slides simultaneously — usually 15–30 seconds
+            </p>
+          )}
+
+          {/* Regenerate outline */}
+          <button
+            onClick={handleGenerateOutline}
+            disabled={isExpanding}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              width: '100%', padding: '11px 0', borderRadius: 10,
+              border: '1.5px solid rgba(45,106,79,0.22)', background: '#f5faf7',
+              color: '#163828', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: '"Plus Jakarta Sans", sans-serif',
+            }}
+          >
+            <RefreshCw size={14} /> Regenerate Outline
+          </button>
+        </div>
+      )}
+
+      {/* ── STEP: preview ────────────────────────────────────────────────────── */}
+      {step === 'preview' && store.expandedSlides && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* Summary + Download CTA */}
+          {/* Download CTA */}
           <div style={{ background: '#163828', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {config.title}
+                {store.topic}
               </p>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#52b788' }}>
-                {config.gradeLevel} · {config.subject} · {totalSlides} slides total
+                {store.gradeLevel} · {store.subject} · {store.expandedSlides.length + 2} slides total
               </p>
             </div>
             <button
@@ -545,89 +735,20 @@ export default function PresentationBuilderPage() {
             </button>
           </div>
 
-          {/* Slide preview list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Slide previews */}
+          {store.expandedSlides.map((sl, i) => (
+            <PreviewCard
+              key={sl.id}
+              slide={sl}
+              index={i}
+              includeNotes={store.includeNotes}
+            />
+          ))}
 
-            {/* Title slide preview */}
-            <div style={{ background: '#163828', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#52b788', minWidth: 52 }}>Slide 1</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff' }}>{config.title}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#52b788' }}>Title Slide</p>
-              </div>
-            </div>
-
-            {/* Generated content slides */}
-            {slides.map((sl, i) => (
-              <div key={i} style={{
-                ...card,
-                borderLeft: `3px solid ${sl.layout === 'section' ? '#52b788' : 'rgba(45,106,79,0.15)'}`,
-                padding: '12px 16px',
-                display: 'flex', gap: 12, alignItems: 'flex-start',
-              }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#9BB8A5', minWidth: 52, paddingTop: 2 }}>
-                  Slide {i + 2}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>{sl.title}</p>
-                    <LayoutBadge layout={sl.layout} />
-                  </div>
-                  {sl.bullets?.slice(0, 3).map((b, bi) => (
-                    <p key={bi} style={{ margin: '2px 0 0', fontSize: 12, color: '#4a6357' }}>• {b}</p>
-                  ))}
-                  {sl.bullets?.length > 3 && (
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#9BB8A5' }}>
-                      +{sl.bullets.length - 3} more bullets
-                    </p>
-                  )}
-                  {config.includeNotes && sl.notes && (
-                    <p style={{ margin: '6px 0 0', fontSize: 11, color: '#9BB8A5', fontStyle: 'italic', borderTop: '1px solid rgba(45,106,79,0.1)', paddingTop: 6 }}>
-                      Note: {sl.notes.slice(0, 100)}{sl.notes.length > 100 ? '…' : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* References slide preview */}
-            {references.length > 0 && (
-              <div style={{ ...card, borderLeft: '3px solid #1565c0', padding: '12px 16px' }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#9BB8A5', minWidth: 52, paddingTop: 2 }}>
-                    Slide {slides.length + 2}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>
-                      References &amp; Sources
-                      <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: '#1565c0', background: '#e8f0fe', borderRadius: 10, padding: '2px 7px' }}>
-                        DepEd Sources
-                      </span>
-                    </p>
-                    {references.map((ref, ri) => (
-                      <p key={ri} style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>
-                        {ri + 1}. {ref}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Closing slide preview */}
-            <div style={{ background: '#163828', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#52b788', minWidth: 52 }}>Slide {totalSlides}</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff' }}>Thank You!</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#52b788' }}>Closing Slide</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Regenerate + New buttons */}
+          {/* Action buttons */}
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button
-              onClick={() => { setSlides(null); setReferences([]); }}
+              onClick={() => store.setStatus('outline-ready')}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '12px 0', borderRadius: 10,
@@ -639,7 +760,7 @@ export default function PresentationBuilderPage() {
               <RefreshCw size={14} /> Regenerate
             </button>
             <button
-              onClick={reset}
+              onClick={store.reset}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '12px 0', borderRadius: 10,

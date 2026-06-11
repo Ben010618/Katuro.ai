@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
-import { updateLessonPlan, deleteLessonPlan, getIlawPlan } from '../services/db';
+import { updateLessonPlan, deleteLessonPlan, getIlawPlan, getDLLPlan } from '../services/db';
 import { useLessonGenStore } from '../store/lessonGenStore';
+import { useDLLStore } from '../store/dllStore';
 import { useToast } from '../context/ToastContext';
 import {
   Plus, Search, MoreVertical, BookOpen,
@@ -31,17 +32,21 @@ function formatDateRange(days) {
 }
 
 function normalizeLesson(doc) {
+  const isDLL = doc.type === 'dll';
   return {
     id:       doc.id,
+    type:     doc.type || 'ilaw',
     title:    doc.lessonName  || doc.title   || 'Untitled',
     subject:  doc.subject     || '—',
     grade:    doc.gradeLevel  || doc.grade   || '—',
     quarter:  doc.term        || doc.quarter || '—',
-    week:     doc.weekNumber  || doc.week    || '—',
-    dates:    doc.selectedDays ? formatDateRange(doc.selectedDays) : (doc.dates || '—'),
+    week:     isDLL ? '—' : (doc.weekNumber || doc.week || '—'),
+    dates:    isDLL
+      ? (doc.teachingDates || '—')
+      : doc.selectedDays ? formatDateRange(doc.selectedDays) : (doc.dates || '—'),
     status:   doc.status      || 'published',
     tags:     doc.tags        || [],
-    sessions: Array.isArray(doc.sessions) ? doc.sessions.length : (doc.sessions || 0),
+    sessions: isDLL ? 5 : (Array.isArray(doc.sessions) ? doc.sessions.length : (doc.sessions || 0)),
     createdAt: doc.createdAt,
   };
 }
@@ -71,12 +76,21 @@ function LessonCard({ lesson, onAction, loadingId }) {
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, flex: 1 }}>
+          <span style={{
+            background: lesson.type === 'dll' ? '#ede9fe' : '#d8f3dc',
+            borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+            color: lesson.type === 'dll' ? '#4f46e5' : '#0d2218',
+          }}>
+            {lesson.type === 'dll' ? 'DLL' : 'ILAW'}
+          </span>
           <span style={{ background: '#d8f3dc', borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: '#0d2218' }}>
             {lesson.subject} {lesson.grade}
           </span>
-          <span style={{ background: '#f5faf7', borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 600, color: '#4a6357' }}>
-            {lesson.quarter} · Wk {lesson.week}
-          </span>
+          {lesson.type !== 'dll' && (
+            <span style={{ background: '#f5faf7', borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 600, color: '#4a6357' }}>
+              {lesson.quarter} · Wk {lesson.week}
+            </span>
+          )}
         </div>
 
         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -132,7 +146,9 @@ function LessonCard({ lesson, onAction, loadingId }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(45,106,79,0.08)', paddingTop: 10 }}>
         <span style={{ background: st.bg, borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: st.color }}>{st.label}</span>
         <span style={{ fontSize: 11, color: '#4a6357' }}>
-          {lesson.sessions} session{lesson.sessions !== 1 ? 's' : ''}
+          {lesson.type === 'dll'
+            ? 'Mon – Fri'
+            : `${lesson.sessions} session${lesson.sessions !== 1 ? 's' : ''}`}
         </span>
       </div>
     </div>
@@ -145,7 +161,8 @@ export default function MyLessonsPage() {
   const { user }     = useAuth();
 
   const { lessonPlans, loading, error } = useLessonPlans(user?.uid);
-  const store = useLessonGenStore();
+  const store    = useLessonGenStore();
+  const dllStore = useDLLStore();
 
   const [search,    setSearch]    = useState('');
   const [filter,    setFilter]    = useState('All');
@@ -165,10 +182,18 @@ export default function MyLessonsPage() {
     if (action === 'view') {
       setViewingId(id);
       try {
-        const doc = await getIlawPlan(user.uid, id);
-        if (!doc) { addToast('Lesson plan not found.', 'error'); return; }
-        store.loadPlan(doc);
-        navigate(`/lesson-gen/output/${id}`);
+        const lessonMeta = lessons.find(l => l.id === id);
+        if (lessonMeta?.type === 'dll') {
+          const docData = await getDLLPlan(user.uid, id);
+          if (!docData) { addToast('DLL not found.', 'error'); return; }
+          dllStore.loadPlan(docData);
+          navigate('/dll-gen/output');
+        } else {
+          const docData = await getIlawPlan(user.uid, id);
+          if (!docData) { addToast('Lesson plan not found.', 'error'); return; }
+          store.loadPlan(docData);
+          navigate(`/lesson-gen/output/${id}`);
+        }
       } catch {
         addToast('Could not load lesson plan.', 'error');
       } finally {

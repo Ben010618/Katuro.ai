@@ -1,12 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each teacher can only read/write their own document tree
+
+    // ── Helper ──────────────────────────────────────────────────────────────
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // ── Teacher documents (own data only, or admin) ─────────────────────────
     match /teachers/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null &&
+        (request.auth.uid == userId || isAdmin());
     }
     match /teachers/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    // ── Admin config — API key lives here, BLOCKED from regular users ───────
+    match /adminConfig/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Presentation caches (Cloud Functions write via Admin SDK) ───────────
+    match /presentationOutlineCache/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /presentationSlideCache/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }

@@ -589,8 +589,15 @@ export default function GamificationPage() {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.15)'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div>
-                <p style={{ margin: '0 0 3px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{plan.lessonName || plan.title || 'Untitled'}</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>{[plan.subject, plan.gradeLevel, plan.term, plan.weekNumber].filter(Boolean).join(' · ')}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', background: plan.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: plan.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
+                    {plan.type === 'dll' ? 'DLL' : 'ILAW'}
+                  </span>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{plan.lessonName || plan.title || 'Untitled'}</p>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
+                  {[plan.subject, plan.gradeLevel, plan.type === 'dll' ? plan.teachingDates : (plan.term && plan.weekNumber ? `${plan.term} · Wk ${plan.weekNumber}` : plan.term)].filter(Boolean).join(' · ')}
+                </p>
               </div>
               <ChevronRight size={16} color="#4a6357" style={{ flexShrink: 0 }} />
             </button>

@@ -28,6 +28,7 @@ const NAV = [
 const TITLES = {
   '/dashboard':       'Dashboard',
   '/lesson-gen':      'Lesson Gen',
+  '/dll-gen':         'Daily Lesson Log',
   '/my-lessons':      'My Lessons',
   '/quiz-builder':    'Quiz Builder',
   '/presentations':   'Presentation Builder',

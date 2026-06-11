@@ -10,7 +10,9 @@ import ktLogo from '../assets/KT Favicon.png';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
+  Key, Eye, EyeOff, CheckCircle2, FlaskConical,
 } from 'lucide-react';
+import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
@@ -182,6 +184,175 @@ function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+// ── API Key section ───────────────────────────────────────────────────────────
+function ApiKeySection({ adminUid }) {
+  const [keyInput,   setKeyInput]   = useState('');
+  const [showKey,    setShowKey]    = useState(false);
+  const [status,     setStatus]     = useState(null);  // { hasKey, preview, updatedAt } | null
+  const [saving,     setSaving]     = useState(false);
+  const [testing,    setTesting]    = useState(false);
+  const [testResult, setTestResult] = useState(null);  // null | 'ok' | 'fail'
+  const [testMsg,    setTestMsg]    = useState('');
+  const [err,        setErr]        = useState('');
+
+  useEffect(() => {
+    getGeminiKeyStatus().then(setStatus).catch(() => setStatus({ hasKey: false }));
+  }, []);
+
+  async function handleSave() {
+    setErr(''); setTestResult(null);
+    setSaving(true);
+    try {
+      await saveGeminiKey(keyInput, adminUid);
+      setKeyInput('');
+      const fresh = await getGeminiKeyStatus();
+      setStatus(fresh);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    if (!keyInput.trim()) { setErr('Enter a key to test first.'); return; }
+    setErr(''); setTestResult(null); setTestMsg('');
+    setTesting(true);
+    try {
+      await testGeminiKey(keyInput.trim());
+      setTestResult('ok');
+      setTestMsg('Key is valid and responding correctly.');
+    } catch (e) {
+      setTestResult('fail');
+      setTestMsg(e.message);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const formattedDate = status?.updatedAt
+    ? (status.updatedAt.toDate ? status.updatedAt.toDate() : new Date(status.updatedAt))
+        .toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+    : null;
+
+  return (
+    <div style={{ ...card, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ede9fe', display: 'grid', placeItems: 'center' }}>
+          <Key size={17} color="#6d28d9" />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Gemini API Settings</h2>
+          <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
+            Key stored in Firestore — teachers cannot read it
+          </p>
+        </div>
+        {/* Current key status */}
+        <div style={{ marginLeft: 'auto' }}>
+          {status === null
+            ? <Loader2 size={14} color="#9BB8A5" style={{ animation: 'spin 1s linear infinite' }} />
+            : status.hasKey
+              ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle2 size={14} color="#2d6a4f" />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f' }}>Key active</span>
+                </div>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#e05c5c' }}>No key set</span>
+              )
+          }
+        </div>
+      </div>
+
+      {/* Current key preview */}
+      {status?.hasKey && (
+        <div style={{ background: '#f5faf7', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Key size={12} color="#4a6357" />
+          <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#163828', flex: 1 }}>{status.preview}</span>
+          {formattedDate && (
+            <span style={{ fontSize: 10, color: '#9BB8A5' }}>Updated {formattedDate}</span>
+          )}
+        </div>
+      )}
+
+      {/* Input row */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>{status?.hasKey ? 'Replace API Key' : 'Set API Key'}</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={keyInput}
+              onChange={e => { setKeyInput(e.target.value); setErr(''); setTestResult(null); }}
+              placeholder="AIzaSy••••••••••••••••••••••••••••••"
+              style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(v => !v)}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+            >
+              {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+        <button
+          onClick={handleTest}
+          disabled={testing || !keyInput.trim()}
+          title="Test the key before saving"
+          style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (testing || !keyInput.trim()) ? 0.6 : 1 }}
+        >
+          {testing
+            ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+            : <FlaskConical size={13} />
+          }
+          Test
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving || !keyInput.trim()}
+          style={{ ...btnPrimary, whiteSpace: 'nowrap', opacity: (saving || !keyInput.trim()) ? 0.6 : 1 }}
+        >
+          {saving
+            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+            : <><Key size={13} /> Save Key</>
+          }
+        </button>
+      </div>
+
+      {/* Test result */}
+      {testResult && (
+        <div style={{
+          marginTop: 10, display: 'flex', gap: 7, alignItems: 'flex-start',
+          background: testResult === 'ok' ? '#d8f3dc' : 'rgba(224,92,92,0.08)',
+          border: `1px solid ${testResult === 'ok' ? 'rgba(45,106,79,0.2)' : 'rgba(224,92,92,0.3)'}`,
+          borderRadius: 8, padding: '8px 12px',
+        }}>
+          {testResult === 'ok'
+            ? <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
+            : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+          }
+          <p style={{ margin: 0, fontSize: 12, color: testResult === 'ok' ? '#163828' : '#c0392b' }}>{testMsg}</p>
+        </div>
+      )}
+
+      {/* Error */}
+      {err && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+        </div>
+      )}
+
+      <p style={{ margin: '12px 0 0', fontSize: 11, color: '#9BB8A5', lineHeight: 1.6 }}>
+        Get your key from{' '}
+        <span style={{ color: '#6d28d9', fontWeight: 600 }}>console.cloud.google.com → APIs & Services → Credentials</span>.
+        The key is write-only — regular teacher accounts cannot read it from Firestore.
+      </p>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -274,6 +445,9 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
+
+        {/* API Key settings */}
+        <ApiKeySection adminUid={user?.uid} />
 
         {/* Users table */}
         <div style={card}>

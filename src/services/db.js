@@ -359,6 +359,40 @@ export async function getIlawPlan(uid, planId) {
 }
 
 /**
+ * Save a fully generated Daily Lesson Log.
+ * Stored in the same lessonPlans collection with type: 'dll'.
+ * Compatibility shims (lessonName, competencyText, sessions) let Quiz/PPT/Gamification
+ * work without modification.
+ */
+export async function saveDLLPlan(uid, dllData) {
+  const { subject, gradeLevel, term, section, teachingDates,
+          contentStandards, performanceStandards, melc,
+          dailyContent, procedure } = dllData;
+  const lessonName = `DLL – ${subject || 'Lesson'} (${gradeLevel || ''})`.trim();
+  const ref = await addDoc(lessonPlansRef(uid), {
+    type: 'dll',
+    lessonName,
+    subject, gradeLevel, term, section, teachingDates,
+    contentStandards, performanceStandards, melc,
+    dailyContent, procedure,
+    // Compatibility shims so Quiz/Presentation/Gamification AI works out-of-the-box
+    competencyText: melc || '',
+    sessions: [],
+    status: 'published',
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/**
+ * Fetch a single DLL plan by ID (uses same collection as ILAW plans).
+ */
+export async function getDLLPlan(uid, planId) {
+  const snap = await getDoc(doc(db, 'teachers', uid, 'lessonPlans', planId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
  * Delete a lesson plan permanently.
  */
 export async function deleteLessonPlan(uid, planId) {
