@@ -1,0 +1,107 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  .wrap{display:flex;height:600px;border-radius:16px;overflow:hidden;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);font-family:'DM Sans',sans-serif}
+  .left{flex:1.1;background:#1a3a2a;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:36px}
+  .left-bg{position:absolute;inset:0;background:linear-gradient(160deg,#0f2d1e 0%,#1a4d33 50%,#0d2218 100%)}
+  .grid-tiles{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:6px;padding:6px;opacity:0.18}
+  .tile{border-radius:8px;background:rgba(255,255,255,0.15)}
+  .accent-card{position:absolute;top:80px;left:32px;background:#e8a320;border-radius:12px;padding:20px 24px;max-width:200px}
+  .accent-card .pct{font-family:'Playfair Display',serif;font-size:38px;font-weight:700;color:#fff;line-height:1}
+  .accent-card .desc{font-size:11px;color:rgba(255,255,255,0.85);margin-top:6px;line-height:1.4}
+  .accent-card2{position:absolute;top:240px;right:28px;background:#2d6a4f;border-radius:12px;padding:18px 22px;max-width:180px;border:1px solid rgba(255,255,255,0.15)}
+  .accent-card2 .pct{font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:#52b788;line-height:1}
+  .accent-card2 .desc{font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;line-height:1.4}
+  .icon-row{display:flex;gap:10px;margin-bottom:8px}
+  .icon-chip{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .left-footer{position:relative;z-index:2}
+  .left-footer .brand{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px}
+  .left-footer .tagline{font-size:12px;color:rgba(255,255,255,0.55);margin-top:4px;font-weight:300;letter-spacing:0.5px;text-transform:uppercase}
+  .right{flex:1;display:flex;flex-direction:column;justify-content:center;padding:48px 44px;background:var(--color-background-primary)}
+  .right-top{display:flex;justify-content:flex-end;margin-bottom:40px;font-size:13px;color:var(--color-text-secondary)}
+  .right-top a{color:#2d6a4f;font-weight:500;text-decoration:none;margin-left:6px}
+  .right-top a:hover{text-decoration:underline}
+  h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px}
+  h1 span{color:#2d6a4f}
+  .subtitle{font-size:13px;color:var(--color-text-secondary);margin-bottom:28px;font-weight:300}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.6px}
+  .field input{width:100%;height:40px;border:0.5px solid var(--color-border-secondary);border-radius:8px;padding:0 14px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;transition:border 0.15s}
+  .field input:focus{border-color:#2d6a4f;background:var(--color-background-primary)}
+  .forgot{text-align:right;font-size:12px;color:#2d6a4f;margin:-6px 0 18px;cursor:pointer}
+  .btn-login{width:100%;height:42px;background:#2d6a4f;color:#fff;border:none;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:background 0.15s;letter-spacing:0.3px}
+  .btn-login:hover{background:#1b4d37}
+  .divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--color-text-tertiary);font-size:12px}
+  .divider::before,.divider::after{content:'';flex:1;height:0.5px;background:var(--color-border-tertiary)}
+  .btn-google{width:100%;height:42px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:8px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;color:var(--color-text-primary);transition:background 0.15s}
+  .btn-google:hover{background:var(--color-background-tertiary)}
+  .g-icon{width:16px;height:16px;flex-shrink:0}
+  .plan-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#e8f5ee;color:#1b5e38;border-radius:20px;padding:3px 10px;margin-top:14px;font-weight:500}
+</style>
+
+<h2 class="sr-only">kaTuro login and authentication page</h2>
+
+<div class="wrap">
+  <div class="left">
+    <div class="left-bg"></div>
+    <div class="grid-tiles">
+      <div class="tile"></div><div class="tile"></div><div class="tile"></div>
+      <div class="tile"></div><div class="tile"></div><div class="tile"></div>
+      <div class="tile"></div><div class="tile"></div><div class="tile"></div>
+    </div>
+    <div class="accent-card">
+      <div class="pct">3–5 hrs</div>
+      <div class="desc">saved per teacher, per week with AI lesson prep</div>
+    </div>
+    <div class="accent-card2">
+      <div class="icon-row">
+        <div class="icon-chip" style="background:rgba(82,183,136,0.2)"><i class="ti ti-file-text" style="color:#52b788;font-size:14px" aria-hidden="true"></i></div>
+        <div class="icon-chip" style="background:rgba(232,163,32,0.2)"><i class="ti ti-chart-bar" style="color:#e8a320;font-size:14px" aria-hidden="true"></i></div>
+      </div>
+      <div class="pct">AI-Powered</div>
+      <div class="desc">DLL, quizzes, and slides — auto-generated from one upload</div>
+    </div>
+    <div class="left-footer">
+      <div class="brand">kaTuro</div>
+      <div class="tagline">AI Co-Teacher for Filipino Classrooms</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="right-top">
+      Don't have an account? <a href="#">Sign up</a>
+    </div>
+    <h1>Sign in to <span>kaTuro</span></h1>
+    <p class="subtitle">Welcome back, Teacher. Enter your credentials to continue.</p>
+
+    <div class="field">
+      <label>Email Address</label>
+      <input type="email" placeholder="you@deped.gov.ph" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" placeholder="••••••••" />
+    </div>
+    <div class="forgot">Forgot password?</div>
+
+    <button class="btn-login">Login</button>
+
+    <div class="divider">or</div>
+
+    <button class="btn-google">
+      <svg class="g-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google
+    </button>
+
+    <div class="plan-badge">
+      <i class="ti ti-sparkles" style="font-size:12px" aria-hidden="true"></i>
+      Free Plan available — No credit card required
+    </div>
+  </div>
+</div>

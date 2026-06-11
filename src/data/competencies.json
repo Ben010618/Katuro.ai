@@ -1,0 +1,582 @@
+{
+  "Science": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "describe the characteristics of living things and distinguish living from non-living things;" },
+        { "week": 1, "text": "identify the levels of biological organization from cell to organism;" },
+        { "week": 2, "text": "describe the structure and function of the cell as the basic unit of life;" },
+        { "week": 2, "text": "distinguish between plant cells and animal cells based on their structures;" },
+        { "week": 3, "text": "explain how cells carry out life processes including nutrient uptake, respiration, and waste removal;" },
+        { "week": 3, "text": "describe the process of cell division and explain its importance in growth and repair;" },
+        { "week": 4, "text": "describe the different types of tissues in plants and animals and their functions;" },
+        { "week": 4, "text": "explain how organ systems work together to maintain life in an organism;" },
+        { "week": 5, "text": "identify the major organ systems of the human body and explain their functions;" },
+        { "week": 5, "text": "describe how the digestive, respiratory, and circulatory systems are interrelated;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe the properties of matter including mass, volume, density, and state;" },
+        { "week": 1, "text": "distinguish between physical and chemical properties of matter;" },
+        { "week": 2, "text": "classify matter as pure substance or mixture and distinguish between homogeneous and heterogeneous mixtures;" },
+        { "week": 2, "text": "describe different methods of separating mixtures based on physical properties;" },
+        { "week": 3, "text": "identify the elements on the periodic table and classify them as metals, non-metals, or metalloids;" },
+        { "week": 3, "text": "explain the arrangement of elements in the periodic table and describe periodic trends;" },
+        { "week": 4, "text": "describe physical changes and chemical changes and give examples of each;" },
+        { "week": 4, "text": "identify the indicators of a chemical change including color change, gas formation, precipitate formation, and temperature change;" },
+        { "week": 5, "text": "explain the concept of conservation of mass in chemical reactions;" },
+        { "week": 5, "text": "balance simple chemical equations and identify reactants and products;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "describe the layers of the Earth and explain their composition and properties;" },
+        { "week": 1, "text": "explain the theory of plate tectonics and describe the types of plate boundaries;" },
+        { "week": 2, "text": "explain how earthquakes and volcanoes are related to plate movement;" },
+        { "week": 2, "text": "describe the effects of earthquakes and volcanic eruptions on communities and ecosystems;" },
+        { "week": 3, "text": "describe the water cycle and explain how it distributes water throughout Earth's systems;" },
+        { "week": 3, "text": "identify the factors that affect weather and explain how weather is measured;" },
+        { "week": 4, "text": "describe the different types of clouds and explain how precipitation forms;" },
+        { "week": 4, "text": "explain the causes and effects of tropical cyclones, monsoons, and other weather disturbances in the Philippines;" },
+        { "week": 5, "text": "describe the components of an ecosystem and explain the flow of energy through food chains and webs;" },
+        { "week": 5, "text": "explain how human activities affect ecosystems and propose ways to protect biodiversity;" }
+      ]
+    },
+    "Grade 8": {
+      "Term 1": [
+        { "week": 1, "text": "explain Newton's laws of motion and apply them to everyday situations;" },
+        { "week": 1, "text": "calculate speed, velocity, and acceleration using appropriate formulas;" },
+        { "week": 2, "text": "describe the different types of forces and explain how unbalanced forces affect motion;" },
+        { "week": 2, "text": "explain the concept of momentum and apply the law of conservation of momentum;" },
+        { "week": 3, "text": "define work and power and calculate them using appropriate formulas;" },
+        { "week": 3, "text": "explain the different forms of energy and describe how energy is transformed;" },
+        { "week": 4, "text": "describe simple machines and explain how they make work easier using the concept of mechanical advantage;" },
+        { "week": 4, "text": "investigate how friction affects motion and describe its practical applications;" },
+        { "week": 5, "text": "explain gravitational force and describe how it affects the motion of objects near Earth's surface;" },
+        { "week": 5, "text": "describe the motion of projectiles and explain the factors that affect their trajectory;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe wave properties including frequency, wavelength, amplitude, and speed;" },
+        { "week": 1, "text": "distinguish between transverse and longitudinal waves and give examples of each;" },
+        { "week": 2, "text": "explain how sound waves are produced, transmitted, and perceived by the human ear;" },
+        { "week": 2, "text": "describe the properties of sound including pitch, loudness, and quality;" },
+        { "week": 3, "text": "explain the behavior of light including reflection, refraction, dispersion, and absorption;" },
+        { "week": 3, "text": "describe how lenses and mirrors form images and identify their applications;" },
+        { "week": 4, "text": "explain static and current electricity and describe the components of an electric circuit;" },
+        { "week": 4, "text": "calculate voltage, current, and resistance using Ohm's Law and apply it to simple circuits;" },
+        { "week": 5, "text": "describe parallel and series circuits and explain the advantages of each;" },
+        { "week": 5, "text": "explain how electricity is generated and distributed and describe energy conservation practices;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "describe Mendel's laws of inheritance and apply them to predict offspring phenotypes and genotypes;" },
+        { "week": 1, "text": "use Punnett squares to determine the probability of inheriting specific traits;" },
+        { "week": 2, "text": "explain the structure and function of DNA and describe how genetic information is stored and expressed;" },
+        { "week": 2, "text": "describe the process of protein synthesis including transcription and translation;" },
+        { "week": 3, "text": "describe mutations and explain how they can affect an organism's traits;" },
+        { "week": 3, "text": "explain the theory of evolution by natural selection and describe the evidence that supports it;" },
+        { "week": 4, "text": "describe how populations change over time through adaptation and speciation;" },
+        { "week": 4, "text": "explain the impact of human activities on biodiversity and describe conservation strategies;" },
+        { "week": 5, "text": "describe the interdependence of organisms in an ecosystem and explain the role of biodiversity in ecosystem stability;" },
+        { "week": 5, "text": "propose solutions to current environmental problems affecting the Philippines;" }
+      ]
+    },
+    "Grade 9": {
+      "Term 1": [
+        { "week": 1, "text": "describe the composition of solutions and calculate concentration using molarity, mass percent, and parts per million;" },
+        { "week": 1, "text": "explain the factors that affect the solubility of substances in water;" },
+        { "week": 2, "text": "classify acids and bases and describe their properties using the Arrhenius and Brønsted-Lowry theories;" },
+        { "week": 2, "text": "use pH scale to determine the acidity or basicity of common substances and explain its significance;" },
+        { "week": 3, "text": "describe neutralization reactions and explain how they are used in everyday applications;" },
+        { "week": 3, "text": "describe the properties and uses of salts and explain how they are formed;" },
+        { "week": 4, "text": "explain the reproductive system of humans and describe the stages of human reproduction;" },
+        { "week": 4, "text": "describe the process of fertilization, embryonic development, and birth;" },
+        { "week": 5, "text": "explain the role of hormones in regulating reproduction and development;" },
+        { "week": 5, "text": "describe reproductive health issues and propose ways to maintain reproductive health;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "explain the carbon cycle and nitrogen cycle and describe their importance to life on Earth;" },
+        { "week": 1, "text": "describe ecosystem dynamics including population growth, carrying capacity, and limiting factors;" },
+        { "week": 2, "text": "explain the concept of ecological succession and describe how communities change over time;" },
+        { "week": 2, "text": "describe biomes and marine ecosystems and explain the unique adaptations of organisms in each;" },
+        { "week": 3, "text": "explain how human activities such as deforestation, pollution, and urbanization affect ecosystem balance;" },
+        { "week": 3, "text": "describe climate change and its effects on Philippine ecosystems and propose mitigation strategies;" },
+        { "week": 4, "text": "explain the formation of rocks and minerals and describe the rock cycle;" },
+        { "week": 4, "text": "describe how soil is formed and explain the importance of soil conservation in the Philippines;" },
+        { "week": 5, "text": "explain how fossil fuels are formed and describe the environmental impact of their use;" },
+        { "week": 5, "text": "describe renewable energy sources available in the Philippines and evaluate their potential for energy security;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "explain force and motion using Newton's law of gravitation and describe circular motion;" },
+        { "week": 1, "text": "describe the motion of satellites and explain how they maintain orbit;" },
+        { "week": 2, "text": "explain the behavior of gas using the kinetic molecular theory and gas laws (Boyle's, Charles's, Gay-Lussac's);" },
+        { "week": 2, "text": "apply the combined gas law and ideal gas law to solve problems involving gas pressure, volume, and temperature;" },
+        { "week": 3, "text": "describe heat transfer by conduction, convection, and radiation and give examples of each;" },
+        { "week": 3, "text": "explain the greenhouse effect and describe its role in regulating Earth's temperature;" },
+        { "week": 4, "text": "describe the electromagnetic spectrum and explain the properties of different types of electromagnetic waves;" },
+        { "week": 4, "text": "explain how electromagnetic waves are used in communication technology and medical applications;" },
+        { "week": 5, "text": "describe nuclear reactions including fission and fusion and explain their energy applications;" },
+        { "week": 5, "text": "evaluate the benefits and risks of nuclear energy and relate them to energy decisions in the Philippines;" }
+      ]
+    },
+    "Grade 10": {
+      "Term 1": [
+        { "week": 1, "text": "describe the properties of carbon and explain why it forms the basis of organic compounds;" },
+        { "week": 1, "text": "classify organic compounds into functional groups and describe their properties;" },
+        { "week": 2, "text": "describe the structure and properties of hydrocarbons (alkanes, alkenes, alkynes) and give examples;" },
+        { "week": 2, "text": "explain isomerism in organic compounds and describe how structural differences affect properties;" },
+        { "week": 3, "text": "describe the properties and uses of alcohols, aldehydes, ketones, carboxylic acids, and esters;" },
+        { "week": 3, "text": "explain how organic reactions including addition, substitution, and esterification occur;" },
+        { "week": 4, "text": "describe the structure and function of biomolecules including carbohydrates, lipids, proteins, and nucleic acids;" },
+        { "week": 4, "text": "explain how enzymes catalyze biological reactions and describe factors that affect enzyme activity;" },
+        { "week": 5, "text": "describe the processes of cellular respiration and photosynthesis and explain their roles in energy transformation;" },
+        { "week": 5, "text": "compare aerobic and anaerobic respiration and explain their significance in living organisms;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe the indicators for a chemical reaction as color change, the formation of a precipitate, the release of gas, and/or odor, or a change in temperature;" },
+        { "week": 1, "text": "explain the law of conservation of mass and apply it in balancing chemical equations;" },
+        { "week": 2, "text": "classify chemical reactions as combination, decomposition, single displacement, double displacement, or combustion;" },
+        { "week": 2, "text": "predict the products of common chemical reactions and write balanced equations for each type;" },
+        { "week": 3, "text": "investigate the factors affecting the rate of a chemical reaction;" },
+        { "week": 3, "text": "explain how catalysts, temperature, concentration, and surface area affect reaction rates;" },
+        { "week": 4, "text": "distinguish between exothermic and endothermic reactions based on energy changes;" },
+        { "week": 4, "text": "calculate the heat of reaction using the formula Q = mcΔT;" },
+        { "week": 5, "text": "explain chemical equilibrium and apply Le Chatelier's principle to predict how systems respond to changes;" },
+        { "week": 5, "text": "describe the industrial applications of chemical equilibrium in the Haber process and Contact process;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "describe the structure of DNA and explain how genetic information is encoded and replicated;" },
+        { "week": 1, "text": "explain the central dogma of molecular biology and describe the roles of DNA, mRNA, and tRNA;" },
+        { "week": 2, "text": "describe mutations at the gene and chromosome level and explain their effects on organisms;" },
+        { "week": 2, "text": "explain genetic engineering and describe its applications in agriculture, medicine, and industry;" },
+        { "week": 3, "text": "describe the origin of the universe using the Big Bang theory and evaluate supporting evidence;" },
+        { "week": 3, "text": "describe the life cycle of stars and explain how elements heavier than hydrogen are formed;" },
+        { "week": 4, "text": "describe the structure of the solar system and explain how it formed from a solar nebula;" },
+        { "week": 4, "text": "explain how the motion of Earth and the Moon causes the seasons, tides, and eclipses;" },
+        { "week": 5, "text": "describe current space exploration missions and evaluate the prospects for human settlement beyond Earth;" },
+        { "week": 5, "text": "evaluate the impact of space technology on everyday life in the Philippines and globally;" }
+      ]
+    }
+  },
+  "Mathematics": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "describe the set of real numbers and perform operations on integers, fractions, and decimals;" },
+        { "week": 1, "text": "apply the properties of real numbers (commutative, associative, distributive) to simplify expressions;" },
+        { "week": 2, "text": "simplify algebraic expressions by combining like terms and applying the distributive property;" },
+        { "week": 2, "text": "evaluate algebraic expressions by substituting given values for the variables;" },
+        { "week": 3, "text": "translate verbal phrases and sentences into algebraic expressions and equations;" },
+        { "week": 3, "text": "solve linear equations in one variable using properties of equality;" },
+        { "week": 4, "text": "solve word problems involving linear equations in one variable;" },
+        { "week": 4, "text": "solve linear inequalities in one variable and graph the solution set on a number line;" },
+        { "week": 5, "text": "describe the Cartesian coordinate plane and plot points in all four quadrants;" },
+        { "week": 5, "text": "graph linear equations in two variables and determine if a given point is a solution;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "define ratio and proportion and solve problems involving direct, inverse, and partitive proportions;" },
+        { "week": 1, "text": "apply percentage, rate, and base to solve real-life problems involving discounts, taxes, and interest;" },
+        { "week": 2, "text": "describe the basic geometric figures: points, lines, planes, angles, and polygons;" },
+        { "week": 2, "text": "classify angles as acute, right, obtuse, or straight and apply properties of complementary and supplementary angles;" },
+        { "week": 3, "text": "identify and describe properties of triangles including the sum of interior angles;" },
+        { "week": 3, "text": "apply the Pythagorean theorem to find missing sides of right triangles;" },
+        { "week": 4, "text": "calculate the perimeter and area of common geometric figures including triangles, quadrilaterals, and circles;" },
+        { "week": 4, "text": "calculate the volume and surface area of rectangular prisms, cylinders, and pyramids;" },
+        { "week": 5, "text": "collect, organize, and display data using frequency tables, bar graphs, line graphs, and pie charts;" },
+        { "week": 5, "text": "calculate the mean, median, and mode of a data set and interpret them in context;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "define probability and calculate the probability of simple events using the formula P = favorable outcomes / total outcomes;" },
+        { "week": 1, "text": "distinguish between experimental and theoretical probability and apply them to real-life situations;" },
+        { "week": 2, "text": "describe patterns and sequences (arithmetic, geometric) and find the next terms;" },
+        { "week": 2, "text": "derive and use formulas for the nth term of arithmetic and geometric sequences;" },
+        { "week": 3, "text": "solve problems involving arithmetic and geometric series and apply them to financial contexts;" },
+        { "week": 3, "text": "apply mathematical reasoning to solve multi-step problems involving number patterns;" },
+        { "week": 4, "text": "define and identify functions and relations and determine if a given set of ordered pairs is a function;" },
+        { "week": 4, "text": "represent functions using tables, graphs, equations, and mappings;" },
+        { "week": 5, "text": "evaluate functions for given values of the domain and identify the range;" },
+        { "week": 5, "text": "apply the concept of functions to model real-life situations and interpret the results;" }
+      ]
+    },
+    "Grade 8": {
+      "Term 1": [
+        { "week": 1, "text": "factor polynomials completely using greatest common factor, difference of two squares, and sum/difference of cubes;" },
+        { "week": 1, "text": "factor quadratic trinomials by trial and error, completing the square, and AC method;" },
+        { "week": 2, "text": "simplify rational algebraic expressions by factoring and cancelling common factors;" },
+        { "week": 2, "text": "perform addition, subtraction, multiplication, and division of rational algebraic expressions;" },
+        { "week": 3, "text": "solve linear equations and inequalities involving rational expressions;" },
+        { "week": 3, "text": "solve systems of linear equations in two variables using substitution, elimination, and graphing;" },
+        { "week": 4, "text": "solve word problems involving systems of linear equations in two variables;" },
+        { "week": 4, "text": "determine the slope of a line given two points and explain its meaning as a rate of change;" },
+        { "week": 5, "text": "write the equation of a line in slope-intercept form and standard form;" },
+        { "week": 5, "text": "graph linear inequalities in two variables and identify the solution region;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe and apply the properties of quadrilaterals including parallelograms, trapezoids, and kites;" },
+        { "week": 1, "text": "prove properties of parallelograms and apply them to solve geometric problems;" },
+        { "week": 2, "text": "apply the properties of similar triangles to find missing lengths and angles;" },
+        { "week": 2, "text": "prove triangle similarity using AA, SAS, and SSS similarity postulates;" },
+        { "week": 3, "text": "state and apply the Triangle Proportionality Theorem and its corollaries;" },
+        { "week": 3, "text": "apply the Pythagorean theorem and its converse to classify triangles and solve problems;" },
+        { "week": 4, "text": "apply special right triangle relationships (45-45-90 and 30-60-90) to solve problems;" },
+        { "week": 4, "text": "define the six trigonometric ratios (sin, cos, tan, csc, sec, cot) and apply them to right triangles;" },
+        { "week": 5, "text": "use trigonometric ratios to solve right triangles and apply them to real-life problems involving angle of elevation and depression;" },
+        { "week": 5, "text": "solve problems involving bearings and navigation using trigonometry;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "describe the basic concepts of probability including sample space, events, and probability rules;" },
+        { "week": 1, "text": "calculate probabilities of mutually exclusive, complementary, and independent events;" },
+        { "week": 2, "text": "apply the counting principle, permutations, and combinations to find the number of possible outcomes;" },
+        { "week": 2, "text": "calculate probabilities using permutations and combinations in real-world situations;" },
+        { "week": 3, "text": "describe the concept of statistical measures of central tendency and variability;" },
+        { "week": 3, "text": "calculate the range, variance, and standard deviation of a data set and interpret the results;" },
+        { "week": 4, "text": "construct and interpret frequency distribution tables, histograms, and box plots;" },
+        { "week": 4, "text": "analyze and interpret data from graphs and tables to draw valid conclusions;" },
+        { "week": 5, "text": "apply statistical concepts to real-life problems and evaluate the reliability of data;" },
+        { "week": 5, "text": "solve problems involving probability and statistics in contexts relevant to daily life;" }
+      ]
+    },
+    "Grade 9": {
+      "Term 1": [
+        { "week": 1, "text": "define quadratic equations and identify their key components;" },
+        { "week": 1, "text": "solve quadratic equations by extracting square roots, factoring, completing the square, and using the quadratic formula;" },
+        { "week": 2, "text": "determine the nature of roots of a quadratic equation using the discriminant;" },
+        { "week": 2, "text": "solve word problems involving quadratic equations in real-life contexts;" },
+        { "week": 3, "text": "describe the properties of the parabola and identify the vertex, axis of symmetry, and intercepts of a quadratic function;" },
+        { "week": 3, "text": "graph quadratic functions in standard and vertex form and analyze their behavior;" },
+        { "week": 4, "text": "apply quadratic functions to model real-life situations involving area, projectile motion, and optimization;" },
+        { "week": 4, "text": "solve quadratic inequalities and represent the solution set on a number line and coordinate plane;" },
+        { "week": 5, "text": "define rational functions and identify their domain, range, intercepts, and asymptotes;" },
+        { "week": 5, "text": "graph rational functions and describe their behavior near asymptotes;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "define radical expressions and simplify them using properties of radicals;" },
+        { "week": 1, "text": "perform operations on radical expressions including addition, subtraction, multiplication, and division;" },
+        { "week": 2, "text": "solve radical equations and check for extraneous solutions;" },
+        { "week": 2, "text": "define and simplify expressions with rational (fractional) exponents;" },
+        { "week": 3, "text": "describe geometric concepts including circles, chords, arcs, tangent lines, and inscribed angles;" },
+        { "week": 3, "text": "apply theorems on circles to solve geometric problems involving chords, tangent lines, and arcs;" },
+        { "week": 4, "text": "derive and apply the equation of a circle given its center and radius;" },
+        { "week": 4, "text": "determine the center and radius of a circle from its equation and graph it on the coordinate plane;" },
+        { "week": 5, "text": "apply the distance formula and midpoint formula to solve geometric problems;" },
+        { "week": 5, "text": "use coordinate geometry to prove geometric theorems about triangles and quadrilaterals;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "define trigonometric identities and apply them to simplify expressions and verify identities;" },
+        { "week": 1, "text": "use sum and difference formulas to find exact values of trigonometric functions;" },
+        { "week": 2, "text": "solve trigonometric equations and express solutions within a specified interval;" },
+        { "week": 2, "text": "apply the Law of Sines to solve triangles and problems involving ambiguous cases;" },
+        { "week": 3, "text": "apply the Law of Cosines to solve triangles when given SAS or SSS information;" },
+        { "week": 3, "text": "solve real-life problems involving the Law of Sines and Law of Cosines;" },
+        { "week": 4, "text": "define combinatorics concepts including permutations and combinations with repetition;" },
+        { "week": 4, "text": "apply the Binomial Theorem to expand binomial expressions and find specific terms;" },
+        { "week": 5, "text": "define matrices and perform operations including addition, subtraction, and scalar multiplication;" },
+        { "week": 5, "text": "multiply matrices and apply matrix operations to solve systems of equations;" }
+      ]
+    },
+    "Grade 10": {
+      "Term 1": [
+        { "week": 1, "text": "describe sequences including arithmetic, geometric, harmonic, and Fibonacci sequences;" },
+        { "week": 1, "text": "derive and apply formulas for the sum of finite arithmetic and geometric series;" },
+        { "week": 2, "text": "apply the concept of series to solve financial problems involving simple and compound interest;" },
+        { "week": 2, "text": "define polynomial functions and describe their key features including zeros, end behavior, and turning points;" },
+        { "week": 3, "text": "perform division of polynomials using long division and synthetic division;" },
+        { "week": 3, "text": "apply the Remainder Theorem and Factor Theorem to evaluate and factor polynomials;" },
+        { "week": 4, "text": "find all zeros of polynomial functions using the Rational Zero Theorem and Descartes' Rule of Signs;" },
+        { "week": 4, "text": "graph polynomial functions and describe their behavior based on degree and leading coefficient;" },
+        { "week": 5, "text": "define and evaluate logarithmic functions and convert between exponential and logarithmic forms;" },
+        { "week": 5, "text": "apply properties of logarithms to simplify expressions and solve logarithmic equations;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "define and graph exponential functions and describe their key features;" },
+        { "week": 1, "text": "solve exponential equations and apply them to real-life contexts involving growth and decay;" },
+        { "week": 2, "text": "apply exponential and logarithmic functions to model population growth, compound interest, and radioactive decay;" },
+        { "week": 2, "text": "define conic sections and identify parabolas, ellipses, hyperbolas, and circles from their equations;" },
+        { "week": 3, "text": "derive the standard equations of conic sections and graph them on the coordinate plane;" },
+        { "week": 3, "text": "apply properties of conic sections to solve real-world problems in engineering and physics;" },
+        { "week": 4, "text": "define systems of nonlinear equations and solve them graphically and algebraically;" },
+        { "week": 4, "text": "solve problems involving systems of nonlinear equations in real-life contexts;" },
+        { "week": 5, "text": "define and compute measures of central tendency and dispersion for grouped and ungrouped data;" },
+        { "week": 5, "text": "interpret quartiles, percentiles, and z-scores and apply them to real-life data analysis;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "apply normal distribution to compute probabilities and interpret data in real-life contexts;" },
+        { "week": 1, "text": "use random sampling techniques to collect data and identify sources of bias;" },
+        { "week": 2, "text": "calculate point estimates and construct confidence intervals for population means and proportions;" },
+        { "week": 2, "text": "formulate and test hypotheses about population parameters using appropriate statistical tests;" },
+        { "week": 3, "text": "describe correlation and regression and compute and interpret the Pearson correlation coefficient;" },
+        { "week": 3, "text": "construct and use the regression line to make predictions from bivariate data;" },
+        { "week": 4, "text": "apply mathematical modeling to solve optimization problems in business and science;" },
+        { "week": 4, "text": "evaluate mathematical models for their appropriateness and accuracy in representing real phenomena;" },
+        { "week": 5, "text": "apply problem-solving strategies to non-routine and open-ended mathematical problems;" },
+        { "week": 5, "text": "communicate mathematical ideas clearly using appropriate notation, vocabulary, and representations;" }
+      ]
+    }
+  },
+  "English": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "use context clues to determine the meaning of unfamiliar words and technical vocabulary;" },
+        { "week": 1, "text": "identify the elements of a short story including plot, setting, characters, conflict, and theme;" },
+        { "week": 2, "text": "analyze how the author develops characters through dialogue, actions, and description;" },
+        { "week": 2, "text": "distinguish between literal and figurative language and identify common literary devices;" },
+        { "week": 3, "text": "write a short narrative that includes a clear beginning, middle, and end with developed characters and setting;" },
+        { "week": 3, "text": "apply correct grammar rules including subject-verb agreement, pronoun-antecedent agreement, and punctuation;" },
+        { "week": 4, "text": "identify the main idea and supporting details of informational texts;" },
+        { "week": 4, "text": "summarize informational texts accurately and objectively in one's own words;" },
+        { "week": 5, "text": "write a summary and a reflection paragraph in response to a text read;" },
+        { "week": 5, "text": "use transition words and cohesive devices to connect ideas within and between paragraphs;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "identify the purpose, audience, tone, and stance of persuasive texts;" },
+        { "week": 1, "text": "distinguish between fact and opinion and evaluate the credibility of supporting evidence;" },
+        { "week": 2, "text": "identify and evaluate persuasive techniques including appeal to ethos, pathos, and logos;" },
+        { "week": 2, "text": "write a persuasive essay with a clear claim, supporting arguments, and a call to action;" },
+        { "week": 3, "text": "describe the features and structure of different expository text types including comparison-contrast, cause-effect, and problem-solution;" },
+        { "week": 3, "text": "write an expository paragraph using an appropriate organizational pattern;" },
+        { "week": 4, "text": "conduct basic research using library and online sources and evaluate source credibility;" },
+        { "week": 4, "text": "paraphrase, summarize, and quote sources accurately and avoid plagiarism;" },
+        { "week": 5, "text": "write a short research report using the three-part structure: introduction, body, and conclusion;" },
+        { "week": 5, "text": "present information clearly and coherently in oral and written forms;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "analyze poems for their use of imagery, figurative language, rhythm, and rhyme scheme;" },
+        { "week": 1, "text": "explain how poetic elements contribute to the mood and meaning of a poem;" },
+        { "week": 2, "text": "read and analyze one-act plays, identifying dramatic elements including dialogue, stage directions, and conflict;" },
+        { "week": 2, "text": "perform a scene from a play with appropriate expression, pacing, and movement;" },
+        { "week": 3, "text": "identify the features of oral traditions including folktales, myths, legends, and epic poetry;" },
+        { "week": 3, "text": "explain how traditional stories reflect the values and beliefs of Filipino culture;" },
+        { "week": 4, "text": "present a researched topic orally using appropriate visual aids and delivery skills;" },
+        { "week": 4, "text": "use active listening strategies and provide constructive feedback on classmates' presentations;" },
+        { "week": 5, "text": "write a literary analysis essay about a text studied, supported by textual evidence;" },
+        { "week": 5, "text": "apply grammar rules in editing and revising one's own writing for clarity and correctness;" }
+      ]
+    },
+    "Grade 8": {
+      "Term 1": [
+        { "week": 1, "text": "analyze how authors use narrative techniques including point of view, foreshadowing, and flashback;" },
+        { "week": 1, "text": "compare and contrast texts from different cultures and identify universal themes;" },
+        { "week": 2, "text": "write a personal narrative essay that uses vivid detail, sensory language, and a clear narrative arc;" },
+        { "week": 2, "text": "apply varied sentence structures and rhetorical devices to enhance writing style;" },
+        { "week": 3, "text": "analyze the author's purpose, tone, and audience in non-fiction texts;" },
+        { "week": 3, "text": "evaluate how an author builds an argument and supports claims with evidence;" },
+        { "week": 4, "text": "write an analytical essay that interprets a literary work and supports the thesis with textual evidence;" },
+        { "week": 4, "text": "correctly use citation formats to attribute sources and avoid plagiarism;" },
+        { "week": 5, "text": "apply knowledge of word parts (prefixes, suffixes, roots) to decode and understand technical vocabulary;" },
+        { "week": 5, "text": "use context clues and reference materials to determine precise word meanings;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe the different speech acts and apply them in conversation (requesting, refusing, expressing opinion, agreeing/disagreeing);" },
+        { "week": 1, "text": "participate effectively in formal and informal group discussions using appropriate language and register;" },
+        { "week": 2, "text": "plan, draft, and deliver an informational speech with an introduction, body, and conclusion;" },
+        { "week": 2, "text": "apply appropriate verbal and non-verbal communication strategies during public speaking;" },
+        { "week": 3, "text": "analyze how media texts (advertisements, news reports, social media posts) construct meaning;" },
+        { "week": 3, "text": "evaluate media messages for bias, propaganda techniques, and credibility;" },
+        { "week": 4, "text": "write a multi-paragraph essay analyzing a media text and its effects on audience;" },
+        { "week": 4, "text": "use appropriate academic language and text structures in expository writing;" },
+        { "week": 5, "text": "apply editing and proofreading strategies to improve drafts for grammar, clarity, and coherence;" },
+        { "week": 5, "text": "use feedback from peers and teachers to revise and improve written work;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "analyze Filipino literary texts including short stories, poems, and essays and relate them to Philippine history and culture;" },
+        { "week": 1, "text": "explain how literature reflects social issues and the Filipino experience;" },
+        { "week": 2, "text": "write a critical response to a Philippine literary work, supporting ideas with textual evidence;" },
+        { "week": 2, "text": "research and present information about a Filipino author and their contribution to literature;" },
+        { "week": 3, "text": "describe the characteristics and purposes of different kinds of letters (formal, informal, business, application);" },
+        { "week": 3, "text": "write a formal letter for a specific purpose using correct letter format and language;" },
+        { "week": 4, "text": "describe the features of digital texts including emails, blog posts, and online articles;" },
+        { "week": 4, "text": "write digital texts for specific purposes using appropriate language, format, and netiquette;" },
+        { "week": 5, "text": "reflect on one's growth as a reader and writer through a portfolio presentation;" },
+        { "week": 5, "text": "set personal goals for language learning and identify strategies to achieve them;" }
+      ]
+    },
+    "Grade 9": {
+      "Term 1": [
+        { "week": 1, "text": "analyze complex literary texts for theme, symbolism, irony, and other literary devices;" },
+        { "week": 2, "text": "compare works from different literary traditions and identify common human experiences;" },
+        { "week": 3, "text": "write an argumentative essay with a clear thesis, evidence-based arguments, and counter-argument;" },
+        { "week": 4, "text": "conduct independent research on a chosen topic and synthesize information from multiple sources;" },
+        { "week": 5, "text": "present a research-based argument orally using appropriate evidence and persuasive techniques;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "analyze how authors use language to create mood, tone, and effect in different genres;" },
+        { "week": 2, "text": "write a research paper with proper citation using MLA or APA format;" },
+        { "week": 3, "text": "evaluate the credibility, relevance, and currency of online and print sources;" },
+        { "week": 4, "text": "create a multimodal text (video, podcast, infographic) to communicate a message effectively;" },
+        { "week": 5, "text": "deliver a persuasive speech on a current issue using rhetorical strategies;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "analyze contemporary Philippine literature and relate it to current social issues;" },
+        { "week": 2, "text": "write a creative non-fiction piece (personal essay or feature article) on a relevant topic;" },
+        { "week": 3, "text": "participate in a formal debate using appropriate language, evidence, and rebuttal strategies;" },
+        { "week": 4, "text": "use language conventions correctly in academic writing including tenses, modals, and passive voice;" },
+        { "week": 5, "text": "reflect critically on the role of language in shaping identity and cultural understanding;" }
+      ]
+    },
+    "Grade 10": {
+      "Term 1": [
+        { "week": 1, "text": "analyze world literature texts for their universal themes, cultural context, and literary techniques;" },
+        { "week": 2, "text": "write a comparative literary essay analyzing two works from different cultures;" },
+        { "week": 3, "text": "evaluate different perspectives on global issues as reflected in literature and media;" },
+        { "week": 4, "text": "conduct independent research and write a formal research paper with proper documentation;" },
+        { "week": 5, "text": "present a research paper orally with appropriate academic language and visual support;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "analyze how language choices affect the meaning and impact of texts in different contexts;" },
+        { "week": 2, "text": "write an analytical report on a topic of social or environmental significance;" },
+        { "week": 3, "text": "critically evaluate media texts for bias, representation, and social impact;" },
+        { "week": 4, "text": "create and deliver a professional oral presentation using technology and visual aids;" },
+        { "week": 5, "text": "apply advanced grammar and style conventions in academic and professional writing;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "analyze Philippine literature in the context of Philippine history and national identity;" },
+        { "week": 2, "text": "write a reflective essay connecting a literary text to personal experience and Filipino values;" },
+        { "week": 3, "text": "plan, write, revise, and publish a personal literary piece in a chosen genre;" },
+        { "week": 4, "text": "demonstrate proficiency in academic English across all four language skills (reading, writing, listening, speaking);" },
+        { "week": 5, "text": "evaluate one's language learning journey and set goals for continued development beyond Grade 10;" }
+      ]
+    }
+  },
+  "Filipino": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "natutukoy ang tema, paksa, at mensahe ng teksto batay sa mga detalye at pahiwatig ng awtor;" },
+        { "week": 2, "text": "nasusuri ang mga katangian ng tauhan, tagpuan, at balangkas ng maikling kuwento;" },
+        { "week": 3, "text": "nakasusulat ng maayos na talata gamit ang tamang bantas at estruktura ng pangungusap;" },
+        { "week": 4, "text": "nagagamit ang iba't ibang uri ng pangungusap nang wasto sa pagsasalita at pagsulat;" },
+        { "week": 5, "text": "naipapaliwanag ang kahulugan ng mga idyoma, salawikain, at pahayag na patalinhaga;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "nasusuri ang mga teknik sa pagbuo ng sariling opinyon batay sa ebidensya mula sa teksto;" },
+        { "week": 2, "text": "nakakasulat ng sanaysay na nagpapahayag ng personal na pananaw sa isang isyung panlipunan;" },
+        { "week": 3, "text": "nagagamit ang mga salita at parirala nang angkop sa konteksto ng komunikasyon;" },
+        { "week": 4, "text": "nakapagbibigay ng buod ng nabasang teksto nang malinaw at tumpak;" },
+        { "week": 5, "text": "nakikilahok sa talakayan nang may paggalang sa iba't ibang pananaw;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "nasusuri ang mga akdang pampanitikan mula sa iba't ibang rehiyon ng Pilipinas;" },
+        { "week": 2, "text": "naipapaliwanag ang kultura at tradisyon ng mga Pilipino batay sa mga akdang pampanitikan;" },
+        { "week": 3, "text": "nakakagawa ng isang simpleng proyektong pangwika tulad ng dula, tula, o kuwento;" },
+        { "week": 4, "text": "nagagamit ang wikang Filipino nang may kahusayan sa iba't ibang sitwasyon ng komunikasyon;" },
+        { "week": 5, "text": "nagpapahalagang mataas sa wikang Filipino bilang bahagi ng pagkakakilanlan ng bansa;" }
+      ]
+    },
+    "Grade 8": {
+      "Term 1": [
+        { "week": 1, "text": "nasusuri ang mga katangian ng iba't ibang uri ng tekstong pang-impormasyon;" },
+        { "week": 2, "text": "nakakasulat ng sanaysay na nagbibigay-impormasyon gamit ang maayos na estruktura;" },
+        { "week": 3, "text": "nagagamit ang mga anyong panggramatika nang wasto sa pagsulat at pagsasalita;" },
+        { "week": 4, "text": "nakapagsasalita nang malinaw at may kumpiyansa sa harap ng madla;" },
+        { "week": 5, "text": "nasusuri at nagagamit ang mga salitang may magkaparehong kahulugan (synonyms) at magkasalungat (antonyms);" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "naipahahayag ang sariling damdamin at karanasan sa pamamagitan ng malikhaing pagsulat;" },
+        { "week": 2, "text": "nasusuri ang pagkakaiba ng pormal at di-pormal na wika sa iba't ibang konteksto;" },
+        { "week": 3, "text": "naiuugnay ang mga tema sa panitikan sa kasalukuyang mga isyu sa lipunan;" },
+        { "week": 4, "text": "nakalikha ng sariling akdang pampanitikan tulad ng tula, maikling kuwento, o sanaysay;" },
+        { "week": 5, "text": "nagkakaroon ng malalim na pagpapahalaga sa mga akdang pampanitikang Pilipino;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "nasusuri ang mga elemento ng dula at naiuugnay ang mga ito sa karanasang panlipunan;" },
+        { "week": 2, "text": "nakaganap sa isang eksena ng dula nang may angkop na ekspresyon at pagganap;" },
+        { "week": 3, "text": "nasusuri ang iba't ibang anyo ng talumpati at natutukoy ang mga layunin nito;" },
+        { "week": 4, "text": "nakabibigay ng maayos na talumpati sa harap ng madla gamit ang angkop na tono at kilos;" },
+        { "week": 5, "text": "nagpapakita ng kahusayan sa paggamit ng wikang Filipino sa lahat ng aspeto ng komunikasyon;" }
+      ]
+    }
+  },
+  "Araling Panlipunan": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "naipaliliwanag ang heograpiya ng Asya at ang impluwensya nito sa pagbuo ng mga sinaunang sibilisasyon;" },
+        { "week": 2, "text": "nasusuri ang mga katangian at kontribusyon ng mga sinaunang sibilisasyon sa Asya;" },
+        { "week": 3, "text": "natutukoy ang mga dahilan at epekto ng paglaganap ng mga relihiyon sa Asya;" },
+        { "week": 4, "text": "naipaliliwanag ang impluwensya ng mga sinaunang sibilisasyon sa kasalukuyang kultura ng Asya;" },
+        { "week": 5, "text": "nasusuri ang mga suliraning pangkalikasan at panlipunan sa Asya at nagmumungkahi ng mga solusyon;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "naipaliliwanag ang mga katangian ng mga sinaunang lipunan sa Timog-Silangang Asya bago ang Espanyol;" },
+        { "week": 2, "text": "nasusuri ang mga puwersang nagdala ng mga dayuhan sa Pilipinas at ang epekto ng kolonisasyon;" },
+        { "week": 3, "text": "naipaliliwanag ang mga pagbabagong hatid ng pananakop ng Espanyol sa politika, ekonomiya, at kultura;" },
+        { "week": 4, "text": "nasusuri ang mga kilusan ng pagbabago at paghihimagsik laban sa kolonyalismong Espanyol;" },
+        { "week": 5, "text": "naipaliliwanag ang kahalagahan ng Himagsikang Pilipino at pagtatag ng Unang Republika;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "nasusuri ang epekto ng pananakop ng Amerikano sa politika, kultura, at edukasyon ng mga Pilipino;" },
+        { "week": 2, "text": "naipaliliwanag ang mga pagbabago sa panahon ng Komonwelt at ang paghahanda sa kalayaan;" },
+        { "week": 3, "text": "nasusuri ang karanasan ng mga Pilipino sa panahon ng Hapon at ang papel ng mga gerilya;" },
+        { "week": 4, "text": "naipaliliwanag ang pagtatag ng Ikatlong Republika at ang mga hamon sa pagpapalago ng bansa;" },
+        { "week": 5, "text": "nagpapahalagang mataas sa mga bayani at lider na nagbigay-buhay para sa kalayaan ng Pilipinas;" }
+      ]
+    }
+  },
+  "MAPEH": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "describe the elements of music (melody, rhythm, harmony, form, texture, timbre, dynamics) and identify them in listened examples;" },
+        { "week": 2, "text": "perform simple rhythmic patterns and melodic phrases using body percussion, voice, and instruments;" },
+        { "week": 3, "text": "describe the principles of visual art (balance, emphasis, contrast, unity, movement, pattern) and identify them in artworks;" },
+        { "week": 4, "text": "create a visual artwork applying the elements and principles of visual art;" },
+        { "week": 5, "text": "demonstrate fundamental movement skills and apply them in simple dance forms;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "perform folk dances of the Philippines with proper technique, costume awareness, and appreciation of cultural context;" },
+        { "week": 2, "text": "describe the health-related components of physical fitness and their importance to overall wellness;" },
+        { "week": 3, "text": "demonstrate health-related fitness activities and measure personal fitness levels;" },
+        { "week": 4, "text": "explain health concepts including nutrition, hygiene, disease prevention, and mental health;" },
+        { "week": 5, "text": "apply first aid procedures for common injuries and emergencies;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "participate in team sports and demonstrate sportsmanship, cooperation, and leadership;" },
+        { "week": 2, "text": "describe the rules and strategies of selected individual and dual sports;" },
+        { "week": 3, "text": "explain the relationship between physical activity, health, and quality of life;" },
+        { "week": 4, "text": "create a personal fitness plan based on individual health and fitness assessment;" },
+        { "week": 5, "text": "demonstrate healthy lifestyle habits and explain how they contribute to lifelong wellness;" }
+      ]
+    }
+  },
+  "GMRC": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "explain the concept of self-awareness and describe one's strengths, interests, and areas for growth;" },
+        { "week": 2, "text": "demonstrate respect for diversity and explain the importance of inclusion in school and community;" },
+        { "week": 3, "text": "describe responsible decision-making and apply it to common ethical dilemmas faced by teenagers;" },
+        { "week": 4, "text": "explain the rights and responsibilities of citizens and describe ways to participate in civic life;" },
+        { "week": 5, "text": "demonstrate empathy, compassion, and solidarity with others, especially the marginalized;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "describe the characteristics of a caring family and explain how family values shape behavior and character;" },
+        { "week": 2, "text": "explain the importance of gender equality and describe ways to promote it in school and community;" },
+        { "week": 3, "text": "discuss responsible use of social media and technology and their impact on relationships and mental health;" },
+        { "week": 4, "text": "explain environmental stewardship and demonstrate practices that protect the natural environment;" },
+        { "week": 5, "text": "describe national identity and cultural pride and explain ways to uphold Filipino values and traditions;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "explain peace-building strategies and apply conflict resolution skills in everyday situations;" },
+        { "week": 2, "text": "describe the importance of honesty, integrity, and accountability in personal and community life;" },
+        { "week": 3, "text": "demonstrate active participation in school and community service activities;" },
+        { "week": 4, "text": "explain the concept of common good and describe how individual actions affect the community;" },
+        { "week": 5, "text": "reflect on personal values and set goals for character development and social responsibility;" }
+      ]
+    }
+  },
+  "TLE": {
+    "Grade 7": {
+      "Term 1": [
+        { "week": 1, "text": "describe the different fields of Technology and Livelihood Education and identify potential career pathways;" },
+        { "week": 2, "text": "demonstrate basic safety practices and proper use of tools and equipment in the TLE specialization;" },
+        { "week": 3, "text": "apply fundamental skills and techniques in the chosen TLE specialization (e.g., cooking, carpentry, dressmaking);" },
+        { "week": 4, "text": "produce a simple output or project applying the skills learned in the TLE specialization;" },
+        { "week": 5, "text": "evaluate one's work using quality standards and identify areas for improvement;" }
+      ],
+      "Term 2": [
+        { "week": 1, "text": "explain entrepreneurship concepts including market, product, cost, and profit;" },
+        { "week": 2, "text": "identify business opportunities in the local community and evaluate their feasibility;" },
+        { "week": 3, "text": "develop a simple business plan for a small enterprise based on community needs;" },
+        { "week": 4, "text": "apply marketing and customer service skills in a simulated business activity;" },
+        { "week": 5, "text": "reflect on the values of industry, perseverance, and financial literacy as foundations for entrepreneurship;" }
+      ],
+      "Term 3": [
+        { "week": 1, "text": "demonstrate proficiency in the core skills of the chosen TLE specialization;" },
+        { "week": 2, "text": "produce a finished product or render a service that meets quality standards;" },
+        { "week": 3, "text": "apply knowledge of occupational health and safety in the workplace;" },
+        { "week": 4, "text": "evaluate career options in the TLE field and identify pathways for further training and employment;" },
+        { "week": 5, "text": "demonstrate entrepreneurial spirit, creativity, and perseverance in completing TLE projects;" }
+      ]
+    }
+  }
+}

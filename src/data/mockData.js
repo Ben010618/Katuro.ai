@@ -1,0 +1,121 @@
+export const MOCK_TEACHER = {
+  uid: 'teacher-1',
+  name: 'Maria Santos',
+  email: 'maria.santos@deped.gov.ph',
+  school: 'Mabini National High School',
+  subject: 'Science',
+  grade: '7',
+  section: 'Aristotle',
+  subscription: 'Free',
+  initials: 'MS',
+};
+
+export const MOCK_LESSONS = [
+  {
+    id: 'l1',
+    title: 'Cells and Their Functions',
+    subject: 'Science',
+    grade: '7',
+    quarter: 'Q1',
+    week: 3,
+    dates: 'May 19–23, 2025',
+    status: 'published',
+    createdAt: '2025-05-19',
+    tags: ['Biology', 'STEM'],
+    objectives: 3,
+    sessions: 5,
+  },
+  {
+    id: 'l2',
+    title: 'Properties of Matter',
+    subject: 'Science',
+    grade: '7',
+    quarter: 'Q1',
+    week: 4,
+    dates: 'May 26–30, 2025',
+    status: 'draft',
+    createdAt: '2025-05-26',
+    tags: ['Chemistry'],
+    objectives: 2,
+    sessions: 5,
+  },
+  {
+    id: 'l3',
+    title: 'Forces and Motion',
+    subject: 'Science',
+    grade: '7',
+    quarter: 'Q2',
+    week: 1,
+    dates: 'Jun 2–6, 2025',
+    status: 'published',
+    createdAt: '2025-06-02',
+    tags: ['Physics'],
+    objectives: 4,
+    sessions: 5,
+  },
+  {
+    id: 'l4',
+    title: 'Ecosystems and Biodiversity',
+    subject: 'Science',
+    grade: '7',
+    quarter: 'Q2',
+    week: 2,
+    dates: 'Jun 9–13, 2025',
+    status: 'draft',
+    createdAt: '2025-06-09',
+    tags: ['Biology', 'Environment'],
+    objectives: 3,
+    sessions: 5,
+  },
+  {
+    id: 'l5',
+    title: "Earth's Structure and Layers",
+    subject: 'Science',
+    grade: '7',
+    quarter: 'Q2',
+    week: 3,
+    dates: 'Jun 16–20, 2025',
+    status: 'archived',
+    createdAt: '2025-06-16',
+    tags: ['Earth Science'],
+    objectives: 2,
+    sessions: 5,
+  },
+];
+
+export const MOCK_STATS = {
+  lessonsThisQuarter: 12,
+  quizzesGraded: 8,
+  classAverage: 78,
+  studentsAtRisk: 4,
+};
+
+export const MOCK_COMPETENCIES = [
+  { code: 'S7-Q1-1', name: 'Cell Structure & Function', coverage: 92, mastery: 78, quizzes: 3 },
+  { code: 'S7-Q1-2', name: 'Cell Division (Mitosis)', coverage: 75, mastery: 61, quizzes: 2 },
+  { code: 'S7-Q1-3', name: 'Properties of Matter', coverage: 55, mastery: 42, quizzes: 1 },
+  { code: 'S7-Q1-4', name: 'Mixtures & Pure Substances', coverage: 40, mastery: 35, quizzes: 1 },
+  { code: 'S7-Q2-1', name: 'Forces and Motion', coverage: 20, mastery: 0, quizzes: 0 },
+  { code: 'S7-Q2-2', name: "Newton's Laws of Motion", coverage: 0, mastery: 0, quizzes: 0 },
+];
+
+export const MOCK_QUIZ_RESULTS = [
+  { id: 'q1', quiz: 'Quiz 1 – Cells', date: 'May 23, 2025', students: 38, avg: 82, highest: 98, lowest: 55, below75: 6 },
+  { id: 'q2', quiz: 'Quiz 2 – Cell Division', date: 'May 30, 2025', students: 38, avg: 74, highest: 95, lowest: 48, below75: 11 },
+  { id: 'q3', quiz: 'Quiz 3 – Properties of Matter', date: 'Jun 6, 2025', students: 37, avg: 69, highest: 92, lowest: 40, below75: 15 },
+];
+
+export const MOCK_LEARNERS = Array.from({ length: 38 }, (_, i) => ({
+  id: `s${i + 1}`,
+  name: [
+    'Ana Reyes', 'Ben Cruz', 'Clara Lim', 'Diego Santos', 'Eva Tan',
+    'Nico Garcia', 'Mia Flores', 'Leo Bautista', 'Ria Dela Cruz', 'Sam Ocampo',
+    'Tina Ramos', 'Vince Mendoza', 'Wena Torres', 'Xela Castillo', 'Ysa Morales',
+    'Zoe Villanueva', 'Arlo Aquino', 'Bea Domingo', 'Cris Espino', 'Dan Ferrer',
+    'Ela Gomez', 'Finn Herrera', 'Gab Ibarra', 'Hana Jimenez', 'Ian Kapunan',
+    'Joy Luna', 'Karl Navarro', 'Lea Ortiz', 'Mark Perez', 'Nina Quirino',
+    'Omar Reyes', 'Pam Salvador', 'Quinn Torres', 'Rex Uy', 'Sonia Vilar',
+    'Troy Wong', 'Uma Xavier', 'Vic Yap',
+  ][i] || `Student ${i + 1}`,
+  avg: Math.round(60 + Math.random() * 38),
+})).sort((a, b) => a.name.localeCompare(b.name));
