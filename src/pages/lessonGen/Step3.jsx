@@ -98,11 +98,14 @@ export default function Step3() {
     };
 
     const results = await runConcurrentSettled(sessions, 1, async (s, i) => {
+      // Small cooldown between sessions to avoid Gemini rate limits
+      if (i > 0) await new Promise(r => setTimeout(r, 1200));
+
       setStatusMsg(`Generating Session ${s.day} of ${n} — ${bloomsBaseOf(s.bloomsLevel)} level…`);
       setProgress(Math.round(5 + (i / n) * 75));
 
       let lastErr = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const result = await generateIlawSession(s, context);
           if (activeGenRef.current !== genId) return null;
@@ -111,11 +114,11 @@ export default function Step3() {
         } catch (err) {
           lastErr = err;
           console.warn(`Session ${s.day} attempt ${attempt + 1} failed:`, err);
-          if (attempt === 0) {
+          if (attempt < 2) {
             const backOff = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
-              : 3000;
-            setStatusMsg(`Session ${s.day} failed — retrying in ${backOff / 1000}s…`);
+              : 5000 + attempt * 3000;
+            setStatusMsg(`Session ${s.day} failed — retrying in ${Math.round(backOff / 1000)}s…`);
             await new Promise(r => setTimeout(r, backOff));
             setStatusMsg(`Retrying Session ${s.day} of ${n}…`);
           }

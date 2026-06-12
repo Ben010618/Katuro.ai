@@ -398,7 +398,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 8192, ...NO_THINKING },
+      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, ...NO_THINKING },
     }),
   });
 
