@@ -478,6 +478,42 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
   return { uid, email };
 }
 
+// ─── Self sign-up: teacher creates their own account ─────────────────────────
+
+export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
+  const { auth: firebaseAuth } = await import('../firebase');
+  const { updateProfile } = await import('firebase/auth');
+
+  const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
+  const uid  = cred.user.uid;
+
+  const displayName = [givenName.trim(), mi ? mi.trim() + '.' : '', surname.trim()]
+    .filter(Boolean).join(' ');
+
+  await updateProfile(cred.user, { displayName });
+
+  await setDoc(teacherRef(uid), {
+    email:        email.trim().toLowerCase(),
+    displayName,
+    surname:      surname.trim(),
+    givenName:    givenName.trim(),
+    mi:           mi?.trim() || '',
+    school:       school.trim(),
+    tokenBalance: 50,
+    isAdmin:      false,
+    disabled:     false,
+    createdAt:    serverTimestamp(),
+  });
+
+  await addDoc(tokenLogsRef(uid), {
+    uid, amount: 50, action: 'welcome_bonus',
+    note: 'Welcome! 50 free tokens to get started.',
+    createdAt: serverTimestamp(),
+  });
+
+  return cred.user;
+}
+
 // ─── Admin: enable / disable a user ─────────────────────────────────────────
 
 export async function adminSetDisabled(uid, disabled) {

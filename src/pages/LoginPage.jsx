@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Loader2, Eye, EyeOff, FileText, BarChart3 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, FileText, BarChart3, Gift } from 'lucide-react';
 import ktLogo from '../assets/KT Favicon.png';
+import { selfSignUp } from '../services/db';
 
 /* ── animations + overrides ─────────────────────────────────────────────── */
 const CSS = `
@@ -106,7 +107,7 @@ const CSS = `
 `;
 
 export default function LoginPage() {
-  const [mode,      setMode]      = useState('login'); // 'login' | 'reset'
+  const [mode,      setMode]      = useState('login'); // 'login' | 'reset' | 'signup'
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
   const [showPw,    setShowPw]    = useState(false);
@@ -114,6 +115,15 @@ export default function LoginPage() {
   const [error,     setError]     = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [shake,     setShake]     = useState(false);
+
+  // signup-specific fields
+  const [surname,   setSurname]   = useState('');
+  const [givenName, setGivenName] = useState('');
+  const [mi,        setMi]        = useState('');
+  const [school,    setSchool]    = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showCPw,   setShowCPw]   = useState(false);
+  const [signedUp,  setSignedUp]  = useState(false);
 
   function triggerShake() {
     setShake(true);
@@ -126,7 +136,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      /* redirect handled by PublicRoute / App.jsx */
     } catch (err) {
       const msg = err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, '');
       setError(msg);
@@ -152,11 +161,66 @@ export default function LoginPage() {
     }
   }
 
+  async function handleSignup(e) {
+    e.preventDefault();
+    if (!surname.trim() || !givenName.trim()) { setError('Surname and Given Name are required.'); triggerShake(); return; }
+    if (!school.trim()) { setError('School name is required.'); triggerShake(); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); triggerShake(); return; }
+    if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
+    setError('');
+    setLoading(true);
+    try {
+      await selfSignUp({ email, password, surname, givenName, mi, school });
+      setSignedUp(true);
+    } catch (err) {
+      const msg = err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, '');
+      setError(msg);
+      triggerShake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function switchMode(m) {
     setMode(m);
     setError('');
     setResetSent(false);
+    setSignedUp(false);
   }
+
+  /* ── shared micro-styles ────────────────────────────────────────────── */
+  const labelStyle = {
+    display: 'block', fontSize: 11, fontWeight: 500,
+    color: '#4a6357', marginBottom: 5,
+    textTransform: 'uppercase', letterSpacing: '0.7px',
+    fontFamily: '"DM Sans", sans-serif',
+  };
+  const fieldStyle = {
+    width: '100%', height: 42, boxSizing: 'border-box',
+    border: '0.5px solid rgba(45,106,79,0.25)', borderRadius: 9,
+    padding: '0 14px', fontSize: 14,
+    fontFamily: '"DM Sans", sans-serif',
+    background: '#fff', color: '#0d2218',
+    outline: 'none', transition: 'border 0.15s, box-shadow 0.15s',
+  };
+  const focusStyle = e => {
+    e.target.style.borderColor = '#2d6a4f';
+    e.target.style.boxShadow = '0 0 0 3px rgba(45,106,79,0.12)';
+  };
+  const blurStyle = e => {
+    e.target.style.borderColor = 'rgba(45,106,79,0.25)';
+    e.target.style.boxShadow = 'none';
+  };
+  const eyeBtn = {
+    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: '#4a6357', display: 'flex', padding: 2,
+  };
+  const linkBtn = {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 12, color: '#2d6a4f', fontWeight: 500,
+    fontFamily: '"DM Sans", sans-serif', padding: 0,
+  };
 
   /* ── render ─────────────────────────────────────────────────────────── */
   return (
@@ -295,8 +359,21 @@ export default function LoginPage() {
               textAlign: 'right', fontSize: 13, color: '#4a6357',
               marginBottom: 40, fontFamily: '"DM Sans", sans-serif',
             }}>
-              Need access?{' '}
-              <span style={{ color: '#2d6a4f', fontWeight: 500 }}>Contact your administrator</span>
+              {mode === 'signup' ? (
+                <>Already have an account?{' '}
+                  <button type="button" onClick={() => switchMode('login')} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: '#2d6a4f', fontWeight: 600, padding: 0, fontFamily: 'inherit',
+                  }}>Sign in</button>
+                </>
+              ) : (
+                <>New here?{' '}
+                  <button type="button" onClick={() => switchMode('signup')} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: '#2d6a4f', fontWeight: 600, padding: 0, fontFamily: 'inherit',
+                  }}>Create a free account</button>
+                </>
+              )}
             </div>
 
             {/* Heading */}
@@ -305,117 +382,163 @@ export default function LoginPage() {
                 fontFamily: '"Playfair Display", Georgia, serif',
                 fontSize: 28, fontWeight: 600, color: '#0d2218', marginBottom: 6,
               }}>
-                {mode === 'reset' ? 'Reset password' : <>Sign in to <span style={{ color: '#2d6a4f' }}>kaTuro</span></>}
+                {mode === 'reset'  ? 'Reset password' :
+                 mode === 'signup' ? <>Join <span style={{ color: '#2d6a4f' }}>kaTuro</span></> :
+                                    <>Sign in to <span style={{ color: '#2d6a4f' }}>kaTuro</span></>}
               </h1>
               <p style={{
                 fontSize: 13, color: '#4a6357', marginBottom: 30,
                 fontWeight: 300, fontFamily: '"DM Sans", sans-serif',
               }}>
-                {mode === 'reset'
-                  ? "Enter your email — we'll send a reset link right away."
-                  : 'Welcome back, Teacher. Enter your credentials to continue.'}
+                {mode === 'reset'  ? "Enter your email — we'll send a reset link right away." :
+                 mode === 'signup' ? 'Create your account. You get 50 free tokens to start.' :
+                                    'Welcome back, Teacher. Enter your credentials to continue.'}
               </p>
             </div>
 
             {/* ── RESET SUCCESS ── */}
-            {resetSent ? (
+            {resetSent && (
               <div style={{
                 background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.25)',
                 borderRadius: 10, padding: '16px 18px', marginBottom: 20,
               }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: '#1a3d2b', margin: 0 }}>
-                  ✓ Reset link sent!
-                </p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#1a3d2b', margin: 0 }}>✓ Reset link sent!</p>
                 <p style={{ fontSize: 13, color: '#4a6357', margin: '4px 0 0' }}>
                   Check your inbox at <strong>{email}</strong>. Follow the link to set a new password.
                 </p>
-                <button
-                  onClick={() => switchMode('login')}
-                  style={{
-                    marginTop: 12, background: 'none', border: 'none',
-                    cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#2d6a4f',
-                    padding: 0, fontFamily: 'inherit',
-                  }}
-                >
-                  ← Back to sign in
-                </button>
+                <button onClick={() => switchMode('login')} style={{
+                  marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, color: '#2d6a4f', padding: 0, fontFamily: 'inherit',
+                }}>← Back to sign in</button>
               </div>
-            ) : (
+            )}
 
-              /* ── FORM ── */
+            {/* ── SIGNUP SUCCESS ── */}
+            {signedUp && (
+              <div style={{
+                background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.25)',
+                borderRadius: 10, padding: '20px 18px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#1a3d2b', margin: 0 }}>Account created!</p>
+                <p style={{ fontSize: 13, color: '#4a6357', margin: '6px 0 14px', lineHeight: 1.5 }}>
+                  Welcome to kaTuro! Your account is ready with <strong>50 free tokens</strong>.<br />
+                  You are now being signed in…
+                </p>
+              </div>
+            )}
+
+            {/* ── FORMS ── */}
+            {!resetSent && !signedUp && (
+
               <form
                 className={shake ? 'kt-error-shake' : ''}
-                onSubmit={mode === 'login' ? handleLogin : handleReset}
+                onSubmit={mode === 'login' ? handleLogin : mode === 'reset' ? handleReset : handleSignup}
                 style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
               >
 
+                {/* ── SIGNUP FIELDS ── */}
+                {mode === 'signup' && (<>
+
+                  {/* Name row: Surname + Given Name */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                    <div>
+                      <label style={labelStyle}>Surname *</label>
+                      <input
+                        type="text" value={surname}
+                        onChange={e => setSurname(e.target.value)}
+                        placeholder="dela Cruz" required disabled={loading}
+                        style={fieldStyle}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Given Name *</label>
+                      <input
+                        type="text" value={givenName}
+                        onChange={e => setGivenName(e.target.value)}
+                        placeholder="Maria" required disabled={loading}
+                        style={fieldStyle}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                    </div>
+                  </div>
+
+                  {/* MI + School row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 14 }}>
+                    <div>
+                      <label style={labelStyle}>M.I.</label>
+                      <input
+                        type="text" value={mi}
+                        onChange={e => setMi(e.target.value.slice(0, 3))}
+                        placeholder="A" maxLength={3} disabled={loading}
+                        style={fieldStyle}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>School *</label>
+                      <input
+                        type="text" value={school}
+                        onChange={e => setSchool(e.target.value)}
+                        placeholder="Mabini National High School" required disabled={loading}
+                        style={fieldStyle}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                    </div>
+                  </div>
+                </>)}
+
                 {/* Email */}
                 <div className="kt-f3" style={{ marginBottom: 14 }}>
-                  <label style={{
-                    display: 'block', fontSize: 11, fontWeight: 500,
-                    color: '#4a6357', marginBottom: 5,
-                    textTransform: 'uppercase', letterSpacing: '0.7px',
-                    fontFamily: '"DM Sans", sans-serif',
-                  }}>Email Address</label>
+                  <label style={labelStyle}>Email Address {mode === 'signup' ? '*' : ''}</label>
                   <input
-                    type="email"
-                    value={email}
+                    type="email" value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@deped.gov.ph"
-                    required
-                    disabled={loading}
-                    style={{
-                      width: '100%', height: 42,
-                      border: '0.5px solid rgba(45,106,79,0.25)', borderRadius: 9,
-                      padding: '0 14px', fontSize: 14,
-                      fontFamily: '"DM Sans", sans-serif',
-                      background: '#fff', color: '#0d2218',
-                      outline: 'none', transition: 'border 0.15s, box-shadow 0.15s',
-                    }}
-                    onFocus={e => { e.target.style.borderColor = '#2d6a4f'; e.target.style.boxShadow = '0 0 0 3px rgba(45,106,79,0.12)'; }}
-                    onBlur={e  => { e.target.style.borderColor = 'rgba(45,106,79,0.25)'; e.target.style.boxShadow = 'none'; }}
+                    required disabled={loading}
+                    style={fieldStyle}
+                    onFocus={focusStyle} onBlur={blurStyle}
                   />
                 </div>
 
-                {/* Password — only in login mode */}
-                {mode === 'login' && (
-                  <div className="kt-f4" style={{ marginBottom: 6 }}>
-                    <label style={{
-                      display: 'block', fontSize: 11, fontWeight: 500,
-                      color: '#4a6357', marginBottom: 5,
-                      textTransform: 'uppercase', letterSpacing: '0.7px',
-                      fontFamily: '"DM Sans", sans-serif',
-                    }}>Password</label>
+                {/* Password */}
+                {mode !== 'reset' && (
+                  <div className="kt-f4" style={{ marginBottom: mode === 'signup' ? 14 : 6 }}>
+                    <label style={labelStyle}>Password {mode === 'signup' ? '* (min 6 chars)' : ''}</label>
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showPw ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        required
-                        disabled={loading}
-                        style={{
-                          width: '100%', height: 42,
-                          border: '0.5px solid rgba(45,106,79,0.25)', borderRadius: 9,
-                          padding: '0 42px 0 14px', fontSize: 14,
-                          fontFamily: '"DM Sans", sans-serif',
-                          background: '#fff', color: '#0d2218',
-                          outline: 'none', transition: 'border 0.15s, box-shadow 0.15s',
-                        }}
-                        onFocus={e => { e.target.style.borderColor = '#2d6a4f'; e.target.style.boxShadow = '0 0 0 3px rgba(45,106,79,0.12)'; }}
-                        onBlur={e  => { e.target.style.borderColor = 'rgba(45,106,79,0.25)'; e.target.style.boxShadow = 'none'; }}
+                        required disabled={loading}
+                        style={{ ...fieldStyle, paddingRight: 42 }}
+                        onFocus={focusStyle} onBlur={blurStyle}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPw(v => !v)}
-                        tabIndex={-1}
-                        style={{
-                          position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: '#4a6357', display: 'flex', padding: 2,
-                        }}
-                      >
+                      <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1} style={eyeBtn}>
                         {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirm Password — signup only */}
+                {mode === 'signup' && (
+                  <div style={{ marginBottom: 6 }}>
+                    <label style={labelStyle}>Confirm Password *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showCPw ? 'text' : 'password'}
+                        value={confirmPw}
+                        onChange={e => setConfirmPw(e.target.value)}
+                        placeholder="••••••••"
+                        required disabled={loading}
+                        style={{ ...fieldStyle, paddingRight: 42 }}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                      <button type="button" onClick={() => setShowCPw(v => !v)} tabIndex={-1} style={eyeBtn}>
+                        {showCPw ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
                   </div>
@@ -423,20 +546,13 @@ export default function LoginPage() {
 
                 {/* Forgot / Back row */}
                 <div style={{ textAlign: 'right', marginBottom: 20 }}>
-                  {mode === 'login' ? (
-                    <button type="button" onClick={() => switchMode('reset')} style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: 12, color: '#2d6a4f', fontWeight: 500,
-                      fontFamily: '"DM Sans", sans-serif', padding: 0,
-                    }}>
+                  {mode === 'login' && (
+                    <button type="button" onClick={() => switchMode('reset')} style={linkBtn}>
                       Forgot password?
                     </button>
-                  ) : (
-                    <button type="button" onClick={() => switchMode('login')} style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: 12, color: '#2d6a4f', fontWeight: 500,
-                      fontFamily: '"DM Sans", sans-serif', padding: 0,
-                    }}>
+                  )}
+                  {(mode === 'reset') && (
+                    <button type="button" onClick={() => switchMode('login')} style={linkBtn}>
                       ← Back to sign in
                     </button>
                   )}
@@ -449,34 +565,32 @@ export default function LoginPage() {
                     borderRadius: 8, padding: '9px 14px', marginBottom: 14,
                     fontSize: 13, color: '#e05c5c', fontWeight: 500,
                     fontFamily: '"DM Sans", sans-serif',
-                  }}>
-                    {error}
-                  </div>
+                  }}>{error}</div>
                 )}
 
-                {/* Submit button */}
+                {/* Submit */}
                 <button
                   type="submit"
-                  disabled={loading || !email || (mode === 'login' && !password)}
+                  disabled={loading}
                   style={{
                     width: '100%', height: 44,
-                    background: loading || !email || (mode === 'login' && !password) ? 'rgba(45,106,79,0.45)' : '#2d6a4f',
+                    background: loading ? 'rgba(45,106,79,0.45)' : '#2d6a4f',
                     color: '#fff', border: 'none', borderRadius: 9,
-                    fontSize: 14, fontWeight: 500, cursor: loading ? 'not-allowed' : !email || (mode === 'login' && !password) ? 'not-allowed' : 'pointer',
+                    fontSize: 14, fontWeight: 500,
+                    cursor: loading ? 'not-allowed' : 'pointer',
                     fontFamily: '"DM Sans", sans-serif',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    letterSpacing: '0.3px',
-                    transition: 'background 0.15s, transform 0.1s',
+                    letterSpacing: '0.3px', transition: 'background 0.15s, transform 0.1s',
                   }}
-                  onMouseEnter={e => { if (!loading && email && (mode === 'reset' || password)) e.currentTarget.style.background = '#1b4d37'; }}
-                  onMouseLeave={e => { if (!loading && email && (mode === 'reset' || password)) e.currentTarget.style.background = '#2d6a4f'; }}
+                  onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#1b4d37'; }}
+                  onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#2d6a4f'; }}
                   onMouseDown={e  => { if (!loading) e.currentTarget.style.transform = 'scale(0.99)'; }}
                   onMouseUp={e    => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   {loading && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />}
                   {loading
-                    ? (mode === 'reset' ? 'Sending…' : 'Signing in…')
-                    : (mode === 'reset' ? 'Send Reset Link' : 'Login')}
+                    ? (mode === 'reset' ? 'Sending…' : mode === 'signup' ? 'Creating account…' : 'Signing in…')
+                    : (mode === 'reset' ? 'Send Reset Link' : mode === 'signup' ? <><Gift size={15} /> Create Account — 50 Free Tokens</> : 'Login')}
                 </button>
               </form>
             )}
@@ -488,7 +602,7 @@ export default function LoginPage() {
               borderRadius: 20, padding: '4px 12px', marginTop: 18,
               fontWeight: 500, fontFamily: '"DM Sans", sans-serif',
             }}>
-              ✦ Free Plan available — No credit card required
+              ✦ Sign up free — get 50 tokens, no credit card needed
             </div>
 
           </div>
