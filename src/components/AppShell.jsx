@@ -13,26 +13,28 @@ const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, Projector,
-  ShieldCheck, Coins, Gamepad2,
+  ShieldCheck, Coins, Gamepad2, FlaskConical,
 } from 'lucide-react';
 
 const NAV = [
-  { to: '/dashboard',       label: 'Dashboard',             Icon: LayoutDashboard },
-  { to: '/lesson-gen',      label: 'Lesson Gen',            Icon: Sparkles        },
-  { to: '/my-lessons',      label: 'My Lessons',            Icon: BookOpen        },
-  { to: '/quiz-builder',    label: 'Quiz Builder',          Icon: ClipboardList   },
-  { to: '/presentations',   label: 'Presentation Builder',  Icon: Projector       },
-  { to: '/gamification',    label: 'Gamification',          Icon: Gamepad2        },
+  { to: '/dashboard',              label: 'Dashboard',             Icon: LayoutDashboard },
+  { to: '/lesson-gen',             label: 'Lesson Gen',            Icon: Sparkles        },
+  { to: '/my-lessons',             label: 'My Lessons',            Icon: BookOpen        },
+  { to: '/quiz-builder',           label: 'Quiz Builder',          Icon: ClipboardList   },
+  { to: '/presentations',          label: 'Presentation Builder',  Icon: Projector       },
+  { to: '/gamification',           label: 'Gamification',          Icon: Gamepad2        },
+  { to: '/action-research/phase-1',label: 'Action Research',       Icon: FlaskConical    },
 ];
 
 const TITLES = {
-  '/dashboard':       'Dashboard',
-  '/lesson-gen':      'Lesson Gen',
-  '/dll-gen':         'Daily Lesson Log',
-  '/my-lessons':      'My Lessons',
-  '/quiz-builder':    'Quiz Builder',
-  '/presentations':   'Presentation Builder',
-  '/gamification':    'Gamification',
+  '/dashboard':               'Dashboard',
+  '/lesson-gen':              'Lesson Gen',
+  '/dll-gen':                 'Daily Lesson Log',
+  '/my-lessons':              'My Lessons',
+  '/quiz-builder':            'Quiz Builder',
+  '/presentations':           'Presentation Builder',
+  '/gamification':            'Gamification',
+  '/action-research/phase-1': 'Action Research',
 };
 
 function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
