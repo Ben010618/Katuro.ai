@@ -936,11 +936,6 @@ const filteredCompetencies = useMemo(() => {
               <CheckCircle2 size={11} /> Saved
             </span>
           )}
-          {!OR_ENABLED && (
-             <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-600">
-               AI disabled — add VITE_MISTRAL_API_KEY
-             </span>
-          )}
         </div>
       </div>
 
@@ -1548,9 +1543,6 @@ const filteredCompetencies = useMemo(() => {
               >
                 <Wand2 size={18} /> Generate 5-Day Lesson Plan
               </button>
-               {!OR_ENABLED && (
-                 <p className="mt-2 text-xs text-red-500 text-center">Add VITE_MISTRAL_API_KEY to .env to enable AI generation.</p>
-               )}
             </>
           )}
 
