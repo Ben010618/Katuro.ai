@@ -71,7 +71,7 @@ const CSS = `
 
   .kt-brand-wrap { animation: kt-brand-in 0.7s ease 0.75s both; }
 
-  .kt-form-wrap { animation: kt-form-in 0.65s cubic-bezier(0.16,1,0.3,1) 0.1s both; }
+  .kt-form-wrap { animation: kt-form-in 0.65s cubic-bezier(0.16,1,0.3,1) 0.1s both; position: relative; z-index: 1; }
 
   .kt-f1 { opacity:0; animation: kt-field-in 0.45s ease 0.3s forwards; }
   .kt-f2 { opacity:0; animation: kt-field-in 0.45s ease 0.42s forwards; }
@@ -83,6 +83,19 @@ const CSS = `
 
   .kt-pw-input { padding-right: 42px !important; }
 
+  /* left panel background image overlay */
+  .kt-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/src/assets/5.png');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.13;
+    z-index: 0;
+    pointer-events: none;
+  }
+
   /* right panel base + background image overlay */
   .kt-right {
     position: relative;
@@ -93,10 +106,10 @@ const CSS = `
     content: '';
     position: absolute;
     inset: 0;
-    background-image: url('/src/assets/WelcomePage.png');
+    background-image: url('/src/assets/3.png');
     background-size: cover;
     background-position: center;
-    opacity: 0.12;
+    opacity: 0.18;
     z-index: 0;
   }
 
