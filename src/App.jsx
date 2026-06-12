@@ -17,6 +17,11 @@ import PresentationBuilderPage from './pages/PresentationBuilderPage';
 import GamificationPage        from './pages/GamificationPage';
 import AdminDashboard          from './pages/AdminDashboard';
 import ActionResearchPhase1    from './pages/ActionResearchPhase1';
+import ActionResearchPhase2    from './pages/ActionResearchPhase2';
+import ActionResearchPhase3    from './pages/ActionResearchPhase3';
+import ActionResearchPhase4    from './pages/ActionResearchPhase4';
+import ActionResearchPhase5    from './pages/ActionResearchPhase5';
+import ActionResearchPhase6    from './pages/ActionResearchPhase6';
 
 // Lesson Gen
 import LessonGenGateway from './pages/lessonGen/LessonGenGateway';
@@ -102,7 +107,12 @@ export default function App() {
             <Route path="presentations"  element={<PresentationBuilderPage />} />
             <Route path="gamification"       element={<GamificationPage />} />
             <Route path="action-research">
-              <Route path="phase-1"           element={<ActionResearchPhase1 />} />
+              <Route path="phase-1"              element={<ActionResearchPhase1 />} />
+              <Route path="phase-2/:docId"       element={<ActionResearchPhase2 />} />
+              <Route path="phase-3/:docId"       element={<ActionResearchPhase3 />} />
+              <Route path="phase-4/:docId"       element={<ActionResearchPhase4 />} />
+              <Route path="phase-5/:docId"       element={<ActionResearchPhase5 />} />
+              <Route path="phase-6/:docId"       element={<ActionResearchPhase6 />} />
             </Route>
 
             {/* Lesson Gen — nested routes */}

@@ -535,6 +535,24 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
   });
 }
 
+// ─── Action Research helpers ─────────────────────────────────────────────────
+
+export const actionResearchColRef = (uid) => collection(db, 'teachers', uid, 'actionResearch');
+export const actionResearchDocRef = (uid, docId) => doc(db, 'teachers', uid, 'actionResearch', docId);
+
+export async function getActionResearch(uid, docId) {
+  const snap = await getDoc(actionResearchDocRef(uid, docId));
+  if (!snap.exists()) throw new Error('Research document not found.');
+  return { id: snap.id, ...snap.data() };
+}
+
+export async function updateActionResearch(uid, docId, data) {
+  await updateDoc(actionResearchDocRef(uid, docId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 // ─── Token deduction ──────────────────────────────────────────────────────────
 // cost defaults to 3; pass a custom value for cheaper actions (e.g. 0.5 for gamification)
 
