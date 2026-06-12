@@ -393,6 +393,25 @@ export async function getDLLPlan(uid, planId) {
 }
 
 /**
+ * Save a fully generated PPST-aligned COT lesson plan.
+ * Stored in the same lessonPlans collection with type: 'cot'.
+ */
+export async function saveCotPlan(uid, planData) {
+  const { subject, grade, quarter, topic, melc, plan } = planData;
+  const lessonName = `COT – ${topic || subject || 'Lesson'} (${grade || ''})`.trim();
+  const ref = await addDoc(lessonPlansRef(uid), {
+    type: 'cot',
+    lessonName,
+    ...planData,
+    competencyText: melc || '',
+    sessions: [],
+    status: 'published',
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/**
  * Delete a lesson plan permanently.
  */
 export async function deleteLessonPlan(uid, planId) {

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
-import { Sparkles, BookOpen, CalendarDays, ArrowRight, RotateCcw } from 'lucide-react';
+import { Sparkles, BookOpen, CalendarDays, ArrowRight, RotateCcw, ShieldCheck } from 'lucide-react';
 
 export default function LessonGenGateway() {
   const navigate = useNavigate();
@@ -45,7 +45,7 @@ export default function LessonGenGateway() {
       </div>
 
       {/* Type cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 18, marginBottom: 28 }}>
 
         {/* ILAW card */}
         <button
@@ -114,6 +114,44 @@ export default function LessonGenGateway() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#4f46e5' }}>3 tokens per generation</span>
             <ArrowRight size={14} color="#4f46e5" />
+          </div>
+        </button>
+
+        {/* COT card */}
+        <button
+          onClick={() => navigate('/cot-gen/step-1')}
+          style={{
+            textAlign: 'left', background: '#fff', border: '2px solid rgba(124,58,237,0.15)',
+            borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
+            display: 'flex', flexDirection: 'column', gap: 14,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#7c3aed'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(124,58,237,0.12)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.15)'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: 'linear-gradient(135deg, #f3e8ff, #ede9fe)',
+            display: 'grid', placeItems: 'center',
+          }}>
+            <ShieldCheck size={22} color="#7c3aed" />
+          </div>
+
+          <div>
+            <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: '#0d2218' }}>
+              PPST-aligned Lesson Plan
+            </p>
+            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              COT-optimized · 4As Framework
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+              Full PIVOT 4A / IDEA lesson plan with a built-in COT Indicator Evidence Map for your IPCRF defense.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>3 tokens per generation</span>
+            <ArrowRight size={14} color="#7c3aed" />
           </div>
         </button>
 

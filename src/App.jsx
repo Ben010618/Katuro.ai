@@ -36,6 +36,13 @@ import DLLStep1      from './pages/dllGen/DLLStep1';
 import DLLStep2      from './pages/dllGen/DLLStep2';
 import DLLOutputPage from './pages/dllGen/DLLOutputPage';
 
+// COT Gen
+import CotLayout     from './pages/cotGen/CotLayout';
+import CotStep1      from './pages/cotGen/CotStep1';
+import CotStep2      from './pages/cotGen/CotStep2';
+import CotStep3      from './pages/cotGen/CotStep3';
+import CotOutputPage from './pages/cotGen/CotOutputPage';
+
 function LoadingScreen() {
   return (
     <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
@@ -131,6 +138,16 @@ export default function App() {
               <Route path="step-1" element={<DLLStep1 />} />
               <Route path="step-2" element={<DLLStep2 />} />
               <Route path="output" element={<DLLOutputPage />} />
+            </Route>
+
+            {/* COT Gen — PPST-aligned Lesson Plan */}
+            <Route path="cot-gen">
+              <Route element={<CotLayout />}>
+                <Route path="step-1" element={<CotStep1 />} />
+                <Route path="step-2" element={<CotStep2 />} />
+                <Route path="step-3" element={<CotStep3 />} />
+              </Route>
+              <Route path="output" element={<CotOutputPage />} />
             </Route>
           </Route>
 
