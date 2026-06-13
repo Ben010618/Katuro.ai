@@ -74,11 +74,7 @@ function SectionBanner({ n, title, desc }) {
 }
 
 function fmtObjectives(s) {
-  return (
-    `Cognitive:\n${s.objective}\n\n` +
-    `Affective:\n(To be generated — complete Step 3)\n\n` +
-    `Psychomotor:\n(To be generated — complete Step 3)`
-  );
+  return s.objective || '';
 }
 
 function fmtPrelesson(s) {
@@ -211,6 +207,7 @@ export default function OutputPage() {
                     gradeLevel:         store.gradeLevel,
                     term:               store.term,
                     weekNumber:         store.weekNumber,
+                    competencies:       store.competencies,
                     competencyText:     store.competencyText,
                     declarationOfAIUse: store.declarationOfAIUse,
                   },
@@ -278,7 +275,16 @@ export default function OutputPage() {
                 <tr><Label note="Cite how AI was used. See DO 3, 2026 Annex A.">Declaration of AI use</Label><Merged n={N}><span style={{ whiteSpace: 'pre-line' }}>{store.declarationOfAIUse}</span></Merged></tr>
 
                 <SectionBanner n={N} title="Intentions." desc="Meaningful learning experiences are anchored in how we frame them. These intentions guide what learners will know, feel, and be able to do by the end of each session." />
-                <tr><Label note="Write the competency/ies from the curriculum that we are targeting.">Learning Competency:</Label><Merged n={N}>• {store.competencyText || '—'}</Merged></tr>
+                <tr>
+                  <Label note="Write the competency/ies from the curriculum that we are targeting.">Learning Competency:</Label>
+                  <Merged n={N}>
+                    <span style={{ whiteSpace: 'pre-line' }}>
+                      {store.competencies?.length > 0
+                        ? store.competencies.map(c => `• ${c.text}`).join('\n')
+                        : `• ${store.competencyText || '—'}`}
+                    </span>
+                  </Merged>
+                </tr>
                 <tr><Label note="Write the smaller knowledge, skills, or tasks from the competency that learners will achieve in each session.">Learning Objectives:</Label><PerSession sessions={sessions} get={fmtObjectives} /></tr>
 
                 <SectionBanner n={N} title="Learning Experience." desc="Learning experiences must be purposefully designed to develop learners' knowledge, skills, and values. The flow follows the ILAW design framework." />

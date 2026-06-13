@@ -75,11 +75,7 @@ function bannerRow(title, desc, n) {
 // ── Objective formatter ────────────────────────────────────────────────────
 
 function fmtObjective(s) {
-  return [
-    `Cognitive: ${s.objective || ''}`,
-    `Affective: (To be determined)`,
-    `Psychomotor: (To be determined)`,
-  ].join('\n');
+  return s.objective || '';
 }
 
 // ── Main export ────────────────────────────────────────────────────────────
@@ -152,7 +148,11 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
 
       // Intentions
       bannerRow('Intentions.', 'Meaningful learning experiences are anchored in how we frame them. These intentions guide what learners will know, feel, and be able to do by the end of each session.', n),
-      mRow('Learning Competency:',  `• ${lessonMeta.competencyText || '—'}`,  'Write the competency/ies from the curriculum that we are targeting.'),
+      mRow('Learning Competency:',
+        lessonMeta.competencies?.length > 0
+          ? lessonMeta.competencies.map(c => `• ${c.text}`).join('\n')
+          : `• ${lessonMeta.competencyText || '—'}`,
+        'Write the competency/ies from the curriculum that we are targeting.'),
       sRow('Learning Objectives:',  fmtObjective, 'Write the smaller knowledge, skills, or tasks from the competency that learners will achieve in each session.'),
 
       // Learning Experience
