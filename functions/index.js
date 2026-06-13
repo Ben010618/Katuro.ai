@@ -40,7 +40,7 @@ function geminiUrl(key) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
 }
 
-async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048 } = {}) {
+async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, _attempt = 0 } = {}) {
   const res = await fetch(geminiUrl(key), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -53,10 +53,25 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048 } =
       },
     }),
   });
+
+  // Retry on 429 (rate limit) or 503 (overloaded) with exponential backoff
+  if ((res.status === 429 || res.status === 503) && _attempt < 4) {
+    const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
+    await new Promise(r => setTimeout(r, delay));
+    return callGemini(key, prompt, { temperature, maxTokens, _attempt: _attempt + 1 });
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new HttpsError('internal', `Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`);
+    const isRateLimit = res.status === 429;
+    throw new HttpsError(
+      isRateLimit ? 'resource-exhausted' : 'internal',
+      isRateLimit
+        ? 'The AI service is busy right now. Please try again in a moment.'
+        : `Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`
+    );
   }
+
   const data  = await res.json();
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   return parts.map(p => p.text ?? '').join('');

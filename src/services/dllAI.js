@@ -1,5 +1,5 @@
 import { getAuth } from 'firebase/auth';
-import { getGeminiKey } from './geminiConfig';
+import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 import { checkDailyLimit } from './usageLimit';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
@@ -31,7 +31,7 @@ async function callGemini(prompt) {
   await checkDailyLimit(uid, 'dll_gen', DLL_DAILY_LIMIT);
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-  const res = await fetch(url, {
+  const res = await geminiWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

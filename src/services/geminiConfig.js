@@ -52,6 +52,29 @@ export function invalidateKeyCache() {
   _fetchedAt = 0;
 }
 
+/**
+ * Wraps a Gemini fetch call with exponential backoff retry.
+ * Retries up to 4 times on 429 (rate limit) or 503 (overloaded).
+ * Delays: ~1s, ~2s, ~4s, ~8s (+ random jitter to avoid thundering herd).
+ *
+ * Usage: replace `await fetch(url, opts)` with `await geminiWithRetry(url, opts)`
+ */
+export async function geminiWithRetry(url, opts, attempt = 0) {
+  const res = await fetch(url, opts);
+
+  if ((res.status === 429 || res.status === 503) && attempt < 4) {
+    const delay = (2 ** attempt) * 1000 + Math.random() * 600;
+    await new Promise(r => setTimeout(r, delay));
+    return geminiWithRetry(url, opts, attempt + 1);
+  }
+
+  if (!res.ok && res.status === 429) {
+    throw new Error('The AI service is busy right now. Please try again in a moment.');
+  }
+
+  return res;
+}
+
 /** Admin-only: save a new key to Firestore */
 export async function saveGeminiKey(apiKey, adminUid) {
   const trimmed = (apiKey || '').trim();

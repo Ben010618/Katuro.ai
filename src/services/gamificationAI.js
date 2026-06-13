@@ -1,4 +1,4 @@
-import { getGeminiKey } from './geminiConfig';
+import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function buildCtx(lesson) {
@@ -11,7 +11,7 @@ Objectives: ${objs || 'Not specified'}`;
 async function callGemini(prompt) {
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-  const res = await fetch(url, {
+  const res = await geminiWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
