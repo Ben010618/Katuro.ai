@@ -90,6 +90,23 @@ export const useCotStore = create(
 
       setStatus: (status) => set({ status }),
 
+      loadPlan: (data) => set({
+        teacherName:        data.teacherName        || '',
+        school:             data.school             || '',
+        subject:            data.subject            || '',
+        grade:              data.grade              || '',
+        quarter:            data.quarter            || '',
+        topic:              data.topic              || '',
+        melc:               data.melc               || '',
+        materials:          data.materials          || '',
+        objectives:         data.objectives         || '',
+        teachingDate:       data.teachingDate       || '',
+        selectedIndicators: data.selectedIndicators || DEFAULT_SELECTED,
+        generatedPlan:      data.plan               || null,
+        planId:             data.id                 || null,
+        status:             'generated',
+      }),
+
       reset: () => set({
         teacherName: '', school: '', subject: '', grade: '', quarter: '',
         topic: '', melc: '', materials: '', objectives: '', teachingDate: '',

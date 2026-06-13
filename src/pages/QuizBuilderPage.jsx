@@ -337,15 +337,22 @@ export default function QuizBuilderPage() {
                       onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.14)'; e.currentTarget.style.background = '#fff'; }}
                     >
                       {/* Icon */}
-                      <div style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: lesson.type === 'dll' ? '#ede9fe' : '#d8f3dc', display: 'grid', placeItems: 'center' }}>
-                        <BookOpen size={18} color={lesson.type === 'dll' ? '#4f46e5' : '#2d6a4f'} />
+                      <div style={{
+                        width: 42, height: 42, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center',
+                        background: lesson.type === 'dll' ? 'linear-gradient(135deg,#dcfce7,#bbf7d0)' : lesson.type === 'cot' ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : '#d8f3dc',
+                      }}>
+                        <BookOpen size={18} color={lesson.type === 'dll' ? '#16a34a' : lesson.type === 'cot' ? '#d97706' : '#2d6a4f'} />
                       </div>
 
                       {/* Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '1px 6px', background: lesson.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: lesson.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
-                            {lesson.type === 'dll' ? 'DLL' : 'ILAW'}
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '1px 6px',
+                            background: lesson.type === 'dll' ? '#dcfce7' : lesson.type === 'cot' ? '#fef3c7' : '#d8f3dc',
+                            color:      lesson.type === 'dll' ? '#14532d' : lesson.type === 'cot' ? '#92400e' : '#1a3d2b',
+                          }}>
+                            {lesson.type === 'dll' ? 'DLL' : lesson.type === 'cot' ? 'COT' : 'ILAW'}
                           </span>
                           <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {title}

@@ -393,6 +393,14 @@ export async function getDLLPlan(uid, planId) {
 }
 
 /**
+ * Fetch a single COT plan by ID (uses same collection as ILAW/DLL plans).
+ */
+export async function getCotPlan(uid, planId) {
+  const snap = await getDoc(doc(db, 'teachers', uid, 'lessonPlans', planId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
  * Save a fully generated PPST-aligned COT lesson plan.
  * Stored in the same lessonPlans collection with type: 'cot'.
  */
