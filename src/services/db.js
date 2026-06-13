@@ -507,9 +507,16 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
 
+const MAX_ACCOUNTS = 200;
+
 export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
+
+  const countSnap = await getDocs(collection(db, "teachers"));
+  if (countSnap.size >= MAX_ACCOUNTS) {
+    throw new Error(`Registration is currently closed — the platform has reached its ${MAX_ACCOUNTS}-account limit. Please contact your administrator.`);
+  }
 
   const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   const uid  = cred.user.uid;
