@@ -17,7 +17,8 @@ export const useLessonGenStore = create(
 
       // ── Step 2 ──────────────────────────────────────────
       selectedCompetency:  null,   // kept for backwards compat
-      competencyText:      '',     // raw textarea value
+      competencies:        [{ text: '', days: 1 }], // multi-competency rows [{ text, days }]
+      competencyText:      '',     // combined text (for Step 3 context + backwards compat)
       content:             '',     // subject matter / content topic
       contentStandards:    '',     // DepEd content standards statement
       learningContext:     '',     // teacher's school/classroom/community context (optional)
@@ -25,7 +26,7 @@ export const useLessonGenStore = create(
       declarationOfAIUse:  DEFAULT_DECLARATION,
       competencyCeiling:   '',     // e.g. "Apply"
       fullLadder:          [],     // e.g. ["Remember","Understand","Apply"]
-      unpackedSessions:    [],     // [{ day, date, bloomsLevel, objective }]
+      unpackedSessions:    [],     // [{ day, date, bloomsLevel, objective, keyContentFocus, activityType, competencyIndex, competencyText }]
 
       // ── Output ──────────────────────────────────────────
       generatedPlan: null,
@@ -40,6 +41,7 @@ export const useLessonGenStore = create(
 
       setStep2: (data) => set(data),
 
+      setCompetencies:     (comps)    => set({ competencies: comps }),
       setCompetencyText:   (text)     => set({ competencyText: text }),
       setContent:          (text)     => set({ content: text }),
       setContentStandards: (text)     => set({ contentStandards: text }),
@@ -57,6 +59,7 @@ export const useLessonGenStore = create(
         weekNumber:         doc.weekNumber         || '',
         selectedDays:       doc.selectedDays       || [],
         sessionCount:       (doc.selectedDays      || []).length,
+        competencies:       doc.competencies       || (doc.competencyText ? [{ text: doc.competencyText, days: (doc.selectedDays || []).length || 1 }] : [{ text: '', days: 1 }]),
         competencyText:     doc.competencyText     || '',
         content:            doc.content            || '',
         contentStandards:   doc.contentStandards   || '',
@@ -82,7 +85,7 @@ export const useLessonGenStore = create(
       reset: () => set({
         subject: '', gradeLevel: '', term: '', weekNumber: '',
         selectedDays: [], sessionCount: 0,
-        selectedCompetency: null, competencyText: '', content: '', contentStandards: '', learningContext: '', lessonName: '', declarationOfAIUse: DEFAULT_DECLARATION,
+        selectedCompetency: null, competencies: [{ text: '', days: 1 }], competencyText: '', content: '', contentStandards: '', learningContext: '', lessonName: '', declarationOfAIUse: DEFAULT_DECLARATION,
         competencyCeiling: '', fullLadder: [], unpackedSessions: [],
         generatedPlan: null, planId: null, status: 'idle',
       }),
@@ -98,6 +101,7 @@ export const useLessonGenStore = create(
         selectedDays:        s.selectedDays,
         sessionCount:        s.sessionCount,
         selectedCompetency:  s.selectedCompetency,
+        competencies:        s.competencies,
         competencyText:      s.competencyText,
         content:             s.content,
         contentStandards:    s.contentStandards,

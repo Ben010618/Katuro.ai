@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, AlertCircle, Plus, X } from 'lucide-react';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { unpackCompetency } from '../../services/ai';
 
@@ -12,6 +12,15 @@ const BLOOMS_COLORS = {
   Create:     { bg: '#d8f3dc', text: '#1a3d2b', border: '#2d6a4f' },
 };
 
+// One color per LC slot (up to 5)
+const LC_COLORS = [
+  { bg: '#d8f3dc', text: '#1a3d2b', border: '#2d6a4f', solid: '#52b788' },
+  { bg: '#e0f2fe', text: '#0369a1', border: '#0284c7', solid: '#38bdf8' },
+  { bg: 'rgba(232,163,32,0.15)', text: '#92400e', border: '#d97706', solid: '#fbbf24' },
+  { bg: '#fde8e8', text: '#c0392b', border: '#e05c5c', solid: '#f87171' },
+  { bg: '#ede9fe', text: '#6d28d9', border: '#7c3aed', solid: '#a78bfa' },
+];
+
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   border: '1px solid rgba(45,106,79,0.2)',
@@ -22,105 +31,199 @@ const inputStyle = {
   fontFamily: 'inherit',
 };
 
+function formatDateLong(iso) {
+  try {
+    return new Date(iso + 'T00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    });
+  } catch { return iso; }
+}
+
+function bloomsBase(level) {
+  return (level || '').split(/\s*[—\-]\s*/)[0].trim();
+}
+
 export default function Step2() {
   const store = useLessonGenStore();
+  const n     = store.selectedDays.length;
+  const days  = store.selectedDays;
 
-  const [competencyText,   setCompetencyText]   = useState(store.competencyText    || '');
-  const [content,          setContent]          = useState(store.content           || '');
-  const [contentStandards, setContentStandards] = useState(store.contentStandards  || '');
-  const [learningContext,  setLearningContext]  = useState(store.learningContext   || '');
-  const [lessonName,       setLessonName]       = useState(store.lessonName        || '');
-  const [contribute,       setContribute]       = useState(false);
-
-  const [ctError, setCtError] = useState(false);
-  const [lnError, setLnError] = useState(false);
-  const [ctShake, setCtShake] = useState(false);
-  const [lnShake, setLnShake] = useState(false);
-
-  const [unpackState,  setUnpackState]  = useState(store.unpackedSessions?.length > 0 ? 'success' : 'idle');
-  const [unpackError,  setUnpackError]  = useState(null);
-  const [unpackResult, setUnpackResult] = useState(
-    store.unpackedSessions?.length > 0
-      ? { competencyCeiling: store.competencyCeiling, fullLadder: store.fullLadder, sessions: store.unpackedSessions }
-      : null
+  // ── Multi-competency state ──────────────────────────────────────────────────
+  const [competencies, setCompetencies] = useState(
+    store.competencies?.length > 0 ? store.competencies : [{ text: '', days: 1 }]
+  );
+  const [compErrors, setCompErrors] = useState(() =>
+    (store.competencies?.length > 0 ? store.competencies : [{ text: '', days: 1 }]).map(() => false)
   );
 
-  const n    = store.selectedDays.length;
-  const days = store.selectedDays;
+  // ── Other fields ────────────────────────────────────────────────────────────
+  const [content,          setContent]          = useState(store.content          || '');
+  const [contentStandards, setContentStandards] = useState(store.contentStandards || '');
+  const [learningContext,  setLearningContext]  = useState(store.learningContext  || '');
+  const [lessonName,       setLessonName]       = useState(store.lessonName       || '');
+  const [lnError,          setLnError]          = useState(false);
+  const [lnShake,          setLnShake]          = useState(false);
+  const [contribute,       setContribute]       = useState(false);
 
-  useEffect(() => {
-    store.setStep2({ competencyText, content, contentStandards, learningContext, lessonName });
-  }, [competencyText, content, contentStandards, learningContext, lessonName]);
+  // ── Unpack state ────────────────────────────────────────────────────────────
+  const [unpackState,    setUnpackState]    = useState(store.unpackedSessions?.length > 0 ? 'success' : 'idle');
+  const [unpackError,    setUnpackError]    = useState(null);
+  const [sessions,       setSessions]       = useState(store.unpackedSessions?.length > 0 ? store.unpackedSessions : []);
+  const [unpackProgress, setUnpackProgress] = useState(0); // 0-100
 
-  function triggerShake(field) {
-    if (field === 'ct') { setCtShake(true); setTimeout(() => setCtShake(false), 500); }
-    else                { setLnShake(true); setTimeout(() => setLnShake(false), 500); }
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const totalDaysUsed = competencies.reduce((s, c) => s + c.days, 0);
+  const daysRemaining = n - totalDaysUsed;
+  const canAddMore    = competencies.length < 5 && daysRemaining > 0;
+  const atLimit       = daysRemaining <= 0;
+
+  // ── Competency row operations ───────────────────────────────────────────────
+  function addCompetency() {
+    if (!canAddMore) return;
+    setCompetencies(prev => [...prev, { text: '', days: 1 }]);
+    setCompErrors(prev => [...prev, false]);
   }
 
+  function removeCompetency(idx) {
+    if (competencies.length === 1) return;
+    setCompetencies(prev => prev.filter((_, i) => i !== idx));
+    setCompErrors(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateText(idx, text) {
+    setCompetencies(prev => prev.map((c, i) => i === idx ? { ...c, text } : c));
+    if (compErrors[idx] && text.trim())
+      setCompErrors(prev => prev.map((e, i) => i === idx ? false : e));
+  }
+
+  function updateDays(idx, newDays) {
+    const oldDays = competencies[idx].days;
+    if (totalDaysUsed - oldDays + newDays > n) return;
+    setCompetencies(prev => prev.map((c, i) => i === idx ? { ...c, days: newDays } : c));
+  }
+
+  // Max days this row's dropdown can offer without exceeding the budget
+  function maxDaysForRow(idx) {
+    const otherDays = competencies.reduce((s, c, i) => i === idx ? s : s + c.days, 0);
+    return Math.max(1, n - otherDays);
+  }
+
+  // ── Validation ──────────────────────────────────────────────────────────────
+  function validate() {
+    let ok = true;
+    const errs = competencies.map(c => {
+      const empty = !c.text.trim();
+      if (empty) ok = false;
+      return empty;
+    });
+    setCompErrors(errs);
+    if (!lessonName.trim()) {
+      setLnError(true); setLnShake(true);
+      setTimeout(() => setLnShake(false), 500);
+      ok = false;
+    } else {
+      setLnError(false);
+    }
+    return ok;
+  }
+
+  // ── Unpack ──────────────────────────────────────────────────────────────────
   async function handleUnpack() {
-    let hasError = false;
-    if (!competencyText.trim()) { setCtError(true); triggerShake('ct'); hasError = true; } else setCtError(false);
-    if (!lessonName.trim())     { setLnError(true); triggerShake('ln'); hasError = true; } else setLnError(false);
-    if (hasError) return;
+    if (!validate()) return;
     await runUnpack(0);
   }
 
   async function runUnpack(attempt) {
     setUnpackState('loading');
     setUnpackError(null);
-    setUnpackResult(null);
+    setSessions([]);
+    setUnpackProgress(0);
 
-    const selectedDates = days.map(iso => {
-      try {
-        return new Date(iso + 'T00:00').toLocaleDateString('en-US', {
-          weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-        });
-      } catch { return iso; }
+    // Slice selectedDates per competency sequentially
+    let offset = 0;
+    const dateSlices = competencies.map(c => {
+      const slice = days.slice(offset, offset + c.days).map(formatDateLong);
+      offset += c.days;
+      return slice;
     });
 
     try {
-      const result = await unpackCompetency({
-        competencyText:   competencyText.trim(),
-        content:          content.trim(),
-        contentStandards: contentStandards.trim(),
-        learningContext:  learningContext.trim(),
-        subject:          store.subject    || 'Science',
-        gradeLevel:       store.gradeLevel || 'Grade 7',
-        term:             store.term       || 'Term 1',
-        numberOfDays:     days.length || 1,
-        selectedDates,
-      });
-      setUnpackResult(result);
+      const merged = [];
+      let globalDay = 1;
+
+      for (let ci = 0; ci < competencies.length; ci++) {
+        if (ci > 0) await new Promise(r => setTimeout(r, 900));
+        setUnpackProgress(Math.round((ci / competencies.length) * 85));
+
+        const comp   = competencies[ci];
+        const result = await unpackCompetency({
+          competencyText:   comp.text.trim(),
+          content:          content.trim(),
+          contentStandards: contentStandards.trim(),
+          learningContext:  learningContext.trim(),
+          subject:          store.subject    || 'Science',
+          gradeLevel:       store.gradeLevel || 'Grade 7',
+          term:             store.term       || 'Term 1',
+          numberOfDays:     comp.days,
+          selectedDates:    dateSlices[ci],
+        });
+
+        const tagged = result.sessions.map((s, si) => ({
+          ...s,
+          day:              globalDay + si,
+          competencyIndex:  ci,
+          competencyText:   comp.text.trim(),
+          competencyCeiling: result.competencyCeiling,
+        }));
+        merged.push(...tagged);
+        globalDay += comp.days;
+      }
+
+      setUnpackProgress(100);
+      setSessions(merged);
       setUnpackState('success');
-      store.setCompetencyText(competencyText.trim());
+
+      // Persist to store — combine texts for Step 3 context
+      const combinedText = competencies.map(c => c.text.trim()).join('; ');
+      store.setCompetencies([...competencies]);
+      store.setCompetencyText(combinedText);
       store.setLessonName(lessonName.trim());
-      store.setCompetencyCeiling(result.competencyCeiling);
-      store.setFullLadder(result.fullLadder);
-      store.setUnpackedSessions(result.sessions);
+      store.setUnpackedSessions(merged);
+      store.setStep2({ content, contentStandards, learningContext });
+
     } catch (err) {
       console.error('Unpack error (attempt', attempt, '):', err);
       if (attempt === 0) {
         await new Promise(r => setTimeout(r, 1200));
-        await runUnpack(1);
-      } else {
-        setUnpackState('error');
-        setUnpackError(err.message);
+        return runUnpack(1);
       }
+      setUnpackState('error');
+      setUnpackError(err.message);
     }
   }
 
   function handleReunpack() {
     setUnpackState('idle');
-    setUnpackResult(null);
+    setSessions([]);
     store.setStep2({ competencyCeiling: '', fullLadder: [], unpackedSessions: [] });
   }
 
-  const isReady   = !!(competencyText.trim() && lessonName.trim());
+  const isReady   = competencies.every(c => c.text.trim()) && !!lessonName.trim();
   const isLoading = unpackState === 'loading';
   const isSuccess = unpackState === 'success';
   const isError   = unpackState === 'error';
-  const sessions  = unpackResult?.sessions || [];
 
+  // ── Budget tracker helper ────────────────────────────────────────────────────
+  function compIdxForDaySlot(slotIndex) {
+    let cum = 0;
+    for (let ci = 0; ci < competencies.length; ci++) {
+      cum += competencies[ci].days;
+      if (slotIndex < cum) return ci;
+    }
+    return -1;
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -137,11 +240,12 @@ export default function Step2() {
           to   { opacity:1; transform:translateY(0); }
         }
         .result-in { animation: resultFadeUp 0.3s ease-out forwards; }
+        @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
       `}</style>
 
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto' }}>
 
-        {/* Phase badge + heading */}
+        {/* ── Phase badge + heading ─────────────────────────────────────────── */}
         <div style={{ marginBottom: 28 }}>
           <span style={{ background: '#ede9fe', color: '#7c3aed', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
             Phase 2 — Competency
@@ -149,15 +253,15 @@ export default function Step2() {
           <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
             What will you teach this week?
           </h2>
-          <p style={{ margin: 0, fontSize: 15, color: '#4a6357', lineHeight: 1.65, maxWidth: 560 }}>
-            Paste your learning competency from the MATATAG Curriculum Guide. kaTuro AI will
-            detect its cognitive level and unpack it across your{' '}
+          <p style={{ margin: 0, fontSize: 15, color: '#4a6357', lineHeight: 1.65, maxWidth: 600 }}>
+            Add each learning competency from your MATATAG Curriculum Guide and assign how many days
+            each needs. kaTuro AI will unpack them across your{' '}
             <strong style={{ color: '#0d2218' }}>{n > 0 ? n : '—'}</strong>{' '}
             selected teaching day{n !== 1 ? 's' : ''}.
           </p>
         </div>
 
-        {/* The card */}
+        {/* ── Main card ────────────────────────────────────────────────────── */}
         <div style={{
           background: '#fff', borderRadius: 14,
           border: '1px solid rgba(45,106,79,0.12)', borderTop: '3px solid #1a3d2b',
@@ -191,7 +295,7 @@ export default function Step2() {
           </div>
 
           {/* Content */}
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 22 }}>
             <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
               Content
             </label>
@@ -209,39 +313,202 @@ export default function Step2() {
             />
           </div>
 
-          {/* Learning Competency */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
-              Learning Competency <span style={{ color: '#e05c5c' }}>*</span>
-            </label>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#4a6357', lineHeight: 1.65 }}>
-              Paste the competency exactly as written in your Curriculum Guide. AI will detect
-              its cognitive level and unpack it across your {n > 0 ? n : '—'} teaching day{n !== 1 ? 's' : ''}.
-            </p>
-            <textarea
-              rows={5}
-              value={competencyText}
-              onChange={e => { setCompetencyText(e.target.value); if (ctError && e.target.value.trim()) setCtError(false); }}
-              placeholder={`Paste your learning competency here...\n\nExamples:\n· describe the indicators for a chemical reaction as color change, formation of a precipitate, release of gas, and/or odor, or a change in temperature;\n\n· investigate the factors affecting the rate of a chemical reaction;`}
-              className={ctShake ? 'field-shake' : ''}
-              style={{
-                ...inputStyle,
-                border: `1px solid ${ctError ? '#e05c5c' : 'rgba(45,106,79,0.2)'}`,
-                background: ctError ? '#fde8e8' : '#f5faf7',
-                resize: 'vertical', lineHeight: 1.65,
-              }}
-              onFocus={e => { if (!ctError) { e.target.style.borderColor = '#52b788'; e.target.style.boxShadow = '0 0 0 2px rgba(82,183,136,0.25)'; } }}
-              onBlur={e  => { if (!ctError) { e.target.style.borderColor = 'rgba(45,106,79,0.2)'; e.target.style.boxShadow = 'none'; } }}
-            />
-            {ctError && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#e05c5c', fontWeight: 600 }}>This is required</p>}
+          <div style={{ borderTop: '1px solid rgba(45,106,79,0.08)', marginBottom: 20 }} />
+
+          {/* ── MULTI-COMPETENCY SECTION ────────────────────────────────────── */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', marginBottom: 3, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+                Learning Competencies <span style={{ color: '#e05c5c' }}>*</span>
+              </label>
+              <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+                Add each competency from your Budget of Work. Assign how many teaching days each one needs — the total cannot exceed your {n}-day week.
+              </p>
+            </div>
+
+            {/* Week Budget Tracker */}
+            {n > 0 && (
+              <div style={{
+                background: '#f5faf7', borderRadius: 10,
+                border: '1px solid rgba(45,106,79,0.12)',
+                padding: '12px 14px', marginBottom: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Week Budget
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: atLimit ? '#1a3d2b' : '#4a6357' }}>
+                    {totalDaysUsed} of {n} day{n !== 1 ? 's' : ''} assigned
+                    {atLimit && <span style={{ color: '#2d6a4f', marginLeft: 6 }}>✓ Full week covered</span>}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {Array.from({ length: n }, (_, i) => {
+                    const ci    = compIdxForDaySlot(i);
+                    const color = ci >= 0 ? LC_COLORS[ci] : null;
+                    let dayLabel = '';
+                    if (days[i]) {
+                      try { dayLabel = new Date(days[i] + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' }); }
+                      catch { dayLabel = `D${i + 1}`; }
+                    } else {
+                      dayLabel = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][i] || `D${i + 1}`;
+                    }
+                    return (
+                      <div key={i} style={{
+                        flex: 1, borderRadius: 7, overflow: 'hidden',
+                        border: `1.5px solid ${color ? color.border : 'rgba(45,106,79,0.15)'}`,
+                        transition: 'border-color 0.2s',
+                      }}>
+                        <div style={{
+                          height: 26,
+                          background: color ? color.solid : 'rgba(45,106,79,0.07)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 10, fontWeight: 800, color: color ? '#fff' : '#b0c4b8',
+                          letterSpacing: '0.04em',
+                          transition: 'background 0.2s',
+                        }}>
+                          {ci >= 0 ? `LC${ci + 1}` : '—'}
+                        </div>
+                        <div style={{
+                          textAlign: 'center', padding: '2px 0',
+                          fontSize: 9, fontWeight: 700, color: '#4a6357',
+                          background: '#fff',
+                        }}>
+                          {dayLabel}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Competency rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {competencies.map((comp, idx) => {
+                const lc       = LC_COLORS[idx];
+                const hasError = compErrors[idx];
+                const maxDays  = maxDaysForRow(idx);
+
+                return (
+                  <div key={idx} style={{
+                    background: '#fafcfa', borderRadius: 10,
+                    border: `1px solid ${hasError ? '#e05c5c' : 'rgba(45,106,79,0.14)'}`,
+                    borderLeft: `3px solid ${lc.solid}`,
+                    padding: '12px 14px',
+                    transition: 'border-color 0.15s',
+                  }}>
+                    {/* Row header: LC badge + days selector + remove */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{
+                        background: lc.bg, color: lc.text,
+                        border: `1px solid ${lc.border}`,
+                        borderRadius: 20, padding: '2px 10px',
+                        fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      }}>
+                        LC {idx + 1}
+                      </span>
+
+                      <div style={{ flex: 1 }} />
+
+                      {/* Days dropdown */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: '#4a6357', fontWeight: 600, whiteSpace: 'nowrap' }}>Days:</span>
+                        <select
+                          value={comp.days}
+                          onChange={e => updateDays(idx, Number(e.target.value))}
+                          style={{
+                            border: '1px solid rgba(45,106,79,0.25)', borderRadius: 7,
+                            padding: '4px 8px', fontSize: 13, fontWeight: 700,
+                            background: '#f5faf7', color: '#0d2218',
+                            cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+                          }}
+                        >
+                          {Array.from({ length: maxDays }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Remove */}
+                      {competencies.length > 1 && (
+                        <button
+                          onClick={() => removeCompetency(idx)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#b0c4b8', padding: 4, borderRadius: 6,
+                            display: 'flex', alignItems: 'center',
+                            transition: 'color 0.15s',
+                          }}
+                          title="Remove this competency"
+                          onMouseEnter={e => e.currentTarget.style.color = '#e05c5c'}
+                          onMouseLeave={e => e.currentTarget.style.color = '#b0c4b8'}
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Competency textarea */}
+                    <textarea
+                      rows={3}
+                      value={comp.text}
+                      onChange={e => updateText(idx, e.target.value)}
+                      placeholder={`Paste Learning Competency ${idx + 1} from the Curriculum Guide…`}
+                      style={{
+                        ...inputStyle,
+                        border: `1px solid ${hasError ? '#e05c5c' : 'rgba(45,106,79,0.15)'}`,
+                        background: hasError ? '#fde8e8' : '#fff',
+                        resize: 'vertical', lineHeight: 1.65, fontSize: 14,
+                        padding: '8px 12px',
+                      }}
+                      onFocus={e => { if (!hasError) { e.target.style.borderColor = '#52b788'; e.target.style.boxShadow = '0 0 0 2px rgba(82,183,136,0.25)'; } }}
+                      onBlur={e  => { if (!hasError) { e.target.style.borderColor = 'rgba(45,106,79,0.15)'; e.target.style.boxShadow = 'none'; } }}
+                    />
+                    {hasError && (
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#e05c5c', fontWeight: 600 }}>
+                        This is required
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add competency button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <button
+                onClick={addCompetency}
+                disabled={!canAddMore}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'none',
+                  border: `1.5px dashed ${canAddMore ? 'rgba(45,106,79,0.4)' : 'rgba(45,106,79,0.15)'}`,
+                  borderRadius: 8, padding: '7px 14px',
+                  fontSize: 13, fontWeight: 600,
+                  color: canAddMore ? '#2d6a4f' : '#b0c4b8',
+                  cursor: canAddMore ? 'pointer' : 'not-allowed',
+                  fontFamily: 'inherit', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (canAddMore) e.currentTarget.style.background = '#f0faf5'; }}
+                onMouseLeave={e => { if (canAddMore) e.currentTarget.style.background = 'none'; }}
+              >
+                <Plus size={14} /> Add Competency
+              </button>
+              {atLimit && (
+                <span style={{ fontSize: 11, color: '#9BB8A5', fontStyle: 'italic' }}>
+                  {n}-day limit reached
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Learning Context (Optional) */}
+          <div style={{ borderTop: '1px solid rgba(45,106,79,0.08)', marginBottom: 20 }} />
+
+          {/* Learning Context */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
-                Learning Context
-              </label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#0d2218' }}>Learning Context</label>
               <span style={{
                 background: 'rgba(232,163,32,0.15)', color: '#92400e',
                 borderRadius: 20, padding: '2px 9px',
@@ -251,20 +518,24 @@ export default function Step2() {
               </span>
             </div>
             <p style={{ margin: '0 0 8px', fontSize: 13, color: '#4a6357', lineHeight: 1.65 }}>
-              Describe your school, classroom, or community situation. When filled, the AI will tailor
-              activities, examples, and assessments to your specific context — not generic ones.
+              Describe your school, classroom, or community situation. The AI will tailor activities,
+              examples, and assessments to your specific context.
             </p>
             <textarea
               rows={3}
               value={learningContext}
               onChange={e => setLearningContext(e.target.value)}
-              placeholder={`Examples:\n· Rural school with limited lab equipment — activities should use locally available materials\n· Coastal community in Quezon Province — connect examples to fishing and marine life\n· Urban school in Cebu with access to tablets and internet\n· Multilingual class — some learners are Bisaya-dominant`}
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.65, borderColor: learningContext.trim() ? 'rgba(232,163,32,0.5)' : 'rgba(45,106,79,0.2)', background: learningContext.trim() ? '#fffbeb' : '#f5faf7' }}
+              placeholder={`Examples:\n· Rural school with limited lab equipment — use locally available materials\n· Coastal community in Quezon Province — connect to fishing and marine life\n· Multilingual class — some learners are Bisaya-dominant`}
+              style={{
+                ...inputStyle, resize: 'vertical', lineHeight: 1.65,
+                borderColor: learningContext.trim() ? 'rgba(232,163,32,0.5)' : 'rgba(45,106,79,0.2)',
+                background:  learningContext.trim() ? '#fffbeb' : '#f5faf7',
+              }}
               onFocus={e => { e.target.style.borderColor = '#d97706'; e.target.style.boxShadow = '0 0 0 2px rgba(217,119,6,0.2)'; }}
               onBlur={e  => { e.target.style.borderColor = learningContext.trim() ? 'rgba(232,163,32,0.5)' : 'rgba(45,106,79,0.2)'; e.target.style.boxShadow = 'none'; }}
             />
             {learningContext.trim() && (
-              <p style={{ margin: '5px 0 0', fontSize: 12, color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <p style={{ margin: '5px 0 0', fontSize: 12, color: '#b45309', fontWeight: 600 }}>
                 ✦ AI will contextualize this lesson to your setting
               </p>
             )}
@@ -279,7 +550,7 @@ export default function Step2() {
               type="text"
               value={lessonName}
               onChange={e => { setLessonName(e.target.value); if (lnError && e.target.value.trim()) setLnError(false); }}
-              placeholder="e.g. Indicators of Chemical Reactions"
+              placeholder="e.g. Chemical Reactions — Indicators, Acids, Bases, and Salts"
               className={lnShake ? 'field-shake' : ''}
               style={{
                 ...inputStyle,
@@ -300,22 +571,36 @@ export default function Step2() {
             <button
               onClick={isLoading ? undefined : handleUnpack}
               style={{
-                width: '100%', height: 48, marginTop: 8,
+                width: '100%', height: 52, marginTop: 8,
                 background: isLoading ? '#1a3d2b' : isReady ? '#1a3d2b' : 'rgba(45,106,79,0.1)',
-                color: isLoading ? '#fff' : isReady ? '#fff' : '#4a6357',
+                color:      isLoading ? '#fff'    : isReady ? '#fff'    : '#4a6357',
                 border: 'none', borderRadius: 10,
                 fontSize: 15, fontWeight: 600,
                 cursor: isLoading ? 'not-allowed' : isReady ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'background 0.15s',
-                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                transition: 'background 0.15s', fontFamily: 'inherit',
               }}
               onMouseEnter={e => { if (isReady && !isLoading) e.currentTarget.style.background = '#2d6a4f'; }}
               onMouseLeave={e => { if (isReady && !isLoading) e.currentTarget.style.background = '#1a3d2b'; }}
             >
               {isLoading ? (
-                <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />AI is detecting cognitive level…</>
-              ) : isReady ? 'Unpack with AI →' : 'Paste a competency to continue'}
+                <>
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  Unpacking {competencies.length} competenc{competencies.length === 1 ? 'y' : 'ies'}…
+                  {unpackProgress > 0 && (
+                    <span style={{
+                      fontSize: 12, fontWeight: 400, opacity: 0.75,
+                      background: 'rgba(255,255,255,0.15)', borderRadius: 20,
+                      padding: '2px 8px',
+                    }}>
+                      {unpackProgress}%
+                    </span>
+                  )}
+                </>
+              ) : isReady
+                ? `Unpack ${competencies.length} competenc${competencies.length === 1 ? 'y' : 'ies'} with AI →`
+                : 'Fill in competencies and lesson name to continue'
+              }
             </button>
           )}
 
@@ -328,9 +613,12 @@ export default function Step2() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#1a3d2b' }}>
-                ✓ Competency unpacked — {sessions.length} session{sessions.length !== 1 ? 's' : ''} ready
+                ✓ {sessions.length} session{sessions.length !== 1 ? 's' : ''} unpacked across {competencies.length} competenc{competencies.length === 1 ? 'y' : 'ies'}
               </span>
-              <span onClick={handleReunpack} style={{ fontSize: 12, color: '#4a6357', textDecoration: 'underline', cursor: 'pointer' }}>
+              <span
+                onClick={handleReunpack}
+                style={{ fontSize: 12, color: '#4a6357', textDecoration: 'underline', cursor: 'pointer' }}
+              >
                 Re-unpack
               </span>
             </div>
@@ -346,10 +634,14 @@ export default function Step2() {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                 <AlertCircle size={15} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
                 <div>
-                  <p style={{ margin: '0 0 2px', fontSize: 13, color: '#e05c5c', fontWeight: 600, lineHeight: 1.5 }}>
-                    ⚠ AI couldn't process this competency.
+                  <p style={{ margin: '0 0 2px', fontSize: 13, color: '#e05c5c', fontWeight: 600 }}>
+                    ⚠ AI couldn't process a competency.
                   </p>
-                  {unpackError && <p style={{ margin: 0, fontSize: 11, color: '#e05c5c', lineHeight: 1.5, opacity: 0.8, wordBreak: 'break-word' }}>{unpackError}</p>}
+                  {unpackError && (
+                    <p style={{ margin: 0, fontSize: 11, color: '#e05c5c', opacity: 0.8, lineHeight: 1.5, wordBreak: 'break-word' }}>
+                      {unpackError}
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -358,8 +650,7 @@ export default function Step2() {
                   background: 'none', border: '1px solid #1a3d2b',
                   borderRadius: 8, padding: '5px 12px',
                   fontSize: 12, fontWeight: 600, color: '#1a3d2b',
-                  cursor: 'pointer', flexShrink: 0, transition: 'background 0.12s',
-                  fontFamily: 'inherit',
+                  cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = '#f0faf5'}
                 onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -370,59 +661,167 @@ export default function Step2() {
           )}
         </div>
 
-        {/* Results after successful unpack */}
-        {isSuccess && unpackResult && (
+        {/* ── 5-COLUMN UNPACKING DISPLAY ──────────────────────────────────── */}
+        {isSuccess && sessions.length > 0 && (
           <div className="result-in">
-            <div style={{
-              background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)',
-              borderRadius: 10, padding: '12px 16px', marginBottom: 12,
-            }}>
-              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#1a3d2b' }}>
-                AI detected: <strong>{unpackResult.competencyCeiling}</strong> level competency
-              </p>
-              <p style={{ margin: 0, fontSize: 13, color: '#4a6357' }}>
-                Unpacked downward: {unpackResult.fullLadder.join(' → ')} → distributed across {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-              </p>
+
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Weekly Teaching Plan</span>
+                <span style={{ marginLeft: 10, fontSize: 12, color: '#4a6357' }}>
+                  {sessions.length} session{sessions.length !== 1 ? 's' : ''} · AI-sequenced by Bloom's Taxonomy
+                </span>
+              </div>
+              <span
+                onClick={handleReunpack}
+                style={{ fontSize: 12, color: '#4a6357', textDecoration: 'underline', cursor: 'pointer', flexShrink: 0 }}
+              >
+                Re-unpack
+              </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d2218' }}>Learning objectives per session</span>
-              <span onClick={handleReunpack} style={{ fontSize: 12, color: '#4a6357', textDecoration: 'underline', cursor: 'pointer' }}>Re-unpack</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {sessions.map((session, i) => {
-                const bc = BLOOMS_COLORS[session.bloomsLevel] || BLOOMS_COLORS.Remember;
+            {/* LC legend */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {competencies.map((comp, idx) => {
+                const lc    = LC_COLORS[idx];
+                const label = comp.text.trim();
                 return (
-                  <div key={i} style={{
-                    background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
-                    borderLeft: `3px solid ${bc.border}`,
-                    borderRadius: 10, padding: '14px 16px',
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: lc.bg, border: `1px solid ${lc.border}`,
+                    borderRadius: 20, padding: '4px 12px',
+                    fontSize: 11, color: lc.text, fontWeight: 600, maxWidth: 320,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#2d6a4f' }}>
-                        Session {session.day} · {session.date}
-                      </span>
-                      <span style={{ background: bc.bg, color: bc.text, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                        {session.bloomsLevel}
-                      </span>
-                    </div>
-                    <p style={{ margin: '8px 0 0', fontSize: 15, color: '#0d2218', lineHeight: 1.65 }}>
-                      {session.objective}
-                    </p>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: lc.solid, flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>LC {idx + 1}:</span>
+                    <span style={{
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      maxWidth: 220,
+                    }} title={label}>
+                      {label.length > 50 ? label.slice(0, 50) + '…' : label}
+                    </span>
+                    <span style={{ color: lc.border, opacity: 0.7, flexShrink: 0 }}>
+                      · {comp.days} day{comp.days !== 1 ? 's' : ''}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 16 }}>
+            {/* Day columns — horizontal scroll on small screens */}
+            <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${sessions.length}, minmax(160px, 1fr))`,
+                gap: 10,
+                minWidth: sessions.length * 170,
+              }}>
+                {sessions.map((session, i) => {
+                  const lc = LC_COLORS[session.competencyIndex ?? 0];
+                  const bc = BLOOMS_COLORS[bloomsBase(session.bloomsLevel)] || BLOOMS_COLORS.Remember;
+
+                  // Parse date string like "Monday, January 13, 2025"
+                  let dayAbbr = `D${session.day}`;
+                  let dateSub = '';
+                  if (session.date) {
+                    const parts = session.date.split(',');
+                    if (parts.length >= 2) {
+                      dayAbbr = parts[0].trim().slice(0, 3);   // "Mon"
+                      dateSub = parts.slice(1).join(',').trim(); // "January 13, 2025"
+                    }
+                  }
+
+                  return (
+                    <div key={i} style={{
+                      background: '#fff',
+                      border: '1px solid rgba(45,106,79,0.12)',
+                      borderTop: `3px solid ${lc.solid}`,
+                      borderRadius: 10,
+                      padding: '14px 13px',
+                      display: 'flex', flexDirection: 'column', gap: 0,
+                    }}>
+                      {/* Day header */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: '#0d2218', lineHeight: 1 }}>
+                          {dayAbbr}
+                        </div>
+                        {dateSub && (
+                          <div style={{ fontSize: 10, color: '#9BB8A5', marginTop: 2, lineHeight: 1.3 }}>
+                            {dateSub}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Badges */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                        <span style={{
+                          background: lc.bg, color: lc.text, border: `1px solid ${lc.border}`,
+                          borderRadius: 20, padding: '2px 8px',
+                          fontSize: 10, fontWeight: 700,
+                        }}>
+                          LC {(session.competencyIndex ?? 0) + 1}
+                        </span>
+                        <span style={{
+                          background: bc.bg, color: bc.text, border: `1px solid ${bc.border}`,
+                          borderRadius: 20, padding: '2px 8px',
+                          fontSize: 10, fontWeight: 700,
+                        }}>
+                          {bloomsBase(session.bloomsLevel)}
+                        </span>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid rgba(45,106,79,0.08)', marginBottom: 10 }} />
+
+                      {/* Objective */}
+                      <div style={{ marginBottom: 9 }}>
+                        <p style={{ margin: '0 0 3px', fontSize: 9, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          Learning Objective
+                        </p>
+                        <p style={{ margin: 0, fontSize: 12, color: '#0d2218', lineHeight: 1.6 }}>
+                          {session.objective}
+                        </p>
+                      </div>
+
+                      {/* Key Content Focus */}
+                      {session.keyContentFocus && (
+                        <div style={{ marginBottom: 9 }}>
+                          <p style={{ margin: '0 0 3px', fontSize: 9, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                            Content Focus
+                          </p>
+                          <p style={{ margin: 0, fontSize: 12, color: '#163828', lineHeight: 1.5, fontWeight: 500 }}>
+                            {session.keyContentFocus}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Activity Type */}
+                      {session.activityType && (
+                        <div style={{
+                          marginTop: 'auto', paddingTop: 8,
+                          background: lc.bg, borderRadius: 6,
+                          padding: '5px 8px',
+                          fontSize: 11, color: lc.text, fontWeight: 600,
+                          textAlign: 'center',
+                        }}>
+                          {session.activityType}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Contribute checkbox */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 18 }}>
               <input
                 type="checkbox" id="contribute" checked={contribute}
                 onChange={e => setContribute(e.target.checked)}
                 style={{ accentColor: '#1a3d2b', marginTop: 2, flexShrink: 0 }}
               />
               <label htmlFor="contribute" style={{ fontSize: 13, color: '#4a6357', cursor: 'pointer', lineHeight: 1.65 }}>
-                Help other teachers — contribute this competency to kaTuro's library
+                Help other teachers — contribute these competencies to kaTuro's library
               </label>
             </div>
           </div>

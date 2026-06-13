@@ -243,6 +243,18 @@ Analyze: analyze, compare, differentiate, examine, relate, categorize
 Evaluate: evaluate, assess, justify, recommend, judge, defend
 Create: design, create, formulate, develop, construct, propose
 
+For each session also write:
+- keyContentFocus: 3–6 words naming the specific concept or skill taught that day (e.g. "Chemical reaction indicators", "Acid-base identification")
+- activityType: the primary instructional strategy for that day. Choose the most fitting:
+  "Concept Introduction" (Remember days — direct instruction, lecture-demo)
+  "Guided Discussion" (Understand days — Socratic questioning, concept unpacking)
+  "Guided Practice" (Apply day 1 — worked examples, teacher-led activity)
+  "Independent Practice" (Apply day 2+ — individual/pair seatwork)
+  "Collaborative Analysis" (Analyze days — group problem-solving, case study)
+  "Performance Task" (Evaluate/Create days — output-based, project)
+  "Review and Practice" (extra Review days)
+  "Enrichment Activity" (extra Enrichment days)
+
 RETURN FORMAT
 
 Return ONLY this JSON structure.
@@ -258,13 +270,17 @@ Just the raw JSON object:
       "day": 1,
       "date": "${selectedDates[0] || 'Day 1'}",
       "bloomsLevel": "Remember",
-      "objective": "Write the specific objective text for this session here"
+      "objective": "Write the specific objective text for this session here",
+      "keyContentFocus": "3–6 word concept focus",
+      "activityType": "Concept Introduction"
     },
     {
       "day": 2,
       "date": "${selectedDates[1] || 'Day 2'}",
       "bloomsLevel": "Understand",
-      "objective": "Write the specific objective text for this session here"
+      "objective": "Write the specific objective text for this session here",
+      "keyContentFocus": "3–6 word concept focus",
+      "activityType": "Guided Discussion"
     }
   ]
 }`;
