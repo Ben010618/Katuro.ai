@@ -4,7 +4,7 @@ import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
-import { FileDown, ChevronDown, ChevronRight, CalendarDays, RotateCcw } from 'lucide-react';
+import { FileDown, RotateCcw, Printer } from 'lucide-react';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -15,58 +15,36 @@ const STEP_LABELS = {
   C: 'Presenting examples/instances of the new lesson',
   D: 'Discussing new concepts and practicing new skills #1',
   E: 'Discussing new concepts and practicing new skills #2',
-  F: 'Developing mastery (Leads to Formative Assessment)',
+  F: 'Developing mastery (Leads to Formative Assessment 3)',
   G: 'Finding practical applications of concepts and skills in daily living',
   H: 'Making generalizations and abstractions about the lesson',
   I: 'Evaluating Learning',
   J: 'Additional activities for application or remediation',
 };
 
-function DayAccordion({ dayKey, dayName, dayProc, content }) {
-  const [open, setOpen] = useState(false);
-  const hasContent = dayProc && STEPS.some(s => dayProc[s]);
+const border = '1px solid #999';
+const base = { border, padding: '4px 6px', fontSize: 11, fontFamily: 'Arial, sans-serif', verticalAlign: 'top' };
+const hdr  = { ...base, background: '#d9e1f2', fontWeight: 700, textAlign: 'center', verticalAlign: 'middle', fontSize: 11 };
+const lbl  = { ...base, background: '#f2f2f2', fontWeight: 600, fontSize: 10, lineHeight: 1.4, verticalAlign: 'top' };
+const sec  = { ...base, background: '#d9e1f2', fontWeight: 700, fontSize: 11 };
 
-  return (
-    <div style={{ border: '1px solid rgba(45,106,79,0.12)', borderRadius: 10, overflow: 'hidden' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', textAlign: 'left', background: open ? 'rgba(79,70,229,0.04)' : '#fff',
-          border: 'none', padding: '13px 18px', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#0d2218' }}>{dayName}</span>
-          {content && (
-            <span style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>{content}</span>
-          )}
-          {!hasContent && (
-            <span style={{ fontSize: 11, color: '#9ca3af', background: '#f3f4f6', padding: '2px 8px', borderRadius: 20 }}>No class</span>
-          )}
-        </div>
-        {open ? <ChevronDown size={15} color="#6b7280" /> : <ChevronRight size={15} color="#6b7280" />}
-      </button>
-
-      {open && hasContent && (
-        <div style={{ borderTop: '1px solid rgba(45,106,79,0.08)', padding: '0' }}>
-          {STEPS.map(step => (
-            <div key={step} style={{
-              display: 'grid', gridTemplateColumns: '260px 1fr',
-              borderBottom: step !== 'J' ? '1px solid rgba(45,106,79,0.06)' : 'none',
-            }}>
-              <div style={{ padding: '10px 16px', background: '#fafafa', fontSize: 12, color: '#4a6357', fontWeight: 600, lineHeight: 1.5 }}>
-                {step}. {STEP_LABELS[step]}
-              </div>
-              <div style={{ padding: '10px 16px', fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>
-                {dayProc[step] || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>—</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// Returns array of <td> elements with colspan based on BOW list
+function bowCells(list) {
+  const cells = [];
+  let used = 0;
+  (list || []).forEach((item, i) => {
+    const span = Math.max(1, item.days || 1);
+    cells.push(
+      <td key={i} colSpan={span} style={{ ...base, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+        {item.text?.trim() || ''}
+      </td>
+    );
+    used += span;
+  });
+  if (used < 5) {
+    cells.push(<td key="pad" colSpan={5 - used} style={base}></td>);
+  }
+  return cells;
 }
 
 export default function DLLOutputPage() {
@@ -99,157 +77,246 @@ export default function DLLOutputPage() {
     }
   }
 
-  function handleNewDLL() {
-    store.reset();
-    navigate('/dll-gen/step-1');
-  }
+  const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
+  const contentList = (store.contentList || []).filter(c => c.text?.trim());
+  const proc        = store.procedure || {};
+  const objs        = store.objectives || {};
 
-  const days = store.dailyContent;
+  const sigRows = [
+    ['Prepared by:', profile?.name || null, profile?.designation || profile?.position || 'Teacher'],
+    ['Checked by:', profile?.supervisorName || null, profile?.supervisorPosition || 'Master Teacher / Head Teacher'],
+    ['Noted by:', null, 'School Principal'],
+  ];
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)', display: 'grid', placeItems: 'center' }}>
-          <CalendarDays size={19} color="#4f46e5" />
-        </div>
-        <div>
+    <>
+      {/* ── Action bar (hidden when printing) ─────────────────────────── */}
+      <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Daily Lesson Log · Generated
           </p>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0d2218' }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0d2218' }}>
             {store.subject} — {store.gradeLevel}
           </h1>
         </div>
-      </div>
-
-      {/* Meta card */}
-      <div style={{
-        background: '#fff', borderRadius: 12, border: '1px solid rgba(45,106,79,0.12)',
-        padding: '18px 22px', marginBottom: 20,
-        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 24px',
-      }}>
-        {[
-          ['Subject', store.subject],
-          ['Grade Level', store.gradeLevel],
-          ['Term', store.term],
-          ['Section', store.section || '—'],
-          ['Teaching Dates', store.teachingDates || '—'],
-          ['Teacher', profile?.name || '—'],
-        ].map(([label, val]) => (
-          <div key={label}>
-            <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#0d2218', fontWeight: 500 }}>{val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* MELC */}
-      <div style={{
-        background: 'rgba(79,70,229,0.04)', border: '1px solid rgba(79,70,229,0.12)',
-        borderRadius: 10, padding: '14px 18px', marginBottom: 22,
-      }}>
-        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MELC</p>
-        {store.melcList?.length > 0
-          ? store.melcList.map((m, i) => (
-              <p key={i} style={{ margin: i === 0 ? 0 : '4px 0 0', fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>
-                <span style={{ fontWeight: 700 }}>MELC {i + 1}</span> ({m.days} day{m.days !== 1 ? 's' : ''}): {m.text}
-              </p>
-            ))
-          : <p style={{ margin: 0, fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>{store.melc}</p>
-        }
-      </div>
-
-      {/* Per-day objectives */}
-      {store.objectives && (
-        <div style={{ marginBottom: 22 }}>
-          <p style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>
-            Learning Objectives
-          </p>
-          <div style={{
-            background: '#fff', borderRadius: 12,
-            border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden',
-          }}>
-            {DAY_KEYS.map((dk, i) => {
-              const obj = store.objectives[dk];
-              if (!obj) return null;
-              return (
-                <div key={dk} style={{
-                  display: 'grid', gridTemplateColumns: '110px 1fr',
-                  borderBottom: i < DAY_KEYS.length - 1 ? '1px solid rgba(45,106,79,0.08)' : 'none',
-                }}>
-                  <div style={{
-                    padding: '10px 14px', background: '#f5faf7',
-                    fontSize: 12, fontWeight: 700, color: '#1a3d2b',
-                    display: 'flex', alignItems: 'flex-start',
-                  }}>
-                    {DAY_NAMES[i]}
-                  </div>
-                  <div style={{ padding: '10px 16px', fontSize: 13, color: '#0d2218', lineHeight: 1.6 }}>
-                    {obj || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>No class</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Procedure accordion */}
-      <p style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Procedure (AI-Generated)</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-        {DAY_KEYS.map((dk, i) => (
-          <DayAccordion
-            key={dk}
-            dayKey={dk}
-            dayName={DAY_NAMES[i]}
-            dayProc={store.procedure[dk]}
-            content={days[['mon', 'tue', 'wed', 'thu', 'fri'][i]]}
-          />
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button onClick={() => window.print()} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Printer size={14} /> Print
+        </button>
         <button
           onClick={handleDownload}
           disabled={downloading}
           className="btn-primary"
-          style={{ fontSize: 15, padding: '12px 26px', opacity: downloading ? 0.7 : 1 }}
+          style={{ fontSize: 13, padding: '9px 18px', opacity: downloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          {downloading ? (
-            <>
-              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-              Preparing…
-            </>
-          ) : (
-            <>
-              <FileDown size={16} />
-              Download DOCX
-            </>
-          )}
+          <FileDown size={14} />
+          {downloading ? 'Preparing…' : 'Download DOCX'}
         </button>
-
-        <button
-          onClick={() => navigate('/dll-gen/step-2')}
-          className="btn-outline"
-          style={{ fontSize: 14, padding: '12px 22px' }}
-        >
+        <button onClick={() => navigate('/dll-gen/step-2')} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px' }}>
           Edit Inputs
         </button>
-
         <button
-          onClick={handleNewDLL}
+          onClick={() => { store.reset(); navigate('/dll-gen/step-1'); }}
           className="btn-outline"
-          style={{ fontSize: 14, padding: '12px 22px' }}
+          style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <RotateCcw size={14} />
-          New DLL
+          <RotateCcw size={13} /> New DLL
         </button>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+      {/* ── DLL Document (A4 paper) ────────────────────────────────────── */}
+      <div className="dll-a4">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="dll-table">
+            <colgroup>
+              {/* label col: 190px; 5 day cols: equal share of remainder */}
+              <col style={{ width: 190 }} />
+              <col /><col /><col /><col /><col />
+            </colgroup>
+            <tbody>
+
+              {/* Title */}
+              <tr>
+                <td colSpan={6} style={{ ...hdr, fontSize: 14, padding: '8px 6px', border: '2px solid #000', letterSpacing: '0.06em' }}>
+                  DAILY LESSON LOG
+                </td>
+              </tr>
+
+              {/* School / teacher info */}
+              <tr>
+                <td colSpan={3} style={{ ...base, fontSize: 10.5 }}>
+                  <strong>School: </strong>{profile?.school || '—'}&emsp;
+                  <strong>Teacher: </strong>{profile?.name || '—'}
+                </td>
+                <td colSpan={2} style={{ ...base, fontSize: 10.5 }}>
+                  <strong>Grade Level: </strong>{store.gradeLevel || '—'}&emsp;
+                  <strong>Learning Area: </strong>{store.subject || '—'}
+                </td>
+                <td style={{ ...base, fontSize: 10 }}>
+                  <div><strong>Teaching Dates: </strong>{store.teachingDates || '—'}</div>
+                  <div><strong>Term: </strong>{store.term || '—'}</div>
+                  {store.section && <div><strong>Section: </strong>{store.section}</div>}
+                </td>
+              </tr>
+
+              {/* Day-column headers */}
+              <tr>
+                <td style={{ ...hdr, textAlign: 'left', fontSize: 10 }}>Objectives / Procedure</td>
+                {DAY_NAMES.map(d => <td key={d} style={hdr}>{d}</td>)}
+              </tr>
+
+              {/* ── I. OBJECTIVES ──────────────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>I. OBJECTIVES</td></tr>
+
+              <tr>
+                <td style={lbl}>A. Content Standards</td>
+                <td colSpan={5} style={base}>{store.contentStandards || '—'}</td>
+              </tr>
+
+              <tr>
+                <td style={lbl}>B. Performance Standards</td>
+                <td colSpan={5} style={base}>{store.performanceStandards || '—'}</td>
+              </tr>
+
+              {/* C — MELC: merged by days allocation */}
+              <tr>
+                <td style={lbl}>
+                  C. Learning Competency /<br />Learning Objectives
+                  <div style={{ fontSize: 9, fontWeight: 400, color: '#666', marginTop: 1 }}>(LC Code)</div>
+                </td>
+                {bowCells(melcList)}
+              </tr>
+
+              {/* Per-day learning objectives (AI-generated) */}
+              <tr>
+                <td style={{ ...lbl, background: '#eef2ff' }}>
+                  Learning Objectives
+                  <div style={{ fontSize: 9, fontWeight: 400, color: '#555' }}>(per day)</div>
+                </td>
+                {DAY_KEYS.map(dk => (
+                  <td key={dk} style={{ ...base, lineHeight: 1.5 }}>
+                    {objs[dk] || <span style={{ color: '#bbb', fontStyle: 'italic' }}>—</span>}
+                  </td>
+                ))}
+              </tr>
+
+              {/* ── II. CONTENT ────────────────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>II. CONTENT (Subject Matter)</td></tr>
+              <tr>
+                <td style={{ ...lbl, verticalAlign: 'middle' }}>
+                  Content<br />
+                  <span style={{ fontWeight: 400, fontSize: 9 }}>(Subject Matter)</span>
+                </td>
+                {bowCells(contentList)}
+              </tr>
+
+              {/* ── III. LEARNING RESOURCES ────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>III. LEARNING RESOURCES</td></tr>
+              {[
+                'A. References',
+                "1. Teacher's Guide pages",
+                "2. Learner's Materials pages",
+                '3. Textbook pages',
+                '4. Additional Materials from LRMDS portal',
+                'B. Other Learning Resources',
+              ].map(label => (
+                <tr key={label}>
+                  <td style={{ ...lbl, fontSize: 10 }}>{label}</td>
+                  <td colSpan={5} style={{ ...base, minHeight: 18 }}></td>
+                </tr>
+              ))}
+
+              {/* ── IV. PROCEDURES ─────────────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>IV. PROCEDURES</td></tr>
+              <tr>
+                <td style={{ ...hdr, textAlign: 'left', fontSize: 10 }}>Steps</td>
+                {DAY_NAMES.map(d => <td key={d} style={{ ...hdr, fontSize: 10 }}>{d}</td>)}
+              </tr>
+              {STEPS.map(s => (
+                <tr key={s}>
+                  <td style={{ ...lbl, fontSize: 10, lineHeight: 1.35 }}>{s}. {STEP_LABELS[s]}</td>
+                  {DAY_KEYS.map(dk => (
+                    <td key={dk} style={{ ...base, fontSize: 10, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                      {proc[dk]?.[s] || ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
+              {/* ── V. REMARKS ─────────────────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>V. REMARKS</td></tr>
+              <tr>
+                <td style={lbl}>Remarks</td>
+                <td colSpan={5} style={{ ...base, height: 36 }}></td>
+              </tr>
+
+              {/* ── VI. REFLECTION ─────────────────────────────────────── */}
+              <tr><td colSpan={6} style={sec}>VI. REFLECTION</td></tr>
+              {[
+                'A. No. of learners who earned 80% in the evaluation',
+                'B. No. of learners who require additional activities for remediation',
+                'C. Did the remedial lessons work? No. of learners who have caught up with the lesson',
+                'D. No. of learners who continue to require remediation',
+                'E. Which of my teaching strategies worked well? Why did these work?',
+                'F. What difficulties did I encounter which my principal or supervisor can help me solve?',
+                'G. What innovation or localized materials did I use/discover which I wish to share with other teachers?',
+              ].map(label => (
+                <tr key={label}>
+                  <td style={{ ...lbl, fontSize: 10, lineHeight: 1.35 }}>{label}</td>
+                  <td colSpan={5} style={{ ...base, height: 28 }}></td>
+                </tr>
+              ))}
+
+            </tbody>
+          </table>
+        </div>
+
+        {/* Signature block */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontFamily: 'Arial, sans-serif' }}>
+          <tbody>
+            <tr>
+              {sigRows.map(([title, name, role]) => (
+                <td key={title} style={{ padding: '4px 10px', width: '33%', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 700, fontSize: 10 }}>{title}</div>
+                  <div style={{ marginTop: 22, borderTop: '1px solid #000', paddingTop: 3 }}>
+                    <div style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11 }}>
+                      {name || '________________________________'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>{role}</div>
+                  </div>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <style>{`
+        .dll-a4 {
+          background: #fff;
+          padding: 16px 20px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+        .dll-table {
+          width: 100%;
+          min-width: 780px;
+          border-collapse: collapse;
+          font-family: Arial, sans-serif;
+        }
+        @media print {
+          @page { size: A4 landscape; margin: 1.27cm 1.27cm; }
+          body * { visibility: hidden; }
+          .dll-a4, .dll-a4 * { visibility: visible; }
+          .dll-a4 {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            padding: 0; border: none; border-radius: 0; box-shadow: none;
+            overflow: visible;
+          }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+    </>
   );
 }

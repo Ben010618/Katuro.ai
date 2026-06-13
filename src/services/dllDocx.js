@@ -128,12 +128,45 @@ const dayHdr = text => tc(
   { width: W.day, vAlign: VerticalAlign.CENTER, shading: hdrBg },
 );
 
+// Build colspan'd TableCell array from a BOW list [{ text, days }]
+function bowCells(list) {
+  const cells = [];
+  let used = 0;
+  for (const item of (list || [])) {
+    const span = Math.max(1, item.days || 1);
+    cells.push(tc(
+      [p([run(item.text?.trim() || '', { size: 15 })], AlignmentType.LEFT)],
+      { colSpan: span, width: span * W.day, vAlign: VerticalAlign.TOP },
+    ));
+    used += span;
+  }
+  if (used < 5) {
+    const rem = 5 - used;
+    cells.push(tc([p('')], { colSpan: rem, width: rem * W.day, vAlign: VerticalAlign.TOP }));
+  }
+  return cells;
+}
+
 // ── Build DLL table ───────────────────────────────────────────────────────────
 function buildTable(store, profile) {
   const { subject, gradeLevel, term, teachingDates, section,
-          contentStandards, performanceStandards, melc,
-          dailyContent, procedure } = store;
+          contentStandards, performanceStandards,
+          melcList, contentList, melc, dailyContent,
+          objectives, procedure } = store;
+
+  // Fall back to legacy flat fields when BOW lists are unavailable
+  const mList = (melcList?.length && melcList.some(m => m.text?.trim()))
+    ? melcList
+    : (melc ? [{ text: melc, days: 5 }] : [{ text: '', days: 5 }]);
+
+  const cList = (contentList?.length && contentList.some(c => c.text?.trim()))
+    ? contentList
+    : DAILY_KEYS
+        .filter(d => dailyContent?.[d]?.trim())
+        .map(d => ({ text: dailyContent[d], days: 1 }));
+
   const proc = procedure || {};
+  const objs = objectives || {};
   const rows = [];
 
   // Row 0 — "DAILY LESSON LOG" full-width title
@@ -184,17 +217,28 @@ function buildTable(store, profile) {
   // Each row: C0(1) + C1(1) + C2-C6(colSpan5) = 7 ✓
   rows.push(tr([secStart('I'), lblCell('A. Content Standards'), wideCell(contentStandards)], 10));
   rows.push(tr([secCont(), lblCell('B. Performance Standards'), wideCell(performanceStandards)], 10));
-  rows.push(tr([secCont(), lblCell('C. Learning Competencies / Objectives\n(Write the LC Code for each)'), wideCell(melc)], 14));
+  // C. Learning Competency — colspan merged by melcList days
+  rows.push(tr([
+    secCont(),
+    lblCell('C. Learning Competencies / Objectives\n(Write the LC Code for each)'),
+    ...bowCells(mList),
+  ], 14));
 
-  // ── Section II — Content (per day) ────────────────────────────────────────
-  // Row: C0(1) + C1(1) + C2+C3+C4+C5+C6(1 each) = 7 ✓
+  // Per-day learning objectives (one per day, AI-generated)
+  rows.push(tr([
+    secCont(),
+    lblCell('Learning Objectives\n(per day)'),
+    ...PROC_DAYS.map(dk => dayCell(objs[dk] || '')),
+  ], 14));
+
+  // ── Section II — Content (colspan merged by contentList days) ─────────────
   rows.push(tr([
     secSingle('II'),
     tc([
       p([run('CONTENT', { bold: true, size: 16 })], AlignmentType.CENTER),
       p([run('(Subject Matter)', { size: 14, italic: true })], AlignmentType.CENTER),
     ], { width: W.c1, vAlign: VerticalAlign.CENTER }),
-    ...DAILY_KEYS.map(d => dayCell(dailyContent?.[d] || '')),
+    ...bowCells(cList),
   ], 12));
 
   // ── Section III — Learning Resources ──────────────────────────────────────
