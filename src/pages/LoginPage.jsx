@@ -198,7 +198,7 @@ export default function LoginPage() {
 
   // Slideshow
   useEffect(() => {
-    const id = setInterval(() => setActiveSlide(s => (s + 1) % SLIDES.length), 3000);
+    const id = setInterval(() => setActiveSlide(s => (s + 1) % SLIDES.length), 5000);
     return () => clearInterval(id);
   }, []);
 
@@ -275,7 +275,7 @@ export default function LoginPage() {
             backgroundImage: `url(${src})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: i === activeSlide ? 0.38 : 0,
+            opacity: i === activeSlide ? 0.63 : 0,
             transition: 'opacity 1.6s ease-in-out',
             zIndex: 0,
           }} />
