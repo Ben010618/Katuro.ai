@@ -115,6 +115,7 @@ export default function App() {
             <Route path="gamification"       element={<GamificationPage />} />
             <Route path="action-research">
               <Route path="phase-1"              element={<ActionResearchPhase1 />} />
+              <Route path="phase-1/:docId"       element={<ActionResearchPhase1 />} />
               <Route path="phase-2/:docId"       element={<ActionResearchPhase2 />} />
               <Route path="phase-3/:docId"       element={<ActionResearchPhase3 />} />
               <Route path="phase-4/:docId"       element={<ActionResearchPhase4 />} />

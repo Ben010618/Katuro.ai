@@ -596,6 +596,16 @@ export async function updateActionResearch(uid, docId, data) {
   });
 }
 
+export async function listActionResearch(uid) {
+  const q = query(actionResearchColRef(uid), orderBy('updatedAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function deleteActionResearch(uid, docId) {
+  return deleteDoc(actionResearchDocRef(uid, docId));
+}
+
 // ─── Token deduction ──────────────────────────────────────────────────────────
 // cost defaults to 3; pass a custom value for cheaper actions (e.g. 0.5 for gamification)
 

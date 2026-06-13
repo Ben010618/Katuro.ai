@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   BookOpen, ShieldCheck, Users, Scale,
   Sparkles, AlertTriangle, X, Loader2, CheckCircle2,
 } from 'lucide-react';
 import { useAuth }    from '../hooks/useAuth';
-import { db }         from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getGeminiKey }          from '../services/geminiConfig';
 import { generateResearchTitles, THEME_LABELS } from '../services/actionResearchAI';
-import { deductTokens }          from '../services/db';
-import ActionResearchShell       from '../components/ActionResearchShell';
+import {
+  actionResearchColRef,
+  getActionResearch,
+  updateActionResearch,
+  deductTokens,
+} from '../services/db';
+import ActionResearchShell from '../components/ActionResearchShell';
 
 /* ── Static data ─────────────────────────────────────────────────────────── */
 
@@ -74,6 +78,10 @@ const blur  = e => { e.target.style.borderColor='rgba(45,106,79,0.2)'; e.target.
 export default function ActionResearchPhase1() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
+  const { docId: urlDocId } = useParams(); // present when resuming an existing project
+
+  // Persisted Firestore doc ID (set when we first save or when resuming)
+  const [docId, setDocId] = useState(urlDocId || null);
 
   const [selectedTheme,  setSelectedTheme]  = useState('teaching-learning');
   const [gradeLevel,     setGradeLevel]     = useState('');
@@ -89,11 +97,34 @@ export default function ActionResearchPhase1() {
   const [titlesLoading,  setTitlesLoading]  = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState('');
+  const [loadingResume,  setLoadingResume]  = useState(!!urlDocId);
   const debounceRef = useRef(null);
 
   const currentTheme = BERA_THEMES.find(t => t.id === selectedTheme);
 
-  // Debounced problem statement suggestion (free)
+  /* ── Load saved data when resuming ─────────────────────────────────── */
+  useEffect(() => {
+    if (!urlDocId || !user?.uid) { setLoadingResume(false); return; }
+    getActionResearch(user.uid, urlDocId)
+      .then(data => {
+        if (data.beraTheme)         setSelectedTheme(data.beraTheme);
+        if (data.gradeLevel)        setGradeLevel(data.gradeLevel);
+        if (data.subjectArea)       setSubjectArea(data.subjectArea);
+        if (data.schoolYear)        setSchoolYear(data.schoolYear);
+        if (data.schoolName)        setSchoolName(data.schoolName);
+        if (data.problemText)       setProblemText(data.problemText);
+        if (data.researchTitles?.length) setResearchTitles(data.researchTitles);
+        if (data.selectedTitle)     setSelectedTitle(data.selectedTitle);
+        if (data.aiProblemStatement) {
+          setAiSuggestion({ problemStatement: data.aiProblemStatement, interventions: [] });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingResume(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlDocId, user?.uid]);
+
+  /* ── Debounced AI problem suggestion ─────────────────────────────────── */
   const triggerAI = useCallback((text, themeId) => {
     clearTimeout(debounceRef.current);
     if (!text.trim() || text.length < 20) { setAiSuggestion(null); return; }
@@ -106,20 +137,61 @@ export default function ActionResearchPhase1() {
       finally { setAiLoading(false); }
     }, 800);
   }, []);
+
   useEffect(() => {
+    if (loadingResume) return; // don't fire while restoring saved data
     triggerAI(problemText, selectedTheme);
     return () => clearTimeout(debounceRef.current);
-  }, [problemText, selectedTheme, triggerAI]);
-  useEffect(() => { setBerfDismissed(false); setResearchTitles([]); setSelectedTitle(''); }, [selectedTheme]);
+  }, [problemText, selectedTheme, triggerAI, loadingResume]);
 
+  /* Theme change: manually clear titles (not via useEffect) so that
+     loading saved data doesn't accidentally clear them. */
+  function handleThemeSelect(id) {
+    if (id === selectedTheme) return;
+    setSelectedTheme(id);
+    setBerfDismissed(false);
+    setResearchTitles([]);
+    setSelectedTitle('');
+  }
+
+  /* ── Save helpers ─────────────────────────────────────────────────────── */
+  function buildPayload(extras = {}) {
+    return {
+      phase: 1, status: 'in-progress',
+      beraTheme: selectedTheme,
+      gradeLevel, subjectArea, schoolYear, schoolName, problemText,
+      aiProblemStatement: aiSuggestion?.problemStatement ?? '',
+      ...extras,
+    };
+  }
+
+  async function saveToFirestore(payload) {
+    if (!user?.uid) return null;
+    if (docId) {
+      await updateActionResearch(user.uid, docId, payload);
+      return docId;
+    }
+    const ref = await addDoc(actionResearchColRef(user.uid), {
+      ...payload,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    setDocId(ref.id);
+    return ref.id;
+  }
+
+  /* ── Generate titles — also saves progress to Firestore ──────────────── */
   async function handleGenerateTitles() {
     if (!user?.uid || problemText.trim().length < 20) return;
     setTitlesLoading(true); setError('');
     try {
       await deductTokens(user.uid, 'action-research-titles', 5);
       const result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel });
-      setResearchTitles(result.titles ?? []);
+      const titles = result.titles ?? [];
+      setResearchTitles(titles);
       setSelectedTitle('');
+      // Save intermediate state so the project appears in the dashboard
+      await saveToFirestore(buildPayload({ researchTitles: titles, selectedTitle: '' }));
     } catch (err) {
       setError(err.message || 'Failed to generate titles. Please try again.');
     } finally {
@@ -127,22 +199,18 @@ export default function ActionResearchPhase1() {
     }
   }
 
+  /* ── Next — finalize Phase 1 and move to Phase 2 ─────────────────────── */
   const canProceed = selectedTheme && problemText.trim().length > 0 && !!selectedTitle;
 
   async function handleNext() {
     if (!canProceed || !user?.uid) return;
     setSaving(true); setError('');
     try {
-      const ref = await addDoc(collection(db, 'teachers', user.uid, 'actionResearch'), {
-        phase: 1, status: 'in-progress',
-        beraTheme: selectedTheme,
-        gradeLevel, subjectArea, schoolYear, schoolName, problemText,
-        aiProblemStatement: aiSuggestion?.problemStatement ?? '',
-        researchTitles, selectedTitle,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
-      navigate(`/action-research/phase-2/${ref.id}`);
-    } catch (err) {
+      const finalDocId = await saveToFirestore(
+        buildPayload({ researchTitles, selectedTitle })
+      );
+      navigate(`/action-research/phase-2/${finalDocId}`);
+    } catch {
       setError('Failed to save. Please try again.');
     } finally {
       setSaving(false);
@@ -151,7 +219,20 @@ export default function ActionResearchPhase1() {
 
   const showBerf = BERF_THEMES.has(selectedTheme) && !berfDismissed;
 
-  /* ── Render ─────────────────────────────────────────────────────────── */
+  /* ── Loading skeleton while restoring saved data ─────────────────────── */
+  if (loadingResume) {
+    return (
+      <ActionResearchShell phase={1} canNext={false} nextLabel="Next: Research Questions" themeName="">
+        <div style={{ textAlign:'center', padding:'60px 0', color:'#4a6357', fontSize:14 }}>
+          <Loader2 size={28} color="#2d6a4f" style={{ animation:'spin 1s linear infinite', marginBottom:12 }} />
+          <p style={{ margin:0 }}>Loading your saved research…</p>
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </ActionResearchShell>
+    );
+  }
+
+  /* ── Render ─────────────────────────────────────────────────────── */
   return (
     <ActionResearchShell
       phase={1}
@@ -163,6 +244,16 @@ export default function ActionResearchPhase1() {
     >
       <style>{CSS}</style>
       <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+
+        {/* Resume banner */}
+        {urlDocId && (
+          <div style={{ background:'#eef2ff', border:'1px solid rgba(79,70,229,0.2)', borderRadius:10, padding:'11px 16px', display:'flex', alignItems:'center', gap:10 }}>
+            <CheckCircle2 size={14} color="#4f46e5" />
+            <p style={{ margin:0, fontSize:13, color:'#312e81', fontWeight:500 }}>
+              Resuming your saved research project — all previous inputs have been restored.
+            </p>
+          </div>
+        )}
 
         {/* BERF alert */}
         {showBerf && (
@@ -184,7 +275,7 @@ export default function ActionResearchPhase1() {
             {BERA_THEMES.map(({ id, name, Icon, description, tags }) => {
               const active = selectedTheme === id;
               return (
-                <button key={id} onClick={() => setSelectedTheme(id)} style={{ textAlign:'left', cursor:'pointer', fontFamily:'inherit', background:active?'#f0f9f4':'#fafafa', border:active?'2px solid #2d6a4f':'1.5px solid rgba(45,106,79,0.15)', borderRadius:12, padding:'16px', transition:'border 0.15s, background 0.15s', position:'relative' }}
+                <button key={id} onClick={() => handleThemeSelect(id)} style={{ textAlign:'left', cursor:'pointer', fontFamily:'inherit', background:active?'#f0f9f4':'#fafafa', border:active?'2px solid #2d6a4f':'1.5px solid rgba(45,106,79,0.15)', borderRadius:12, padding:'16px', transition:'border 0.15s, background 0.15s', position:'relative' }}
                   onMouseEnter={e=>{if(!active)e.currentTarget.style.background='#f5faf7';}}
                   onMouseLeave={e=>{if(!active)e.currentTarget.style.background='#fafafa';}}>
                   {active && <div style={{ position:'absolute', top:10, right:10, background:'#2d6a4f', color:'#fff', fontSize:10, fontWeight:700, borderRadius:20, padding:'2px 8px' }}>Selected</div>}
@@ -256,13 +347,17 @@ export default function ActionResearchPhase1() {
                   <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Suggested problem statement</p>
                   <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.65 }}>{aiSuggestion.problemStatement}</p>
                 </div>
-                <p style={{ margin:'0 0 8px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Suggested interventions</p>
-                {(aiSuggestion.interventions??[]).map((t,i)=>(
-                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#fff', borderRadius:8, border:'1px solid rgba(45,106,79,0.1)', padding:'9px 12px', marginBottom:6 }}>
-                    <div style={{ width:18, height:18, borderRadius:'50%', background:'#2d6a4f', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, flexShrink:0, marginTop:1 }}>{i+1}</div>
-                    <p style={{ margin:0, fontSize:12, color:'#163828', lineHeight:1.55 }}>{t}</p>
-                  </div>
-                ))}
+                {aiSuggestion.interventions?.length > 0 && (
+                  <>
+                    <p style={{ margin:'0 0 8px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Suggested interventions</p>
+                    {aiSuggestion.interventions.map((t,i)=>(
+                      <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#fff', borderRadius:8, border:'1px solid rgba(45,106,79,0.1)', padding:'9px 12px', marginBottom:6 }}>
+                        <div style={{ width:18, height:18, borderRadius:'50%', background:'#2d6a4f', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, flexShrink:0, marginTop:1 }}>{i+1}</div>
+                        <p style={{ margin:0, fontSize:12, color:'#163828', lineHeight:1.55 }}>{t}</p>
+                      </div>
+                    ))}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -308,6 +403,7 @@ export default function ActionResearchPhase1() {
         {/* Error */}
         {error && <div style={{ background:'#fde8e8', border:'1px solid rgba(224,92,92,0.3)', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#c0392b', fontWeight:500 }}>{error}</div>}
       </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </ActionResearchShell>
   );
 }
