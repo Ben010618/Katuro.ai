@@ -347,7 +347,161 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Action Research Projects ─────────────────────────────────────────── */}
+      {/* Teacher Profile */}
+      <div style={{
+        background: '#fff', borderRadius: 14, padding: '24px',
+        border: '1px solid rgba(45,106,79,0.12)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <User size={18} color="#2d6a4f" />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Teacher Profile</h2>
+            <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>Included in lesson plans, quizzes, and game sheets</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+              Full Name
+            </label>
+            <input
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Juan Dela Cruz"
+              style={INPUT_STYLE}
+              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
+              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+              Designation / Position
+            </label>
+            <input
+              value={form.designation}
+              onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
+              placeholder="Teacher II"
+              style={INPUT_STYLE}
+              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
+              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+              School
+            </label>
+            <input
+              value={form.school}
+              onChange={e => setForm(f => ({ ...f, school: e.target.value }))}
+              placeholder="Dayap National High School"
+              style={INPUT_STYLE}
+              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
+              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleSaveProfile}
+          disabled={savingProfile}
+          style={{
+            marginTop: 18,
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: profileSaved ? '#d8f3dc' : '#2d6a4f',
+            color: profileSaved ? '#1a3d2b' : '#fff',
+            border: 'none', borderRadius: 10, padding: '9px 20px',
+            fontSize: 13, fontWeight: 600,
+            cursor: savingProfile ? 'default' : 'pointer',
+            transition: 'all 0.2s', opacity: savingProfile ? 0.7 : 1,
+          }}
+        >
+          {profileSaved ? <CheckCircle size={14} /> : <Save size={14} />}
+          {savingProfile ? 'Saving…' : profileSaved ? 'Saved!' : 'Save Profile'}
+        </button>
+      </div>
+
+      {/* Recent lesson plans */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Recent Lesson Plans</h2>
+          <button onClick={() => navigate('/my-lessons')} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 12, fontWeight: 600, color: '#2d6a4f',
+          }}>
+            View All <ArrowRight size={13} />
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+          {recentLessons.map(lesson => {
+            const st = STATUS_COLORS[lesson.status] || STATUS_COLORS.draft;
+            return (
+              <div key={lesson.id} style={{
+                background: '#fff', borderRadius: 14,
+                border: '1px solid rgba(45,106,79,0.12)',
+                padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.12)'; e.currentTarget.style.transform = 'none'; }}
+                onClick={() => navigate('/my-lessons')}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ background: subjectColor(lesson.subject), borderRadius: 7, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: '#0d2218', flexShrink: 0 }}>
+                    {lesson.subject} {lesson.grade}
+                  </div>
+                  <div style={{ background: st.bg, borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: st.color, flexShrink: 0 }}>
+                    {st.label}
+                  </div>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0d2218', lineHeight: 1.3 }}>{lesson.title}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#4a6357' }}>
+                    {lesson.quarter} · Week {lesson.week} · {lesson.dates}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                  <span style={{ fontSize: 11, color: '#4a6357', fontWeight: 500 }}>
+                    {lesson.sessions} session{lesson.sessions !== 1 ? 's' : ''}
+                  </span>
+                  <button onClick={e => { e.stopPropagation(); navigate('/my-lessons'); }} style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    background: '#d8f3dc', border: 'none', borderRadius: 8,
+                    padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#2d6a4f', cursor: 'pointer',
+                  }}>
+                    View <ArrowRight size={11} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* New lesson CTA card */}
+          <button onClick={() => navigate('/lesson-gen')} style={{
+            background: '#f5faf7', border: '2px dashed rgba(45,106,79,0.25)',
+            borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 10, minHeight: 140, transition: 'all 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#40916c'; e.currentTarget.style.background = '#edf7f0'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.25)'; e.currentTarget.style.background = '#f5faf7'; }}
+          >
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: '#2d6a4f', display: 'grid', placeItems: 'center' }}>
+              <Plus size={20} color="#fff" />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#2d6a4f' }}>Create New Lesson</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>AI-powered planning</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* ── My Action Research ───────────────────────────────────────────────── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -516,160 +670,6 @@ export default function DashboardPage() {
             Showing 4 of {researches.length} projects
           </p>
         )}
-      </div>
-
-      {/* Teacher Profile */}
-      <div style={{
-        background: '#fff', borderRadius: 14, padding: '24px',
-        border: '1px solid rgba(45,106,79,0.12)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <User size={18} color="#2d6a4f" />
-          </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Teacher Profile</h2>
-            <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>Included in lesson plans, quizzes, and game sheets</p>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-              Full Name
-            </label>
-            <input
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Juan Dela Cruz"
-              style={INPUT_STYLE}
-              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
-              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-              Designation / Position
-            </label>
-            <input
-              value={form.designation}
-              onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
-              placeholder="Teacher II"
-              style={INPUT_STYLE}
-              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
-              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-              School
-            </label>
-            <input
-              value={form.school}
-              onChange={e => setForm(f => ({ ...f, school: e.target.value }))}
-              placeholder="Dayap National High School"
-              style={INPUT_STYLE}
-              onFocus={e => e.target.style.borderColor = '#2d6a4f'}
-              onBlur={e => e.target.style.borderColor = 'rgba(45,106,79,0.2)'}
-            />
-          </div>
-        </div>
-
-        <button
-          onClick={handleSaveProfile}
-          disabled={savingProfile}
-          style={{
-            marginTop: 18,
-            display: 'flex', alignItems: 'center', gap: 7,
-            background: profileSaved ? '#d8f3dc' : '#2d6a4f',
-            color: profileSaved ? '#1a3d2b' : '#fff',
-            border: 'none', borderRadius: 10, padding: '9px 20px',
-            fontSize: 13, fontWeight: 600,
-            cursor: savingProfile ? 'default' : 'pointer',
-            transition: 'all 0.2s', opacity: savingProfile ? 0.7 : 1,
-          }}
-        >
-          {profileSaved ? <CheckCircle size={14} /> : <Save size={14} />}
-          {savingProfile ? 'Saving…' : profileSaved ? 'Saved!' : 'Save Profile'}
-        </button>
-      </div>
-
-      {/* Recent lesson plans */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Recent Lesson Plans</h2>
-          <button onClick={() => navigate('/my-lessons')} style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 12, fontWeight: 600, color: '#2d6a4f',
-          }}>
-            View All <ArrowRight size={13} />
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-          {recentLessons.map(lesson => {
-            const st = STATUS_COLORS[lesson.status] || STATUS_COLORS.draft;
-            return (
-              <div key={lesson.id} style={{
-                background: '#fff', borderRadius: 14,
-                border: '1px solid rgba(45,106,79,0.12)',
-                padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10,
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.12)'; e.currentTarget.style.transform = 'none'; }}
-                onClick={() => navigate('/my-lessons')}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ background: subjectColor(lesson.subject), borderRadius: 7, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: '#0d2218', flexShrink: 0 }}>
-                    {lesson.subject} {lesson.grade}
-                  </div>
-                  <div style={{ background: st.bg, borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: st.color, flexShrink: 0 }}>
-                    {st.label}
-                  </div>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0d2218', lineHeight: 1.3 }}>{lesson.title}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#4a6357' }}>
-                    {lesson.quarter} · Week {lesson.week} · {lesson.dates}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                  <span style={{ fontSize: 11, color: '#4a6357', fontWeight: 500 }}>
-                    {lesson.sessions} session{lesson.sessions !== 1 ? 's' : ''}
-                  </span>
-                  <button onClick={e => { e.stopPropagation(); navigate('/my-lessons'); }} style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    background: '#d8f3dc', border: 'none', borderRadius: 8,
-                    padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#2d6a4f', cursor: 'pointer',
-                  }}>
-                    View <ArrowRight size={11} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* New lesson CTA card */}
-          <button onClick={() => navigate('/lesson-gen')} style={{
-            background: '#f5faf7', border: '2px dashed rgba(45,106,79,0.25)',
-            borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 10, minHeight: 140, transition: 'all 0.15s',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#40916c'; e.currentTarget.style.background = '#edf7f0'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.25)'; e.currentTarget.style.background = '#f5faf7'; }}
-          >
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: '#2d6a4f', display: 'grid', placeItems: 'center' }}>
-              <Plus size={20} color="#fff" />
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#2d6a4f' }}>Create New Lesson</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>AI-powered planning</p>
-            </div>
-          </button>
-        </div>
       </div>
     </div>
   );
