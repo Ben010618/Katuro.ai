@@ -508,17 +508,18 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 }
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
+// After MAX_ACCOUNTS enabled users, new registrations are auto-disabled
+// (pendingApproval: true) until the admin manually enables them.
 
-const MAX_ACCOUNTS = 200;
+const MAX_ACCOUNTS = 250;
 
 export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
 
   const countSnap = await getDocs(collection(db, "teachers"));
-  if (countSnap.size >= MAX_ACCOUNTS) {
-    throw new Error(`Registration is currently closed — the platform has reached its ${MAX_ACCOUNTS}-account limit. Please contact your administrator.`);
-  }
+  const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
+  const atCap = activeCount >= MAX_ACCOUNTS;
 
   const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   const uid  = cred.user.uid;
@@ -529,31 +530,36 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   await updateProfile(cred.user, { displayName });
 
   await setDoc(teacherRef(uid), {
-    email:        email.trim().toLowerCase(),
+    email:           email.trim().toLowerCase(),
     displayName,
-    surname:      surname.trim(),
-    givenName:    givenName.trim(),
-    mi:           mi?.trim() || '',
-    school:       school.trim(),
-    tokenBalance: 50,
-    isAdmin:      false,
-    disabled:     false,
-    createdAt:    serverTimestamp(),
+    surname:         surname.trim(),
+    givenName:       givenName.trim(),
+    mi:              mi?.trim() || '',
+    school:          school.trim(),
+    tokenBalance:    atCap ? 0 : 50,
+    isAdmin:         false,
+    disabled:        atCap,
+    pendingApproval: atCap,
+    createdAt:       serverTimestamp(),
   });
 
-  await addDoc(tokenLogsRef(uid), {
-    uid, amount: 50, action: 'welcome_bonus',
-    note: 'Welcome! 50 free tokens to get started.',
-    createdAt: serverTimestamp(),
-  });
+  if (!atCap) {
+    await addDoc(tokenLogsRef(uid), {
+      uid, amount: 50, action: 'welcome_bonus',
+      note: 'Welcome! 50 free tokens to get started.',
+      createdAt: serverTimestamp(),
+    });
+  }
 
-  return cred.user;
+  return { user: cred.user, pendingApproval: atCap };
 }
 
 // ─── Admin: enable / disable a user ─────────────────────────────────────────
 
 export async function adminSetDisabled(uid, disabled) {
-  return updateDoc(teacherRef(uid), { disabled, updatedAt: serverTimestamp() });
+  const update = { disabled, updatedAt: serverTimestamp() };
+  if (!disabled) update.pendingApproval = false; // clear waitlist flag when enabling
+  return updateDoc(teacherRef(uid), update);
 }
 
 // ─── Admin: add tokens to a user ─────────────────────────────────────────────

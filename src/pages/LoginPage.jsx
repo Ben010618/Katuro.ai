@@ -136,7 +136,7 @@ export default function LoginPage() {
   const [school,    setSchool]    = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showCPw,   setShowCPw]   = useState(false);
-  const [signedUp,  setSignedUp]  = useState(false);
+  const [signedUp,  setSignedUp]  = useState(false);  // 'active' | 'pending' | false
 
   function triggerShake() {
     setShake(true);
@@ -183,8 +183,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await selfSignUp({ email, password, surname, givenName, mi, school });
-      setSignedUp(true);
+      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
+      setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
       const msg = err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, '');
       setError(msg);
@@ -426,8 +426,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ── SIGNUP SUCCESS ── */}
-            {signedUp && (
+            {/* ── SIGNUP SUCCESS — active ── */}
+            {signedUp === 'active' && (
               <div style={{
                 background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.25)',
                 borderRadius: 10, padding: '20px 18px', textAlign: 'center',
@@ -441,8 +441,33 @@ export default function LoginPage() {
               </div>
             )}
 
+            {/* ── SIGNUP SUCCESS — pending approval ── */}
+            {signedUp === 'pending' && (
+              <div style={{
+                background: '#fef9e7', border: '1px solid rgba(217,119,6,0.3)',
+                borderRadius: 10, padding: '20px 18px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#92400e', margin: 0 }}>Account created — pending approval</p>
+                <p style={{ fontSize: 13, color: '#78350f', margin: '6px 0 14px', lineHeight: 1.5 }}>
+                  Your account has been registered. The platform is currently at capacity —
+                  an administrator will review and activate your account soon.
+                </p>
+                <button
+                  onClick={() => switchMode('login')}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, color: '#d97706', padding: 0, fontFamily: 'inherit',
+                  }}
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            )}
+
             {/* ── FORMS ── */}
             {!resetSent && !signedUp && (
+
 
               <form
                 className={shake ? 'kt-error-shake' : ''}

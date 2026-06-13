@@ -1,5 +1,9 @@
+import { getAuth } from 'firebase/auth';
 import { getGeminiKey } from './geminiConfig';
+import { checkDailyLimit } from './usageLimit';
+
 const GEMINI_MODEL = 'gemini-2.5-flash';
+const DLL_DAILY_LIMIT = 10;
 
 export const DAYS      = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 export const STEPS     = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
@@ -23,6 +27,8 @@ function isTagalogSubject(s) {
 }
 
 async function callGemini(prompt) {
+  const uid = getAuth().currentUser?.uid;
+  await checkDailyLimit(uid, 'dll_gen', DLL_DAILY_LIMIT);
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
   const res = await fetch(url, {

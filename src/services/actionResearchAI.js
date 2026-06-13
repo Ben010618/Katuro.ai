@@ -1,6 +1,9 @@
+import { getAuth } from 'firebase/auth';
 import { getGeminiKey } from './geminiConfig';
+import { checkDailyLimit } from './usageLimit';
 
 const MODEL = 'gemini-2.5-flash';
+const ACTION_RESEARCH_DAILY_LIMIT = 30;
 
 export const THEME_LABELS = {
   'teaching-learning': 'Teaching and Learning',
@@ -10,6 +13,8 @@ export const THEME_LABELS = {
 };
 
 async function callGemini(prompt, maxTokens = 2048) {
+  const uid = getAuth().currentUser?.uid;
+  await checkDailyLimit(uid, 'action_research_ai', ACTION_RESEARCH_DAILY_LIMIT);
   const key = await getGeminiKey();
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,

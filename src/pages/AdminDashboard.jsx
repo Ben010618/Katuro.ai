@@ -501,8 +501,15 @@ export default function AdminDashboard() {
     navigate('/login', { replace: true });
   }
 
-  const totalTokens = teachers.reduce((s, t) => s + (t.tokenBalance ?? 0), 0);
-  const activeCount = teachers.filter(t => !t.disabled).length;
+  const totalTokens   = teachers.reduce((s, t) => s + (t.tokenBalance ?? 0), 0);
+  const activeCount   = teachers.filter(t => !t.disabled).length;
+  const pendingCount  = teachers.filter(t => t.pendingApproval).length;
+
+  // Pending users appear first, then active, then manually-disabled
+  const sortedTeachers = [...teachers].sort((a, b) => {
+    const rank = t => t.pendingApproval ? 0 : t.disabled ? 2 : 1;
+    return rank(a) - rank(b) || (a.email || '').localeCompare(b.email || '');
+  });
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5faf7', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -535,15 +542,16 @@ export default function AdminDashboard() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total Users',    value: teachers.length,  Icon: Users       },
-            { label: 'Active Users',   value: activeCount,      Icon: ShieldCheck },
-            { label: 'Tokens in Pool', value: totalTokens,      Icon: Coins       },
-          ].map(({ label, value, Icon }) => (
+            { label: 'Total Users',      value: teachers.length, Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
+            { label: 'Active Users',     value: activeCount,     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },
+            { label: 'Pending Approval', value: pendingCount,    Icon: ShieldOff,   accent: pendingCount > 0 ? '#fef9e7' : '#f5faf7', iconColor: pendingCount > 0 ? '#d97706' : '#9BB8A5' },
+            { label: 'Tokens in Pool',   value: totalTokens,     Icon: Coins,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
+          ].map(({ label, value, Icon, accent, iconColor }) => (
             <div key={label} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center' }}>
-                <Icon size={18} color="#2d6a4f" />
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: accent, display: 'grid', placeItems: 'center' }}>
+                <Icon size={18} color={iconColor} />
               </div>
               <div>
                 <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
@@ -604,7 +612,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {teachers.map(t => (
+                  {sortedTeachers.map(t => (
                     <tr key={t.id} style={{ borderBottom: '1px solid rgba(45,106,79,0.06)' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#fafcfa'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -633,10 +641,14 @@ export default function AdminDashboard() {
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{
                           fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '3px 9px',
-                          background: t.disabled ? 'rgba(224,92,92,0.1)' : '#d8f3dc',
-                          color:      t.disabled ? '#c0392b'             : '#1a3d2b',
+                          background: t.pendingApproval ? '#fef9e7'
+                            : t.disabled ? 'rgba(224,92,92,0.1)'
+                            : '#d8f3dc',
+                          color: t.pendingApproval ? '#d97706'
+                            : t.disabled ? '#c0392b'
+                            : '#1a3d2b',
                         }}>
-                          {t.disabled ? 'Disabled' : 'Active'}
+                          {t.pendingApproval ? 'Pending Approval' : t.disabled ? 'Disabled' : 'Active'}
                         </span>
                       </td>
                       <td style={{ padding: '10px 12px' }}>

@@ -73,6 +73,33 @@ function cacheKey(obj) {
   return crypto.createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 32);
 }
 
+// ── Per-user daily usage limiter ────────────────────────────────────────────
+const DAILY_LIMITS = {
+  outline_gen: 15,  // generateOutline calls per day (free endpoint, must guard)
+};
+
+async function checkAndIncrementDailyUsage(uid, action) {
+  const limit = DAILY_LIMITS[action];
+  if (!limit) return;
+  const today = new Date().toISOString().slice(0, 10); // "2026-06-13"
+  const ref   = db.doc(`teachers/${uid}/usage/${today}`);
+
+  await db.runTransaction(async tx => {
+    const snap    = await tx.get(ref);
+    const current = snap.data()?.[action] ?? 0;
+    if (current >= limit) {
+      throw new HttpsError(
+        'resource-exhausted',
+        `Daily limit of ${limit} reached for this feature. Try again tomorrow.`
+      );
+    }
+    tx.set(ref, {
+      [action]:  admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
 async function deductTokensServer(uid, action, cost) {
   if (!cost || cost <= 0) return;
   const ref = db.doc(`teachers/${uid}`);
@@ -126,6 +153,7 @@ exports.generateOutline = onCall(
   { region: 'us-central1', timeoutSeconds: 60 },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+    await checkAndIncrementDailyUsage(req.auth.uid, 'outline_gen');
 
     const { subject, gradeLevel, melcCode, topic, slideCount = 12 } = req.data;
     if (!subject || !gradeLevel || !topic) {

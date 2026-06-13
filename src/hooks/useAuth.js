@@ -34,8 +34,9 @@ export function useAuth() {
     user,
     loading,
     profile,
-    isAdmin:      profile?.isAdmin      ?? false,
-    tokenBalance: profile?.tokenBalance ?? 0,
-    disabled:     profile?.disabled     ?? false,
+    isAdmin:         profile?.isAdmin         ?? false,
+    tokenBalance:    profile?.tokenBalance     ?? 0,
+    disabled:        profile?.disabled         ?? false,
+    pendingApproval: profile?.pendingApproval  ?? false,
   };
 }

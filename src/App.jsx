@@ -7,6 +7,7 @@ import { ToastProvider } from './context/ToastContext';
 import { ensureTeacherProfile } from './services/db';
 import { auth } from './firebase';
 import AppShell from './components/AppShell';
+import { Clock, LogOut as LogOutIcon } from 'lucide-react';
 
 // Pages
 import LoginPage        from './pages/LoginPage';
@@ -58,8 +59,40 @@ function LoadingScreen() {
   );
 }
 
+function PendingApprovalScreen() {
+  return (
+    <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7', padding: 24 }}>
+      <div style={{ textAlign:'center', maxWidth: 420 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 18, background: '#fef3c7', display: 'grid', placeItems: 'center', margin: '0 auto 20px' }}>
+          <Clock size={30} color="#d97706" />
+        </div>
+        <img src={ktLogo} alt="kaTuro AI" style={{ width:36, height:36, borderRadius:9, margin:'0 auto 12px', display:'block', objectFit:'cover' }} />
+        <h2 style={{ margin:'0 0 10px', fontSize:22, fontWeight:700, color:'#0d2218', fontFamily:'"Playfair Display", serif' }}>
+          Account Pending Approval
+        </h2>
+        <p style={{ margin:'0 0 24px', fontSize:14, color:'#4a6357', lineHeight:1.6 }}>
+          Your account has been created and is waiting for administrator approval.
+          You will be able to access kaTuro once your account is enabled.
+          Please contact your school administrator or wait for an email confirmation.
+        </p>
+        <button
+          onClick={() => signOut(auth)}
+          style={{
+            display:'inline-flex', alignItems:'center', gap:7,
+            background:'#fff', border:'1px solid rgba(45,106,79,0.2)',
+            borderRadius:9, padding:'10px 20px', fontSize:13, fontWeight:600,
+            color:'#4a6357', cursor:'pointer',
+          }}
+        >
+          <LogOutIcon size={14} /> Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
-  const { user, loading, disabled } = useAuth();
+  const { user, loading, disabled, pendingApproval } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -68,13 +101,15 @@ function ProtectedRoute({ children }) {
   }, [user]);
 
   useEffect(() => {
-    if (disabled && user) {
+    // Only auto-sign-out users manually disabled by admin, not pending-approval users
+    if (disabled && !pendingApproval && user) {
       signOut(auth);
     }
-  }, [disabled, user]);
+  }, [disabled, pendingApproval, user]);
 
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
+  if (pendingApproval) return <PendingApprovalScreen />;
   return children;
 }
 
