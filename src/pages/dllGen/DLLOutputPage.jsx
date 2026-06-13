@@ -150,9 +150,51 @@ export default function DLLOutputPage() {
         background: 'rgba(79,70,229,0.04)', border: '1px solid rgba(79,70,229,0.12)',
         borderRadius: 10, padding: '14px 18px', marginBottom: 22,
       }}>
-        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MELC</p>
-        <p style={{ margin: 0, fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>{store.melc}</p>
+        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MELC</p>
+        {store.melcList?.length > 0
+          ? store.melcList.map((m, i) => (
+              <p key={i} style={{ margin: i === 0 ? 0 : '4px 0 0', fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>
+                <span style={{ fontWeight: 700 }}>MELC {i + 1}</span> ({m.days} day{m.days !== 1 ? 's' : ''}): {m.text}
+              </p>
+            ))
+          : <p style={{ margin: 0, fontSize: 13, color: '#1a3d2b', lineHeight: 1.6 }}>{store.melc}</p>
+        }
       </div>
+
+      {/* Per-day objectives */}
+      {store.objectives && (
+        <div style={{ marginBottom: 22 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>
+            Learning Objectives
+          </p>
+          <div style={{
+            background: '#fff', borderRadius: 12,
+            border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden',
+          }}>
+            {DAY_KEYS.map((dk, i) => {
+              const obj = store.objectives[dk];
+              if (!obj) return null;
+              return (
+                <div key={dk} style={{
+                  display: 'grid', gridTemplateColumns: '110px 1fr',
+                  borderBottom: i < DAY_KEYS.length - 1 ? '1px solid rgba(45,106,79,0.08)' : 'none',
+                }}>
+                  <div style={{
+                    padding: '10px 14px', background: '#f5faf7',
+                    fontSize: 12, fontWeight: 700, color: '#1a3d2b',
+                    display: 'flex', alignItems: 'flex-start',
+                  }}>
+                    {DAY_NAMES[i]}
+                  </div>
+                  <div style={{ padding: '10px 16px', fontSize: 13, color: '#0d2218', lineHeight: 1.6 }}>
+                    {obj || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>No class</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Procedure accordion */}
       <p style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Procedure (AI-Generated)</p>

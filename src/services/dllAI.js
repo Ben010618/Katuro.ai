@@ -1,10 +1,9 @@
 import { getGeminiKey } from './geminiConfig';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
-const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-const STEPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-
-const STEP_LABELS = {
+export const DAYS      = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+export const STEPS     = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+export const STEP_LABELS = {
   A: 'Reviewing previous lesson or presenting a new lesson',
   B: 'Establishing a purpose for the lesson',
   C: 'Presenting examples/instances of the new lesson',
@@ -16,6 +15,12 @@ const STEP_LABELS = {
   I: 'Evaluating learning',
   J: 'Additional activities for application or remediation',
 };
+
+const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
+function isTagalogSubject(s) {
+  const sl = (s || '').toLowerCase();
+  return TAGALOG_SUBJECTS.some(t => sl.includes(t));
+}
 
 async function callGemini(prompt) {
   const key = await getGeminiKey();
@@ -40,83 +45,131 @@ async function callGemini(prompt) {
   return JSON.parse(m[1] ?? m[0]);
 }
 
-const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
-
-function isTagalogSubject(subject) {
-  const s = (subject || '').toLowerCase();
-  return TAGALOG_SUBJECTS.some(t => s.includes(t));
-}
-
-function emptyDay() {
-  return Object.fromEntries(STEPS.map(s => [s, '']));
+/**
+ * Build a per-day lookup from a BOW list: [{ text, days }]
+ * Returns an array of 5 entries (one per day Mon–Fri), each being the
+ * assigned item text, or null if the total days < 5 (day unassigned).
+ */
+function buildDayMap(list) {
+  const map = [null, null, null, null, null]; // indices 0-4 = Mon-Fri
+  let slot = 0;
+  for (const item of list) {
+    for (let d = 0; d < item.days && slot < 5; d++, slot++) {
+      map[slot] = item.text.trim();
+    }
+  }
+  return map;
 }
 
 /**
- * Generate all 10 Procedure steps (A–J) for each day of the week.
- * Returns { monday: {A,B,...J}, tuesday: {...}, ... }
+ * Generate per-day learning objectives (one line each) AND all 10 procedure
+ * steps (A–J) for each day, given multi-MELC and multi-content BOW lists.
+ *
+ * @param {object} params
+ * @param {string} params.subject
+ * @param {string} params.gradeLevel
+ * @param {string} params.term
+ * @param {string} params.contentStandards
+ * @param {string} params.performanceStandards
+ * @param {Array}  params.melcList     — [{ text, days }]
+ * @param {Array}  params.contentList  — [{ text, days }]
+ *
+ * @returns {{ objectives: object, procedure: object }}
+ *   objectives: { monday: '...', tuesday: '...', ... }
+ *   procedure:  { monday: {A,...J}, tuesday: {...}, ... }
  */
 export async function generateDLLProcedure({
   subject, gradeLevel, term,
-  contentStandards, performanceStandards, melc,
-  dailyContent,
+  contentStandards, performanceStandards,
+  melcList, contentList,
 }) {
-  const lang = isTagalogSubject(subject) ? 'Filipino/Tagalog' : 'English';
-  const dayLines = [
-    `Monday: ${dailyContent.mon || '(No class)'}`,
-    `Tuesday: ${dailyContent.tue || '(No class)'}`,
-    `Wednesday: ${dailyContent.wed || '(No class)'}`,
-    `Thursday: ${dailyContent.thu || '(No class)'}`,
-    `Friday: ${dailyContent.fri || '(No class)'}`,
-  ].join('\n');
+  const lang       = isTagalogSubject(subject) ? 'Filipino/Tagalog' : 'English';
+  const melcMap    = buildDayMap(melcList);
+  const contentMap = buildDayMap(contentList);
 
-  const stepDescriptions = STEPS
-    .map(s => `${s}. ${STEP_LABELS[s]}`)
+  const DAY_NAMES_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  // Build a per-day context block for the prompt
+  const dayContext = DAY_NAMES_FULL.map((name, i) => {
+    const melc    = melcMap[i]    || '(No class)';
+    const content = contentMap[i] || '(No class)';
+    return `${name}:\n  MELC: ${melc}\n  Content: ${content}`;
+  }).join('\n\n');
+
+  // MELC summary for the header
+  const melcSummary = melcList
+    .filter(m => m.text.trim())
+    .map((m, i) => `MELC ${i + 1} (${m.days} day${m.days !== 1 ? 's' : ''}): ${m.text.trim()}`)
     .join('\n');
 
-  const prompt = `
-You are a DepEd (Philippines) curriculum expert writing a Daily Lesson Log (DLL) in professional Filipino public-school style.
+  const stepDescriptions = STEPS.map(s => `${s}. ${STEP_LABELS[s]}`).join('\n');
+
+  const prompt = `You are a DepEd (Philippines) curriculum expert writing a Daily Lesson Log (DLL).
 
 Subject: ${subject}
 Grade Level: ${gradeLevel}
 Term: ${term}
-
 Content Standards: ${contentStandards}
 Performance Standards: ${performanceStandards}
-MELC: ${melc}
 
-Daily Content (topic per day):
-${dayLines}
+Learning Competencies (MELC) this week:
+${melcSummary}
 
-For each day that has a topic, generate ALL 10 procedure steps in DepEd DLL style (concise, action-oriented, 1–3 sentences each):
+Per-day assignment (MELC and Content topic for each day):
+${dayContext}
+
+Language: Write ALL content in ${lang} only.
+
+TASK 1 — LEARNING OBJECTIVES (one per day)
+For each day that has a class, write ONE clear and measurable learning objective.
+- Start with an action verb (Bloom's Taxonomy appropriate to the MELC)
+- Be specific to that day's MELC and Content
+- Achievable in one 60-minute period
+- If a day is "(No class)" write an empty string ""
+
+TASK 2 — PROCEDURE STEPS (A–J per day)
+For each day that has a class, generate all 10 DepEd DLL procedure steps:
 ${stepDescriptions}
 
-Language: Write ALL procedure step content in ${lang} only.
-
-Rules:
-- Write as a teacher would fill in the DLL (instructional activities, not meta-descriptions).
-- Be specific to the day's content/topic.
-- Step I (Evaluating learning) = a concrete formative assessment task.
-- Step J (Additional activities) = a brief homework or enrichment task.
-- If a day is "(No class)", use empty strings for all its steps.
+Rules for procedure:
+- Write as a teacher filling in the DLL (instructional activities, not meta-descriptions)
+- Be specific to that day's Content topic and MELC
+- Step I = concrete formative assessment task
+- Step J = brief homework or enrichment task
+- If a day is "(No class)" use empty strings for all its steps
 
 Return ONLY valid JSON (no markdown, no explanation):
 {
-  "monday":    { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
-  "tuesday":   { "A": "...", ... },
-  "wednesday": { "A": "...", ... },
-  "thursday":  { "A": "...", ... },
-  "friday":    { "A": "...", ... }
+  "objectives": {
+    "monday":    "objective text or empty string",
+    "tuesday":   "objective text or empty string",
+    "wednesday": "objective text or empty string",
+    "thursday":  "objective text or empty string",
+    "friday":    "objective text or empty string"
+  },
+  "procedure": {
+    "monday":    { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
+    "tuesday":   { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
+    "wednesday": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
+    "thursday":  { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
+    "friday":    { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." }
+  }
 }`;
 
   const raw = await callGemini(prompt);
 
-  // Normalise: ensure all 5 days and all 10 steps exist
-  const result = {};
+  // Normalise objectives
+  const objectives = {};
   for (const day of DAYS) {
-    const src = raw[day] || {};
-    result[day] = Object.fromEntries(STEPS.map(s => [s, src[s] || '']));
+    objectives[day] = raw.objectives?.[day] ?? '';
   }
-  return result;
-}
 
-export { STEP_LABELS, STEPS, DAYS };
+  // Normalise procedure
+  const procedure = {};
+  for (const day of DAYS) {
+    const src = raw.procedure?.[day] || {};
+    procedure[day] = Object.fromEntries(STEPS.map(s => [s, src[s] || '']));
+  }
+
+  return { objectives, procedure };
+}
