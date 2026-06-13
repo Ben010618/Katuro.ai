@@ -2,6 +2,15 @@ import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { Sparkles, BookOpen, CalendarDays, ArrowRight, RotateCcw, ShieldCheck } from 'lucide-react';
 
+// ── Colors extracted from the Filipino education mural ─────────────────────
+// 1. Philippine Flag Blue  — cobalt sky & flag field  #0f2d6e → #1d4ed8
+// 2. Rice Terrace Green    — lush mountains & terraces #14532d → #16a34a
+// 3. Sunburst Amber-Gold   — radiating sun & flag gold #92400e → #d97706
+
+const ILAW_COLOR  = '#1d4ed8';   // Philippine Blue
+const DLL_COLOR   = '#16a34a';   // Rice Terrace Green
+const COT_COLOR   = '#d97706';   // Sunburst Amber-Gold
+
 export default function LessonGenGateway() {
   const navigate = useNavigate();
   const store    = useLessonGenStore();
@@ -20,7 +29,7 @@ export default function LessonGenGateway() {
   }
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto' }}>
+    <div style={{ maxWidth: 820, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
@@ -47,24 +56,31 @@ export default function LessonGenGateway() {
       {/* Type cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 18, marginBottom: 28 }}>
 
-        {/* ILAW card */}
+        {/* ILAW card — Philippine Blue */}
         <button
           onClick={handleILAW}
           style={{
-            textAlign: 'left', background: '#fff', border: '2px solid rgba(45,106,79,0.15)',
+            textAlign: 'left', background: '#fff',
+            border: `2px solid rgba(29,78,216,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
             display: 'flex', flexDirection: 'column', gap: 14,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#2d6a4f'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(45,106,79,0.12)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.15)'; e.currentTarget.style.boxShadow = 'none'; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = ILAW_COLOR;
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(29,78,216,0.14)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(29,78,216,0.15)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #ccfbf1, #d8f3dc)',
+            background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
             display: 'grid', placeItems: 'center',
           }}>
-            <BookOpen size={22} color="#0d9488" />
+            <BookOpen size={22} color={ILAW_COLOR} />
           </div>
 
           <div>
@@ -77,29 +93,36 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#0d9488' }}>3 tokens per generation</span>
-            <ArrowRight size={14} color="#0d9488" />
+            <span style={{ fontSize: 12, fontWeight: 600, color: ILAW_COLOR }}>3 tokens per generation</span>
+            <ArrowRight size={14} color={ILAW_COLOR} />
           </div>
         </button>
 
-        {/* DLL card */}
+        {/* DLL card — Rice Terrace Green */}
         <button
           onClick={() => navigate('/dll-gen/step-1')}
           style={{
-            textAlign: 'left', background: '#fff', border: '2px solid rgba(79,70,229,0.15)',
+            textAlign: 'left', background: '#fff',
+            border: `2px solid rgba(22,163,74,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
             display: 'flex', flexDirection: 'column', gap: 14,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(79,70,229,0.12)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(79,70,229,0.15)'; e.currentTarget.style.boxShadow = 'none'; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = DLL_COLOR;
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(22,163,74,0.14)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(22,163,74,0.15)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)',
+            background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
             display: 'grid', placeItems: 'center',
           }}>
-            <CalendarDays size={22} color="#4f46e5" />
+            <CalendarDays size={22} color={DLL_COLOR} />
           </div>
 
           <div>
@@ -112,36 +135,43 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#4f46e5' }}>3 tokens per generation</span>
-            <ArrowRight size={14} color="#4f46e5" />
+            <span style={{ fontSize: 12, fontWeight: 600, color: DLL_COLOR }}>3 tokens per generation</span>
+            <ArrowRight size={14} color={DLL_COLOR} />
           </div>
         </button>
 
-        {/* COT card */}
+        {/* COT card — Sunburst Amber-Gold */}
         <button
           onClick={() => navigate('/cot-gen/step-1')}
           style={{
-            textAlign: 'left', background: '#fff', border: '2px solid rgba(124,58,237,0.15)',
+            textAlign: 'left', background: '#fff',
+            border: `2px solid rgba(217,119,6,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
             display: 'flex', flexDirection: 'column', gap: 14,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#7c3aed'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(124,58,237,0.12)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.15)'; e.currentTarget.style.boxShadow = 'none'; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = COT_COLOR;
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(217,119,6,0.14)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(217,119,6,0.15)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #f3e8ff, #ede9fe)',
+            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
             display: 'grid', placeItems: 'center',
           }}>
-            <ShieldCheck size={22} color="#7c3aed" />
+            <ShieldCheck size={22} color={COT_COLOR} />
           </div>
 
           <div>
             <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: '#0d2218' }}>
-              PPST-aligned Lesson Plan
+              Build your COT Lesson Plan
             </p>
-            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: COT_COLOR, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               COT-optimized · 4As Framework
             </p>
             <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
@@ -150,8 +180,8 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>3 tokens per generation</span>
-            <ArrowRight size={14} color="#7c3aed" />
+            <span style={{ fontSize: 12, fontWeight: 600, color: COT_COLOR }}>3 tokens per generation</span>
+            <ArrowRight size={14} color={COT_COLOR} />
           </div>
         </button>
 
@@ -160,12 +190,12 @@ export default function LessonGenGateway() {
       {/* Resume draft */}
       {hasDraft && (
         <div style={{
-          background: 'rgba(45,106,79,0.04)', border: '1px solid rgba(45,106,79,0.12)',
+          background: 'rgba(29,78,216,0.04)', border: '1px solid rgba(29,78,216,0.12)',
           borderRadius: 12, padding: '14px 18px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1a3d2b' }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e3a8a' }}>
               You have an ILAW draft in progress
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4a6357' }}>
