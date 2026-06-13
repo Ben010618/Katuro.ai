@@ -4,13 +4,13 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
-  getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
+  getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens, adminChangePassword,
 } from '../services/db';
 import ktLogo from '../assets/KT Favicon.png';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
-  Key, Eye, EyeOff, CheckCircle2, FlaskConical,
+  Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -179,6 +179,112 @@ function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// ── Change Password modal ─────────────────────────────────────────────────────
+function ChangePasswordModal({ target, onClose, onSuccess }) {
+  const [newPassword,  setNewPassword]  = useState('');
+  const [showCurrent,  setShowCurrent]  = useState(false);
+  const [showNew,      setShowNew]      = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [err,          setErr]          = useState('');
+  const [done,         setDone]         = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (newPassword.length < 6) { setErr('Password must be at least 6 characters.'); return; }
+    setSaving(true); setErr('');
+    try {
+      await adminChangePassword(target.id, newPassword);
+      setDone(true);
+      onSuccess(target.id, newPassword);
+    } catch (ex) {
+      setErr(ex.message || 'Failed to change password.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} title={`Password — ${target.email}`}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Current stored password */}
+        <div>
+          <label style={labelStyle}>Current Password</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              readOnly
+              type={showCurrent ? 'text' : 'password'}
+              value={target.password || '(not stored — account self-registered)'}
+              style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13, color: target.password ? '#163828' : '#9BB8A5' }}
+            />
+            {target.password && (
+              <button
+                type="button"
+                onClick={() => setShowCurrent(v => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+              >
+                {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* New password */}
+        {done ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '12px 14px' }}>
+            <CheckCircle2 size={15} color="#2d6a4f" />
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#163828' }}>Password changed successfully.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={e => { setNewPassword(e.target.value); setErr(''); }}
+                  placeholder="Min 6 characters"
+                  style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+                >
+                  {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+            {err && (
+              <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
+                <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={onClose} style={btnSecondary}>Cancel</button>
+              <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
+                {saving
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+                  : <><Lock size={14} /> Change Password</>
+                }
+              </button>
+            </div>
+          </form>
+        )}
+
+        {done && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={onClose} style={btnPrimary}><CheckCircle2 size={14} /> Done</button>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
@@ -363,6 +469,7 @@ export default function AdminDashboard() {
   const [addUserOpen,   setAddUserOpen]   = useState(false);
   const [tokensTarget,  setTokensTarget]  = useState(null);
   const [togglingUid,   setTogglingUid]   = useState(null);
+  const [pwTarget,      setPwTarget]      = useState(null);
 
   const fetchTeachers = useCallback(async () => {
     setLoadingList(true); setListErr('');
@@ -541,6 +648,13 @@ export default function AdminDashboard() {
                           >
                             <Coins size={12} /> Tokens
                           </button>
+                          <button
+                            onClick={() => setPwTarget(t)}
+                            style={{ ...btnSecondary, padding: '5px 10px', fontSize: 11 }}
+                            title="View / change password"
+                          >
+                            <Lock size={12} /> Password
+                          </button>
                           {!t.isAdmin && (
                             <button
                               onClick={() => toggleDisabled(t)}
@@ -605,6 +719,16 @@ match /teachers/{uid} {
           onSuccess={() => {
             fetchTeachers();
             setTokensTarget(null);
+          }}
+        />
+      )}
+      {pwTarget && (
+        <ChangePasswordModal
+          target={pwTarget}
+          onClose={() => setPwTarget(null)}
+          onSuccess={(uid, newPw) => {
+            setTeachers(prev => prev.map(t => t.id === uid ? { ...t, password: newPw } : t));
+            setPwTarget(prev => prev ? { ...prev, password: newPw } : null);
           }}
         />
       )}

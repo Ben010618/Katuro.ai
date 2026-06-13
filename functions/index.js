@@ -94,6 +94,32 @@ async function deductTokensServer(uid, action, cost) {
   });
 }
 
+// ── adminChangePassword ──────────────────────────────────────────────────────
+exports.adminChangePassword = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data().isAdmin) {
+      throw new HttpsError('permission-denied', 'Admins only.');
+    }
+
+    const { uid, password } = req.data;
+    if (!uid || !password || password.length < 6) {
+      throw new HttpsError('invalid-argument', 'uid and password (min 6 chars) are required.');
+    }
+
+    await admin.auth().updateUser(uid, { password });
+    await db.doc(`teachers/${uid}`).update({
+      password,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true };
+  }
+);
+
 // ── generateOutline ─────────────────────────────────────────────────────────
 // Free to call — lets teachers iterate on the outline before committing tokens.
 exports.generateOutline = onCall(

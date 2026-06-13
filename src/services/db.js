@@ -28,7 +28,8 @@ import {
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db, firebaseConfig } from "../firebase";
+import { db, firebaseConfig, functions } from "../firebase";
+import { httpsCallable } from "firebase/functions";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
@@ -488,6 +489,7 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 
   await setDoc(teacherRef(uid), {
     email,
+    password,
     tokenBalance: initialTokens,
     isAdmin:  false,
     disabled: false,
@@ -567,6 +569,13 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
     uid: targetUid, amount, note, action: "top_up",
     addedBy: adminUid, createdAt: serverTimestamp(),
   });
+}
+
+// ─── Admin: change a user's password ─────────────────────────────────────────
+
+export async function adminChangePassword(targetUid, newPassword) {
+  const fn = httpsCallable(functions, 'adminChangePassword');
+  await fn({ uid: targetUid, password: newPassword });
 }
 
 // ─── Action Research helpers ─────────────────────────────────────────────────
