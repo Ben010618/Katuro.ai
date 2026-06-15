@@ -596,7 +596,16 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
 export async function uploadIdPhoto(uid, file) {
   const ext      = file.name.split('.').pop() || 'jpg';
   const photoRef = storageRef(storage, `userIds/${uid}/id-photo.${ext}`);
-  await uploadBytes(photoRef, file);
+
+  const timeoutMs = 20_000;
+  const uploadRace = Promise.race([
+    uploadBytes(photoRef, file),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Upload timed out. Check your internet or Firebase Storage rules.')), timeoutMs)
+    ),
+  ]);
+  await uploadRace;
+
   const url = await getDownloadURL(photoRef);
   await updateDoc(teacherRef(uid), { idPhotoUrl: url, updatedAt: serverTimestamp() });
   return url;
