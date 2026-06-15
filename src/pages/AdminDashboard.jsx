@@ -5,12 +5,14 @@ import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens, adminChangePassword,
+  getAdminNotifications, markAllNotificationsRead,
 } from '../services/db';
 import ktLogo from '../assets/KT Favicon.png';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
+  Bell, UserPlus, Image, Clock,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -567,14 +569,38 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
 
-  const [teachers,      setTeachers]      = useState([]);
-  const [loadingList,   setLoadingList]   = useState(true);
-  const [listErr,       setListErr]       = useState('');
-  const [addUserOpen,   setAddUserOpen]   = useState(false);
-  const [tokensTarget,  setTokensTarget]  = useState(null);
-  const [togglingUid,   setTogglingUid]   = useState(null);
-  const [pwTarget,      setPwTarget]      = useState(null);
-  const [detailUser,    setDetailUser]    = useState(null);
+  const [teachers,       setTeachers]       = useState([]);
+  const [loadingList,    setLoadingList]     = useState(true);
+  const [listErr,        setListErr]         = useState('');
+  const [addUserOpen,    setAddUserOpen]     = useState(false);
+  const [tokensTarget,   setTokensTarget]    = useState(null);
+  const [togglingUid,    setTogglingUid]     = useState(null);
+  const [pwTarget,       setPwTarget]        = useState(null);
+  const [detailUser,     setDetailUser]      = useState(null);
+
+  // Notifications
+  const [notifications,  setNotifications]  = useState([]);
+  const [showNotifs,     setShowNotifs]      = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  useEffect(() => {
+    getAdminNotifications().then(setNotifications).catch(() => {});
+  }, []);
+
+  async function handleMarkAllRead() {
+    await markAllNotificationsRead().catch(() => {});
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }
+
+  function timeAgo(ts) {
+    if (!ts) return '';
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (diff < 60)   return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  }
 
   const fetchTeachers = useCallback(async () => {
     setLoadingList(true); setListErr('');
@@ -633,6 +659,127 @@ export default function AdminDashboard() {
         <span style={{ fontSize: 12, color: 'rgba(45,106,79,0.4)', margin: '0 2px' }}>›</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#2d6a4f' }}>Admin Dashboard</span>
         <div style={{ flex: 1 }} />
+
+        {/* Bell notification button */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowNotifs(v => !v)}
+            style={{
+              ...btnSecondary, fontSize: 12, position: 'relative',
+              background: showNotifs ? '#f0f9f4' : undefined,
+              borderColor: showNotifs ? 'rgba(45,106,79,0.3)' : undefined,
+            }}
+            title="Notifications"
+          >
+            <Bell size={14} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -6, right: -6,
+                background: '#e05c5c', color: '#fff',
+                fontSize: 9, fontWeight: 800, lineHeight: 1,
+                borderRadius: '50%', width: 16, height: 16,
+                display: 'grid', placeItems: 'center',
+                border: '2px solid #fff',
+              }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </button>
+
+          {/* Notification panel */}
+          {showNotifs && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+              width: 340, background: '#fff', borderRadius: 14,
+              border: '1px solid rgba(45,106,79,0.12)',
+              boxShadow: '0 12px 40px rgba(13,34,24,0.16)',
+              zIndex: 100, overflow: 'hidden',
+            }}>
+              {/* Panel header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <Bell size={13} color="#2d6a4f" />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Notifications</span>
+                  {unreadCount > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: '#e05c5c', color: '#fff', borderRadius: 20, padding: '1px 7px' }}>
+                      {unreadCount} new
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {unreadCount > 0 && (
+                    <button onClick={handleMarkAllRead} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: 10, fontWeight: 700, color: '#2d6a4f', padding: '3px 6px',
+                    }}>
+                      Mark all read
+                    </button>
+                  )}
+                  <button onClick={() => setShowNotifs(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 2 }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Notification list */}
+              <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9bb8a5' }}>
+                    <Bell size={24} style={{ opacity: 0.3, marginBottom: 8 }} />
+                    <p style={{ margin: 0, fontSize: 12 }}>No notifications yet</p>
+                  </div>
+                ) : notifications.map(n => (
+                  <div key={n.id} style={{
+                    display: 'flex', gap: 10, padding: '12px 16px',
+                    borderBottom: '1px solid rgba(45,106,79,0.06)',
+                    background: n.read ? '#fff' : '#f0faf5',
+                    transition: 'background 0.15s',
+                  }}>
+                    {/* Avatar */}
+                    <div style={{
+                      width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                      background: 'linear-gradient(135deg,#2d6a4f,#52b788)',
+                      display: 'grid', placeItems: 'center',
+                      fontSize: 12, fontWeight: 700, color: '#fff',
+                    }}>
+                      {(n.givenName?.[0] || n.email?.[0] || 'T').toUpperCase()}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                        <UserPlus size={10} color="#2d6a4f" />
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Registration</span>
+                        {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05c5c', flexShrink: 0 }} />}
+                      </div>
+                      <p style={{ margin: '0 0 2px', fontSize: 12, fontWeight: 700, color: '#0d2218' }}>
+                        {n.givenName && n.surname ? `${n.givenName} ${n.surname}` : n.displayName || n.email}
+                      </p>
+                      <p style={{ margin: '0 0 4px', fontSize: 11, color: '#4a6357' }}>{n.school || n.email}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, borderRadius: 20, padding: '2px 7px',
+                          display: 'flex', alignItems: 'center', gap: 3,
+                          background: n.idPhotoUrl ? '#d8f3dc' : 'rgba(232,163,32,0.15)',
+                          color:      n.idPhotoUrl ? '#1a5c3a'  : '#92400e',
+                        }}>
+                          <Image size={8} />
+                          {n.idPhotoUrl ? 'ID uploaded' : 'No ID photo'}
+                        </span>
+                        {n.pendingApproval && (
+                          <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 20, padding: '2px 7px', background: '#fef9e7', color: '#d97706' }}>
+                            Pending Approval
+                          </span>
+                        )}
+                        <span style={{ fontSize: 9, color: '#9bb8a5', display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+                          <Clock size={8} />{timeAgo(n.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={() => navigate('/dashboard')}
           style={{ ...btnSecondary, fontSize: 12 }}

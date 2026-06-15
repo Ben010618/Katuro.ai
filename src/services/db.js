@@ -567,7 +567,49 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
     });
   }
 
+  // Notify admin of new registration
+  await addDoc(collection(db, 'adminNotifications'), {
+    type:        'new_user',
+    uid,
+    email:       email.trim().toLowerCase(),
+    displayName,
+    givenName:   givenName.trim(),
+    surname:     surname.trim(),
+    school:      school.trim(),
+    idPhotoUrl,
+    pendingApproval: atCap,
+    read:        false,
+    createdAt:   serverTimestamp(),
+  });
+
   return { user: cred.user, pendingApproval: atCap };
+}
+
+// ─── Upload ID photo after signup ─────────────────────────────────────────────
+
+export async function uploadIdPhoto(uid, file) {
+  const ext      = file.name.split('.').pop() || 'jpg';
+  const photoRef = storageRef(storage, `userIds/${uid}/id-photo.${ext}`);
+  await uploadBytes(photoRef, file);
+  const url = await getDownloadURL(photoRef);
+  await updateDoc(teacherRef(uid), { idPhotoUrl: url, updatedAt: serverTimestamp() });
+  return url;
+}
+
+// ─── Admin notifications ──────────────────────────────────────────────────────
+
+export async function getAdminNotifications() {
+  const snap = await getDocs(
+    query(collection(db, 'adminNotifications'), orderBy('createdAt', 'desc'))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function markAllNotificationsRead() {
+  const snap = await getDocs(
+    query(collection(db, 'adminNotifications'), where('read', '==', false))
+  );
+  await Promise.all(snap.docs.map(d => updateDoc(d.ref, { read: true })));
 }
 
 // ─── Admin: enable / disable a user ─────────────────────────────────────────
@@ -638,7 +680,13 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("User profile not found.");
-    const balance = snap.data().tokenBalance ?? 0;
+    const data    = snap.data();
+    const idPhotoUrl = data.idPhotoUrl ?? null;
+    if (!idPhotoUrl) {
+      window.dispatchEvent(new CustomEvent('kt-no-id'));
+      throw new Error("Please upload your Photo of Identification to use AI generation.");
+    }
+    const balance = data.tokenBalance ?? 0;
     if (balance < cost) {
       window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
       throw new Error("Not enough tokens. Contact your administrator to add tokens.");
