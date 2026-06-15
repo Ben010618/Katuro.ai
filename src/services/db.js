@@ -640,6 +640,7 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
     if (!snap.exists()) throw new Error("User profile not found.");
     const balance = snap.data().tokenBalance ?? 0;
     if (balance < cost) {
+      window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
       throw new Error("Not enough tokens. Contact your administrator to add tokens.");
     }
     tx.update(ref, { tokenBalance: balance - cost, updatedAt: serverTimestamp() });
