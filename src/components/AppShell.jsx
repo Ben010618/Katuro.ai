@@ -175,7 +175,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
 }
 
 export default function AppShell() {
-  const { user, tokenBalance, isAdmin } = useAuth();
+  const { user, tokenBalance, isAdmin, loading } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [slideIdx, setSlideIdx] = useState(0);
@@ -187,13 +187,13 @@ export default function AppShell() {
     return () => clearInterval(id);
   }, []);
 
-  // Auto-show once per session when tokenBalance is zero
+  // Auto-show once per session — only after profile is fully loaded AND balance is truly zero
   useEffect(() => {
-    if (tokenBalance === 0 && !shownOnLogin.current) {
+    if (!loading && tokenBalance === 0 && !shownOnLogin.current) {
       shownOnLogin.current = true;
       setShowBundle(true);
     }
-  }, [tokenBalance]);
+  }, [loading, tokenBalance]);
 
   // Show when a generate action fails due to zero tokens
   useEffect(() => {
