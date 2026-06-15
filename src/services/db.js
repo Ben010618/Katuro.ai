@@ -28,8 +28,9 @@ import {
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db, firebaseConfig, functions } from "../firebase";
+import { db, firebaseConfig, functions, storage } from "../firebase";
 import { httpsCallable } from "firebase/functions";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
@@ -511,15 +512,16 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 // After MAX_ACCOUNTS enabled users, new registrations are auto-disabled
 // (pendingApproval: true) until the admin manually enables them.
 
-const MAX_ACCOUNTS = 250;
+const MAX_ACCOUNTS    = 250;
+const WELCOME_TOKENS  = 30;
 
-export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
+export async function selfSignUp({ email, password, surname, givenName, mi, school, idPhotoFile }) {
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
 
-  const countSnap = await getDocs(collection(db, "teachers"));
+  const countSnap   = await getDocs(collection(db, "teachers"));
   const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
-  const atCap = activeCount >= MAX_ACCOUNTS;
+  const atCap       = activeCount >= MAX_ACCOUNTS;
 
   const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   const uid  = cred.user.uid;
@@ -529,6 +531,19 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
 
   await updateProfile(cred.user, { displayName });
 
+  // Upload ID photo to Firebase Storage if provided
+  let idPhotoUrl = null;
+  if (idPhotoFile) {
+    try {
+      const ext      = idPhotoFile.name.split('.').pop() || 'jpg';
+      const photoRef = storageRef(storage, `userIds/${uid}/id-photo.${ext}`);
+      await uploadBytes(photoRef, idPhotoFile);
+      idPhotoUrl = await getDownloadURL(photoRef);
+    } catch {
+      // Non-fatal — account still created without photo
+    }
+  }
+
   await setDoc(teacherRef(uid), {
     email:           email.trim().toLowerCase(),
     displayName,
@@ -536,17 +551,18 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
     givenName:       givenName.trim(),
     mi:              mi?.trim() || '',
     school:          school.trim(),
-    tokenBalance:    atCap ? 0 : 50,
+    tokenBalance:    atCap ? 0 : WELCOME_TOKENS,
     isAdmin:         false,
     disabled:        atCap,
     pendingApproval: atCap,
+    idPhotoUrl,
     createdAt:       serverTimestamp(),
   });
 
   if (!atCap) {
     await addDoc(tokenLogsRef(uid), {
-      uid, amount: 50, action: 'welcome_bonus',
-      note: 'Welcome! 50 free tokens to get started.',
+      uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
+      note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
       createdAt: serverTimestamp(),
     });
   }

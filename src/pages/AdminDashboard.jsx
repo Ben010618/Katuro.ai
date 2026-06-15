@@ -289,6 +289,110 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
   );
 }
 
+// ── User Details modal ───────────────────────────────────────────────────────
+function UserDetailsModal({ teacher: t, onClose }) {
+  const statusLabel = t.pendingApproval ? 'Pending Approval' : t.disabled ? 'Disabled' : 'Active';
+  const statusColor = t.pendingApproval ? '#d97706' : t.disabled ? '#c0392b' : '#1a3d2b';
+  const statusBg    = t.pendingApproval ? '#fef9e7' : t.disabled ? 'rgba(224,92,92,0.1)' : '#d8f3dc';
+
+  const createdAt = t.createdAt
+    ? (t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt))
+        .toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' })
+    : '—';
+
+  function Row({ label, value }) {
+    return (
+      <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
+        <span style={{ ...labelStyle, marginBottom: 0, width: 120, flexShrink: 0, lineHeight: '1.4' }}>{label}</span>
+        <span style={{ fontSize: 13, color: '#0d2218', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{value || '—'}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(13,34,24,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 20, overflowY: 'auto',
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fff', borderRadius: 18, padding: 0,
+        width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(13,34,24,0.22)',
+        overflow: 'hidden',
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+          padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,0.25)', display: 'grid', placeItems: 'center',
+            fontSize: 18, fontWeight: 700, color: '#fff',
+          }}>
+            {(t.givenName?.[0] || t.email?.[0] || 'T').toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff' }}>
+              {t.givenName && t.surname ? `${t.givenName} ${t.mi ? t.mi + '. ' : ''}${t.surname}` : t.displayName || t.email}
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>{t.email}</p>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '4px 10px', background: statusBg, color: statusColor }}>
+            {statusLabel}
+          </span>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: '#fff', borderRadius: 8, padding: 6 }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px' }}>
+
+          {/* ID photo */}
+          {t.idPhotoUrl && (
+            <div style={{ marginBottom: 20, textAlign: 'center' }}>
+              <p style={{ ...labelStyle, marginBottom: 8 }}>ID Photo</p>
+              <a href={t.idPhotoUrl} target="_blank" rel="noopener noreferrer" title="Open full size">
+                <img
+                  src={t.idPhotoUrl}
+                  alt="ID Photo"
+                  style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 12, border: '2px solid rgba(45,106,79,0.15)', objectFit: 'contain', cursor: 'zoom-in' }}
+                />
+              </a>
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#9BB8A5' }}>Click to open full size</p>
+            </div>
+          )}
+          {!t.idPhotoUrl && (
+            <div style={{ marginBottom: 16, background: '#f5faf7', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>📋</span>
+              <p style={{ margin: 0, fontSize: 12, color: '#9BB8A5', fontStyle: 'italic' }}>No ID photo uploaded during signup</p>
+            </div>
+          )}
+
+          {/* Fields */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <Row label="First Name"   value={t.givenName} />
+            <Row label="Middle Init." value={t.mi} />
+            <Row label="Last Name"    value={t.surname} />
+            <Row label="School"       value={t.school} />
+            <Row label="Email"        value={t.email} />
+            <Row label="Token Balance" value={t.tokenBalance !== undefined ? `${t.tokenBalance} tokens` : undefined} />
+            <Row label="Signed Up"    value={createdAt} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(45,106,79,0.1)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={btnPrimary}><X size={14} /> Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // ── API Key section ───────────────────────────────────────────────────────────
 function ApiKeySection({ adminUid }) {
@@ -470,6 +574,7 @@ export default function AdminDashboard() {
   const [tokensTarget,  setTokensTarget]  = useState(null);
   const [togglingUid,   setTogglingUid]   = useState(null);
   const [pwTarget,      setPwTarget]      = useState(null);
+  const [detailUser,    setDetailUser]    = useState(null);
 
   const fetchTeachers = useCallback(async () => {
     setLoadingList(true); setListErr('');
@@ -618,20 +723,31 @@ export default function AdminDashboard() {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <td style={{ padding: '10px 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                            background: t.isAdmin ? 'linear-gradient(135deg,#e8a320,#b47a10)' : 'linear-gradient(135deg,#2d6a4f,#52b788)',
-                            display: 'grid', placeItems: 'center',
-                            fontSize: 10, fontWeight: 700, color: '#fff',
-                          }}>
-                            {(t.email?.[0] || 'T').toUpperCase()}
+                        <button
+                          onClick={() => setDetailUser(t)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
+                          title="View user details"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                              background: t.isAdmin ? 'linear-gradient(135deg,#e8a320,#b47a10)' : 'linear-gradient(135deg,#2d6a4f,#52b788)',
+                              display: 'grid', placeItems: 'center',
+                              fontSize: 10, fontWeight: 700, color: '#fff',
+                            }}>
+                              {(t.givenName?.[0] || t.email?.[0] || 'T').toUpperCase()}
+                            </div>
+                            <div>
+                              {(t.givenName || t.surname) && (
+                                <p style={{ margin: '0 0 1px', fontWeight: 700, fontSize: 13, color: '#0d2218' }}>
+                                  {[t.givenName, t.mi ? `${t.mi}.` : '', t.surname].filter(Boolean).join(' ')}
+                                </p>
+                              )}
+                              <p style={{ margin: 0, fontWeight: 600, color: '#4a6357', fontSize: 12, textDecoration: 'underline dotted' }}>{t.email}</p>
+                              {t.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: '#b47a10', background: 'rgba(232,163,32,0.12)', borderRadius: 4, padding: '1px 5px' }}>Admin</span>}
+                            </div>
                           </div>
-                          <div>
-                            <p style={{ margin: 0, fontWeight: 600, color: '#0d2218' }}>{t.email}</p>
-                            {t.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: '#b47a10', background: 'rgba(232,163,32,0.12)', borderRadius: 4, padding: '1px 5px' }}>Admin</span>}
-                          </div>
-                        </div>
+                        </button>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ fontFamily: '"DM Mono", monospace', fontWeight: 700, fontSize: 15, color: '#0d2218' }}>
@@ -742,6 +858,12 @@ match /teachers/{uid} {
             setTeachers(prev => prev.map(t => t.id === uid ? { ...t, password: newPw } : t));
             setPwTarget(prev => prev ? { ...prev, password: newPw } : null);
           }}
+        />
+      )}
+      {detailUser && (
+        <UserDetailsModal
+          teacher={detailUser}
+          onClose={() => setDetailUser(null)}
         />
       )}
     </div>

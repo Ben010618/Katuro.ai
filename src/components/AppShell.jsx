@@ -13,8 +13,75 @@ const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, Projector,
-  ShieldCheck, Coins, Gamepad2, FlaskConical,
+  ShieldCheck, Coins, Gamepad2, FlaskConical, MessageCircle,
 } from 'lucide-react';
+
+const FB_URL = 'https://www.facebook.com/Teachers2ls';
+
+function FacebookIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+
+function ZeroTokenBanner({ compact = false }) {
+  if (compact) {
+    return (
+      <a
+        href={FB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: '#1877f2', color: '#fff',
+          borderRadius: 20, padding: '4px 12px',
+          fontSize: 11, fontWeight: 700, textDecoration: 'none',
+          transition: 'opacity 0.15s',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+      >
+        <FacebookIcon size={12} />
+        Get Tokens
+      </a>
+    );
+  }
+  return (
+    <div style={{
+      margin: '8px 6px 0',
+      background: 'linear-gradient(135deg, #e8f4fd 0%, #dbeafe 100%)',
+      border: '1px solid #bfdbfe',
+      borderRadius: 12, padding: '10px 12px',
+    }}>
+      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#1e3a5f' }}>
+        Out of tokens
+      </p>
+      <p style={{ margin: '0 0 8px', fontSize: 10, color: '#3b5f8a', lineHeight: 1.4 }}>
+        Message us to get more tokens and keep teaching!
+      </p>
+      <a
+        href={FB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          background: '#1877f2', color: '#fff',
+          borderRadius: 8, padding: '6px 10px',
+          fontSize: 11, fontWeight: 700, textDecoration: 'none',
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+      >
+        <FacebookIcon size={13} />
+        Message Us on Facebook
+      </a>
+    </div>
+  );
+}
 
 const NAV = [
   { to: '/dashboard',              label: 'Dashboard',             Icon: LayoutDashboard },
@@ -147,12 +214,13 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <Coins size={10} color="#b47a10" />
               <span style={{
-                fontSize: 10, fontWeight: 700, color: '#b47a10',
+                fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#c0392b' : '#b47a10',
                 fontFamily: '"DM Mono", monospace',
               }}>{tokenBalance} tokens</span>
             </div>
           </div>
         </div>
+        {tokenBalance === 0 && <ZeroTokenBanner />}
         <button
           onClick={handleLogout}
           style={{
@@ -262,16 +330,20 @@ export default function AppShell() {
               <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{pageTitle}</span>
             </div>
 
-            {/* Token balance badge */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: 'rgba(232,163,32,0.12)', borderRadius: 20, padding: '4px 12px',
-              fontSize: 11, fontWeight: 700, color: '#b47a10',
-            }}>
-              <Coins size={12} />
-              <span style={{ fontFamily: '"DM Mono", monospace' }}>{tokenBalance}</span>
-              <span style={{ fontWeight: 500 }}>tokens</span>
-            </div>
+            {/* Token balance badge / zero-token CTA */}
+            {tokenBalance === 0 ? (
+              <ZeroTokenBanner compact />
+            ) : (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: 'rgba(232,163,32,0.12)', borderRadius: 20, padding: '4px 12px',
+                fontSize: 11, fontWeight: 700, color: '#b47a10',
+              }}>
+                <Coins size={12} />
+                <span style={{ fontFamily: '"DM Mono", monospace' }}>{tokenBalance}</span>
+                <span style={{ fontWeight: 500 }}>tokens</span>
+              </div>
+            )}
           </header>
 
           {/* Page content */}

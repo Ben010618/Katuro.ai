@@ -194,6 +194,7 @@ export default function LoginPage() {
   const [school,    setSchool]    = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showCPw,   setShowCPw]   = useState(false);
+  const [idFile,    setIdFile]    = useState(null);
   const [signedUp,  setSignedUp]  = useState(false); // false | 'active' | 'pending'
 
   // Slideshow
@@ -243,7 +244,7 @@ export default function LoginPage() {
     if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
     setError(''); setLoading(true);
     try {
-      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
+      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school, idPhotoFile: idFile });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
       setError(err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, ''));
@@ -488,7 +489,7 @@ export default function LoginPage() {
                   </h2>
                   <p style={{ margin: '5px 0 0', fontSize: 13, color: '#6b8a7a', lineHeight: 1.5, fontWeight: 400 }}>
                     {mode === 'reset'  ? "We'll send a reset link to your email." :
-                     mode === 'signup' ? 'Join kaTuro — get 50 free tokens to start.' :
+                     mode === 'signup' ? 'Join kaTuro — get 30 free tokens to start.' :
                                          'Sign in to your teaching workspace.'}
                   </p>
                 </div>
@@ -522,7 +523,7 @@ export default function LoginPage() {
                 <div style={{ fontSize: 36, marginBottom: 8 }}>🎉</div>
                 <p style={{ fontSize: 15, fontWeight: 700, color: '#1a3d2b', margin: '0 0 6px' }}>Account created!</p>
                 <p style={{ fontSize: 13, color: '#4a6357', margin: 0, lineHeight: 1.5 }}>
-                  Welcome to kaTuro! You have <strong>50 free tokens</strong>. Signing you in…
+                  Welcome to kaTuro! You have <strong>30 free tokens</strong>. Signing you in…
                 </p>
               </div>
             )}
@@ -623,6 +624,56 @@ export default function LoginPage() {
                   </div>
                 )}
 
+                {/* ID Photo — signup only */}
+                {mode === 'signup' && (
+                  <div>
+                    <label className="kt-label">
+                      School / Employee ID Photo <span style={{ fontWeight: 400, textTransform: 'none', color: '#9bb8a5' }}>(optional — helps admin verify faster)</span>
+                    </label>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      border: `1.5px dashed ${idFile ? '#2d6a4f' : '#cde0d6'}`,
+                      borderRadius: 12, padding: '10px 14px', cursor: 'pointer',
+                      background: idFile ? '#f0faf5' : '#f8faf9', transition: 'all 0.2s',
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: idFile ? '#d8f3dc' : '#e8f0ec',
+                        display: 'grid', placeItems: 'center',
+                      }}>
+                        {idFile
+                          ? <span style={{ fontSize: 16 }}>✓</span>
+                          : <span style={{ fontSize: 16 }}>📎</span>
+                        }
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: idFile ? '#1a3d2b' : '#4a6357' }}>
+                          {idFile ? idFile.name : 'Upload ID Photo'}
+                        </p>
+                        <p style={{ margin: 0, fontSize: 11, color: '#9bb8a5' }}>
+                          {idFile ? `${(idFile.size / 1024).toFixed(0)} KB` : 'JPG, PNG — max 5 MB'}
+                        </p>
+                      </div>
+                      {idFile && (
+                        <button type="button" onClick={e => { e.preventDefault(); setIdFile(null); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9bb8a5', fontSize: 16, padding: 2 }}>
+                          ✕
+                        </button>
+                      )}
+                      <input
+                        type="file" accept="image/*" style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f && f.size <= 5 * 1024 * 1024) setIdFile(f);
+                          else if (f) setError('ID photo must be under 5 MB.');
+                          e.target.value = '';
+                        }}
+                        disabled={loading}
+                      />
+                    </label>
+                  </div>
+                )}
+
                 {/* Forgot / Back links */}
                 <div style={{ display: 'flex', justifyContent: mode === 'reset' ? 'center' : 'flex-end', marginTop: -2 }}>
                   {mode === 'login' && (
@@ -647,7 +698,7 @@ export default function LoginPage() {
                         {mode === 'reset' ? 'Sending…' : mode === 'signup' ? 'Creating account…' : 'Signing in…'}
                       </>
                     : mode === 'reset'  ? 'Send Reset Link'
-                    : mode === 'signup' ? <><Gift size={15} /> Create Account — 50 Free Tokens</>
+                    : mode === 'signup' ? <><Gift size={15} /> Create Account — 30 Free Tokens</>
                     :                     'Sign In to kaTuro'
                   }
                 </button>
