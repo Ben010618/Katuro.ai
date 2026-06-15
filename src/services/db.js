@@ -519,11 +519,13 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
 
+  // Create auth user FIRST so all subsequent Firestore reads are authenticated
+  const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
+
+  // Count active teachers NOW that we are authenticated
   const countSnap   = await getDocs(collection(db, "teachers"));
   const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
   const atCap       = activeCount >= MAX_ACCOUNTS;
-
-  const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   const uid  = cred.user.uid;
 
   const displayName = [givenName.trim(), mi ? mi.trim() + '.' : '', surname.trim()]
@@ -567,20 +569,24 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
     });
   }
 
-  // Notify admin of new registration
-  await addDoc(collection(db, 'adminNotifications'), {
-    type:        'new_user',
-    uid,
-    email:       email.trim().toLowerCase(),
-    displayName,
-    givenName:   givenName.trim(),
-    surname:     surname.trim(),
-    school:      school.trim(),
-    idPhotoUrl,
-    pendingApproval: atCap,
-    read:        false,
-    createdAt:   serverTimestamp(),
-  });
+  // Notify admin of new registration — non-fatal if rules block it
+  try {
+    await addDoc(collection(db, 'adminNotifications'), {
+      type:        'new_user',
+      uid,
+      email:       email.trim().toLowerCase(),
+      displayName,
+      givenName:   givenName.trim(),
+      surname:     surname.trim(),
+      school:      school.trim(),
+      idPhotoUrl,
+      pendingApproval: atCap,
+      read:        false,
+      createdAt:   serverTimestamp(),
+    });
+  } catch {
+    // Non-fatal — account is already created, notification failure shouldn't block signup
+  }
 
   return { user: cred.user, pendingApproval: atCap };
 }
