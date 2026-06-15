@@ -687,10 +687,12 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("User profile not found.");
     const data    = snap.data();
-    const idPhotoUrl = data.idPhotoUrl ?? null;
-    if (!idPhotoUrl) {
-      window.dispatchEvent(new CustomEvent('kt-no-id'));
-      throw new Error("Please upload your Photo of Identification to use AI generation.");
+    if (!data.isAdmin) {
+      const idPhotoUrl = data.idPhotoUrl ?? null;
+      if (!idPhotoUrl) {
+        window.dispatchEvent(new CustomEvent('kt-no-id'));
+        throw new Error("Please upload your Photo of Identification to use AI generation.");
+      }
     }
     const balance = data.tokenBalance ?? 0;
     if (balance < cost) {
