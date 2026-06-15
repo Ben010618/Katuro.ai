@@ -53,7 +53,7 @@ export async function generateResearchTitles({ beraTheme, problemText, subjectAr
   const text = await callGemini(
     `You are a DepEd action research expert helping Filipino public school teachers write BERF-ready action research papers.
 
-Generate exactly 5 formal, publishable action research titles.
+Generate exactly 5 action research titles — a MIX of formal academic titles and modern abbreviated project-style titles.
 
 Context:
 - BERA Theme: ${theme}
@@ -61,16 +61,30 @@ Context:
 - Grade Level: ${gradeLevel || 'Not specified'}
 - Observed Problem: ${problemText}
 
-Rules:
-- Each title must be specific, measurable, and academic in tone
-- Use format variations: "[Strategy] to [Improve/Enhance] [Outcome] Among Grade [X] [Subject] Learners"
-- Vary the intervention types (e.g., differentiated instruction, gamification, collaborative learning, etc.)
-- Sentence case only — no ALL CAPS
+TITLE TYPE BREAKDOWN — generate ALL 5:
+Titles 1–3: Formal academic titles
+- Format: "[Strategy] to [Improve/Enhance] [Outcome] Among Grade [X] [Subject] Learners"
+- Vary the intervention types across titles (e.g., differentiated instruction, gamification, collaborative learning, peer tutoring, etc.)
+- Specific and measurable
+
+Titles 4–5: Modern abbreviated / acronym project-style titles (at least 2)
+- Create a meaningful acronym where each letter stands for a word related to the intervention or outcome
+- Format options (use one for title 4, the other for title 5):
+  a. ACRONYM: Full descriptive subtitle expanding the acronym
+     Example: "SPARK: Strengthening Participation and Academic Results through Knowledge-Based Activities"
+  b. Project ACRONYM: Full descriptive subtitle
+     Example: "Project READ: Reading Enhancement and Development Program for Struggling Readers"
+- The acronym must be a real English word (SPARK, RISE, GLOW, LEAP, BLOOM, SOAR, REACH, LIFT, ECHO, NEST, etc.)
+- The subtitle must naturally expand each letter of the acronym
+- Both titles 4 and 5 must be relevant to the observed problem and context
+
+General rules:
 - No numbering inside the title text
+- All 5 titles must address the same problem but offer different intervention approaches
 
 Return ONLY this JSON (no markdown):
-{ "titles": ["title 1", "title 2", "title 3", "title 4", "title 5"] }`,
-    1024
+{ "titles": ["formal title 1", "formal title 2", "formal title 3", "ACRONYM: subtitle", "Project ACRONYM: subtitle"] }`,
+    1500
   );
   return parseJSON(text);
 }

@@ -384,15 +384,65 @@ export default function ActionResearchPhase1() {
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {researchTitles.map((title, i) => {
                 const active = selectedTitle === title;
+                // Detect "ACRONYM: subtitle" or "Project ACRONYM: subtitle" pattern
+                const abbrMatch = title.match(/^(Project\s+)?([A-Z]{2,}):\s+(.+)/);
+                const isAbbr = !!abbrMatch;
+                const acronym  = abbrMatch ? (abbrMatch[1] ? abbrMatch[1].trim() + ' ' : '') + abbrMatch[2] : null;
+                const subtitle = abbrMatch ? abbrMatch[3] : null;
+
                 return (
                   <button key={i} onClick={() => setSelectedTitle(title)}
-                    style={{ textAlign:'left', fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:12, background:active?'#f0f9f4':'#fafafa', border:active?'2px solid #2d6a4f':'1.5px solid rgba(45,106,79,0.15)', borderRadius:10, padding:'14px 16px', transition:'border 0.15s, background 0.15s' }}
-                    onMouseEnter={e=>{if(!active)e.currentTarget.style.background='#f5faf7';}}
-                    onMouseLeave={e=>{if(!active)e.currentTarget.style.background='#fafafa';}}>
-                    <div style={{ width:20, height:20, borderRadius:'50%', border:active?'none':'2px solid rgba(45,106,79,0.3)', background:active?'#2d6a4f':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                    style={{
+                      textAlign:'left', fontFamily:'inherit', cursor:'pointer',
+                      display:'flex', alignItems:'flex-start', gap:12,
+                      background: active ? (isAbbr ? '#f0f6ff' : '#f0f9f4') : (isAbbr ? '#f8faff' : '#fafafa'),
+                      border: active
+                        ? `2px solid ${isAbbr ? '#3b82f6' : '#2d6a4f'}`
+                        : `1.5px solid ${isAbbr ? 'rgba(59,130,246,0.25)' : 'rgba(45,106,79,0.15)'}`,
+                      borderRadius:10, padding:'14px 16px',
+                      transition:'border 0.15s, background 0.15s',
+                    }}
+                    onMouseEnter={e=>{ if(!active) e.currentTarget.style.background = isAbbr ? '#f0f6ff' : '#f5faf7'; }}
+                    onMouseLeave={e=>{ if(!active) e.currentTarget.style.background = isAbbr ? '#f8faff' : '#fafafa'; }}>
+
+                    {/* Radio dot */}
+                    <div style={{
+                      width:20, height:20, borderRadius:'50%', flexShrink:0, marginTop:2,
+                      border: active ? 'none' : `2px solid ${isAbbr ? 'rgba(59,130,246,0.4)' : 'rgba(45,106,79,0.3)'}`,
+                      background: active ? (isAbbr ? '#3b82f6' : '#2d6a4f') : 'transparent',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>
                       {active && <CheckCircle2 size={14} color="#fff" />}
                     </div>
-                    <p style={{ margin:0, fontSize:13, color:active?'#1a3d2b':'#0d2218', lineHeight:1.6, fontWeight:active?600:400 }}>{title}</p>
+
+                    {/* Title text */}
+                    <div style={{ flex:1 }}>
+                      {isAbbr ? (
+                        <>
+                          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
+                            <span style={{
+                              fontSize:11, fontWeight:700, letterSpacing:'0.06em',
+                              color: active ? '#1d4ed8' : '#2563eb',
+                              background: active ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.08)',
+                              borderRadius:6, padding:'2px 8px',
+                            }}>
+                              {acronym}
+                            </span>
+                            <span style={{ fontSize:10, fontWeight:600, color:'#6b8fb0', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                              Project Title
+                            </span>
+                          </div>
+                          <p style={{ margin:0, fontSize:13, color: active ? '#1e3a6e' : '#0d2218', lineHeight:1.6, fontWeight: active ? 600 : 400 }}>
+                            <span style={{ color: active ? '#1d4ed8' : '#2563eb', fontWeight:700 }}>{acronym}:</span>{' '}
+                            {subtitle}
+                          </p>
+                        </>
+                      ) : (
+                        <p style={{ margin:0, fontSize:13, color:active?'#1a3d2b':'#0d2218', lineHeight:1.6, fontWeight:active?600:400 }}>
+                          {title}
+                        </p>
+                      )}
+                    </div>
                   </button>
                 );
               })}
