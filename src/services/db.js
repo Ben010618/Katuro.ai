@@ -28,9 +28,8 @@ import {
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db, firebaseConfig, functions, storage } from "../firebase";
+import { db, firebaseConfig, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
@@ -515,7 +514,7 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 const MAX_ACCOUNTS    = 250;
 const WELCOME_TOKENS  = 30;
 
-export async function selfSignUp({ email, password, surname, givenName, mi, school, idPhotoFile }) {
+export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
 
@@ -526,25 +525,12 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const countSnap   = await getDocs(collection(db, "teachers"));
   const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
   const atCap       = activeCount >= MAX_ACCOUNTS;
-  const uid  = cred.user.uid;
+  const uid         = cred.user.uid;
 
   const displayName = [givenName.trim(), mi ? mi.trim() + '.' : '', surname.trim()]
     .filter(Boolean).join(' ');
 
   await updateProfile(cred.user, { displayName });
-
-  // Upload ID photo to Firebase Storage if provided
-  let idPhotoUrl = null;
-  if (idPhotoFile) {
-    try {
-      const ext      = idPhotoFile.name.split('.').pop() || 'jpg';
-      const photoRef = storageRef(storage, `userIds/${uid}/id-photo.${ext}`);
-      await uploadBytes(photoRef, idPhotoFile);
-      idPhotoUrl = await getDownloadURL(photoRef);
-    } catch {
-      // Non-fatal — account still created without photo
-    }
-  }
 
   await setDoc(teacherRef(uid), {
     email:           email.trim().toLowerCase(),
@@ -557,7 +543,6 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
     isAdmin:         false,
     disabled:        atCap,
     pendingApproval: atCap,
-    idPhotoUrl,
     createdAt:       serverTimestamp(),
   });
 
@@ -572,43 +557,22 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   // Notify admin of new registration — non-fatal if rules block it
   try {
     await addDoc(collection(db, 'adminNotifications'), {
-      type:        'new_user',
+      type:            'new_user',
       uid,
-      email:       email.trim().toLowerCase(),
+      email:           email.trim().toLowerCase(),
       displayName,
-      givenName:   givenName.trim(),
-      surname:     surname.trim(),
-      school:      school.trim(),
-      idPhotoUrl,
+      givenName:       givenName.trim(),
+      surname:         surname.trim(),
+      school:          school.trim(),
       pendingApproval: atCap,
-      read:        false,
-      createdAt:   serverTimestamp(),
+      read:            false,
+      createdAt:       serverTimestamp(),
     });
   } catch {
-    // Non-fatal — account is already created, notification failure shouldn't block signup
+    // Non-fatal — account already created, notification failure shouldn't block signup
   }
 
   return { user: cred.user, pendingApproval: atCap };
-}
-
-// ─── Upload ID photo after signup ─────────────────────────────────────────────
-
-export async function uploadIdPhoto(uid, file) {
-  const ext      = file.name.split('.').pop() || 'jpg';
-  const photoRef = storageRef(storage, `userIds/${uid}/id-photo.${ext}`);
-
-  const timeoutMs = 20_000;
-  const uploadRace = Promise.race([
-    uploadBytes(photoRef, file),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Upload timed out. Check your internet or Firebase Storage rules.')), timeoutMs)
-    ),
-  ]);
-  await uploadRace;
-
-  const url = await getDownloadURL(photoRef);
-  await updateDoc(teacherRef(uid), { idPhotoUrl: url, updatedAt: serverTimestamp() });
-  return url;
 }
 
 // ─── Admin notifications ──────────────────────────────────────────────────────
@@ -696,13 +660,6 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("User profile not found.");
     const data    = snap.data();
-    if (!data.isAdmin) {
-      const idPhotoUrl = data.idPhotoUrl ?? null;
-      if (!idPhotoUrl) {
-        window.dispatchEvent(new CustomEvent('kt-no-id'));
-        throw new Error("Please upload your Photo of Identification to use AI generation.");
-      }
-    }
     const balance = data.tokenBalance ?? 0;
     if (balance < cost) {
       window.dispatchEvent(new CustomEvent('kt-zero-tokens'));

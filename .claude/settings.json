@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"export.*function\\\\|export.*const\")",
+      "Bash(git commit -m ' *)",
+      "Bash(npx vite *)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" status)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" diff --stat)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" add src/pages/DashboardPage.jsx)",
+      "Bash(git -C 'c:\\\\Users\\\\USER\\\\katuro-ai' commit -m ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" push)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" add functions/index.js src/App.jsx src/hooks/useAuth.js src/pages/AdminDashboard.jsx src/pages/LoginPage.jsx src/services/actionResearchAI.js src/services/db.js src/services/dllAI.js src/services/usageLimit.js)",
+      "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" add src/pages/LoginPage.jsx)"
+    ]
+  }
+}

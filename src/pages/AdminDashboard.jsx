@@ -12,7 +12,7 @@ import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
-  Bell, UserPlus, Image, Clock,
+  Bell, UserPlus, Clock,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -352,27 +352,6 @@ function UserDetailsModal({ teacher: t, onClose }) {
 
         {/* Body */}
         <div style={{ padding: '20px 24px' }}>
-
-          {/* ID photo */}
-          {t.idPhotoUrl && (
-            <div style={{ marginBottom: 20, textAlign: 'center' }}>
-              <p style={{ ...labelStyle, marginBottom: 8 }}>ID Photo</p>
-              <a href={t.idPhotoUrl} target="_blank" rel="noopener noreferrer" title="Open full size">
-                <img
-                  src={t.idPhotoUrl}
-                  alt="ID Photo"
-                  style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 12, border: '2px solid rgba(45,106,79,0.15)', objectFit: 'contain', cursor: 'zoom-in' }}
-                />
-              </a>
-              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#9BB8A5' }}>Click to open full size</p>
-            </div>
-          )}
-          {!t.idPhotoUrl && (
-            <div style={{ marginBottom: 16, background: '#f5faf7', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>📋</span>
-              <p style={{ margin: 0, fontSize: 12, color: '#9BB8A5', fontStyle: 'italic' }}>No ID photo uploaded during signup</p>
-            </div>
-          )}
 
           {/* Fields */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -754,15 +733,6 @@ export default function AdminDashboard() {
                       </p>
                       <p style={{ margin: '0 0 4px', fontSize: 11, color: '#4a6357' }}>{n.school || n.email}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{
-                          fontSize: 9, fontWeight: 700, borderRadius: 20, padding: '2px 7px',
-                          display: 'flex', alignItems: 'center', gap: 3,
-                          background: n.idPhotoUrl ? '#d8f3dc' : 'rgba(232,163,32,0.15)',
-                          color:      n.idPhotoUrl ? '#1a5c3a'  : '#92400e',
-                        }}>
-                          <Image size={8} />
-                          {n.idPhotoUrl ? 'ID uploaded' : 'No ID photo'}
-                        </span>
                         {n.pendingApproval && (
                           <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 20, padding: '2px 7px', background: '#fef9e7', color: '#d97706' }}>
                             Pending Approval

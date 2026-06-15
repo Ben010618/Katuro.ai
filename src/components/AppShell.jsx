@@ -9,7 +9,6 @@ import img3 from '../assets/3.png';
 import img4 from '../assets/4.png';
 import ktLogo from '../assets/KT Favicon.png';
 import TokenBundleModal from './TokenBundleModal';
-import IdUploadModal    from './IdUploadModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -181,7 +180,6 @@ export default function AppShell() {
   const [mobileOpen,   setMobileOpen]   = useState(false);
   const [slideIdx,     setSlideIdx]     = useState(0);
   const [showBundle,   setShowBundle]   = useState(false);
-  const [showIdUpload, setShowIdUpload] = useState(false);
   const shownOnLogin = useRef(false);
 
   useEffect(() => {
@@ -204,12 +202,6 @@ export default function AppShell() {
     return () => window.removeEventListener('kt-zero-tokens', handler);
   }, []);
 
-  // Show ID upload modal when a generate action fires without an ID photo
-  useEffect(() => {
-    const handler = () => setShowIdUpload(true);
-    window.addEventListener('kt-no-id', handler);
-    return () => window.removeEventListener('kt-no-id', handler);
-  }, []);
 
   const pageTitle = Object.keys(TITLES).find(k => location.pathname.startsWith(k))
     ? TITLES[Object.keys(TITLES).find(k => location.pathname.startsWith(k))]
@@ -327,8 +319,7 @@ export default function AppShell() {
         </div>
       </div>
 
-      {showBundle   && <TokenBundleModal onClose={() => setShowBundle(false)} />}
-      {showIdUpload && <IdUploadModal uid={user?.uid} onClose={() => setShowIdUpload(false)} />}
+      {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
     </>
   );
 }

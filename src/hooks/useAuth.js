@@ -43,6 +43,5 @@ export function useAuth() {
     tokenBalance:    profile?.tokenBalance     ?? 0,
     disabled:        profile?.disabled         ?? false,
     pendingApproval: profile?.pendingApproval  ?? false,
-    idPhotoUrl:      profile?.idPhotoUrl       ?? null,
   };
 }
