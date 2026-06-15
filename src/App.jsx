@@ -47,13 +47,28 @@ import CotOutputPage from './pages/cotGen/CotOutputPage';
 function LoadingScreen() {
   return (
     <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
+      <style>{`
+        @keyframes kt-spin { to { transform: rotate(360deg); } }
+        @keyframes kt-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+      `}</style>
       <div style={{ textAlign:'center' }}>
-        <img
-          src={ktLogo}
-          alt="kaTuro AI"
-          style={{ width:42, height:42, borderRadius:11, margin:'0 auto 14px', display:'block', objectFit:'cover' }}
-        />
-        <p style={{ margin:0, fontSize:13, fontWeight:600, color:'#4a6357' }}>Loading workspace…</p>
+        <div style={{ position:'relative', width:56, height:56, margin:'0 auto 18px' }}>
+          {/* Spinning ring */}
+          <div style={{
+            position:'absolute', inset:0, borderRadius:'50%',
+            border:'3px solid rgba(45,106,79,0.12)',
+            borderTopColor:'#2d6a4f',
+            animation:'kt-spin 0.8s linear infinite',
+          }} />
+          <img
+            src={ktLogo}
+            alt="kaTuro AI"
+            style={{ width:40, height:40, borderRadius:10, objectFit:'cover', position:'absolute', top:8, left:8 }}
+          />
+        </div>
+        <p style={{ margin:0, fontSize:13, fontWeight:600, color:'#4a6357', animation:'kt-pulse 1.6s ease-in-out infinite' }}>
+          Loading workspace…
+        </p>
       </div>
     </div>
   );

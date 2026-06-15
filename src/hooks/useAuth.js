@@ -10,12 +10,10 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 10_000);
+    const timeout = setTimeout(() => setLoading(false), 5_000);
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
       clearTimeout(timeout);
       setUser(currentUser);
-      // If no user, stop loading now. If user exists, keep loading
-      // until the Firestore profile snapshot arrives (see effect below).
       if (!currentUser) setLoading(false);
     });
     return () => { unsubAuth(); clearTimeout(timeout); };
@@ -23,10 +21,17 @@ export function useAuth() {
 
   useEffect(() => {
     if (!user?.uid) { setProfile(null); return; }
-    const unsub = onSnapshot(teacherRef(user.uid), (snap) => {
-      setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      teacherRef(user.uid),
+      (snap) => {
+        setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+        setLoading(false);
+      },
+      (_err) => {
+        // Permission denied or network error — stop loading, show app anyway
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [user?.uid]);
 
