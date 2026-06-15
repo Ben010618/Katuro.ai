@@ -205,6 +205,8 @@ Grade Level: ${gradeLevel || 'Not specified'}
 Research Questions:
 ${(selectedQuestions ?? []).map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
+Also decide which ONE research instrument best matches your recommended primary tool. Choose exactly one from: "questionnaire", "interview-guide", "checklist", "pretest-posttest".
+
 Return ONLY this JSON (no markdown):
 {
   "primaryTool": {
@@ -226,7 +228,8 @@ Return ONLY this JSON (no markdown):
     { "formula": "Paired-samples t-test",        "purpose": "Determine significant difference between pre and post scores", "interpretation": "p < 0.05 indicates significant improvement" },
     { "formula": "Percentage / Frequency",        "purpose": "Describe distribution of qualitative responses", "interpretation": "Higher percentage indicates stronger trend" }
   ],
-  "analysisApproach": "Narrative description of how you will analyze all data and how analysis answers each research question..."
+  "analysisApproach": "Narrative description of how you will analyze all data and how analysis answers each research question...",
+  "recommendedInstrument": "pretest-posttest"
 }`,
     3072
   );

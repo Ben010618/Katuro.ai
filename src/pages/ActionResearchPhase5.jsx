@@ -311,9 +311,12 @@ export default function ActionResearchPhase5() {
   const [error,               setError]               = useState('');
 
   // Instrument state
-  const [instrumentType,      setInstrumentType]      = useState('questionnaire');
-  const [instrument,          setInstrument]          = useState(null);
+  const [instrumentType,       setInstrumentType]       = useState('questionnaire');
+  const [aiRecommended,        setAiRecommended]        = useState(null);
+  const [instrument,           setInstrument]           = useState(null);
   const [generatingInstrument, setGeneratingInstrument] = useState(false);
+
+  const VALID_TYPES = INSTRUMENT_TYPES.map(t => t.id);
 
   useEffect(() => {
     if (!user?.uid || !docId) return;
@@ -321,7 +324,14 @@ export default function ActionResearchPhase5() {
       if (snap.exists()) {
         const d = { id: snap.id, ...snap.data() };
         setDocData(d);
-        if (d.dataCollection) setDataCollection(d.dataCollection);
+        if (d.dataCollection) {
+          setDataCollection(d.dataCollection);
+          const rec = d.dataCollection.recommendedInstrument;
+          if (rec && VALID_TYPES.includes(rec)) {
+            setAiRecommended(rec);
+            setInstrumentType(rec);
+          }
+        }
         if (d.instrument)     setInstrument(d.instrument);
         if (d.instrumentType) setInstrumentType(d.instrumentType);
       }
@@ -340,6 +350,11 @@ export default function ActionResearchPhase5() {
         gradeLevel: docData.gradeLevel,
       });
       setDataCollection(result);
+      const rec = result.recommendedInstrument;
+      if (rec && VALID_TYPES.includes(rec)) {
+        setAiRecommended(rec);
+        setInstrumentType(rec);
+      }
     } catch (err) {
       setError(err.message || 'Failed to generate. Please try again.');
     } finally { setGenerating(false); }
@@ -417,10 +432,15 @@ export default function ActionResearchPhase5() {
           <p style={{ margin:'0 0 0', fontSize:14, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
         </div>
 
-        {/* Data Collection Methodology */}
+        {/* ── Step 1: Data Collection Methodology ─────────────────────────── */}
         <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>Data Collection Methodology</p>
-          <p style={{ margin:'0 0 16px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>AI recommends the best data collection tools, statistical formulas, and analysis approach for your research.</p>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
+            <div style={{ width:26, height:26, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center', flexShrink:0 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>1</span>
+            </div>
+            <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#0d2218' }}>Data Collection Methodology</p>
+          </div>
+          <p style={{ margin:'0 0 16px', fontSize:13, color:'#4a6357', lineHeight:1.5, paddingLeft:36 }}>AI recommends the best data collection tools, statistical formulas, and analysis approach for your research.</p>
           <button onClick={handleGenerate} disabled={generating} style={{
             display:'flex', alignItems:'center', gap:7,
             background:generating?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff',
@@ -505,19 +525,23 @@ export default function ActionResearchPhase5() {
           </div>
         )}
 
-        {/* ── Research Instrument Generator ─────────────────────────────────── */}
+        {/* ── Step 2: Research Instrument Generator ─────────────────────────── */}
         <div style={{
           background:'#fff', borderRadius:14,
           border:'2px solid rgba(45,106,79,0.15)', padding:'22px 24px',
         }}>
           {/* Section header */}
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-            <div style={{ width:32, height:32, borderRadius:9, background:'linear-gradient(135deg,#0d2218,#2d6a4f)', display:'grid', placeItems:'center', flexShrink:0 }}>
-              <FileText size={15} color="#52b788" />
+            <div style={{ width:26, height:26, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center', flexShrink:0 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>2</span>
             </div>
-            <div>
+            <div style={{ flex:1 }}>
               <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#0d2218' }}>Auto-Generate Research Instruments</p>
-              <p style={{ margin:0, fontSize:11, color:'#4a6357' }}>AI drafts a complete, ready-to-use instrument — select one type below</p>
+              <p style={{ margin:0, fontSize:11, color:'#4a6357' }}>
+                {aiRecommended
+                  ? 'AI suggests and highlights the best instrument below — choose and generate.'
+                  : 'AI drafts a complete, ready-to-use instrument — select one type below, then generate.'}
+              </p>
             </div>
             {instrument && (
               <span style={{ marginLeft:'auto', background:'#d8f3dc', color:'#1a3d2b', borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
@@ -531,7 +555,8 @@ export default function ActionResearchPhase5() {
           {/* Type selector — 2×2 grid */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
             {INSTRUMENT_TYPES.map(({ id, label, Icon, desc }) => {
-              const active = instrumentType === id;
+              const active     = instrumentType === id;
+              const isAiPick   = aiRecommended === id;
               return (
                 <button
                   key={id}
@@ -546,12 +571,25 @@ export default function ActionResearchPhase5() {
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background='#f5faf7'; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background='#fafafa'; }}
                 >
+                  {/* AI Recommended badge — top-left */}
+                  {isAiPick && (
+                    <span style={{
+                      position:'absolute', top:8, left:10,
+                      background:'#e8a320', color:'#fff',
+                      fontSize:9, fontWeight:700, letterSpacing:'0.05em',
+                      borderRadius:20, padding:'2px 7px',
+                      display:'flex', alignItems:'center', gap:3,
+                    }}>
+                      <Sparkles size={8} /> AI Recommended
+                    </span>
+                  )}
+                  {/* Selected check — top-right */}
                   {active && (
                     <div style={{ position:'absolute', top:8, right:8, width:16, height:16, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center' }}>
                       <CheckCircle2 size={10} color="#fff" />
                     </div>
                   )}
-                  <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:5 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:5, marginTop: isAiPick ? 18 : 0 }}>
                     <Icon size={14} color={active ? '#2d6a4f' : '#4a6357'} />
                     <p style={{ margin:0, fontSize:13, fontWeight:700, color: active ? '#1a3d2b' : '#0d2218' }}>{label}</p>
                   </div>
