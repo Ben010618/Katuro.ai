@@ -79,8 +79,9 @@ export default function DLLOutputPage() {
 
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
   const contentList = (store.contentList || []).filter(c => c.text?.trim());
-  const proc        = store.procedure || {};
+  const proc        = store.procedure  || {};
   const objs        = store.objectives || {};
+  const res         = store.resources  || {};
 
   const sigRows = [
     ['Prepared by:', profile?.name || null, profile?.designation || profile?.position || 'Teacher'],
@@ -213,16 +214,16 @@ export default function DLLOutputPage() {
               {/* ── III. LEARNING RESOURCES ────────────────────────────── */}
               <tr><td colSpan={6} style={sec}>III. LEARNING RESOURCES</td></tr>
               {[
-                'A. References',
-                "1. Teacher's Guide pages",
-                "2. Learner's Materials pages",
-                '3. Textbook pages',
-                '4. Additional Materials from LRMDS portal',
-                'B. Other Learning Resources',
-              ].map(label => (
+                ['A. References',                                 null],
+                ["1. Teacher's Guide pages",                      res.teacherGuidePages],
+                ["2. Learner's Materials pages",                  res.learnersMaterialPages],
+                ['3. Textbook pages',                             res.textbookPages],
+                ['4. Additional Materials from LRMDS portal',     res.lrmdsPortal],
+                ['B. Other Learning Resources',                   res.otherResources],
+              ].map(([label, value]) => (
                 <tr key={label}>
                   <td style={{ ...lbl, fontSize: 10 }}>{label}</td>
-                  <td colSpan={5} style={{ ...base, minHeight: 18 }}></td>
+                  <td colSpan={5} style={{ ...base, minHeight: 18 }}>{value || ''}</td>
                 </tr>
               ))}
 

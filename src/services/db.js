@@ -368,14 +368,16 @@ export async function getIlawPlan(uid, planId) {
 export async function saveDLLPlan(uid, dllData) {
   const { subject, gradeLevel, term, section, teachingDates,
           contentStandards, performanceStandards, melc,
-          dailyContent, procedure } = dllData;
+          melcList, contentList, dailyContent,
+          objectives, procedure, resources } = dllData;
   const lessonName = `DLL – ${subject || 'Lesson'} (${gradeLevel || ''})`.trim();
   const ref = await addDoc(lessonPlansRef(uid), {
     type: 'dll',
     lessonName,
     subject, gradeLevel, term, section, teachingDates,
     contentStandards, performanceStandards, melc,
-    dailyContent, procedure,
+    melcList, contentList, dailyContent,
+    objectives, procedure, resources,
     // Compatibility shims so Quiz/Presentation/Gamification AI works out-of-the-box
     competencyText: melc || '',
     sessions: [],

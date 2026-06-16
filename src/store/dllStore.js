@@ -25,14 +25,16 @@ export const useDLLStore = create((set) => ({
   // Generated output
   objectives: null,  // { monday: '...', tuesday: '...', ... }
   procedure:  null,  // { monday: {A,B,...J}, tuesday: {...}, ... }
+  resources:  null,  // { teacherGuidePages, learnersMaterialPages, textbookPages, lrmdsPortal, otherResources }
   savedId:    null,
 
-  setField:        (key, val) => set({ [key]: val }),
-  setMelcList:     (list)     => set({ melcList: list }),
-  setContentList:  (list)     => set({ contentList: list }),
-  setProcedure:    (procedure) => set({ procedure }),
-  setObjectives:   (objectives) => set({ objectives }),
-  setSavedId:      (savedId)   => set({ savedId }),
+  setField:        (key, val)    => set({ [key]: val }),
+  setMelcList:     (list)        => set({ melcList: list }),
+  setContentList:  (list)        => set({ contentList: list }),
+  setProcedure:    (procedure)   => set({ procedure }),
+  setObjectives:   (objectives)  => set({ objectives }),
+  setResources:    (resources)   => set({ resources }),
+  setSavedId:      (savedId)     => set({ savedId }),
 
   loadPlan: (doc) => {
     // Reconstruct melcList from legacy single-melc plans
@@ -62,6 +64,7 @@ export const useDLLStore = create((set) => ({
       dailyContent: doc.dailyContent || { mon: '', tue: '', wed: '', thu: '', fri: '' },
       objectives:   doc.objectives   || null,
       procedure:    doc.procedure    || null,
+      resources:    doc.resources    || null,
       savedId:      doc.id           || null,
     });
   },
@@ -75,6 +78,7 @@ export const useDLLStore = create((set) => ({
     dailyContent: { mon: '', tue: '', wed: '', thu: '', fri: '' },
     objectives: null,
     procedure:  null,
+    resources:  null,
     savedId:    null,
   }),
 }));

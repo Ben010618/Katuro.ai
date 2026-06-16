@@ -152,7 +152,7 @@ function buildTable(store, profile) {
   const { subject, gradeLevel, term, teachingDates, section,
           contentStandards, performanceStandards,
           melcList, contentList, melc, dailyContent,
-          objectives, procedure } = store;
+          objectives, procedure, resources } = store;
 
   // Fall back to legacy flat fields when BOW lists are unavailable
   const mList = (melcList?.length && melcList.some(m => m.text?.trim()))
@@ -242,19 +242,20 @@ function buildTable(store, profile) {
   ], 12));
 
   // ── Section III — Learning Resources ──────────────────────────────────────
+  const r = resources || {};
   const resRows = [
-    ['A. References', true, true],
-    ["1. Teacher's Guide pages", false, false],
-    ["2. Learner's Materials pages", false, false],
-    ['3. Textbook pages', false, false],
-    ['4. Additional Materials from LRMDS portal', false, false],
-    ['B. Other Learning Resources', false, false],
+    ['A. References',                                true,  true,  ''],
+    ["1. Teacher's Guide pages",                     false, false, r.teacherGuidePages     || ''],
+    ["2. Learner's Materials pages",                 false, false, r.learnersMaterialPages || ''],
+    ['3. Textbook pages',                            false, false, r.textbookPages         || ''],
+    ['4. Additional Materials from LRMDS portal',    false, false, r.lrmdsPortal           || ''],
+    ['B. Other Learning Resources',                  false, false, r.otherResources        || ''],
   ];
-  resRows.forEach(([label, isFirst, isGray]) => {
+  resRows.forEach(([label, isFirst, isGray, value]) => {
     rows.push(tr([
       isFirst ? secStart('III') : secCont(),
       lblCell(label, isGray ? { bg: gryBg } : {}),
-      wideCell(''),
+      wideCell(value),
     ], 7));
   });
 

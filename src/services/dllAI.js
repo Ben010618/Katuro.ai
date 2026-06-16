@@ -144,6 +144,14 @@ Rules for procedure:
 - Step J = brief homework or enrichment task
 - If a day is "(No class)" use empty strings for all its steps
 
+TASK 3 — LEARNING RESOURCES (Section III of the DLL)
+Based on the subject, grade level, and MELC above, suggest realistic DepEd-aligned learning resources:
+- teacherGuidePages: Specific page range from the official DepEd Teacher's Guide for this subject and grade (e.g., "pp. 45–52")
+- learnersMaterialPages: Page range from the DepEd Learner's Materials / LM (e.g., "pp. 38–44")
+- textbookPages: Additional textbook reference with unit/chapter and pages (e.g., "Unit 2 Chapter 3, pp. 78–85")
+- lrmdsPortal: Name of a specific material available on the DepEd LRMDS portal (e.g., "Grade 8 Science – Module 4: Chemical Reactions, DepEd Learning Portal")
+- otherResources: Supplementary materials — be specific (e.g., "Chart of the periodic table; video: 'Evidence of Chemical Change' via YouTube; activity sheets")
+
 Return ONLY valid JSON (no markdown, no explanation):
 {
   "objectives": {
@@ -159,6 +167,13 @@ Return ONLY valid JSON (no markdown, no explanation):
     "wednesday": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
     "thursday":  { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." },
     "friday":    { "A": "...", "B": "...", "C": "...", "D": "...", "E": "...", "F": "...", "G": "...", "H": "...", "I": "...", "J": "..." }
+  },
+  "resources": {
+    "teacherGuidePages": "...",
+    "learnersMaterialPages": "...",
+    "textbookPages": "...",
+    "lrmdsPortal": "...",
+    "otherResources": "..."
   }
 }`;
 
@@ -177,5 +192,15 @@ Return ONLY valid JSON (no markdown, no explanation):
     procedure[day] = Object.fromEntries(STEPS.map(s => [s, src[s] || '']));
   }
 
-  return { objectives, procedure };
+  // Normalise resources
+  const r = raw.resources || {};
+  const resources = {
+    teacherGuidePages:     r.teacherGuidePages     || '',
+    learnersMaterialPages: r.learnersMaterialPages || '',
+    textbookPages:         r.textbookPages         || '',
+    lrmdsPortal:           r.lrmdsPortal           || '',
+    otherResources:        r.otherResources        || '',
+  };
+
+  return { objectives, procedure, resources };
 }

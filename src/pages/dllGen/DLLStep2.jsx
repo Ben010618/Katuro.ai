@@ -253,7 +253,7 @@ export default function DLLStep2() {
     try {
       await deductTokens(user.uid, 'dll', 3);
 
-      const { objectives, procedure } = await generateDLLProcedure({
+      const { objectives, procedure, resources } = await generateDLLProcedure({
         subject:              store.subject,
         gradeLevel:           store.gradeLevel,
         term:                 store.term,
@@ -265,6 +265,7 @@ export default function DLLStep2() {
 
       store.setObjectives(objectives);
       store.setProcedure(procedure);
+      store.setResources(resources);
 
       // Derive flat fields for backward compat + Firestore save
       const combinedMelc = melcList.map(m => m.text.trim()).join('; ');
@@ -284,6 +285,7 @@ export default function DLLStep2() {
           contentList,
           objectives,
           procedure,
+          resources,
         });
         store.setSavedId(id);
       } catch (e) {
