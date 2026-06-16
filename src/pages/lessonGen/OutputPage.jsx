@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
+import { useCotStore } from '../../store/cotStore';
 import { getTeacherProfile } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation } from 'lucide-react';
 
 const baseTd = {
   padding: '10px 12px',
@@ -130,19 +131,60 @@ function fmtReflection(s) {
   );
 }
 
+function InfoRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 13, color: '#0d2218', lineHeight: 1.6 }}>{value}</div>
+    </div>
+  );
+}
+
 export default function OutputPage() {
   const navigate      = useNavigate();
   const { addToast }  = useToast();
   const { user }      = useAuth();
   const store         = useLessonGenStore();
+  const cotStore      = useCotStore();
 
   const sessions = store.generatedPlan?.sessions?.length > 0
     ? store.generatedPlan.sessions
     : store.unpackedSessions || [];
   const N = sessions.length;
 
-  const [teacherProfile, setTeacherProfile] = useState(null);
-  const [docxLoading,    setDocxLoading]    = useState(false);
+  const [teacherProfile,   setTeacherProfile]  = useState(null);
+  const [docxLoading,      setDocxLoading]     = useState(false);
+  const [selectedSession,  setSelectedSession] = useState(null);
+
+  function handleGoToCOT() {
+    if (selectedSession === null) return;
+    const s = sessions[selectedSession];
+    const sessionMelc = s.competencyText || store.competencyText || '';
+    const topic = s.keyContentFocus || store.content || '';
+    const rawRes = s.resources;
+    const materials = typeof rawRes === 'string' && rawRes.trim()
+      ? rawRes
+      : "Learner's Module, Printed worksheets, Chalk and board";
+    cotStore.reset();
+    cotStore.setStep1({
+      subject:              store.subject              || '',
+      grade:                store.gradeLevel           || '',
+      quarter:              store.term                 || '',
+      topic,
+      melc:                 sessionMelc,
+      objectives:           s.objective               || '',
+      teacherName:          teacherProfile?.name       || '',
+      school:               teacherProfile?.school     || '',
+      teachingDate:         s.date                    || '',
+      materials,
+      contentStandards:     store.contentStandards     || '',
+      performanceStandards: '',
+    });
+    navigate('/cot-gen/step-2');
+  }
 
   useEffect(() => {
     if (N === 0) navigate('/lesson-gen/step-2', { replace: true });
@@ -175,6 +217,19 @@ export default function OutputPage() {
           .ilaw-table { font-size: 11px !important; }
           tr { page-break-inside: avoid; }
           @page { margin: 1.5cm; size: landscape; }
+        }
+        .ilaw-session-hdr {
+          cursor: pointer;
+          transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+          user-select: none;
+        }
+        .ilaw-session-hdr:hover {
+          background: #00c974 !important;
+          color: #fff !important;
+          box-shadow: inset 0 0 0 2px rgba(0,201,116,0.6), 0 0 16px rgba(0,201,116,0.45) !important;
+        }
+        .ilaw-session-hdr:hover .session-date-sub {
+          color: rgba(255,255,255,0.75) !important;
         }
       `}</style>
 
@@ -246,8 +301,22 @@ export default function OutputPage() {
         </div>
       </div>
 
+      {/* Hint banner */}
+      <div className="no-print" style={{
+        maxWidth: 1100, margin: '14px auto 0',
+        background: 'linear-gradient(90deg, rgba(0,201,116,0.08) 0%, rgba(26,61,43,0.06) 100%)',
+        border: '1px solid rgba(0,201,116,0.25)',
+        borderRadius: 10, padding: '9px 16px',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <Sparkles size={14} color="#00c974" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: '#1a3d2b', fontWeight: 500 }}>
+          Click any <strong>Session</strong> header to generate a <strong>COT 4As Lesson Plan</strong> for that session.
+        </span>
+      </div>
+
       {/* Document wrapper */}
-      <div style={{ maxWidth: 1100, margin: '20px auto 0', padding: '0 0 48px' }}>
+      <div style={{ maxWidth: 1100, margin: '12px auto 0', padding: '0 0 48px' }}>
         <p className="no-print" style={{ fontSize: 12, color: '#4a6357', marginBottom: 8 }}>
           ILAW Lesson Plan · {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} session{N !== 1 ? 's' : ''}
         </p>
@@ -269,9 +338,17 @@ export default function OutputPage() {
                 <tr style={{ background: '#f3f4f6' }}>
                   <td style={{ ...labelTd, background: '#f3f4f6' }}>No. of Sessions</td>
                   {sessions.map((s, i) => (
-                    <td key={i} style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: '#f3f4f6' }}>
-                      <div style={{ fontSize: 13 }}>Session {s.day}</div>
-                      <div style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>{s.date}</div>
+                    <td
+                      key={i}
+                      className="ilaw-session-hdr"
+                      onClick={() => setSelectedSession(i)}
+                      style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: '#f3f4f6' }}
+                    >
+                      <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <Sparkles size={12} />
+                        Session {s.day}
+                      </div>
+                      <div className="session-date-sub" style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>{s.date}</div>
                     </td>
                   ))}
                 </tr>
@@ -322,6 +399,113 @@ export default function OutputPage() {
             </table>
           </div>
         </div>
+
+      {/* Session → COT modal */}
+      {selectedSession !== null && (() => {
+        const s = sessions[selectedSession];
+        const sessionMelc = s.competencyText || store.competencyText || '';
+        const topic = s.keyContentFocus || store.content || '';
+        return (
+          <div
+            onClick={() => setSelectedSession(null)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 200,
+              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#fff', borderRadius: 18,
+                boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
+                width: '100%', maxWidth: 440, overflow: 'hidden',
+              }}
+            >
+              {/* Modal header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #1a3d2b 0%, #2d6a4f 100%)',
+                padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Sparkles size={15} color="#00c974" />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#00c974', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+                      Session {s.day}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 4 }}>
+                    Generate COT 4As Lesson Plan
+                  </div>
+                  {s.date && (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{s.date}</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedSession(null)}
+                  style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Preview */}
+              <div style={{ padding: '18px 20px 10px' }}>
+                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  Session Preview
+                </p>
+                <InfoRow label="Subject / Grade" value={`${store.subject || ''} · ${store.gradeLevel || ''}`} />
+                <InfoRow label="Bloom's Level" value={s.bloomsLevel} />
+                {topic && <InfoRow label="Content Topic" value={topic} />}
+                {sessionMelc && <InfoRow label="MELC / Competency" value={sessionMelc} />}
+                {s.objective && <InfoRow label="Learning Objective" value={s.objective} />}
+              </div>
+
+              <div style={{ height: 1, background: '#f3f4f6', margin: '0 20px' }} />
+
+              {/* Action buttons */}
+              <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  onClick={handleGoToCOT}
+                  style={{
+                    width: '100%', background: '#1a3d2b', color: '#fff',
+                    border: 'none', borderRadius: 10, padding: '13px 20px',
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    fontFamily: 'inherit', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#2d6a4f'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#1a3d2b'}
+                >
+                  <Sparkles size={15} />
+                  Continue to COT Indicators →
+                </button>
+
+                <button
+                  disabled
+                  style={{
+                    width: '100%', background: '#f9fafb', color: '#9ca3af',
+                    border: '1.5px dashed #d1d5db', borderRadius: 10, padding: '11px 20px',
+                    fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <Presentation size={14} />
+                  Generate Presentation
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, background: '#e5e7eb', color: '#6b7280',
+                    borderRadius: 6, padding: '2px 6px', letterSpacing: '0.5px', textTransform: 'uppercase',
+                  }}>
+                    COMING SOON
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
         {/* Signature block */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
