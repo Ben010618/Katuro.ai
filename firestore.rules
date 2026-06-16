@@ -32,5 +32,47 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
+
+    // ── Classroom Management Module ──────────────────────────────────────────
+
+    // sections — adviser creates and manages; all auth teachers can read (needed for invite lookup)
+    match /sections/{sectionId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.adviserUid == request.auth.uid || isAdmin()
+      );
+      allow delete: if request.auth != null && (
+        resource.data.adviserUid == request.auth.uid || isAdmin()
+      );
+
+      // Student roster — adviser manages; assigned teachers read
+      match /students/{studentId} {
+        allow read, write: if request.auth != null;
+      }
+
+      // Grade component weights — subject teacher writes; adviser reads
+      match /gradeWeights/{subject} {
+        allow read, write: if request.auth != null;
+      }
+
+      // Student grades — subject teacher writes; adviser reads via consolidated sheet
+      match /grades/{subject}/students/{studentId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    // invitations — adviser creates/regenerates; any auth teacher reads to validate code; acceptor updates
+    match /invitations/{invitationId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.adviserUid == request.auth.uid ||
+        resource.data.status == 'pending'
+      );
+      allow delete: if request.auth != null && (
+        resource.data.adviserUid == request.auth.uid || isAdmin()
+      );
+    }
   }
 }
