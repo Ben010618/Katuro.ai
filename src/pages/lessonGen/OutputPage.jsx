@@ -256,6 +256,11 @@ export default function OutputPage() {
           <div style={{ overflowX: 'auto' }}>
             <table className="ilaw-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
               <tbody>
+                <tr>
+                  <td colSpan={N + 1} style={{ ...baseTd, background: '#1a3d2b', color: '#fff', textAlign: 'center', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', padding: '10px 16px' }}>
+                    ILAW LESSON PLAN · SY 2026–2027 · DepEd Order No. 16, s. 2026
+                  </td>
+                </tr>
                 <tr><Label>Name of Lesson</Label><Merged n={N}>{store.lessonName || '—'}</Merged></tr>
                 <tr><Label>Learning Area/s</Label><Merged n={N}>{store.subject || '—'}</Merged></tr>
                 <tr><Label>Designed by Teacher/s</Label><Merged n={N}>{teacherName}</Merged></tr>
@@ -272,7 +277,7 @@ export default function OutputPage() {
                 </tr>
 
                 <tr><Label note="books, websites, toolkits, etc.">References</Label><Merged n={N}><span style={{ whiteSpace: 'pre-line' }}>{references}</span></Merged></tr>
-                <tr><Label note="Cite how AI was used. See DO 3, 2026 Annex A.">Declaration of AI use</Label><Merged n={N}><span style={{ whiteSpace: 'pre-line' }}>{store.declarationOfAIUse}</span></Merged></tr>
+                <tr><Label note="Cite how AI was used. See DO 16, s. 2026 Annex A.">Declaration of AI use</Label><Merged n={N}><span style={{ whiteSpace: 'pre-line' }}>{store.declarationOfAIUse}</span></Merged></tr>
 
                 <SectionBanner n={N} title="Intentions." desc="Meaningful learning experiences are anchored in how we frame them. These intentions guide what learners will know, feel, and be able to do by the end of each session." />
                 <tr>
@@ -282,6 +287,14 @@ export default function OutputPage() {
                       {store.competencies?.length > 0
                         ? store.competencies.map(c => `• ${c.text}`).join('\n')
                         : `• ${store.competencyText || '—'}`}
+                    </span>
+                  </Merged>
+                </tr>
+                <tr>
+                  <Label note="Describe the strengths, interests, needs, and barriers to learning of this class/community.">Learner Context:</Label>
+                  <Merged n={N}>
+                    <span style={{ whiteSpace: 'pre-line', color: store.learningContext ? '#0d2218' : '#9ca3af', fontStyle: store.learningContext ? 'normal' : 'italic' }}>
+                      {store.learningContext || '(No specific learner context provided)'}
                     </span>
                   </Merged>
                 </tr>
@@ -299,6 +312,12 @@ export default function OutputPage() {
                 <SectionBanner n={N} title="Ways Forward." desc="Extend learning beyond the classroom and give learners space to reflect, connect, and grow." />
                 <tr><Label note="Meaningful activities learners can do independently beyond class time.">Extended Learning Opportunities:</Label><PerSession sessions={sessions} get={fmtExtended} /></tr>
                 <tr><Label note="What worked? What confused learners? What will you adjust? Fill after teaching.">Reflections:</Label><PerSession sessions={sessions} get={fmtReflection} amber /></tr>
+                <tr>
+                  <Label note="To be filled by the school head, master teacher, or coach after observation.">Coaching Notes:</Label>
+                  <Merged n={N} style={{ color: '#9ca3af', fontStyle: 'italic', background: '#fafafa' }}>
+                    *(To be filled by observer/coach after the lesson)*
+                  </Merged>
+                </tr>
               </tbody>
             </table>
           </div>
