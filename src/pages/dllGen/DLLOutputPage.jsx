@@ -128,6 +128,9 @@ export default function DLLOutputPage() {
     ].filter(Boolean);
     const materials = matParts.join('; ') || '';
 
+    // Reset first so no stale generatedPlan / status leaks from a previous COT session
+    cotStore.reset();
+
     // Pre-fill the COT store — teacher continues from Step 2 (Indicators) → Step 3 (Generate)
     cotStore.setStep1({
       subject:              store.subject              || '',
