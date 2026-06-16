@@ -210,19 +210,33 @@ function InviteModal({ sectionId, section, subject, onClose }) {
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              style={{ ...BTN_PRIMARY, flex: 1, justifyContent: 'center', padding: '10px', opacity: generating ? 0.7 : 1 }}
-            >
-              {generating ? 'Generating…' : (
-                <>
-                  {invite ? <><RefreshCw size={13} /> Regenerate Link</> : <><Link size={13} /> Generate Invitation Link</>}
-                </>
-              )}
-            </button>
+            {isAccepted ? (
+              <button
+                disabled
+                style={{
+                  flex: 1, background: '#f3f4f6', color: '#9ca3af',
+                  border: '1.5px dashed #d1d5db', borderRadius: 10, padding: '11px',
+                  fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  fontFamily: 'inherit',
+                }}
+              >
+                <Check size={14} /> Link Disabled — Teacher Assigned
+              </button>
+            ) : (
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                style={{ ...BTN_PRIMARY, flex: 1, justifyContent: 'center', padding: '10px', opacity: generating ? 0.7 : 1 }}
+              >
+                {generating ? 'Generating…' : invite
+                  ? <><RefreshCw size={13} /> Regenerate Link</>
+                  : <><Link size={13} /> Generate Invitation Link</>
+                }
+              </button>
+            )}
           </div>
-          {invite && (
+          {invite && !isAccepted && (
             <p style={{ margin: '10px 0 0', fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
               Generating a new link will invalidate the previous one.
             </p>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { subscribeAssignments, acceptInvitation } from '../../services/classroomDb';
+import { subscribeAssignments } from '../../services/classroomDb';
 import { GraduationCap, ChevronRight, BookOpen } from 'lucide-react';
 
 const SUBJECT_COLORS = {
@@ -27,16 +27,14 @@ export default function ClassesITeachPage() {
   const [assignments, setAssignments] = useState([]);
   const [loading,     setLoading]     = useState(true);
 
-  // Accept any pending invitation stored by InvitePage
+  // After login redirect: if a pending invite code is in sessionStorage,
+  // send the teacher back to the invite confirmation page instead of auto-accepting
   useEffect(() => {
     if (!user) return;
     const code = sessionStorage.getItem('kt-invite-code');
     if (!code) return;
     sessionStorage.removeItem('kt-invite-code');
-    const name = user.displayName || user.email?.split('@')[0] || 'Teacher';
-    acceptInvitation(code, user.uid, name)
-      .then(() => addToast('Invitation accepted! Class added.', 'success'))
-      .catch(err => addToast('Could not accept invitation: ' + err.message, 'error'));
+    navigate(`/invite/${code}`, { replace: true });
   }, [user]);
 
   useEffect(() => {
