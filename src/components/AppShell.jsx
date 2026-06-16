@@ -15,6 +15,7 @@ import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, Projector,
   ShieldCheck, Coins, Gamepad2, FlaskConical, Zap,
+  School, GraduationCap,
 } from 'lucide-react';
 
 
@@ -26,6 +27,8 @@ const NAV = [
   { to: '/presentations',          label: 'Presentation Builder',  Icon: Projector       },
   { to: '/gamification',           label: 'Gamification',          Icon: Gamepad2        },
   { to: '/action-research/phase-1',label: 'Action Research',       Icon: FlaskConical    },
+  { to: '/classroom-management',   label: 'Classroom Management',  Icon: School          },
+  { to: '/classes-i-teach',        label: 'Classes I Teach',       Icon: GraduationCap   },
 ];
 
 const TITLES = {
@@ -37,6 +40,8 @@ const TITLES = {
   '/presentations':           'Presentation Builder',
   '/gamification':            'Gamification',
   '/action-research/phase-1': 'Action Research',
+  '/classroom-management':    'Classroom Management',
+  '/classes-i-teach':         'Classes I Teach',
 };
 
 function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {

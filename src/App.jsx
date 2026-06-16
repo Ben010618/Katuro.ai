@@ -44,6 +44,13 @@ import CotStep2      from './pages/cotGen/CotStep2';
 import CotStep3      from './pages/cotGen/CotStep3';
 import CotOutputPage from './pages/cotGen/CotOutputPage';
 
+// Classroom Management Module
+import ClassroomManagementPage from './pages/classroomMgmt/ClassroomManagementPage';
+import SectionDetailPage       from './pages/classroomMgmt/SectionDetailPage';
+import ClassesITeachPage       from './pages/classroomMgmt/ClassesITeachPage';
+import GradingTablePage        from './pages/classroomMgmt/GradingTablePage';
+import InvitePage              from './pages/classroomMgmt/InvitePage';
+
 function LoadingScreen() {
   return (
     <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
@@ -200,7 +207,16 @@ export default function App() {
               </Route>
               <Route path="output" element={<CotOutputPage />} />
             </Route>
+
+            {/* Classroom Management Module */}
+            <Route path="classroom-management" element={<ClassroomManagementPage />} />
+            <Route path="classroom-management/section/:sectionId" element={<SectionDetailPage />} />
+            <Route path="classes-i-teach" element={<ClassesITeachPage />} />
+            <Route path="classes-i-teach/grade/:sectionId/:subject" element={<GradingTablePage />} />
           </Route>
+
+          {/* Public invite route — handles logged-in and not-logged-in */}
+          <Route path="/invite/:inviteCode" element={<InvitePage />} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
