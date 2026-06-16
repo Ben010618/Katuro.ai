@@ -71,7 +71,6 @@ export const useCotStore = create(
       // Extra context pre-filled when coming from DLL
       contentStandards:     '',
       performanceStandards: '',
-      dllProcedure:         '',
 
       // ── Step 2 ──────────────────────────────────────────
       selectedIndicators: DEFAULT_SELECTED,
@@ -107,7 +106,6 @@ export const useCotStore = create(
         teachingDate:         data.teachingDate         || '',
         contentStandards:     data.contentStandards     || '',
         performanceStandards: data.performanceStandards || '',
-        dllProcedure:         '',
         selectedIndicators:   data.selectedIndicators   || DEFAULT_SELECTED,
         generatedPlan:      data.plan               || null,
         planId:             data.id                 || null,
@@ -117,7 +115,7 @@ export const useCotStore = create(
       reset: () => set({
         teacherName: '', school: '', subject: '', grade: '', quarter: '',
         topic: '', melc: '', materials: '', objectives: '', teachingDate: '',
-        contentStandards: '', performanceStandards: '', dllProcedure: '',
+        contentStandards: '', performanceStandards: '',
         selectedIndicators: DEFAULT_SELECTED,
         generatedPlan: null, planId: null, status: 'idle',
       }),

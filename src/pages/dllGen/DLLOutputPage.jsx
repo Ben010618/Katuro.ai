@@ -128,13 +128,6 @@ export default function DLLOutputPage() {
     ].filter(Boolean);
     const materials = matParts.join('; ') || '';
 
-    // Format the day's DLL procedure steps (A–J) as context for the COT AI (used in Step 3)
-    const dayProc = (store.procedure || {})[dayKey] || {};
-    const dllProcedure = STEPS
-      .filter(s => dayProc[s]?.trim())
-      .map(s => `Step ${s} — ${STEP_LABELS[s]}:\n${dayProc[s]}`)
-      .join('\n\n');
-
     // Pre-fill the COT store — teacher continues from Step 2 (Indicators) → Step 3 (Generate)
     cotStore.setStep1({
       subject:              store.subject              || '',
@@ -149,7 +142,6 @@ export default function DLLOutputPage() {
       materials,
       contentStandards:     store.contentStandards     || '',
       performanceStandards: store.performanceStandards || '',
-      dllProcedure,
     });
 
     navigate('/cot-gen/step-2');

@@ -23,16 +23,15 @@ function parseJSON(text) {
  * @param {string} params.topic
  * @param {string} params.melc
  * @param {string} params.materials
- * @param {string} params.objectives        — optional; AI generates if blank
- * @param {Array}  params.selectedIndicators — array of indicator objects { id, code, num, description }
- * @param {string} params.contentStandards  — optional; from DLL so COT aligns with it
+ * @param {string} params.objectives           — optional; AI generates if blank
+ * @param {Array}  params.selectedIndicators   — array of indicator objects { id, code, num, description }
+ * @param {string} params.contentStandards     — optional; from DLL so COT aligns with it
  * @param {string} params.performanceStandards — optional; from DLL
- * @param {string} params.dllProcedure      — optional; formatted DLL steps A–J for the day
  */
 export async function generateCotLesson({
   teacherName, school, subject, grade, quarter, topic,
   melc, materials, objectives, selectedIndicators,
-  contentStandards, performanceStandards, dllProcedure,
+  contentStandards, performanceStandards,
 }) {
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
@@ -57,20 +56,11 @@ Quarter: ${quarter}
 Topic / Lesson: ${topic}
 MELC Competency: ${melc}
 Available Materials: ${materials || 'Textbook, chalk, board, printed worksheets'}
-${contentStandards     ? `Content Standards (from DLL — use exactly): ${contentStandards}` : ''}
-${performanceStandards ? `Performance Standards (from DLL — use exactly): ${performanceStandards}` : ''}
+${contentStandards     ? `Content Standards: ${contentStandards}` : ''}
+${performanceStandards ? `Performance Standards: ${performanceStandards}` : ''}
 ${objectives
-  ? `Teacher's Draft Objective (from DLL — refine for 3 domains):\n${objectives}`
-  : '(No draft objectives — generate all three domains using Bloom\'s Taxonomy.)'}
-${dllProcedure ? `
-═══════════════════════════════════════════════════════
-DLL PROCEDURE CONTEXT — ALIGN 4As WITH THESE ACTIVITIES
-(The teacher already planned these steps in their Daily Lesson Log.
-Build the 4As phases around them: expand, enrich, and embed COT evidence.
-Do NOT copy verbatim — enhance each step into a full COT-quality activity.)
-═══════════════════════════════════════════════════════
-${dllProcedure}
-` : ''}
+  ? `Teacher's Draft Objectives:\n${objectives}\n(Refine these to align with Bloom's Taxonomy and PPST.)`
+  : "(No draft objectives provided — generate all three domains using Bloom's Taxonomy.)"}
 
 ═══════════════════════════════════════════════════════
 SELECTED COT INDICATORS — EMBED EVIDENCE FOR EACH
@@ -88,9 +78,9 @@ Write objectives using Bloom's Taxonomy. Start each with "By the end of the less
 • Psychomotor: Use a physical/demonstration verb (perform, construct, demonstrate, sketch, etc.)
 
 TASK 2 — CONTENT & PERFORMANCE STANDARDS
-${contentStandards && performanceStandards
-  ? `Use the exact standards provided above from the DLL. Do not rewrite them.`
-  : `Write DepEd-style statements (1-2 sentences each):\n• contentStandards: What learners should know and understand about the topic\n• performanceStandards: What learners should be able to do with their knowledge`}
+Write DepEd-style statements (1-2 sentences each). If standards were provided above, align with them:
+• contentStandards: What learners should know and understand about the topic
+• performanceStandards: What learners should be able to do with their knowledge
 
 TASK 3 — ENABLING COMPETENCIES
 List 2-3 prerequisite skills or knowledge the learners need to have before this lesson.

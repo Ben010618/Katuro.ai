@@ -67,7 +67,6 @@ export default function CotStep3() {
           objectives:           store.objectives,
           contentStandards:     store.contentStandards     || '',
           performanceStandards: store.performanceStandards || '',
-          dllProcedure:         store.dllProcedure         || '',
           selectedIndicators,
         });
         break;
