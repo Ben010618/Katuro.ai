@@ -4,7 +4,9 @@ import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
-import { FileDown, RotateCcw, Printer } from 'lucide-react';
+import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
+import { generateCotLesson } from '../../services/cotAI';
+import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck } from 'lucide-react';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -28,6 +30,18 @@ const hdr  = { ...base, background: '#d9e1f2', fontWeight: 700, textAlign: 'cent
 const lbl  = { ...base, background: '#f2f2f2', fontWeight: 600, fontSize: 10, lineHeight: 1.4, verticalAlign: 'top' };
 const sec  = { ...base, background: '#d9e1f2', fontWeight: 700, fontSize: 11 };
 
+// Maps BOW list → array of 5 entries (one per day Mon–Fri)
+function buildDayMap(list) {
+  const map = [null, null, null, null, null];
+  let slot = 0;
+  for (const item of (list || [])) {
+    for (let d = 0; d < (item.days || 1) && slot < 5; d++, slot++) {
+      map[slot] = item.text?.trim() || null;
+    }
+  }
+  return map;
+}
+
 // Returns array of <td> elements with colspan based on BOW list
 function bowCells(list) {
   const cells = [];
@@ -47,12 +61,30 @@ function bowCells(list) {
   return cells;
 }
 
+function InfoRow({ label, value }) {
+  return (
+    <div>
+      <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {label}
+      </p>
+      <p style={{ margin: 0, fontSize: 13, color: '#0d2218', lineHeight: 1.5 }}>
+        {value || <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>—</span>}
+      </p>
+    </div>
+  );
+}
+
 export default function DLLOutputPage() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
+  const cotStore     = useCotStore();
   const { profile }  = useAuth();
   const { addToast } = useToast();
-  const [downloading, setDownloading] = useState(false);
+
+  const [downloading,  setDownloading]  = useState(false);
+  const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
+  const [generating,   setGenerating]   = useState(false);
+  const [genError,     setGenError]     = useState('');
 
   if (!store.procedure) {
     return (
@@ -77,6 +109,56 @@ export default function DLLOutputPage() {
     }
   }
 
+  async function handleGenerateCOT() {
+    if (generating || selectedDay === null) return;
+    setGenerating(true);
+    setGenError('');
+
+    const dayIdx     = selectedDay;
+    const dayKey     = DAY_KEYS[dayIdx];
+    const melcMap    = buildDayMap(store.melcList);
+    const contentMap = buildDayMap(store.contentList);
+    const dayMelc    = melcMap[dayIdx]    || store.melc || '';
+    const dayContent = contentMap[dayIdx] || '';
+    const dayObj     = (store.objectives || {})[dayKey] || '';
+
+    // Pre-fill the COT store so the output page has full context
+    cotStore.setStep1({
+      subject:      store.subject    || '',
+      grade:        store.gradeLevel || '',
+      quarter:      store.term       || '',
+      topic:        dayContent,
+      melc:         dayMelc,
+      objectives:   dayObj,
+      teacherName:  profile?.name    || '',
+      school:       profile?.school  || '',
+      teachingDate: '',
+      materials:    store.resources?.otherResources || '',
+    });
+
+    try {
+      const plan = await generateCotLesson({
+        subject:            store.subject    || '',
+        grade:              store.gradeLevel || '',
+        quarter:            store.term       || '',
+        topic:              dayContent,
+        melc:               dayMelc,
+        objectives:         dayObj,
+        teacherName:        profile?.name    || '',
+        school:             profile?.school  || '',
+        materials:          store.resources?.otherResources || '',
+        selectedIndicators: ALL_INDICATORS,
+      });
+
+      cotStore.setGeneratedPlan(plan);
+      navigate('/cot-gen/output');
+    } catch (err) {
+      setGenError(err.message || 'Generation failed. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
   const contentList = (store.contentList || []).filter(c => c.text?.trim());
   const proc        = store.procedure  || {};
@@ -89,8 +171,46 @@ export default function DLLOutputPage() {
     ['Noted by:', null, 'School Principal'],
   ];
 
+  // Pre-compute day data for the modal preview
+  const melcMap    = buildDayMap(store.melcList);
+  const contentMap = buildDayMap(store.contentList);
+
   return (
     <>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .dll-day-hdr {
+          cursor: pointer;
+          transition: background 0.15s;
+          user-select: none;
+        }
+        .dll-day-hdr:hover { background: #b8c9ee !important; }
+        .dll-a4 {
+          background: #fff;
+          padding: 16px 20px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+        .dll-table {
+          width: 100%;
+          min-width: 780px;
+          border-collapse: collapse;
+          font-family: Arial, sans-serif;
+        }
+        @media print {
+          @page { size: A4 landscape; margin: 1.27cm 1.27cm; }
+          body * { visibility: hidden; }
+          .dll-a4, .dll-a4 * { visibility: visible; }
+          .dll-a4 {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            padding: 0; border: none; border-radius: 0; box-shadow: none;
+            overflow: visible;
+          }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+
       {/* ── Action bar (hidden when printing) ─────────────────────────── */}
       <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -125,12 +245,21 @@ export default function DLLOutputPage() {
         </button>
       </div>
 
+      {/* ── Hint banner ───────────────────────────────────────────────── */}
+      <div className="no-print" style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)',
+        borderRadius: 10, padding: '9px 14px', marginBottom: 14, fontSize: 12, color: '#6d28d9',
+      }}>
+        <Sparkles size={13} />
+        <span><strong>Tip:</strong> Click any day column header (Monday–Friday) to generate a <strong>COT 4As Lesson Plan</strong> for that day — free, using your DLL data.</span>
+      </div>
+
       {/* ── DLL Document (A4 paper) ────────────────────────────────────── */}
       <div className="dll-a4">
         <div style={{ overflowX: 'auto' }}>
           <table className="dll-table">
             <colgroup>
-              {/* label col: 190px; 5 day cols: equal share of remainder */}
               <col style={{ width: 190 }} />
               <col /><col /><col /><col /><col />
             </colgroup>
@@ -160,10 +289,23 @@ export default function DLLOutputPage() {
                 </td>
               </tr>
 
-              {/* Day-column headers */}
+              {/* Day-column headers — CLICKABLE */}
               <tr>
                 <td style={{ ...hdr, textAlign: 'left', fontSize: 10 }}>Objectives / Procedure</td>
-                {DAY_NAMES.map(d => <td key={d} style={hdr}>{d}</td>)}
+                {DAY_NAMES.map((d, i) => (
+                  <td
+                    key={d}
+                    className="dll-day-hdr no-print"
+                    style={{ ...hdr, position: 'relative' }}
+                    onClick={() => { setSelectedDay(i); setGenError(''); }}
+                    title={`Generate COT 4As Lesson Plan for ${d}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      {d}
+                      <Sparkles size={9} style={{ opacity: 0.55, flexShrink: 0 }} />
+                    </div>
+                  </td>
+                ))}
               </tr>
 
               {/* ── I. OBJECTIVES ──────────────────────────────────────── */}
@@ -179,7 +321,6 @@ export default function DLLOutputPage() {
                 <td colSpan={5} style={base}>{store.performanceStandards || '—'}</td>
               </tr>
 
-              {/* C — MELC: merged by days allocation */}
               <tr>
                 <td style={lbl}>
                   C. Learning Competency /<br />Learning Objectives
@@ -188,7 +329,6 @@ export default function DLLOutputPage() {
                 {bowCells(melcList)}
               </tr>
 
-              {/* Per-day learning objectives (AI-generated) */}
               <tr>
                 <td style={{ ...lbl, background: '#eef2ff' }}>
                   Learning Objectives
@@ -292,32 +432,134 @@ export default function DLLOutputPage() {
         </table>
       </div>
 
-      <style>{`
-        .dll-a4 {
-          background: #fff;
-          padding: 16px 20px;
-          border: 1px solid #e5e7eb;
-          border-radius: 6px;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-        }
-        .dll-table {
-          width: 100%;
-          min-width: 780px;
-          border-collapse: collapse;
-          font-family: Arial, sans-serif;
-        }
-        @media print {
-          @page { size: A4 landscape; margin: 1.27cm 1.27cm; }
-          body * { visibility: hidden; }
-          .dll-a4, .dll-a4 * { visibility: visible; }
-          .dll-a4 {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            padding: 0; border: none; border-radius: 0; box-shadow: none;
-            overflow: visible;
-          }
-          .no-print { display: none !important; }
-        }
-      `}</style>
+      {/* ── COT 4As Modal ──────────────────────────────────────────────── */}
+      {selectedDay !== null && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(13,34,24,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => { if (!generating) setSelectedDay(null); }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 480, position: 'relative',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close */}
+            {!generating && (
+              <button
+                onClick={() => setSelectedDay(null)}
+                style={{
+                  position: 'absolute', top: 14, right: 14,
+                  background: '#f3f4f6', border: 'none', cursor: 'pointer',
+                  borderRadius: 8, padding: 6, color: '#6b7280',
+                  display: 'flex', alignItems: 'center',
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+                background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                display: 'grid', placeItems: 'center',
+              }}>
+                <BookOpenCheck size={21} color="#fff" />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  COT 4As Lesson Plan
+                </p>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#0d2218' }}>
+                  {DAY_NAMES[selectedDay]}
+                </h2>
+              </div>
+            </div>
+
+            {/* Day data preview */}
+            <div style={{
+              background: '#f9fafb', borderRadius: 12,
+              border: '1px solid rgba(45,106,79,0.12)',
+              padding: '14px 16px', marginBottom: 20,
+              display: 'flex', flexDirection: 'column', gap: 11,
+            }}>
+              <InfoRow
+                label="Subject / Grade"
+                value={`${store.subject || '—'} — ${store.gradeLevel || '—'}`}
+              />
+              <InfoRow
+                label="Content Topic"
+                value={contentMap[selectedDay] || '—'}
+              />
+              <InfoRow
+                label="MELC"
+                value={melcMap[selectedDay] || store.melc || '—'}
+              />
+              <InfoRow
+                label="Learning Objective"
+                value={(store.objectives || {})[DAY_KEYS[selectedDay]] || '—'}
+              />
+            </div>
+
+            {/* Error */}
+            {genError && (
+              <div style={{
+                background: '#fde8e8', border: '1px solid rgba(224,92,92,0.3)',
+                borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                fontSize: 13, color: '#c0392b',
+              }}>
+                ⚠ {genError}
+              </div>
+            )}
+
+            {/* Generate button */}
+            <button
+              onClick={handleGenerateCOT}
+              disabled={generating}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                background: generating
+                  ? 'rgba(124,58,237,0.55)'
+                  : 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                color: '#fff', border: 'none', borderRadius: 12,
+                padding: '13px 20px', fontSize: 14, fontWeight: 700,
+                cursor: generating ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', transition: 'opacity 0.15s',
+              }}
+            >
+              {generating ? (
+                <>
+                  <span style={{
+                    display: 'inline-block', width: 16, height: 16,
+                    border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
+                    borderRadius: '50%', animation: 'spin 0.7s linear infinite',
+                    flexShrink: 0,
+                  }} />
+                  Generating COT 4As Plan…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Generate COT 4As Lesson Plan
+                </>
+              )}
+            </button>
+
+            <p style={{ margin: '11px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
+              Free · no extra tokens · opens in COT output page
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
