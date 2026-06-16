@@ -6,7 +6,7 @@ import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { generateCotLesson } from '../../services/cotAI';
-import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck } from 'lucide-react';
+import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector } from 'lucide-react';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -116,38 +116,59 @@ export default function DLLOutputPage() {
 
     const dayIdx     = selectedDay;
     const dayKey     = DAY_KEYS[dayIdx];
-    const melcMap    = buildDayMap(store.melcList);
-    const contentMap = buildDayMap(store.contentList);
-    const dayMelc    = melcMap[dayIdx]    || store.melc || '';
-    const dayContent = contentMap[dayIdx] || '';
+    const melcMapFn  = buildDayMap(store.melcList);
+    const contentMapFn = buildDayMap(store.contentList);
+    const dayMelc    = melcMapFn[dayIdx]    || store.melc || '';
+    const dayContent = contentMapFn[dayIdx] || '';
     const dayObj     = (store.objectives || {})[dayKey] || '';
+
+    // Build combined materials string from all DLL resources
+    const r = store.resources || {};
+    const matParts = [
+      r.teacherGuidePages     ? `Teacher's Guide: ${r.teacherGuidePages}`           : null,
+      r.learnersMaterialPages ? `Learner's Materials: ${r.learnersMaterialPages}`   : null,
+      r.textbookPages         ? `Textbook: ${r.textbookPages}`                      : null,
+      r.lrmdsPortal           ? `LRMDS: ${r.lrmdsPortal}`                           : null,
+      r.otherResources        ? r.otherResources                                    : null,
+    ].filter(Boolean);
+    const materials = matParts.join('; ') || '';
+
+    // Format the day's DLL procedure steps (A–J) as context for the COT AI
+    const dayProc = (store.procedure || {})[dayKey] || {};
+    const dllProcedure = STEPS
+      .filter(s => dayProc[s]?.trim())
+      .map(s => `Step ${s} — ${STEP_LABELS[s]}:\n${dayProc[s]}`)
+      .join('\n\n');
 
     // Pre-fill the COT store so the output page has full context
     cotStore.setStep1({
-      subject:      store.subject    || '',
-      grade:        store.gradeLevel || '',
-      quarter:      store.term       || '',
+      subject:      store.subject             || '',
+      grade:        store.gradeLevel          || '',
+      quarter:      store.term                || '',
       topic:        dayContent,
       melc:         dayMelc,
       objectives:   dayObj,
-      teacherName:  profile?.name    || '',
-      school:       profile?.school  || '',
+      teacherName:  profile?.name             || '',
+      school:       profile?.school           || '',
       teachingDate: '',
-      materials:    store.resources?.otherResources || '',
+      materials,
     });
 
     try {
       const plan = await generateCotLesson({
-        subject:            store.subject    || '',
-        grade:              store.gradeLevel || '',
-        quarter:            store.term       || '',
-        topic:              dayContent,
-        melc:               dayMelc,
-        objectives:         dayObj,
-        teacherName:        profile?.name    || '',
-        school:             profile?.school  || '',
-        materials:          store.resources?.otherResources || '',
-        selectedIndicators: ALL_INDICATORS,
+        subject:              store.subject             || '',
+        grade:                store.gradeLevel          || '',
+        quarter:              store.term                || '',
+        topic:                dayContent,
+        melc:                 dayMelc,
+        objectives:           dayObj,
+        teacherName:          profile?.name             || '',
+        school:               profile?.school           || '',
+        materials,
+        contentStandards:     store.contentStandards    || '',
+        performanceStandards: store.performanceStandards || '',
+        dllProcedure,
+        selectedIndicators:   ALL_INDICATORS,
       });
 
       cotStore.setGeneratedPlan(plan);
@@ -181,10 +202,14 @@ export default function DLLOutputPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         .dll-day-hdr {
           cursor: pointer;
-          transition: background 0.15s;
+          transition: background 0.15s, color 0.15s, box-shadow 0.15s;
           user-select: none;
         }
-        .dll-day-hdr:hover { background: #b8c9ee !important; }
+        .dll-day-hdr:hover {
+          background: #00aaff !important;
+          color: #fff !important;
+          box-shadow: 0 0 14px rgba(0,170,255,0.55);
+        }
         .dll-a4 {
           background: #fff;
           padding: 16px 20px;
@@ -557,6 +582,31 @@ export default function DLLOutputPage() {
             <p style={{ margin: '11px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
               Free · no extra tokens · opens in COT output page
             </p>
+
+            {/* Generate Presentation — coming soon */}
+            <div style={{ position: 'relative', marginTop: 10 }}>
+              <button
+                disabled
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: '#f9fafb', color: '#d1d5db',
+                  border: '1.5px dashed #e5e7eb', borderRadius: 12,
+                  padding: '13px 20px', fontSize: 14, fontWeight: 700,
+                  cursor: 'not-allowed', fontFamily: 'inherit',
+                }}
+              >
+                <Projector size={16} />
+                Generate Presentation
+              </button>
+              <span style={{
+                position: 'absolute', top: -9, right: 14,
+                background: '#f59e0b', color: '#fff',
+                fontSize: 9, fontWeight: 800, borderRadius: 20,
+                padding: '2px 9px', letterSpacing: '0.06em', pointerEvents: 'none',
+              }}>
+                COMING SOON
+              </span>
+            </div>
           </div>
         </div>
       )}
