@@ -4,8 +4,7 @@ import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
-import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
-import { generateCotLesson } from '../../services/cotAI';
+import { useCotStore } from '../../store/cotStore';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector } from 'lucide-react';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -83,8 +82,6 @@ export default function DLLOutputPage() {
 
   const [downloading,  setDownloading]  = useState(false);
   const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
-  const [generating,   setGenerating]   = useState(false);
-  const [genError,     setGenError]     = useState('');
 
   if (!store.procedure) {
     return (
@@ -109,75 +106,53 @@ export default function DLLOutputPage() {
     }
   }
 
-  async function handleGenerateCOT() {
-    if (generating || selectedDay === null) return;
-    setGenerating(true);
-    setGenError('');
+  function handleGoToCOT() {
+    if (selectedDay === null) return;
 
-    const dayIdx     = selectedDay;
-    const dayKey     = DAY_KEYS[dayIdx];
-    const melcMapFn  = buildDayMap(store.melcList);
+    const dayIdx       = selectedDay;
+    const dayKey       = DAY_KEYS[dayIdx];
+    const melcMapFn    = buildDayMap(store.melcList);
     const contentMapFn = buildDayMap(store.contentList);
-    const dayMelc    = melcMapFn[dayIdx]    || store.melc || '';
-    const dayContent = contentMapFn[dayIdx] || '';
-    const dayObj     = (store.objectives || {})[dayKey] || '';
+    const dayMelc      = melcMapFn[dayIdx]    || store.melc || '';
+    const dayContent   = contentMapFn[dayIdx] || '';
+    const dayObj       = (store.objectives || {})[dayKey] || '';
 
     // Build combined materials string from all DLL resources
     const r = store.resources || {};
     const matParts = [
-      r.teacherGuidePages     ? `Teacher's Guide: ${r.teacherGuidePages}`           : null,
-      r.learnersMaterialPages ? `Learner's Materials: ${r.learnersMaterialPages}`   : null,
-      r.textbookPages         ? `Textbook: ${r.textbookPages}`                      : null,
-      r.lrmdsPortal           ? `LRMDS: ${r.lrmdsPortal}`                           : null,
-      r.otherResources        ? r.otherResources                                    : null,
+      r.teacherGuidePages     ? `Teacher's Guide: ${r.teacherGuidePages}`         : null,
+      r.learnersMaterialPages ? `Learner's Materials: ${r.learnersMaterialPages}` : null,
+      r.textbookPages         ? `Textbook: ${r.textbookPages}`                    : null,
+      r.lrmdsPortal           ? `LRMDS: ${r.lrmdsPortal}`                         : null,
+      r.otherResources        ? r.otherResources                                  : null,
     ].filter(Boolean);
     const materials = matParts.join('; ') || '';
 
-    // Format the day's DLL procedure steps (A–J) as context for the COT AI
+    // Format the day's DLL procedure steps (A–J) as context for the COT AI (used in Step 3)
     const dayProc = (store.procedure || {})[dayKey] || {};
     const dllProcedure = STEPS
       .filter(s => dayProc[s]?.trim())
       .map(s => `Step ${s} — ${STEP_LABELS[s]}:\n${dayProc[s]}`)
       .join('\n\n');
 
-    // Pre-fill the COT store so the output page has full context
+    // Pre-fill the COT store — teacher continues from Step 2 (Indicators) → Step 3 (Generate)
     cotStore.setStep1({
-      subject:      store.subject             || '',
-      grade:        store.gradeLevel          || '',
-      quarter:      store.term                || '',
-      topic:        dayContent,
-      melc:         dayMelc,
-      objectives:   dayObj,
-      teacherName:  profile?.name             || '',
-      school:       profile?.school           || '',
-      teachingDate: '',
+      subject:              store.subject              || '',
+      grade:                store.gradeLevel           || '',
+      quarter:              store.term                 || '',
+      topic:                dayContent,
+      melc:                 dayMelc,
+      objectives:           dayObj,
+      teacherName:          profile?.name              || '',
+      school:               profile?.school            || '',
+      teachingDate:         '',
       materials,
+      contentStandards:     store.contentStandards     || '',
+      performanceStandards: store.performanceStandards || '',
+      dllProcedure,
     });
 
-    try {
-      const plan = await generateCotLesson({
-        subject:              store.subject             || '',
-        grade:                store.gradeLevel          || '',
-        quarter:              store.term                || '',
-        topic:                dayContent,
-        melc:                 dayMelc,
-        objectives:           dayObj,
-        teacherName:          profile?.name             || '',
-        school:               profile?.school           || '',
-        materials,
-        contentStandards:     store.contentStandards    || '',
-        performanceStandards: store.performanceStandards || '',
-        dllProcedure,
-        selectedIndicators:   ALL_INDICATORS,
-      });
-
-      cotStore.setGeneratedPlan(plan);
-      navigate('/cot-gen/output');
-    } catch (err) {
-      setGenError(err.message || 'Generation failed. Please try again.');
-    } finally {
-      setGenerating(false);
-    }
+    navigate('/cot-gen/step-2');
   }
 
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
@@ -466,7 +441,7 @@ export default function DLLOutputPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
           }}
-          onClick={() => { if (!generating) setSelectedDay(null); }}
+          onClick={() => setSelectedDay(null)}
         >
           <div
             style={{
@@ -477,19 +452,17 @@ export default function DLLOutputPage() {
             onClick={e => e.stopPropagation()}
           >
             {/* Close */}
-            {!generating && (
-              <button
-                onClick={() => setSelectedDay(null)}
-                style={{
-                  position: 'absolute', top: 14, right: 14,
-                  background: '#f3f4f6', border: 'none', cursor: 'pointer',
-                  borderRadius: 8, padding: 6, color: '#6b7280',
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                <X size={16} />
-              </button>
-            )}
+            <button
+              onClick={() => setSelectedDay(null)}
+              style={{
+                position: 'absolute', top: 14, right: 14,
+                background: '#f3f4f6', border: 'none', cursor: 'pointer',
+                borderRadius: 8, padding: 6, color: '#6b7280',
+                display: 'flex', alignItems: 'center',
+              }}
+            >
+              <X size={16} />
+            </button>
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
@@ -535,52 +508,25 @@ export default function DLLOutputPage() {
               />
             </div>
 
-            {/* Error */}
-            {genError && (
-              <div style={{
-                background: '#fde8e8', border: '1px solid rgba(224,92,92,0.3)',
-                borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-                fontSize: 13, color: '#c0392b',
-              }}>
-                ⚠ {genError}
-              </div>
-            )}
-
-            {/* Generate button */}
+            {/* Continue to COT Indicators button */}
             <button
-              onClick={handleGenerateCOT}
-              disabled={generating}
+              onClick={handleGoToCOT}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                background: generating
-                  ? 'rgba(124,58,237,0.55)'
-                  : 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
                 color: '#fff', border: 'none', borderRadius: 12,
                 padding: '13px 20px', fontSize: 14, fontWeight: 700,
-                cursor: generating ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', transition: 'opacity 0.15s',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s',
               }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
             >
-              {generating ? (
-                <>
-                  <span style={{
-                    display: 'inline-block', width: 16, height: 16,
-                    border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
-                    borderRadius: '50%', animation: 'spin 0.7s linear infinite',
-                    flexShrink: 0,
-                  }} />
-                  Generating COT 4As Plan…
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  Generate COT 4As Lesson Plan
-                </>
-              )}
+              <Sparkles size={16} />
+              Continue to COT Indicators →
             </button>
 
             <p style={{ margin: '11px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
-              Free · no extra tokens · opens in COT output page
+              Free · DLL data pre-filled · you choose indicators next → then generate
             </p>
 
             {/* Generate Presentation — coming soon */}

@@ -56,15 +56,18 @@ export default function CotStep3() {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         plan = await generateCotLesson({
-          teacherName:        store.teacherName,
-          school:             store.school,
-          subject:            store.subject,
-          grade:              store.grade,
-          quarter:            store.quarter,
-          topic:              store.topic,
-          melc:               store.melc,
-          materials:          store.materials,
-          objectives:         store.objectives,
+          teacherName:          store.teacherName,
+          school:               store.school,
+          subject:              store.subject,
+          grade:                store.grade,
+          quarter:              store.quarter,
+          topic:                store.topic,
+          melc:                 store.melc,
+          materials:            store.materials,
+          objectives:           store.objectives,
+          contentStandards:     store.contentStandards     || '',
+          performanceStandards: store.performanceStandards || '',
+          dllProcedure:         store.dllProcedure         || '',
           selectedIndicators,
         });
         break;
