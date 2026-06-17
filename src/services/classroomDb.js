@@ -34,15 +34,29 @@ function generateCode() {
 export function computeFinalGrade({
   writtenWorks = [], performanceTask = [], quarterlyExam = 0,
   writtenWorksWeight = 40, performanceTaskWeight = 40, quarterlyExamWeight = 20,
+  wwMax = [], ptMax = [],
 }) {
-  const avg = arr => arr.length
-    ? arr.reduce((s, v) => s + (Number(v) || 0), 0) / arr.length
-    : 0;
-  const raw =
-    avg(writtenWorks)     * (Number(writtenWorksWeight)     || 0) / 100 +
-    avg(performanceTask)  * (Number(performanceTaskWeight)  || 0) / 100 +
-    (Number(quarterlyExam) || 0) * (Number(quarterlyExamWeight) || 0) / 100;
-  return Math.round(raw * 100) / 100;
+  // Percentage Score: total raw ÷ total highest possible × 100
+  const percentScore = (scores, maxArr) => {
+    if (!scores.length) return 0;
+    const totalRaw = scores.reduce((s, v) => s + (Number(v) || 0), 0);
+    const totalMax = scores.reduce((s, _, i) => s + (Number(maxArr[i]) || 100), 0);
+    return totalMax > 0 ? (totalRaw / totalMax) * 100 : 0;
+  };
+
+  const PS_WW = percentScore(writtenWorks, wwMax);
+  const PS_PT = percentScore(performanceTask, ptMax);
+  const PS_QE = Number(quarterlyExam) || 0;
+
+  // Weights stored as integers (40, 40, 20) — divide by 100 only here
+  const IG =
+    PS_WW * (writtenWorksWeight / 100) +
+    PS_PT * (performanceTaskWeight / 100) +
+    PS_QE * (quarterlyExamWeight / 100);
+
+  // DepEd transmutation: TG = 60 + (IG / 100 × 40)
+  const TG = 60 + (IG / 100 * 40);
+  return Math.round(TG * 100) / 100;
 }
 
 // ── Collection helpers ────────────────────────────────────────────────────────
@@ -173,6 +187,8 @@ export async function acceptInvitation(inviteCode, teacherUid, teacherName) {
   const DEFAULT_WEIGHTS = {
     writtenWorksWeight: 40, performanceTaskWeight: 40, quarterlyExamWeight: 20,
     wwCount: 3, ptCount: 2,
+    wwMax: [100, 100, 100],
+    ptMax: [100, 100],
   };
   const initGrades = {};
   students.forEach(s => {

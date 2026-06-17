@@ -17,8 +17,12 @@ const SCORE_INPUT = {
   background: '#f5faf7', outline: 'none', color: '#0d2218',
 };
 
-const DEFAULT_WEIGHTS = { writtenWorksWeight: 40, performanceTaskWeight: 40, quarterlyExamWeight: 20 };
-const DEFAULT_COUNTS  = { wwCount: 3, ptCount: 2 };
+const DEFAULT_WEIGHTS = {
+  writtenWorksWeight: 40, performanceTaskWeight: 40, quarterlyExamWeight: 20,
+  wwCount: 3, ptCount: 2,
+  wwMax: [100, 100, 100],
+  ptMax: [100, 100],
+};
 const TERMS = [
   { key: 'term1', label: 'Term 1' },
   { key: 'term2', label: 'Term 2' },
@@ -47,7 +51,7 @@ export default function GradingTablePage() {
   useEffect(() => {
     initializedRef.current = false;
     setSheet(null);
-    setLocalWeights({ ...DEFAULT_WEIGHTS, ...DEFAULT_COUNTS });
+    setLocalWeights({ ...DEFAULT_WEIGHTS });
     setLocalGrades({});
     setDirty(false);
     setLoading(true);
@@ -59,7 +63,7 @@ export default function GradingTablePage() {
     const unsub = subscribeGradeSheet(user.uid, sectionId, decodedSubject, activeTerm, s => {
       if (!initializedRef.current) {
         initializedRef.current = true;
-        setLocalWeights(s?.weights || { ...DEFAULT_WEIGHTS, ...DEFAULT_COUNTS });
+        setLocalWeights(s?.weights || { ...DEFAULT_WEIGHTS });
         setLocalGrades(s?.grades  || {});
         setDirty(false);
       } else {
@@ -99,7 +103,12 @@ export default function GradingTablePage() {
   }
 
   function computeDisplay(studentId) {
-    return computeFinalGrade({ ...getGrade(studentId), ...localWeights });
+    const g = getGrade(studentId);
+    return computeFinalGrade({
+      ...g, ...localWeights,
+      wwMax: (localWeights.wwMax || []).slice(0, localWeights.wwCount),
+      ptMax: (localWeights.ptMax || []).slice(0, localWeights.ptCount),
+    });
   }
 
   async function handleSave() {
@@ -170,7 +179,25 @@ export default function GradingTablePage() {
 
   function changeCount(key, delta) {
     setDirty(true);
-    setLocalWeights(w => ({ ...w, [key]: Math.max(1, (w[key] || 1) + delta) }));
+    setLocalWeights(w => {
+      const newCount = Math.max(1, (w[key] || 1) + delta);
+      const updated = { ...w, [key]: newCount };
+      if (key === 'wwCount') {
+        updated.wwMax = Array.from({ length: newCount }, (_, i) => w.wwMax?.[i] ?? 100);
+      } else if (key === 'ptCount') {
+        updated.ptMax = Array.from({ length: newCount }, (_, i) => w.ptMax?.[i] ?? 100);
+      }
+      return updated;
+    });
+  }
+
+  function setMaxScore(field, idx, value) {
+    setDirty(true);
+    setLocalWeights(w => {
+      const arr = [...(w[field] || [])];
+      arr[idx] = Math.max(1, Number(value) || 100);
+      return { ...w, [field]: arr };
+    });
   }
 
   const weightSum    = (localWeights.writtenWorksWeight || 0) + (localWeights.performanceTaskWeight || 0) + (localWeights.quarterlyExamWeight || 0);
@@ -334,6 +361,35 @@ export default function GradingTablePage() {
                 </tr>
               </thead>
               <tbody>
+                {/* Highest possible score row — used for PS calculation */}
+                <tr style={{ background: '#fffde7' }}>
+                  <td colSpan={3} style={{ ...CELL, background: '#fffde7', fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '5px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    Highest Score
+                  </td>
+                  {Array.from({ length: localWeights.wwCount }, (_, i) => (
+                    <td key={i} style={{ ...CELL, background: '#fefce8' }}>
+                      <input
+                        style={{ ...SCORE_INPUT, background: '#fefce8', borderColor: 'rgba(161,98,7,0.3)' }}
+                        type="number" min="1"
+                        value={(localWeights.wwMax || [])[i] ?? 100}
+                        onChange={e => setMaxScore('wwMax', i, e.target.value)}
+                      />
+                    </td>
+                  ))}
+                  {Array.from({ length: localWeights.ptCount }, (_, i) => (
+                    <td key={i} style={{ ...CELL, background: '#fef9e7' }}>
+                      <input
+                        style={{ ...SCORE_INPUT, background: '#fef9e7', borderColor: 'rgba(161,98,7,0.3)' }}
+                        type="number" min="1"
+                        value={(localWeights.ptMax || [])[i] ?? 100}
+                        onChange={e => setMaxScore('ptMax', i, e.target.value)}
+                      />
+                    </td>
+                  ))}
+                  <td style={{ ...CELL, background: '#f0fdf4', fontSize: 12, fontWeight: 700, color: '#166534', textAlign: 'center' }}>100</td>
+                  <td style={{ ...CELL, background: '#f5faf7' }} />
+                </tr>
+
                 {students.length === 0 ? (
                   <tr>
                     <td colSpan={3 + localWeights.wwCount + localWeights.ptCount + 2} style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
