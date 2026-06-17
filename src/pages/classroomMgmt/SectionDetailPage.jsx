@@ -9,9 +9,10 @@ import {
 } from '../../services/classroomDb';
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Link, Copy, Check,
-  Users, BookOpen, BarChart2, Shield, RefreshCw, FileText,
+  Users, BookOpen, BarChart2, Shield, RefreshCw, FileText, ClipboardList,
 } from 'lucide-react';
-import SchoolFormsPanel from './SchoolFormsPanel';
+import SchoolFormsPanel      from './SchoolFormsPanel';
+import TempReportCardPanel   from './TempReportCardPanel';
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -369,10 +370,11 @@ function InviteModal({ sectionId, section, subject, onClose }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'roster',   label: 'Student Roster',        Icon: Users       },
-  { key: 'subjects', label: 'Subjects',              Icon: BookOpen    },
-  { key: 'grading',  label: 'Consolidated Grading', Icon: BarChart2   },
-  { key: 'forms',    label: 'School Forms',          Icon: FileText    },
+  { key: 'roster',   label: 'Student Roster',        Icon: Users          },
+  { key: 'subjects', label: 'Subjects',              Icon: BookOpen       },
+  { key: 'grading',  label: 'Consolidated Grading', Icon: BarChart2      },
+  { key: 'tempcard', label: 'Report Card',           Icon: ClipboardList  },
+  { key: 'forms',    label: 'School Forms',          Icon: FileText       },
 ];
 
 export default function SectionDetailPage() {
@@ -756,6 +758,15 @@ export default function SectionDetailPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Tab: Temporary Report Card ── */}
+      {activeTab === 'tempcard' && (
+        <TempReportCardPanel
+          section={{ ...section, id: sectionId }}
+          students={students}
+          user={user}
+        />
       )}
 
       {/* ── Tab: School Forms ── */}
