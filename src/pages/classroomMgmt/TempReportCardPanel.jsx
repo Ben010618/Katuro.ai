@@ -21,7 +21,7 @@ const F = 'Georgia, "Times New Roman", serif';
 
 // ── Single report card ─────────────────────────────────────────────────────────
 
-function ReportCardInner({ student, grades, section, schoolProfile, showTerms, allSubjects }) {
+function ReportCardInner({ student, grades, section, schoolProfile, showTerms, allSubjects, showFinal }) {
   const name = [student.surname, student.givenName, student.middleInitial]
     .filter(Boolean).join(', ');
 
@@ -145,14 +145,14 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
           tableLayout: 'fixed',
         }}>
           <colgroup>
-            <col style={{ width: '44%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '14%' }} />
+            <col style={{ width: showFinal ? '44%' : '58%' }} />
+            <col style={{ width: showFinal ? '14%' : '14%' }} />
+            <col style={{ width: showFinal ? '14%' : '14%' }} />
+            <col style={{ width: showFinal ? '14%' : '14%' }} />
+            {showFinal && <col style={{ width: '14%' }} />}
           </colgroup>
 
-          {/* Header row 1 */}
+          {/* Header rows */}
           <thead>
             <tr style={{ height: 22 }}>
               <th style={headCell({ textAlign: 'left', paddingLeft: 8 })} rowSpan={2}>
@@ -161,11 +161,12 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
               <th style={headCell()} colSpan={3}>
                 TERMS
               </th>
-              <th style={headCell({ lineHeight: 1.3, fontSize: 7 })} rowSpan={2}>
-                FINAL<br />RATING
-              </th>
+              {showFinal && (
+                <th style={headCell({ lineHeight: 1.3, fontSize: 7 })} rowSpan={2}>
+                  FINAL<br />RATING
+                </th>
+              )}
             </tr>
-            {/* Header row 2 */}
             <tr style={{ height: 18 }}>
               {['TERM 1', 'TERM 2', 'TERM 3'].map(t => (
                 <th key={t} style={subHeadCell()}>{t}</th>
@@ -186,22 +187,26 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
                 <td style={dataCell({ textAlign: 'center' })}>
                   {showTerms.includes('term3') ? (getGrade(subj, 'term3') || '') : ''}
                 </td>
-                <td style={dataCell({ textAlign: 'center', fontWeight: 'bold', border: `1px solid ${KT_MID}` })}>
-                  {getFinal(subj)}
-                </td>
+                {showFinal && (
+                  <td style={dataCell({ textAlign: 'center', fontWeight: 'bold', border: `1px solid ${KT_MID}` })}>
+                    {getFinal(subj)}
+                  </td>
+                )}
               </tr>
             ))}
 
-            {/* General Average row */}
-            <tr>
-              <td style={gaCell({ paddingLeft: 8, textAlign: 'left' })}>
-                GENERAL AVERAGE
-              </td>
-              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
-              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
-              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
-              <td style={gaCell({ textAlign: 'center', fontSize: 9.5 })}>{GA}</td>
-            </tr>
+            {/* General Average — only when all 3 terms are printed */}
+            {showFinal && (
+              <tr>
+                <td style={gaCell({ paddingLeft: 8, textAlign: 'left' })}>
+                  GENERAL AVERAGE
+                </td>
+                <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+                <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+                <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+                <td style={gaCell({ textAlign: 'center', fontSize: 9.5 })}>{GA}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -236,7 +241,7 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
 
 // ── A4 page: 2×2 grid ─────────────────────────────────────────────────────────
 
-function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjects }) {
+function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjects, showFinal }) {
   return (
     <div style={{
       width: 794, height: 1123,
@@ -262,6 +267,7 @@ function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjec
               schoolProfile={schoolProfile}
               showTerms={showTerms}
               allSubjects={allSubjects}
+              showFinal={showFinal}
             />
           ) : null}
         </div>
@@ -442,6 +448,7 @@ export default function TempReportCardPanel({ section, students, user }) {
                   schoolProfile={schoolProfile}
                   showTerms={showTerms}
                   allSubjects={allSubjects}
+                  showFinal={selectedPrint === 'term3'}
                 />
               </div>
             </div>
