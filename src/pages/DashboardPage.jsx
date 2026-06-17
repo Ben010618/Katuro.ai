@@ -325,17 +325,17 @@ export default function DashboardPage() {
       {/* ── Classroom spotlight ──────────────────────────────────────────────── */}
       <div style={{
         borderRadius: 16, overflow: 'hidden',
-        background: 'linear-gradient(135deg, #082212 0%, #0d2e1a 50%, #143d25 100%)',
-        border: '1px solid rgba(74,222,128,0.14)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1a2236 50%, #1e293b 100%)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
         padding: '22px 24px',
         position: 'relative',
       }}>
         {/* subtle glow orb */}
-        <div style={{ position: 'absolute', top: -40, right: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(74,222,128,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -40, right: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: 'rgba(74,222,128,0.6)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>New Feature</p>
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: 'rgba(148,163,184,0.7)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>New Feature</p>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>Grading &amp; Classroom</h2>
           </div>
         </div>
@@ -346,21 +346,21 @@ export default function DashboardPage() {
           ].map(({ to, label, sub, Icon }) => (
             <button key={to} onClick={() => navigate(to)} style={{
               display: 'flex', alignItems: 'center', gap: 13,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(74,222,128,0.2)',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
               transition: 'background 0.15s, border-color 0.15s, transform 0.15s',
             }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(74,222,128,0.14)', borderColor: 'rgba(74,222,128,0.5)', transform: 'translateY(-2px)' })}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(74,222,128,0.2)', transform: 'none' })}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.22)', transform: 'translateY(-2px)' })}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', transform: 'none' })}
             >
-              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.25)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <Icon size={20} color="#4ade80" />
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Icon size={20} color="#fff" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#d8f3dc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(187,247,208,0.55)', lineHeight: 1.4 }}>{sub}</p>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(148,163,184,0.8)', lineHeight: 1.4 }}>{sub}</p>
               </div>
-              <ArrowRight size={14} color="rgba(74,222,128,0.4)" style={{ flexShrink: 0 }} />
+              <ArrowRight size={14} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
             </button>
           ))}
         </div>

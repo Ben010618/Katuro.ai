@@ -126,14 +126,14 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
         <div style={{
           marginTop: 10,
           borderRadius: 13,
-          background: 'linear-gradient(160deg, #082212 0%, #0d2e1a 55%, #143d25 100%)',
-          border: '1px solid rgba(74,222,128,0.18)',
+          background: 'linear-gradient(160deg, #0f172a 0%, #1a2236 55%, #1e293b 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
           padding: '10px 8px 8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(74,222,128,0.08)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)',
         }}>
           <p style={{
             margin: '0 0 7px 7px', fontSize: 9, fontWeight: 800,
-            color: 'rgba(74,222,128,0.55)', textTransform: 'uppercase', letterSpacing: '1.6px',
+            color: 'rgba(148,163,184,0.65)', textTransform: 'uppercase', letterSpacing: '1.6px',
           }}>
             Classroom
           </p>
@@ -145,19 +145,19 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
               style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 10px', borderRadius: 9, textDecoration: 'none', marginBottom: 2,
-                background: isActive ? 'rgba(74,222,128,0.22)' : 'transparent',
-                color: isActive ? '#4ade80' : 'rgba(187,247,208,0.72)',
+                background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                color: '#ffffff',
                 fontWeight: isActive ? 700 : 500, fontSize: 13,
-                transition: 'background 0.14s, color 0.14s',
+                transition: 'background 0.14s',
                 borderLeft: isActive ? '3px solid #4ade80' : '3px solid transparent',
               })}
               onMouseEnter={e => {
                 if (e.currentTarget.getAttribute('aria-current') !== 'page')
-                  Object.assign(e.currentTarget.style, { background: 'rgba(74,222,128,0.16)', color: '#86efac' });
+                  Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.09)' });
               }}
               onMouseLeave={e => {
                 if (e.currentTarget.getAttribute('aria-current') !== 'page')
-                  Object.assign(e.currentTarget.style, { background: 'transparent', color: 'rgba(187,247,208,0.72)' });
+                  Object.assign(e.currentTarget.style, { background: 'transparent' });
               }}
             >
               <Icon size={15} style={{ flexShrink: 0 }} />
