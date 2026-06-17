@@ -13,7 +13,7 @@ const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
   Sparkles, BookOpen, ClipboardList,
   ArrowRight, Plus, Save, CheckCircle, User,
-  FlaskConical, Trash2,
+  FlaskConical, Trash2, School, GraduationCap,
 } from 'lucide-react';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -290,10 +290,11 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
         <div style={{
           background: '#fff', borderRadius: 14, padding: '18px 20px',
-          border: '1px solid rgba(45,106,79,0.12)', transition: 'border-color 0.2s, transform 0.2s',
+          border: '1px solid rgba(45,106,79,0.12)', transition: 'all 0.18s',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
         }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.12)'; e.currentTarget.style.transform = 'none'; }}
+          onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: '#2d6a4f', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(45,106,79,0.12)' })}
+          onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(45,106,79,0.12)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
         >
           <div style={{ width: 36, height: 36, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', marginBottom: 12 }}>
             <BookOpen size={18} color="#2d6a4f" />
@@ -305,11 +306,12 @@ export default function DashboardPage() {
         {!researchLoading && (
           <div style={{
             background: '#fff', borderRadius: 14, padding: '18px 20px',
-            border: '1px solid rgba(3,105,161,0.15)', transition: 'border-color 0.2s, transform 0.2s', cursor: 'pointer',
+            border: '1px solid rgba(3,105,161,0.15)', transition: 'all 0.18s', cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}
             onClick={() => navigate('/action-research/phase-1')}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(3,105,161,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(3,105,161,0.15)'; e.currentTarget.style.transform = 'none'; }}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: '#0369a1', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(3,105,161,0.12)' })}
+            onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(3,105,161,0.15)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
           >
             <div style={{ width: 36, height: 36, borderRadius: 10, background: '#e0f2fe', display: 'grid', placeItems: 'center', marginBottom: 12 }}>
               <FlaskConical size={18} color="#0369a1" />
@@ -318,6 +320,50 @@ export default function DashboardPage() {
             <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Research Projects</p>
           </div>
         )}
+      </div>
+
+      {/* ── Classroom spotlight ──────────────────────────────────────────────── */}
+      <div style={{
+        borderRadius: 16, overflow: 'hidden',
+        background: 'linear-gradient(135deg, #082212 0%, #0d2e1a 50%, #143d25 100%)',
+        border: '1px solid rgba(74,222,128,0.14)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+        padding: '22px 24px',
+        position: 'relative',
+      }}>
+        {/* subtle glow orb */}
+        <div style={{ position: 'absolute', top: -40, right: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(74,222,128,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: 'rgba(74,222,128,0.6)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>New Feature</p>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>Grading &amp; Classroom</h2>
+          </div>
+        </div>
+        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
+            { to: '/classroom-management', label: 'Classroom Management', sub: 'Manage sections, students & invitations', Icon: School },
+            { to: '/classes-i-teach',      label: 'Classes I Teach',       sub: 'Enter grades and submit to adviser',      Icon: GraduationCap },
+          ].map(({ to, label, sub, Icon }) => (
+            <button key={to} onClick={() => navigate(to)} style={{
+              display: 'flex', alignItems: 'center', gap: 13,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(74,222,128,0.2)',
+              borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
+              transition: 'background 0.15s, border-color 0.15s, transform 0.15s',
+            }}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(74,222,128,0.14)', borderColor: 'rgba(74,222,128,0.5)', transform: 'translateY(-2px)' })}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(74,222,128,0.2)', transform: 'none' })}
+            >
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.25)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Icon size={20} color="#4ade80" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#d8f3dc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(187,247,208,0.55)', lineHeight: 1.4 }}>{sub}</p>
+              </div>
+              <ArrowRight size={14} color="rgba(74,222,128,0.4)" style={{ flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Quick actions */}
@@ -329,13 +375,14 @@ export default function DashboardPage() {
               display: 'flex', alignItems: 'center', gap: 12,
               background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
               borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-              transition: 'all 0.15s',
+              transition: 'all 0.18s',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
             }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.12)'; e.currentTarget.style.transform = 'none'; }}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: color, transform: 'translateY(-2px)', boxShadow: `0 6px 20px ${color}22` })}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(45,106,79,0.12)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
             >
-              <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: `${color}15`, display: 'grid', placeItems: 'center' }}>
-                <Icon size={18} color={color} />
+              <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: `${color}14`, border: `1px solid ${color}28`, display: 'grid', placeItems: 'center' }}>
+                <Icon size={19} color={color} />
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>{label}</p>

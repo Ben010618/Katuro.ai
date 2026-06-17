@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 
-const NAV = [
+const MAIN_NAV = [
   { to: '/dashboard',              label: 'Dashboard',             Icon: LayoutDashboard },
   { to: '/lesson-gen',             label: 'Lesson Gen',            Icon: Sparkles        },
   { to: '/my-lessons',             label: 'My Lessons',            Icon: BookOpen        },
@@ -27,9 +27,14 @@ const NAV = [
   { to: '/presentations',          label: 'Presentation Builder',  Icon: Projector       },
   { to: '/gamification',           label: 'Gamification',          Icon: Gamepad2        },
   { to: '/action-research/phase-1',label: 'Action Research',       Icon: FlaskConical    },
+];
+
+const CLASSROOM_NAV = [
   { to: '/classroom-management',   label: 'Classroom Management',  Icon: School          },
   { to: '/classes-i-teach',        label: 'Classes I Teach',       Icon: GraduationCap   },
 ];
+
+const NAV = [...MAIN_NAV, ...CLASSROOM_NAV];
 
 const TITLES = {
   '/dashboard':               'Dashboard',
@@ -87,8 +92,9 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV.map(({ to, label, Icon }) => (
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
+        {/* Main nav items */}
+        {MAIN_NAV.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -96,40 +102,84 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
             style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
-              background: isActive ? '#d8f3dc' : 'transparent',
-              color: isActive ? '#1a3d2b' : '#4a6357',
-              fontWeight: isActive ? 600 : 500, fontSize: 13,
-              transition: 'background 0.15s, color 0.15s',
+              background: isActive ? '#bbf7d0' : 'transparent',
+              color: isActive ? '#14532d' : '#4a6357',
+              fontWeight: isActive ? 700 : 500, fontSize: 13,
+              transition: 'background 0.14s, color 0.14s',
+              borderLeft: isActive ? '3px solid #22c55e' : '3px solid transparent',
             })}
             onMouseEnter={e => {
-              if (!e.currentTarget.dataset.active) {
-                e.currentTarget.style.background = '#f5faf7';
-              }
+              if (e.currentTarget.getAttribute('aria-current') !== 'page')
+                Object.assign(e.currentTarget.style, { background: '#dcfce7', color: '#14532d' });
             }}
             onMouseLeave={e => {
-              if (!e.currentTarget.dataset.active) {
-                e.currentTarget.style.background = 'transparent';
-              }
+              if (e.currentTarget.getAttribute('aria-current') !== 'page')
+                Object.assign(e.currentTarget.style, { background: 'transparent', color: '#4a6357' });
             }}
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
             {label}
           </NavLink>
         ))}
+
+        {/* ── Classroom Box ────────────────────────────────── */}
+        <div style={{
+          marginTop: 10,
+          borderRadius: 13,
+          background: 'linear-gradient(160deg, #082212 0%, #0d2e1a 55%, #143d25 100%)',
+          border: '1px solid rgba(74,222,128,0.18)',
+          padding: '10px 8px 8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(74,222,128,0.08)',
+        }}>
+          <p style={{
+            margin: '0 0 7px 7px', fontSize: 9, fontWeight: 800,
+            color: 'rgba(74,222,128,0.55)', textTransform: 'uppercase', letterSpacing: '1.6px',
+          }}>
+            Classroom
+          </p>
+          {CLASSROOM_NAV.map(({ to, label, Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 10px', borderRadius: 9, textDecoration: 'none', marginBottom: 2,
+                background: isActive ? 'rgba(74,222,128,0.22)' : 'transparent',
+                color: isActive ? '#4ade80' : 'rgba(187,247,208,0.72)',
+                fontWeight: isActive ? 700 : 500, fontSize: 13,
+                transition: 'background 0.14s, color 0.14s',
+                borderLeft: isActive ? '3px solid #4ade80' : '3px solid transparent',
+              })}
+              onMouseEnter={e => {
+                if (e.currentTarget.getAttribute('aria-current') !== 'page')
+                  Object.assign(e.currentTarget.style, { background: 'rgba(74,222,128,0.16)', color: '#86efac' });
+              }}
+              onMouseLeave={e => {
+                if (e.currentTarget.getAttribute('aria-current') !== 'page')
+                  Object.assign(e.currentTarget.style, { background: 'transparent', color: 'rgba(187,247,208,0.72)' });
+              }}
+            >
+              <Icon size={15} style={{ flexShrink: 0 }} />
+              {label}
+            </NavLink>
+          ))}
+        </div>
+
         {isAdmin && (
           <NavLink
             to="/admin"
             onClick={onClose}
             style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 10,
+              display: 'flex', alignItems: 'center', gap: 10, marginTop: 4,
               padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
-              background: isActive ? 'rgba(232,163,32,0.15)' : 'transparent',
+              background: isActive ? 'rgba(232,163,32,0.18)' : 'transparent',
               color: isActive ? '#b47a10' : '#4a6357',
-              fontWeight: isActive ? 600 : 500, fontSize: 13,
-              transition: 'background 0.15s, color 0.15s',
+              fontWeight: isActive ? 700 : 500, fontSize: 13,
+              transition: 'background 0.14s, color 0.14s',
             })}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,163,32,0.08)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,163,32,0.12)'; e.currentTarget.style.color = '#92400e'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#4a6357'; }}
           >
             <ShieldCheck size={15} style={{ flexShrink: 0 }} />
             Admin
