@@ -37,10 +37,13 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
   const name = [student.surname, student.givenName, student.middleInitial]
     .filter(Boolean).join(', ');
 
+  const showFinal = showTerms.includes('term3');
+
   const getGrade = (subj, term) =>
     grades[term]?.[subj]?.[student.id]?.finalGrade ?? '';
 
   const getFinal = (subj) => {
+    if (!showFinal) return '';
     const vals = showTerms
       .map(t => grades[t]?.[subj]?.[student.id]?.finalGrade)
       .filter(g => g !== undefined && g !== null && g > 0);
@@ -48,7 +51,7 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
     return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
   };
 
-  const finals = SUBJECTS.map(s => getFinal(s)).filter(g => g !== '');
+  const finals = showFinal ? SUBJECTS.map(s => getFinal(s)).filter(g => g !== '') : [];
   const GA = finals.length
     ? +(finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1)
     : '';
