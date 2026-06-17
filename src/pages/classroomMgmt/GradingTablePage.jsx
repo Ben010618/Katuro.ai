@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import {
   subscribeGradeSheet, saveGradeSheet, submitGradeSheet, computeFinalGrade,
 } from '../../services/classroomDb';
-import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download } from 'lucide-react';
 
 const CELL = {
   padding: '7px 6px', border: '1px solid rgba(45,106,79,0.12)',
@@ -22,6 +23,7 @@ const DEFAULT_WEIGHTS = {
   wwCount: 3, ptCount: 2,
   wwMax: [100, 100, 100],
   ptMax: [100, 100],
+  qeMax: 100,
 };
 const TERMS = [
   { key: 'term1', label: 'Term 1' },
@@ -76,6 +78,7 @@ export default function GradingTablePage() {
           ptMax: saved.ptMax?.length === ptCount
             ? saved.ptMax
             : Array.from({ length: ptCount }, (_, i) => saved.ptMax?.[i] ?? 100),
+          qeMax: saved.qeMax ?? 100,
         });
         setLocalGrades(s?.grades  || {});
         setDirty(false);
@@ -121,7 +124,58 @@ export default function GradingTablePage() {
       ...g, ...localWeights,
       wwMax: (localWeights.wwMax || []).slice(0, localWeights.wwCount),
       ptMax: (localWeights.ptMax || []).slice(0, localWeights.ptCount),
+      qeMax: localWeights.qeMax ?? 100,
     });
+  }
+
+  function handleDownload() {
+    const termLabel = TERMS.find(t => t.key === activeTerm)?.label || activeTerm;
+    const { wwCount, ptCount, writtenWorksWeight, performanceTaskWeight, quarterlyExamWeight, wwMax, ptMax, qeMax } = localWeights;
+
+    const colHeaders = [
+      'Surname', 'Given Name', 'M.I.',
+      ...Array.from({ length: wwCount }, (_, i) => `WW ${i + 1}`),
+      ...Array.from({ length: ptCount }, (_, i) => `PT ${i + 1}`),
+      'QE', 'Final Grade',
+    ];
+    const maxRow = [
+      'HIGHEST SCORE', '', '',
+      ...(wwMax || []).slice(0, wwCount),
+      ...(ptMax || []).slice(0, ptCount),
+      qeMax ?? 100, '',
+    ];
+    const studentRows = students.map(s => {
+      const g  = localGrades[s.id] || {};
+      const fg = computeDisplay(s.id);
+      return [
+        s.surname, s.givenName, s.middleInitial || '',
+        ...Array.from({ length: wwCount }, (_, i) => (g.writtenWorks || [])[i] ?? ''),
+        ...Array.from({ length: ptCount }, (_, i) => (g.performanceTask || [])[i] ?? ''),
+        g.quarterlyExam ?? '',
+        fg > 0 ? fg : '',
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([
+      [`${sheet.gradeLevel} – ${sheet.sectionName} | ${decodedSubject} | ${termLabel}`],
+      [`Component Weights: WW=${writtenWorksWeight}%  PT=${performanceTaskWeight}%  QE=${quarterlyExamWeight}%`],
+      [`Highest Possible Scores: WW=[${(wwMax || []).slice(0, wwCount).join(', ')}]  PT=[${(ptMax || []).slice(0, ptCount).join(', ')}]  QE=${qeMax ?? 100}`],
+      [],
+      colHeaders,
+      maxRow,
+      ...studentRows,
+    ]);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 18 }, { wch: 16 }, { wch: 5 },
+      ...Array.from({ length: wwCount + ptCount + 2 }, () => ({ wch: 10 })),
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const sheetName = `${decodedSubject.substring(0, 18)} ${termLabel}`.substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${sheet.sectionName}_${decodedSubject}_${termLabel}.xlsx`);
   }
 
   async function handleSave() {
@@ -252,6 +306,18 @@ export default function GradingTablePage() {
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#fff' }}>{decodedSubject}</h2>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleDownload}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                background: 'rgba(255,255,255,0.1)', color: '#d8f3dc',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Download size={14} /> Excel
+            </button>
             <button
               onClick={handleSave}
               disabled={saving || submitting || !dirty}
@@ -399,7 +465,17 @@ export default function GradingTablePage() {
                       />
                     </td>
                   ))}
-                  <td style={{ ...CELL, background: '#f0fdf4', fontSize: 12, fontWeight: 700, color: '#166534', textAlign: 'center' }}>100</td>
+                  <td style={{ ...CELL, background: '#f0fdf4' }}>
+                    <input
+                      style={{ ...SCORE_INPUT, background: '#f0fdf4', borderColor: 'rgba(22,101,52,0.3)' }}
+                      type="number" min="1"
+                      value={localWeights.qeMax ?? 100}
+                      onChange={e => {
+                        setDirty(true);
+                        setLocalWeights(w => ({ ...w, qeMax: Math.max(1, Number(e.target.value) || 100) }));
+                      }}
+                    />
+                  </td>
                   <td style={{ ...CELL, background: '#f5faf7' }} />
                 </tr>
 

@@ -34,7 +34,7 @@ function generateCode() {
 export function computeFinalGrade({
   writtenWorks = [], performanceTask = [], quarterlyExam = 0,
   writtenWorksWeight = 40, performanceTaskWeight = 40, quarterlyExamWeight = 20,
-  wwMax = [], ptMax = [],
+  wwMax = [], ptMax = [], qeMax = 100,
   wwCount, ptCount,
 }) {
   // Use configured count; fall back to whichever array is longer
@@ -54,7 +54,8 @@ export function computeFinalGrade({
 
   const PS_WW = percentScore(writtenWorks, wwMax, wwLen);
   const PS_PT = percentScore(performanceTask, ptMax, ptLen);
-  const PS_QE = Math.min(100, Number(quarterlyExam) || 0);
+  const qeMaxVal = Number(qeMax) || 100;
+  const PS_QE = Math.min(100, qeMaxVal > 0 ? ((Number(quarterlyExam) || 0) / qeMaxVal) * 100 : 0);
 
   // Weights stored as integers (40, 40, 20) — divide by 100 only here
   const IG =
@@ -197,6 +198,7 @@ export async function acceptInvitation(inviteCode, teacherUid, teacherName) {
     wwCount: 3, ptCount: 2,
     wwMax: [100, 100, 100],
     ptMax: [100, 100],
+    qeMax: 100,
   };
   const initGrades = {};
   students.forEach(s => {
