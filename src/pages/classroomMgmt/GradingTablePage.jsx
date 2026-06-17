@@ -63,7 +63,20 @@ export default function GradingTablePage() {
     const unsub = subscribeGradeSheet(user.uid, sectionId, decodedSubject, activeTerm, s => {
       if (!initializedRef.current) {
         initializedRef.current = true;
-        setLocalWeights(s?.weights || { ...DEFAULT_WEIGHTS });
+        // Merge saved weights with defaults — old sheets lack wwMax/ptMax
+        const saved = s?.weights || {};
+        const wwCount = saved.wwCount || DEFAULT_WEIGHTS.wwCount;
+        const ptCount = saved.ptCount || DEFAULT_WEIGHTS.ptCount;
+        setLocalWeights({
+          ...DEFAULT_WEIGHTS,
+          ...saved,
+          wwMax: saved.wwMax?.length === wwCount
+            ? saved.wwMax
+            : Array.from({ length: wwCount }, (_, i) => saved.wwMax?.[i] ?? 100),
+          ptMax: saved.ptMax?.length === ptCount
+            ? saved.ptMax
+            : Array.from({ length: ptCount }, (_, i) => saved.ptMax?.[i] ?? 100),
+        });
         setLocalGrades(s?.grades  || {});
         setDirty(false);
       } else {

@@ -35,18 +35,26 @@ export function computeFinalGrade({
   writtenWorks = [], performanceTask = [], quarterlyExam = 0,
   writtenWorksWeight = 40, performanceTaskWeight = 40, quarterlyExamWeight = 20,
   wwMax = [], ptMax = [],
+  wwCount, ptCount,
 }) {
-  // Percentage Score: total raw ÷ total highest possible × 100
-  const percentScore = (scores, maxArr) => {
-    if (!scores.length) return 0;
-    const totalRaw = scores.reduce((s, v) => s + (Number(v) || 0), 0);
-    const totalMax = scores.reduce((s, _, i) => s + (Number(maxArr[i]) || 100), 0);
-    return totalMax > 0 ? (totalRaw / totalMax) * 100 : 0;
+  // Use configured count; fall back to whichever array is longer
+  const wwLen = wwCount || Math.max(writtenWorks.length, wwMax.length, 1);
+  const ptLen = ptCount || Math.max(performanceTask.length, ptMax.length, 1);
+
+  // Percentage Score iterates over the CONFIGURED count so missing entries = 0
+  const percentScore = (scores, maxArr, len) => {
+    if (!len) return 0;
+    let totalRaw = 0, totalMax = 0;
+    for (let i = 0; i < len; i++) {
+      totalRaw += Number(scores[i]) || 0;
+      totalMax += Number(maxArr[i]) || 100; // default max per item = 100
+    }
+    return totalMax > 0 ? Math.min(100, (totalRaw / totalMax) * 100) : 0;
   };
 
-  const PS_WW = percentScore(writtenWorks, wwMax);
-  const PS_PT = percentScore(performanceTask, ptMax);
-  const PS_QE = Number(quarterlyExam) || 0;
+  const PS_WW = percentScore(writtenWorks, wwMax, wwLen);
+  const PS_PT = percentScore(performanceTask, ptMax, ptLen);
+  const PS_QE = Math.min(100, Number(quarterlyExam) || 0);
 
   // Weights stored as integers (40, 40, 20) — divide by 100 only here
   const IG =
@@ -54,9 +62,9 @@ export function computeFinalGrade({
     PS_PT * (performanceTaskWeight / 100) +
     PS_QE * (quarterlyExamWeight / 100);
 
-  // DepEd transmutation: TG = 60 + (IG / 100 × 40)
+  // DepEd transmutation: TG = 60 + (IG / 100 × 40), capped at 100
   const TG = 60 + (IG / 100 * 40);
-  return Math.round(TG * 100) / 100;
+  return Math.round(Math.min(100, TG) * 100) / 100;
 }
 
 // ── Collection helpers ────────────────────────────────────────────────────────
@@ -307,7 +315,7 @@ export async function submitGradeSheet(teacherUid, sectionId, subject, term) {
 
   // Push each student's computed final grade to adviser's section
   Object.entries(sheet.grades || {}).forEach(([studentId, g]) => {
-    const finalGrade = computeFinalGrade({ ...g, ...w });
+    const finalGrade = computeFinalGrade({ ...g, ...w, wwCount: w.wwCount, ptCount: w.ptCount });
     batch.set(grdDoc(sectionId, subject, studentId, term), {
       studentId, ...g, finalGrade, updatedAt: serverTimestamp(),
     }, { merge: true });
