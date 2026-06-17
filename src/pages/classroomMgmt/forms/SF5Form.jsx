@@ -100,7 +100,7 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
     return pool.filter(s => proficiencyLevel(s.ga) === code).length;
   };
 
-  const MIN_ROWS = 30;
+  const MIN_ROWS = 25;
 
   const renderRows = (list) => {
     const rows = list.map(s => (
@@ -147,30 +147,28 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 5, fontSize: 8, color: '#000' }}>
         <tbody>
           <tr>
-            <td style={{ fontWeight: 'bold', paddingRight: 4, whiteSpace: 'nowrap' }}>Region</td>
-            <td style={{ borderBottom: '1px solid #000', paddingRight: 10, minWidth: 70 }}>{sp.region || 'Region VIII'}</td>
+            <td style={{ fontWeight: 'bold', paddingRight: 4, whiteSpace: 'nowrap' }}>School ID</td>
+            <td style={{ borderBottom: '1px solid #000', paddingRight: 10, minWidth: 70 }}>{sp.schoolId || ''}</td>
+            <td style={{ fontWeight: 'bold', padding: '0 8px', whiteSpace: 'nowrap' }}>Region</td>
+            <td style={{ borderBottom: '1px solid #000', paddingRight: 10, minWidth: 90 }}>{sp.region || 'Region VIII'}</td>
             <td style={{ fontWeight: 'bold', padding: '0 8px', whiteSpace: 'nowrap' }}>Division</td>
-            <td style={{ borderBottom: '1px solid #000', paddingRight: 10, minWidth: 140 }}>{sp.division || ''}</td>
+            <td style={{ borderBottom: '1px solid #000', paddingRight: 10, minWidth: 120 }}>{sp.division || ''}</td>
             <td style={{ fontWeight: 'bold', padding: '0 8px', whiteSpace: 'nowrap' }}>District</td>
-            <td style={{ borderBottom: '1px solid #000', minWidth: 130 }}>{sp.district || ''}</td>
+            <td style={{ borderBottom: '1px solid #000', minWidth: 100 }}>{sp.district || ''}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 'bold', paddingRight: 4, paddingTop: 3, whiteSpace: 'nowrap' }}>School ID</td>
-            <td style={{ borderBottom: '1px solid #000', paddingTop: 3, paddingRight: 10 }}>{sp.schoolId || ''}</td>
+            <td style={{ fontWeight: 'bold', paddingRight: 4, paddingTop: 3, whiteSpace: 'nowrap' }}>School Name</td>
+            <td colSpan={3} style={{ borderBottom: '1px solid #000', paddingTop: 3, paddingRight: 10 }}>{sp.schoolName || ''}</td>
             <td style={{ fontWeight: 'bold', padding: '3px 8px 0', whiteSpace: 'nowrap' }}>School Year</td>
             <td style={{ borderBottom: '1px solid #000', paddingTop: 3 }}>{section?.academicYear || ''}</td>
             <td style={{ fontWeight: 'bold', padding: '3px 8px 0', whiteSpace: 'nowrap' }}>Curriculum</td>
             <td style={{ borderBottom: '1px solid #000', paddingTop: 3 }}>K to 12</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 'bold', paddingRight: 4, paddingTop: 3, whiteSpace: 'nowrap' }}>School Name</td>
-            <td colSpan={3} style={{ borderBottom: '1px solid #000', paddingTop: 3, paddingRight: 10 }}>{sp.schoolName || ''}</td>
-            <td style={{ fontWeight: 'bold', padding: '3px 8px 0', whiteSpace: 'nowrap' }}>Grade Level</td>
-            <td style={{ borderBottom: '1px solid #000', paddingTop: 3 }}>
-              {section?.gradeLevel || ''}
-              <span style={{ marginLeft: 20, fontWeight: 'bold' }}>Section</span>
-              <span style={{ display: 'inline-block', minWidth: 80, marginLeft: 6, borderBottom: '1px solid #000' }}>{section?.sectionName || ''}</span>
-            </td>
+            <td style={{ fontWeight: 'bold', paddingRight: 4, paddingTop: 3, whiteSpace: 'nowrap' }}>Grade Level</td>
+            <td style={{ borderBottom: '1px solid #000', paddingTop: 3, paddingRight: 10 }}>{section?.gradeLevel || ''}</td>
+            <td style={{ fontWeight: 'bold', padding: '3px 8px 0', whiteSpace: 'nowrap' }}>Section</td>
+            <td colSpan={5} style={{ borderBottom: '1px solid #000', paddingTop: 3 }}>{section?.sectionName || ''}</td>
           </tr>
         </tbody>
       </table>
@@ -261,9 +259,9 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
               ].map(([label, m, f, t]) => (
                 <tr key={label} style={{ height: 20 }}>
                   <td style={{ ...TD_LEFT, fontWeight: 'bold', fontSize: 7 }}>{label}</td>
-                  <td style={{ ...TD, background: m ? '#d8f3dc' : '' }}>{m || ''}</td>
-                  <td style={{ ...TD, background: f ? '#d8f3dc' : '' }}>{f || ''}</td>
-                  <td style={{ ...TD, fontWeight: 'bold', background: t ? '#d8f3dc' : '' }}>{t || ''}</td>
+                  <td style={TD}>{m || ''}</td>
+                  <td style={TD}>{f || ''}</td>
+                  <td style={{ ...TD, fontWeight: 'bold' }}>{t || ''}</td>
                 </tr>
               ))}
             </tbody>

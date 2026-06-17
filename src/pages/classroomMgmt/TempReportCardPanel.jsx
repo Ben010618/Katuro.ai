@@ -103,7 +103,7 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
               LEARNING AREAS
             </th>
             <th style={hdr()} colSpan={3}>TERMS</th>
-            <th style={hdr()} rowSpan={2}>FINAL{'\n'}RATING</th>
+            <th style={hdr()} rowSpan={2}>FINAL<br />RATING</th>
           </tr>
           <tr>
             <th style={hdr({ fontSize: 7 })}>TERM 1</th>
@@ -184,9 +184,8 @@ function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjec
               showTerms={showTerms}
               allSubjects={allSubjects}
             />
-          ) : (
-            <div style={{ width: '100%', height: '100%', background: '#fff' }} />
-          )}
+          ) : null}
+
         </div>
       ))}
     </div>
@@ -385,12 +384,12 @@ export default function TempReportCardPanel({ section, students, user }) {
         </div>
       )}
 
-      {/* Hidden A4 pages for PDF capture */}
+      {/* Hidden A4 pages for PDF capture — must NOT be visibility:hidden or display:none */}
       <div
         ref={hiddenRef}
         style={{
-          position: 'fixed', left: '-9999px', top: 0,
-          zIndex: -1, pointerEvents: 'none', visibility: 'hidden',
+          position: 'absolute', left: '-9999px', top: 0,
+          zIndex: -1, pointerEvents: 'none',
         }}
       >
         {pages.map((pageStudents, pi) => (
