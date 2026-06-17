@@ -9,8 +9,9 @@ import {
 } from '../../services/classroomDb';
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Link, Copy, Check,
-  Users, BookOpen, BarChart2, Shield, RefreshCw,
+  Users, BookOpen, BarChart2, Shield, RefreshCw, FileText,
 } from 'lucide-react';
+import SchoolFormsPanel from './SchoolFormsPanel';
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -36,12 +37,24 @@ const BTN_GHOST = {
 
 // ── Student form modal ────────────────────────────────────────────────────────
 
-const BLANK_STUDENT = { lrn: '', studentNumber: '', surname: '', givenName: '', middleInitial: '', gender: 'Male' };
+const BLANK_STUDENT = {
+  // Basic
+  lrn: '', studentNumber: '', surname: '', givenName: '', middleInitial: '', gender: 'Male',
+  // SF1 Personal
+  birthdate: '', motherTongue: '', ipGroup: '', religion: '',
+  // SF1 Address
+  houseStreet: '', barangay: '', municipality: '', province: '',
+  // SF1 Parents
+  fatherName: '', motherMaidenName: '',
+  // SF1 Guardian
+  guardianName: '', guardianRelationship: '', contactNumber: '',
+};
 
 function StudentModal({ sectionId, initial, onClose }) {
   const { addToast } = useToast();
-  const [form, setForm] = useState({ ...BLANK_STUDENT, ...initial });
-  const [saving, setSaving] = useState(false);
+  const [form,      setForm]      = useState({ ...BLANK_STUDENT, ...initial });
+  const [tab,       setTab]       = useState('basic'); // 'basic' | 'sf1'
+  const [saving,    setSaving]    = useState(false);
   const isEdit = !!initial?.id;
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
@@ -67,50 +80,156 @@ function StudentModal({ sectionId, initial, onClose }) {
     }
   }
 
+  const TAB_BTN = (key) => ({
+    flex: 1, padding: '7px 0', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+    borderRadius: 8, fontSize: 12, fontWeight: tab === key ? 700 : 500,
+    background: tab === key ? '#1a3d2b' : 'transparent',
+    color: tab === key ? '#fff' : '#4a6357',
+    transition: 'background 0.12s, color 0.12s',
+  });
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
-        <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{isEdit ? 'Edit Student' : 'Add Student'}</span>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, width: 28, height: 28, cursor: 'pointer', color: '#fff', display: 'grid', placeItems: 'center' }}>
             <X size={14} />
           </button>
         </div>
-        <form onSubmit={handleSave} style={{ padding: 22, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={LABEL}>LRN (Learner Reference Number)</label>
-            <input style={INPUT} type="number" value={form.lrn} onChange={e => set('lrn', e.target.value)} placeholder="123456789012" required />
+
+        {/* Tab switcher */}
+        <div style={{ padding: '10px 20px 0', background: '#f9fafb', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 4, background: '#e5e7eb', borderRadius: 10, padding: 3 }}>
+            <button onClick={() => setTab('basic')} style={TAB_BTN('basic')}>Basic Info</button>
+            <button onClick={() => setTab('sf1')} style={TAB_BTN('sf1')}>SF1 Details</button>
           </div>
-          <div>
-            <label style={LABEL}>Student Number</label>
-            <input style={INPUT} value={form.studentNumber} onChange={e => set('studentNumber', e.target.value)} placeholder="2024-001" required />
-          </div>
-          <div>
-            <label style={LABEL}>Gender</label>
-            <select style={INPUT} value={form.gender} onChange={e => set('gender', e.target.value)}>
-              <option>Male</option>
-              <option>Female</option>
-            </select>
-          </div>
-          <div>
-            <label style={LABEL}>Surname</label>
-            <input style={INPUT} value={form.surname} onChange={e => set('surname', e.target.value)} placeholder="Dela Cruz" required />
-          </div>
-          <div>
-            <label style={LABEL}>Given Name</label>
-            <input style={INPUT} value={form.givenName} onChange={e => set('givenName', e.target.value)} placeholder="Juan" required />
-          </div>
-          <div>
-            <label style={LABEL}>Middle Initial</label>
-            <input style={INPUT} maxLength={2} value={form.middleInitial} onChange={e => set('middleInitial', e.target.value)} placeholder="R." />
-          </div>
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10 }}>
-            <button type="button" onClick={onClose} style={{ ...BTN_GHOST, flex: 1, justifyContent: 'center', padding: '10px' }}>Cancel</button>
-            <button type="submit" disabled={saving} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: 'center', padding: '10px', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Saving…' : (isEdit ? 'Update' : 'Add Student')}
-            </button>
+          {tab === 'sf1' && (
+            <p style={{ margin: '6px 0 0', fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
+              These fields auto-fill SF1 (School Register). All optional.
+            </p>
+          )}
+        </div>
+
+        {/* Scrollable form body */}
+        <form id="student-form" onSubmit={handleSave} style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
+            {tab === 'basic' && (<>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>LRN (Learner Reference Number)</label>
+                <input style={INPUT} type="number" value={form.lrn} onChange={e => set('lrn', e.target.value)} placeholder="123456789012" required />
+              </div>
+              <div>
+                <label style={LABEL}>Student Number</label>
+                <input style={INPUT} value={form.studentNumber} onChange={e => set('studentNumber', e.target.value)} placeholder="2024-001" required />
+              </div>
+              <div>
+                <label style={LABEL}>Gender</label>
+                <select style={INPUT} value={form.gender} onChange={e => set('gender', e.target.value)}>
+                  <option>Male</option>
+                  <option>Female</option>
+                </select>
+              </div>
+              <div>
+                <label style={LABEL}>Surname</label>
+                <input style={INPUT} value={form.surname} onChange={e => set('surname', e.target.value)} placeholder="Dela Cruz" required />
+              </div>
+              <div>
+                <label style={LABEL}>Given Name</label>
+                <input style={INPUT} value={form.givenName} onChange={e => set('givenName', e.target.value)} placeholder="Juan" required />
+              </div>
+              <div>
+                <label style={LABEL}>Middle Initial</label>
+                <input style={INPUT} maxLength={2} value={form.middleInitial} onChange={e => set('middleInitial', e.target.value)} placeholder="R." />
+              </div>
+            </>)}
+
+            {tab === 'sf1' && (<>
+              {/* Personal */}
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
+                Personal Information
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>Birthdate</label>
+                <input style={INPUT} type="date" value={form.birthdate} onChange={e => set('birthdate', e.target.value)} />
+              </div>
+              <div>
+                <label style={LABEL}>Mother Tongue</label>
+                <input style={INPUT} value={form.motherTongue} onChange={e => set('motherTongue', e.target.value)} placeholder="e.g. Waray" />
+              </div>
+              <div>
+                <label style={LABEL}>Religion</label>
+                <input style={INPUT} value={form.religion} onChange={e => set('religion', e.target.value)} placeholder="e.g. Roman Catholic" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>IP / Ethnic Group <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10 }}>(leave blank if not applicable)</span></label>
+                <input style={INPUT} value={form.ipGroup} onChange={e => set('ipGroup', e.target.value)} placeholder="e.g. Waray-Waray" />
+              </div>
+
+              {/* Address */}
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+                Address
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>House #, Street, Sitio / Purok</label>
+                <input style={INPUT} value={form.houseStreet} onChange={e => set('houseStreet', e.target.value)} placeholder="e.g. 123 Rizal St., Purok 3" />
+              </div>
+              <div>
+                <label style={LABEL}>Barangay</label>
+                <input style={INPUT} value={form.barangay} onChange={e => set('barangay', e.target.value)} placeholder="e.g. Brgy. San Roque" />
+              </div>
+              <div>
+                <label style={LABEL}>Municipality / City</label>
+                <input style={INPUT} value={form.municipality} onChange={e => set('municipality', e.target.value)} placeholder="e.g. Borongan City" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>Province</label>
+                <input style={INPUT} value={form.province} onChange={e => set('province', e.target.value)} placeholder="e.g. Eastern Samar" />
+              </div>
+
+              {/* Parents */}
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+                Parents
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>Father's Name <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10 }}>(Last, First, Middle)</span></label>
+                <input style={INPUT} value={form.fatherName} onChange={e => set('fatherName', e.target.value)} placeholder="e.g. Dela Cruz, Jose, R." />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>Mother's Maiden Name <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10 }}>(Last, First, Middle)</span></label>
+                <input style={INPUT} value={form.motherMaidenName} onChange={e => set('motherMaidenName', e.target.value)} placeholder="e.g. Santos, Maria, C." />
+              </div>
+
+              {/* Guardian */}
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+                Guardian <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10, letterSpacing: 0 }}>(if not parent)</span>
+              </div>
+              <div>
+                <label style={LABEL}>Guardian Name</label>
+                <input style={INPUT} value={form.guardianName} onChange={e => set('guardianName', e.target.value)} placeholder="Full name" />
+              </div>
+              <div>
+                <label style={LABEL}>Relationship</label>
+                <input style={INPUT} value={form.guardianRelationship} onChange={e => set('guardianRelationship', e.target.value)} placeholder="e.g. Aunt" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={LABEL}>Contact Number</label>
+                <input style={INPUT} value={form.contactNumber} onChange={e => set('contactNumber', e.target.value)} placeholder="e.g. 09XXXXXXXXX" />
+              </div>
+            </>)}
           </div>
         </form>
+
+        {/* Footer buttons */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(45,106,79,0.08)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button type="button" onClick={onClose} style={{ ...BTN_GHOST, flex: 1, justifyContent: 'center', padding: '10px' }}>Cancel</button>
+          <button form="student-form" type="submit" disabled={saving} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: 'center', padding: '10px', opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : (isEdit ? 'Update' : 'Add Student')}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -250,9 +369,10 @@ function InviteModal({ sectionId, section, subject, onClose }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'roster',   label: 'Student Roster',          Icon: Users       },
-  { key: 'subjects', label: 'Subjects',                Icon: BookOpen    },
-  { key: 'grading',  label: 'Consolidated Grading',   Icon: BarChart2   },
+  { key: 'roster',   label: 'Student Roster',        Icon: Users       },
+  { key: 'subjects', label: 'Subjects',              Icon: BookOpen    },
+  { key: 'grading',  label: 'Consolidated Grading', Icon: BarChart2   },
+  { key: 'forms',    label: 'School Forms',          Icon: FileText    },
 ];
 
 export default function SectionDetailPage() {
@@ -636,6 +756,15 @@ export default function SectionDetailPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Tab: School Forms ── */}
+      {activeTab === 'forms' && (
+        <SchoolFormsPanel
+          section={{ ...section, id: sectionId }}
+          students={students}
+          user={user}
+        />
       )}
 
       {/* Modals */}
