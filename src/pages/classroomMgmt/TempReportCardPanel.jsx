@@ -11,9 +11,15 @@ const PRINT_OPTIONS = [
   { key: 'term3', label: 'End of Term 3 (Final)', show: ['term1', 'term2', 'term3'] },
 ];
 
+// kaTuro brand palette
+const KT_DARK  = '#1a3d2b';
+const KT_MID   = '#2d6a4f';
+const KT_LIGHT = '#d8f3dc';
+const KT_PALE  = '#f0fdf4';
+
 const F = 'Georgia, "Times New Roman", serif';
 
-// ── Single card ────────────────────────────────────────────────────────────────
+// ── Single report card ─────────────────────────────────────────────────────────
 
 function ReportCardInner({ student, grades, section, schoolProfile, showTerms, allSubjects }) {
   const name = [student.surname, student.givenName, student.middleInitial]
@@ -35,183 +41,166 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
     ? +(subjectFinals.reduce((a, b) => a + b, 0) / subjectFinals.length).toFixed(1)
     : '';
 
-  const TH = {
-    fontFamily: F, fontWeight: 'bold',
-    color: '#fff', background: '#1a1a1a',
-    border: '1px solid #444',
-    padding: '4px 5px', textAlign: 'center',
-    fontSize: 7.5, verticalAlign: 'middle', lineHeight: 1.25,
-  };
-  const TD = (extra = {}) => ({
-    fontFamily: F, color: '#000',
-    border: '1px solid #c0c0c0',
-    padding: '0 5px',
-    fontSize: 8.5, verticalAlign: 'middle',
+  // ── Shared cell styles ───────────────────────────────────────────────────────
+  const headCell = (extra = {}) => ({
+    fontFamily: F, fontWeight: 'bold', fontSize: 7.5,
+    color: KT_DARK, background: KT_LIGHT,
+    border: `1px solid ${KT_MID}`,
+    padding: '3px 5px', textAlign: 'center',
+    verticalAlign: 'middle', lineHeight: 1.25,
     ...extra,
   });
-  const GA_TD = (extra = {}) => ({
-    fontFamily: F, fontWeight: 'bold', color: '#000',
-    background: '#1a1a1a', border: '1px solid #444',
-    padding: '0 5px', fontSize: 8.5,
-    verticalAlign: 'middle', color: '#fff',
+
+  const subHeadCell = (extra = {}) => ({
+    ...headCell(),
+    background: '#b7e4c7',
+    fontSize: 7,
     ...extra,
   });
+
+  const dataCell = (extra = {}) => ({
+    fontFamily: F, fontSize: 8.5,
+    color: '#000', border: '1px solid #bbb',
+    padding: '0 6px', verticalAlign: 'middle',
+    ...extra,
+  });
+
+  const gaCell = (extra = {}) => ({
+    fontFamily: F, fontWeight: 'bold', fontSize: 8.5,
+    color: '#fff', background: KT_DARK,
+    border: `1px solid ${KT_DARK}`,
+    padding: '0 6px', verticalAlign: 'middle',
+    ...extra,
+  });
+
+  // ── Info field helper ─────────────────────────────────────────────────────────
+  const Line = ({ label, value, minWidth, flex }) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+      <span style={{ fontFamily: F, fontWeight: 'bold', fontSize: 8, color: '#000', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <span style={{
+        fontFamily: F, fontSize: 8.5, color: '#000',
+        borderBottom: '1px solid #555',
+        paddingBottom: 1, paddingLeft: 3,
+        minWidth: minWidth || 0,
+        flex: flex ? 1 : undefined,
+        display: 'inline-block',
+      }}>
+        {value}
+      </span>
+    </div>
+  );
 
   return (
     <div style={{
       width: '100%', height: '100%',
-      fontFamily: F, color: '#000', background: '#fff',
+      fontFamily: F, background: '#fff', color: '#000',
       display: 'flex', flexDirection: 'column',
     }}>
 
-      {/* ── Title header ── */}
+      {/* ── Title ── */}
       <div style={{
-        background: '#1a1a1a', color: '#fff',
         padding: '10px 14px 8px',
-        textAlign: 'center', flexShrink: 0,
-        letterSpacing: '0.5px',
+        textAlign: 'center',
+        borderBottom: `2px solid ${KT_DARK}`,
+        flexShrink: 0,
       }}>
         <div style={{
-          fontSize: 13, fontWeight: 'bold',
-          fontFamily: F, letterSpacing: '1.8px',
-          textTransform: 'uppercase',
+          fontFamily: F, fontWeight: 'bold',
+          fontSize: 13, color: KT_DARK,
+          letterSpacing: '2px', textTransform: 'uppercase',
         }}>
           Temporary Report Card
         </div>
-        <div style={{
-          fontSize: 7, marginTop: 4,
-          fontStyle: 'italic', opacity: 0.75, fontFamily: F,
-        }}>
-          Republic of the Philippines &nbsp;·&nbsp; Department of Education
-        </div>
       </div>
 
-      {/* ── Student info ── */}
+      {/* ── Learner info ── */}
       <div style={{
-        padding: '7px 12px 7px',
-        borderBottom: '1.5px solid #1a1a1a',
+        padding: '7px 12px 6px',
+        borderBottom: `1px solid ${KT_MID}`,
         flexShrink: 0,
+        display: 'flex', flexDirection: 'column', gap: 5,
       }}>
-        {/* Name */}
-        <div style={{
-          display: 'flex', alignItems: 'baseline', gap: 4,
-          marginBottom: 4,
-        }}>
-          <span style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F, whiteSpace: 'nowrap' }}>
-            {"Learner's Name:"}
-          </span>
-          <span style={{
-            flex: 1, borderBottom: '0.75px solid #555',
-            paddingBottom: 1, paddingLeft: 4,
-            fontSize: 8.5, fontFamily: F, fontStyle: 'italic',
-          }}>{name}</span>
+        {/* Name — full width */}
+        <Line label="Learner's Name:" value={name} flex />
+
+        {/* Grade+Section / SY on one row */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <Line label="Grade & Section:" value={
+            `${section.gradeLevel || ''}${section.sectionName ? ' – ' + section.sectionName : ''}`
+          } minWidth={70} />
+          <Line label="School Year:" value={section.academicYear || ''} minWidth={55} />
         </div>
 
-        {/* Grade/Section + SY */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-          <span style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F, whiteSpace: 'nowrap' }}>
-            {'Grade & Section:'}
-          </span>
-          <span style={{
-            borderBottom: '0.75px solid #555', paddingBottom: 1, paddingLeft: 4,
-            fontSize: 8.5, fontFamily: F, fontStyle: 'italic',
-            minWidth: 80, marginRight: 8,
-          }}>
-            {section.gradeLevel}{section.sectionName ? ` – ${section.sectionName}` : ''}
-          </span>
-          <span style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F, whiteSpace: 'nowrap' }}>
-            {'School Year:'}
-          </span>
-          <span style={{
-            borderBottom: '0.75px solid #555', paddingBottom: 1, paddingLeft: 4,
-            fontSize: 8.5, fontFamily: F, fontStyle: 'italic', minWidth: 55,
-          }}>
-            {section.academicYear || ''}
-          </span>
-        </div>
-
-        {/* School */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F, whiteSpace: 'nowrap' }}>
-            {'School:'}
-          </span>
-          <span style={{
-            flex: 1, borderBottom: '0.75px solid #555',
-            paddingBottom: 1, paddingLeft: 4,
-            fontSize: 8.5, fontFamily: F, fontStyle: 'italic',
-          }}>
-            {schoolProfile?.schoolName || ''}
-          </span>
-        </div>
+        {/* School — full width */}
+        <Line label="School:" value={schoolProfile?.schoolName || ''} flex />
       </div>
 
       {/* ── Grade table — fills remaining space ── */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <table style={{
           borderCollapse: 'collapse',
-          width: '100%', tableLayout: 'fixed',
-          height: '100%',
-          border: '1px solid #aaa',
+          width: '100%', height: '100%',
+          tableLayout: 'fixed',
         }}>
           <colgroup>
-            <col style={{ width: '48%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '13%' }} />
+            <col style={{ width: '44%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
           </colgroup>
+
+          {/* Header row 1 */}
           <thead>
             <tr style={{ height: 22 }}>
-              <th style={{ ...TH, textAlign: 'left', padding: '4px 7px' }} rowSpan={2}>
+              <th style={headCell({ textAlign: 'left', paddingLeft: 8 })} rowSpan={2}>
                 LEARNING AREAS
               </th>
-              <th style={{ ...TH, background: '#333', border: '1px solid #555' }} colSpan={3}>
+              <th style={headCell()} colSpan={3}>
                 TERMS
               </th>
-              <th style={{ ...TH, background: '#333', lineHeight: 1.3, fontSize: 7 }} rowSpan={2}>
+              <th style={headCell({ lineHeight: 1.3, fontSize: 7 })} rowSpan={2}>
                 FINAL<br />RATING
               </th>
             </tr>
+            {/* Header row 2 */}
             <tr style={{ height: 18 }}>
               {['TERM 1', 'TERM 2', 'TERM 3'].map(t => (
-                <th key={t} style={{ ...TH, background: '#444', fontSize: 7, border: '1px solid #555' }}>
-                  {t}
-                </th>
+                <th key={t} style={subHeadCell()}>{t}</th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {allSubjects.map((subj, idx) => (
-              <tr key={subj} style={{ background: idx % 2 === 0 ? '#fff' : '#f7f7f7' }}>
-                <td style={TD({ textAlign: 'left', paddingLeft: 7, fontSize: 8 })}>
-                  {subj}
-                </td>
-                <td style={TD({ textAlign: 'center' })}>
+              <tr key={subj} style={{ background: idx % 2 === 0 ? '#fff' : KT_PALE }}>
+                <td style={dataCell({ paddingLeft: 8, fontSize: 8 })}>{subj}</td>
+                <td style={dataCell({ textAlign: 'center' })}>
                   {showTerms.includes('term1') ? (getGrade(subj, 'term1') || '') : ''}
                 </td>
-                <td style={TD({ textAlign: 'center' })}>
+                <td style={dataCell({ textAlign: 'center' })}>
                   {showTerms.includes('term2') ? (getGrade(subj, 'term2') || '') : ''}
                 </td>
-                <td style={TD({ textAlign: 'center' })}>
+                <td style={dataCell({ textAlign: 'center' })}>
                   {showTerms.includes('term3') ? (getGrade(subj, 'term3') || '') : ''}
                 </td>
-                <td style={TD({ textAlign: 'center', fontWeight: 'bold', fontSize: 9, border: '1px solid #888' })}>
+                <td style={dataCell({ textAlign: 'center', fontWeight: 'bold', border: `1px solid ${KT_MID}` })}>
                   {getFinal(subj)}
                 </td>
               </tr>
             ))}
 
-            {/* General Average */}
+            {/* General Average row */}
             <tr>
-              <td style={GA_TD({ textAlign: 'left', paddingLeft: 7, fontSize: 8.5 })}>
+              <td style={gaCell({ paddingLeft: 8, textAlign: 'left' })}>
                 GENERAL AVERAGE
               </td>
-              <td style={GA_TD({ textAlign: 'center', background: '#333', border: '1px solid #555' })}></td>
-              <td style={GA_TD({ textAlign: 'center', background: '#333', border: '1px solid #555' })}></td>
-              <td style={GA_TD({ textAlign: 'center', background: '#333', border: '1px solid #555' })}></td>
-              <td style={GA_TD({ textAlign: 'center', fontSize: 10, background: '#1a1a1a', border: '1px solid #444' })}>
-                {GA}
-              </td>
+              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+              <td style={gaCell({ textAlign: 'center', background: KT_MID, border: `1px solid ${KT_MID}` })}></td>
+              <td style={gaCell({ textAlign: 'center', fontSize: 9.5 })}>{GA}</td>
             </tr>
           </tbody>
         </table>
@@ -219,23 +208,25 @@ function ReportCardInner({ student, grades, section, schoolProfile, showTerms, a
 
       {/* ── Signatures ── */}
       <div style={{
-        padding: '8px 16px 10px',
-        borderTop: '1.5px solid #1a1a1a',
+        padding: '8px 20px 10px',
+        borderTop: `1px solid ${KT_MID}`,
         display: 'flex', justifyContent: 'space-between',
-        alignItems: 'flex-end', flexShrink: 0,
+        alignItems: 'flex-start', flexShrink: 0,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ height: 24, borderBottom: '1px solid #000', width: 110, marginBottom: 3 }} />
-          <div style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F }}>Class Adviser</div>
-          <div style={{ fontSize: 7, fontFamily: F, marginTop: 2, color: '#444' }}>
-            Date: <span style={{ borderBottom: '0.5px solid #555', display: 'inline-block', width: 60 }} />
+          <div style={{ height: 22, borderBottom: '1px solid #000', width: 110, margin: '0 auto 3px' }} />
+          <div style={{ fontFamily: F, fontSize: 7.5, fontWeight: 'bold', color: '#000' }}>Class Adviser</div>
+          <div style={{ fontFamily: F, fontSize: 7, color: '#555', marginTop: 2 }}>
+            {'Date: '}
+            <span style={{ display: 'inline-block', width: 65, borderBottom: '0.5px solid #555' }} />
           </div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ height: 24, borderBottom: '1px solid #000', width: 120, marginBottom: 3 }} />
-          <div style={{ fontSize: 7.5, fontWeight: 'bold', fontFamily: F }}>Parent / Guardian</div>
-          <div style={{ fontSize: 7, fontFamily: F, marginTop: 2, color: '#444' }}>
-            Date: <span style={{ borderBottom: '0.5px solid #555', display: 'inline-block', width: 60 }} />
+          <div style={{ height: 22, borderBottom: '1px solid #000', width: 120, margin: '0 auto 3px' }} />
+          <div style={{ fontFamily: F, fontSize: 7.5, fontWeight: 'bold', color: '#000' }}>Parent/Guardian</div>
+          <div style={{ fontFamily: F, fontSize: 7, color: '#555', marginTop: 2 }}>
+            {'Date: '}
+            <span style={{ display: 'inline-block', width: 65, borderBottom: '0.5px solid #555' }} />
           </div>
         </div>
       </div>
@@ -249,20 +240,19 @@ function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjec
   return (
     <div style={{
       width: 794, height: 1123,
-      background: '#e8e8e8',
-      padding: 12, boxSizing: 'border-box',
+      background: '#f5f5f5',
+      padding: 14, boxSizing: 'border-box',
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gridTemplateRows: '1fr 1fr',
-      gap: 10,
+      gap: 12,
     }}>
       {[0, 1, 2, 3].map(i => (
         <div key={i} style={{
           background: '#fff',
-          border: '1.5px solid #1a1a1a',
-          borderRadius: 3,
+          border: `1.5px solid ${KT_DARK}`,
+          borderRadius: 7,
           overflow: 'hidden',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
         }}>
           {students[i] ? (
             <ReportCardInner
@@ -280,7 +270,7 @@ function A4Page({ students, grades, section, schoolProfile, showTerms, allSubjec
   );
 }
 
-// ── Panel ──────────────────────────────────────────────────────────────────────
+// ── Main panel ─────────────────────────────────────────────────────────────────
 
 export default function TempReportCardPanel({ section, students, user }) {
   const [selectedPrint, setSelectedPrint] = useState('term1');
@@ -339,7 +329,7 @@ export default function TempReportCardPanel({ section, students, user }) {
         if (i > 0) pdf.addPage();
         const canvas = await html2canvas(pageEls[i], {
           scale: 2,
-          backgroundColor: '#e8e8e8',
+          backgroundColor: '#f5f5f5',
           useCORS: true,
           logging: false,
           width: 794,
@@ -359,21 +349,21 @@ export default function TempReportCardPanel({ section, students, user }) {
 
   const termBtnStyle = (key) => ({
     padding: '7px 18px',
-    border: selectedPrint === key ? '2px solid #1a3d2b' : '1.5px solid rgba(45,106,79,0.25)',
+    border: selectedPrint === key ? `2px solid ${KT_DARK}` : '1.5px solid rgba(45,106,79,0.25)',
     borderRadius: 8,
-    background: selectedPrint === key ? '#1a3d2b' : '#fff',
-    color: selectedPrint === key ? '#fff' : '#1a3d2b',
+    background: selectedPrint === key ? KT_DARK : '#fff',
+    color: selectedPrint === key ? '#fff' : KT_DARK,
     fontWeight: 700, fontSize: 12, cursor: 'pointer',
     fontFamily: 'inherit', transition: 'all 0.15s',
   });
 
-  const PREVIEW_SCALE = 0.54;
+  const SCALE = 0.54;
 
   return (
     <div>
       {/* Controls */}
       <div style={{
-        background: '#f0fdf4', borderRadius: 12,
+        background: KT_PALE, borderRadius: 12,
         border: '1px solid rgba(45,106,79,0.15)',
         padding: '16px 20px', marginBottom: 22,
         display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
@@ -404,12 +394,11 @@ export default function TempReportCardPanel({ section, students, user }) {
             disabled={generating || !students.length}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              background: generating ? '#6b7280' : '#1a3d2b',
+              background: generating ? '#6b7280' : KT_DARK,
               color: '#fff', border: 'none', borderRadius: 9,
               padding: '10px 22px', fontSize: 13, fontWeight: 700,
               cursor: generating || !students.length ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', opacity: !students.length ? 0.5 : 1,
-              transition: 'background 0.15s',
             }}
           >
             <Download size={14} />
@@ -418,9 +407,9 @@ export default function TempReportCardPanel({ section, students, user }) {
         </div>
       </div>
 
-      {/* Preview heading */}
+      {/* Preview label */}
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ClipboardList size={15} color="#2d6a4f" />
+        <ClipboardList size={15} color={KT_MID} />
         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>
           Preview &mdash; {currentOption.label}
         </p>
@@ -430,24 +419,24 @@ export default function TempReportCardPanel({ section, students, user }) {
       {/* Scaled preview */}
       {pages.length > 0 ? (
         <div style={{
-          background: '#4b5563', borderRadius: 12, padding: 24,
+          background: '#374151', borderRadius: 12, padding: 24,
           display: 'flex', flexDirection: 'column', gap: 20,
           alignItems: 'center', overflowX: 'auto',
         }}>
-          {pages.map((pageStudents, pi) => (
+          {pages.map((pg, pi) => (
             <div
               key={pi}
               style={{
-                width:  Math.round(794 * PREVIEW_SCALE),
-                height: Math.round(1123 * PREVIEW_SCALE),
-                overflow: 'hidden', position: 'relative', flexShrink: 0,
+                width:  Math.round(794 * SCALE),
+                height: Math.round(1123 * SCALE),
+                overflow: 'hidden', flexShrink: 0,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                borderRadius: 3,
+                borderRadius: 4,
               }}
             >
-              <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
+              <div style={{ transform: `scale(${SCALE})`, transformOrigin: 'top left' }}>
                 <A4Page
-                  students={pageStudents}
+                  students={pg}
                   grades={allGrades}
                   section={sectionData}
                   schoolProfile={schoolProfile}
@@ -465,15 +454,15 @@ export default function TempReportCardPanel({ section, students, user }) {
         </div>
       )}
 
-      {/* Hidden pages for PDF capture — must stay visible (no visibility:hidden) */}
+      {/* Off-screen pages for PDF capture — must NOT use visibility:hidden */}
       <div
         ref={hiddenRef}
         style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}
       >
-        {pages.map((pageStudents, pi) => (
+        {pages.map((pg, pi) => (
           <div key={pi} className="rc-a4-page">
             <A4Page
-              students={pageStudents}
+              students={pg}
               grades={allGrades}
               section={sectionData}
               schoolProfile={schoolProfile}
