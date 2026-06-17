@@ -243,6 +243,64 @@ export async function acceptInvitation(inviteCode, teacherUid, teacherName) {
   return invite;
 }
 
+// ── Section delete (cascade) ──────────────────────────────────────────────────
+
+async function batchedDelete(refs) {
+  const CHUNK = 450;
+  for (let i = 0; i < refs.length; i += CHUNK) {
+    const b = writeBatch(db);
+    refs.slice(i, i + CHUNK).forEach(r => b.delete(r));
+    await b.commit();
+  }
+}
+
+export async function deleteSection(sectionId) {
+  const refs = [];
+
+  // students
+  const students = await getDocs(stuCol(sectionId));
+  students.docs.forEach(d => refs.push(d.ref));
+
+  // gradeWeights
+  const weights = await getDocs(collection(db, 'sections', sectionId, 'gradeWeights'));
+  weights.docs.forEach(d => refs.push(d.ref));
+
+  // grades/{groupId}/students/{studentId} + the group docs themselves
+  const groups = await getDocs(collection(db, 'sections', sectionId, 'grades'));
+  for (const g of groups.docs) {
+    const gradeStudents = await getDocs(collection(g.ref, 'students'));
+    gradeStudents.docs.forEach(d => refs.push(d.ref));
+    refs.push(g.ref);
+  }
+
+  // section doc itself
+  refs.push(secDoc(sectionId));
+
+  await batchedDelete(refs);
+
+  // teacher-side cleanup: invitations → assignments + gradeSheets per teacher
+  const invitesSnap = await getDocs(query(invCol(), where('sectionId', '==', sectionId)));
+  const teacherRefs = [];
+
+  for (const inv of invitesSnap.docs) {
+    const { teacherUid } = inv.data();
+    if (teacherUid) {
+      const assignSnap = await getDocs(
+        query(assCol(teacherUid), where('sectionId', '==', sectionId))
+      );
+      assignSnap.docs.forEach(d => teacherRefs.push(d.ref));
+
+      const sheetsSnap = await getDocs(
+        query(collection(db, 'teachers', teacherUid, 'gradeSheets'), where('sectionId', '==', sectionId))
+      );
+      sheetsSnap.docs.forEach(d => teacherRefs.push(d.ref));
+    }
+    teacherRefs.push(inv.ref);
+  }
+
+  if (teacherRefs.length) await batchedDelete(teacherRefs);
+}
+
 // ── Assignments (Classes I Teach) ─────────────────────────────────────────────
 
 export function subscribeAssignments(uid, cb) {

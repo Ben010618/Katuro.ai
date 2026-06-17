@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import {
-  createSection, subscribeAdviserSections, GRADE_LEVELS,
+  createSection, subscribeAdviserSections, deleteSection, GRADE_LEVELS,
 } from '../../services/classroomDb';
-import { Plus, School, ChevronRight, Users, BookOpen } from 'lucide-react';
+import { Plus, School, ChevronRight, Users, BookOpen, Trash2, AlertTriangle } from 'lucide-react';
 
 const INPUT = {
   width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 14,
@@ -91,9 +91,12 @@ function CreateClassModal({ onClose, onCreated }) {
 export default function ClassroomManagementPage() {
   const { user }       = useAuth();
   const navigate       = useNavigate();
-  const [sections, setSections]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const { addToast }   = useToast();
+  const [sections,    setSections]   = useState([]);
+  const [loading,     setLoading]    = useState(true);
+  const [showModal,   setShowModal]  = useState(false);
+  const [confirmDel,  setConfirmDel] = useState(null); // section object to delete
+  const [deleting,    setDeleting]   = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -103,6 +106,20 @@ export default function ClassroomManagementPage() {
     });
     return unsub;
   }, [user?.uid]);
+
+  async function handleDelete() {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await deleteSection(confirmDel.id);
+      addToast(`"${confirmDel.gradeLevel} – ${confirmDel.sectionName}" deleted.`, 'success');
+      setConfirmDel(null);
+    } catch (err) {
+      addToast('Delete failed: ' + err.message, 'error');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -173,7 +190,23 @@ export default function ClassroomManagementPage() {
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: '#d8f3dc', display: 'grid', placeItems: 'center' }}>
                   <School size={20} color="#2d6a4f" />
                 </div>
-                <ChevronRight size={16} color="#4a6357" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDel(sec); }}
+                    title="Delete class"
+                    style={{
+                      background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)',
+                      borderRadius: 8, width: 30, height: 30, cursor: 'pointer',
+                      display: 'grid', placeItems: 'center', color: '#dc2626',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.18)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(220,38,38,0.08)'}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                  <ChevronRight size={16} color="#4a6357" />
+                </div>
               </div>
 
               <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>
@@ -201,6 +234,51 @@ export default function ClassroomManagementPage() {
           onClose={() => setShowModal(false)}
           onCreated={id => { setShowModal(false); navigate(`/classroom-management/section/${id}`); }}
         />
+      )}
+
+      {/* ── Delete confirmation modal ── */}
+      {confirmDel && (
+        <div
+          onClick={() => !deleting && setConfirmDel(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)' }}>
+            <div style={{ background: 'rgba(220,38,38,0.06)', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '20px 24px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(220,38,38,0.12)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={20} color="#dc2626" />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Delete Class?</p>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
+                  <strong>{confirmDel.gradeLevel} – {confirmDel.sectionName}</strong> · SY {confirmDel.academicYear}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ padding: '18px 24px' }}>
+              <p style={{ margin: '0 0 18px', fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
+                This will permanently delete the class, all students, all grades, and remove it from every subject teacher's account. <strong>This cannot be undone.</strong>
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setConfirmDel(null)}
+                  disabled={deleting}
+                  style={{ flex: 1, background: '#f5faf7', color: '#4a6357', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: deleting ? 0.5 : 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{ flex: 1, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: deleting ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+                >
+                  <Trash2 size={14} />
+                  {deleting ? 'Deleting…' : 'Yes, Delete Class'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
