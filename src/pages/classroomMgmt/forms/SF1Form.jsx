@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { X, Download, FileText } from 'lucide-react';
+import { generateSF1 } from '../../../utils/formGenerators/generateSF1';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -329,7 +330,8 @@ function SF1TableContent({ section, students, schoolProfile, refDate }) {
 
 export default function SF1Form({ section, students, schoolProfile, onClose }) {
   const printRef    = useRef(null);
-  const [generating, setGenerating] = useState(false);
+  const [generating,     setGenerating]     = useState(false);
+  const [generatingXlsx, setGeneratingXlsx] = useState(false);
 
   const syStart = section?.academicYear?.split('-')[0];
   const refDate = syStart ? getFirstFridayOfJune(parseInt(syStart)) : new Date();
@@ -435,6 +437,31 @@ export default function SF1Form({ section, students, schoolProfile, onClose }) {
     XLSX.writeFile(wb, `SF1_${section?.gradeLevel || 'G'}_${section?.sectionName || 'Section'}_${section?.academicYear || 'SY'}.xlsx`);
   }
 
+  // ── ExcelJS pixel-perfect SF1 download ─────────────────────────────────────
+  async function downloadSF1Official() {
+    setGeneratingXlsx(true);
+    try {
+      const sp = schoolProfile || {};
+      await generateSF1(
+        {
+          schoolName:   sp.schoolName   || '',
+          schoolId:     sp.schoolId     || '',
+          region:       sp.region       || 'Region VIII',
+          division:     sp.division     || '',
+          district:     sp.district     || '',
+          academicYear: section?.academicYear  || '',
+          gradeLevel:   section?.gradeLevel    || '',
+          sectionName:  section?.sectionName   || '',
+        },
+        students,
+      );
+    } catch (err) {
+      console.error('SF1 Excel error:', err);
+    } finally {
+      setGeneratingXlsx(false);
+    }
+  }
+
   // ── Shared button style ─────────────────────────────────────────────────────
   const BTN = (bg, color) => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -484,7 +511,14 @@ export default function SF1Form({ section, students, schoolProfile, onClose }) {
             onClick={downloadExcel}
             style={BTN('rgba(34,197,94,0.12)', '#166534')}
           >
-            <Download size={13} /> Excel
+            <Download size={13} /> Excel (simple)
+          </button>
+          <button
+            onClick={downloadSF1Official}
+            disabled={generatingXlsx}
+            style={{ ...BTN('rgba(34,197,94,0.9)', '#fff'), opacity: generatingXlsx ? 0.65 : 1 }}
+          >
+            <Download size={13} /> {generatingXlsx ? 'Generating…' : 'SF1 Excel (Official)'}
           </button>
           <button
             onClick={downloadPDF}
