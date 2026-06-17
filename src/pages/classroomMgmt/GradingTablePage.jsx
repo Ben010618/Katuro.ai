@@ -38,7 +38,7 @@ export default function GradingTablePage() {
 
   const [activeTerm,   setActiveTerm]   = useState('term1');
   const [sheet,        setSheet]        = useState(null);   // gradesheet metadata
-  const [localWeights, setLocalWeights] = useState({ ...DEFAULT_WEIGHTS, ...DEFAULT_COUNTS });
+  const [localWeights, setLocalWeights] = useState({ ...DEFAULT_WEIGHTS });
   const [localGrades,  setLocalGrades]  = useState({});
   const [dirty,        setDirty]        = useState(false);
   const [saving,       setSaving]       = useState(false);
