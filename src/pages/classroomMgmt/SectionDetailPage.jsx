@@ -275,6 +275,7 @@ export default function SectionDetailPage() {
 
   // Grading sheet tab — grades keyed by subject name
   const [allGrades, setAllGrades] = useState({});
+  const [activeGradeTerm, setActiveGradeTerm] = useState('term1');
 
   // Invite modal
   const [inviteSubject, setInviteSubject] = useState(null);
@@ -289,17 +290,23 @@ export default function SectionDetailPage() {
     return unsub;
   }, [sectionId]);
 
+  // Reset grade map when term changes so stale data doesn't bleed over
+  useEffect(() => {
+    setAllGrades({});
+  }, [activeGradeTerm]);
+
   // Subscribe to grades for ALL subjects when grading tab is active
   useEffect(() => {
     if (activeTab !== 'grading' || !section) return;
     const allSubjects = [...(section.subjects || []), ...(section.specialSubjects || [])];
     const unsubs = allSubjects.map(subj =>
       subscribeSubjectGrades(sectionId, subj, gradeMap =>
-        setAllGrades(prev => ({ ...prev, [subj]: gradeMap }))
+        setAllGrades(prev => ({ ...prev, [subj]: gradeMap })),
+        activeGradeTerm,
       )
     );
     return () => unsubs.forEach(fn => fn());
-  }, [activeTab, sectionId, section?.subjects?.length, section?.specialSubjects?.length]);
+  }, [activeTab, sectionId, section?.subjects?.length, section?.specialSubjects?.length, activeGradeTerm]);
 
   async function handleAddSpecialSubject() {
     const name = newSubject.trim();
@@ -507,9 +514,34 @@ export default function SectionDetailPage() {
       {/* ── Tab: Consolidated Grading ── */}
       {activeTab === 'grading' && (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Consolidated Grading Sheet</h3>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#4a6357' }}>Click a subject column header to manage the assigned teacher.</p>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Consolidated Grading Sheet</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#4a6357' }}>Click a subject column header to manage the assigned teacher.</p>
+            </div>
+            {/* Term pill switcher */}
+            <div style={{ display: 'flex', gap: 3, background: '#f3f4f6', borderRadius: 10, padding: 3 }}>
+              {[
+                { key: 'term1', label: 'Term 1' },
+                { key: 'term2', label: 'Term 2' },
+                { key: 'term3', label: 'Term 3' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setActiveGradeTerm(t.key)}
+                  style={{
+                    padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: activeGradeTerm === t.key ? 700 : 500,
+                    fontFamily: 'inherit',
+                    background: activeGradeTerm === t.key ? '#1a3d2b' : 'transparent',
+                    color: activeGradeTerm === t.key ? '#fff' : '#6b7280',
+                    transition: 'background 0.12s, color 0.12s',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -565,6 +597,43 @@ export default function SectionDetailPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Excel-style sheet tabs at bottom of grading card */}
+          <div style={{
+            background: '#e5e7eb', borderTop: '1px solid #d1d5db',
+            display: 'flex', alignItems: 'flex-end', padding: '0 0 0 12px', height: 40,
+          }}>
+            {[
+              { key: 'term1', label: 'Term 1' },
+              { key: 'term2', label: 'Term 2' },
+              { key: 'term3', label: 'Term 3' },
+            ].map(t => {
+              const isActive = activeGradeTerm === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setActiveGradeTerm(t.key)}
+                  style={{
+                    padding: '0 18px',
+                    height: isActive ? 36 : 30,
+                    alignSelf: 'flex-end',
+                    background: isActive ? '#fff' : '#d1d5db',
+                    color: isActive ? '#1a3d2b' : '#6b7280',
+                    border: '1px solid #c4c4c4',
+                    borderBottom: isActive ? '1px solid #fff' : '1px solid #c4c4c4',
+                    borderRadius: '5px 5px 0 0',
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                    marginRight: 2,
+                    transition: 'background 0.1s, color 0.1s, height 0.1s',
+                    boxShadow: isActive ? '0 -2px 5px rgba(0,0,0,0.05)' : 'none',
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
