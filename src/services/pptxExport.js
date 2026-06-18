@@ -124,12 +124,12 @@ export async function exportToPptx({
     } else {
       // Slide title
       s.addText(sl.title, {
-        x: 0.5, y: CONTENT_Y + 0.14, w: 12.33, h: 0.65,
-        fontSize: 21, bold: true, color: C.dark,
+        x: 0.5, y: CONTENT_Y + 0.1, w: 12.33, h: 0.72,
+        fontSize: 26, bold: true, color: C.dark,
       });
       // Underline
       s.addShape(prs.ShapeType.rect, {
-        x: 0.5, y: CONTENT_Y + 0.82, w: 12.33, h: 0.025,
+        x: 0.5, y: CONTENT_Y + 0.85, w: 12.33, h: 0.03,
         fill: { color: C.accent },
       });
 
@@ -137,9 +137,9 @@ export async function exportToPptx({
       if (sl.bullets?.length) {
         const runs = buildBulletRuns(sl.bullets);
         s.addText(runs, {
-          x: 0.5, y: CONTENT_Y + 0.9, w: 12.33, h: CONTENT_H - 1.0,
-          fontSize: 15, valign: 'top', wrap: true,
-          lineSpacingMultiple: 1.25,
+          x: 0.5, y: CONTENT_Y + 0.95, w: 12.33, h: CONTENT_H - 1.05,
+          fontSize: 20, valign: 'top', wrap: true,
+          lineSpacingMultiple: 1.45,
         });
       }
     }

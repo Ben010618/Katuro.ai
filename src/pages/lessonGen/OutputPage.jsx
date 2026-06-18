@@ -4,8 +4,10 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
-import { getTeacherProfile } from '../../services/db';
+import { getTeacherProfile, deductTokens } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
+import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
+import { exportToPptx } from '../../services/pptxExport';
 import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation } from 'lucide-react';
 
 const baseTd = {
@@ -158,6 +160,8 @@ export default function OutputPage() {
   const [teacherProfile,   setTeacherProfile]  = useState(null);
   const [docxLoading,      setDocxLoading]     = useState(false);
   const [selectedSession,  setSelectedSession] = useState(null);
+  const [pptLoading,       setPptLoading]      = useState(false);
+  const [pptPhase,         setPptPhase]        = useState('');
 
   function handleGoToCOT() {
     if (selectedSession === null) return;
@@ -184,6 +188,59 @@ export default function OutputPage() {
       performanceStandards: '',
     });
     navigate('/cot-gen/step-2');
+  }
+
+  async function handleGeneratePresentation() {
+    if (selectedSession === null) return;
+    const s = sessions[selectedSession];
+    const sessionMelc = s.competencyText || store.competencyText || '';
+    const topic = s.keyContentFocus || store.content || '';
+    const title = store.lessonName || topic || store.subject || 'Lesson';
+
+    setPptLoading(true);
+    try {
+      setPptPhase('Checking tokens…');
+      await deductTokens(user.uid, 'presentation_gen', 3);
+
+      setPptPhase('Generating slide outline…');
+      const { outline } = await generateOutline({
+        subject:    store.subject    || '',
+        gradeLevel: store.gradeLevel || '',
+        melcCode:   sessionMelc,
+        topic:      topic || title,
+        slideCount: 14,
+      });
+
+      setPptPhase('Writing content with AI…');
+      const { slides: expanded } = await expandSlides({
+        subject:    store.subject    || '',
+        gradeLevel: store.gradeLevel || '',
+        melcCode:   sessionMelc,
+        topic:      topic || title,
+        slides:     outline,
+        style:      'Academic',
+      });
+
+      setPptPhase('Building your PPTX…');
+      await exportToPptx({
+        title,
+        subject:      store.subject    || '',
+        gradeLevel:   store.gradeLevel || '',
+        schoolName:   teacherProfile?.school || '',
+        schoolEmail:  teacherProfile?.email  || user?.email || '',
+        slides:       toExportSlides(expanded),
+        includeNotes: true,
+      });
+
+      addToast('Presentation downloaded! (3 tokens used)', 'success');
+      setSelectedSession(null);
+    } catch (err) {
+      addToast(err.message || 'Presentation generation failed.', 'error');
+      console.error('PPT error:', err);
+    } finally {
+      setPptLoading(false);
+      setPptPhase('');
+    }
   }
 
   useEffect(() => {
@@ -483,23 +540,24 @@ export default function OutputPage() {
                 </button>
 
                 <button
-                  disabled
+                  onClick={handleGeneratePresentation}
+                  disabled={pptLoading}
                   style={{
-                    width: '100%', background: '#f9fafb', color: '#9ca3af',
-                    border: '1.5px dashed #d1d5db', borderRadius: 10, padding: '11px 20px',
-                    fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
+                    width: '100%',
+                    background: pptLoading ? '#374151' : '#e8a320',
+                    color: '#fff',
+                    border: 'none', borderRadius: 10, padding: '11px 20px',
+                    fontSize: 13, fontWeight: 600,
+                    cursor: pptLoading ? 'not-allowed' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    fontFamily: 'inherit',
+                    fontFamily: 'inherit', transition: 'background 0.15s',
+                    opacity: pptLoading ? 0.85 : 1,
                   }}
                 >
-                  <Presentation size={14} />
-                  Generate Presentation
-                  <span style={{
-                    fontSize: 9, fontWeight: 700, background: '#e5e7eb', color: '#6b7280',
-                    borderRadius: 6, padding: '2px 6px', letterSpacing: '0.5px', textTransform: 'uppercase',
-                  }}>
-                    COMING SOON
-                  </span>
+                  {pptLoading
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Generating…'}</>
+                    : <><Presentation size={14} /> Generate Presentation <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>3 tokens</span></>
+                  }
                 </button>
               </div>
             </div>
