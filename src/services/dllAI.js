@@ -127,11 +127,12 @@ ${dayContext}
 Language: Write ALL content in ${lang} only.
 
 TASK 1 — LEARNING OBJECTIVES (one per day)
-For each day that has a class, write ONE clear and measurable learning objective.
-- Start with an action verb (Bloom's Taxonomy appropriate to the MELC)
-- Be specific to that day's MELC and Content
-- Achievable in one 60-minute period
-- If a day is "(No class)" write an empty string ""
+CRITICAL: You MUST write a unique, non-empty learning objective for EVERY day that has content — even when multiple days share the same MELC. Differentiate each day's objective by focusing on that day's specific Content topic.
+- Start with a Bloom's Taxonomy action verb appropriate to the lesson stage (e.g., identify, describe, explain, compare, analyze, evaluate)
+- Be specific to THAT DAY'S Content topic (not just the MELC)
+- Keep it achievable in one 60-minute period (one verb, one concept)
+- Write in complete sentence form: "The learners will be able to [verb] [specific content]…"
+- Only write an empty string "" if the day is explicitly marked "(No class)"
 
 TASK 2 — PROCEDURE STEPS (A–J per day)
 For each day that has a class, generate all 10 DepEd DLL procedure steps:
@@ -179,10 +180,22 @@ Return ONLY valid JSON (no markdown, no explanation):
 
   const raw = await callGemini(prompt);
 
-  // Normalise objectives
+  // Normalise objectives — fallback from day's content if AI returned empty
   const objectives = {};
-  for (const day of DAYS) {
-    objectives[day] = raw.objectives?.[day] ?? '';
+  for (let i = 0; i < DAYS.length; i++) {
+    const day = DAYS[i];
+    const aiObj = raw.objectives?.[day] ?? '';
+    if (aiObj.trim()) {
+      objectives[day] = aiObj.trim();
+    } else if (contentMap[i]) {
+      // AI skipped this day — derive a basic objective from content + MELC
+      const content = contentMap[i];
+      objectives[day] = lang === 'Filipino/Tagalog'
+        ? `Natutukoy at naipapaliwanag ng mga mag-aaral ang mga pangunahing konsepto ng ${content}.`
+        : `The learners will be able to identify and explain key concepts related to ${content}.`;
+    } else {
+      objectives[day] = '';
+    }
   }
 
   // Normalise procedure

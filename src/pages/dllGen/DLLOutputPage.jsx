@@ -5,6 +5,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
+import { deductTokens } from '../../services/db';
+import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
+import { exportToPptx } from '../../services/pptxExport';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector } from 'lucide-react';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -77,11 +80,14 @@ export default function DLLOutputPage() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
   const cotStore     = useCotStore();
-  const { profile }  = useAuth();
+  const { profile, user } = useAuth();
   const { addToast } = useToast();
 
   const [downloading,  setDownloading]  = useState(false);
   const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
+  const [pptLoading,   setPptLoading]   = useState(false);
+  const [pptPhase,     setPptPhase]     = useState('');
+  const [genError,     setGenError]     = useState('');
 
   if (!store.procedure) {
     return (
@@ -150,6 +156,58 @@ export default function DLLOutputPage() {
     navigate('/cot-gen/step-2');
   }
 
+  // Pre-compute day data (used by modal preview AND handleGeneratePresentation)
+  const melcMap    = buildDayMap(store.melcList);
+  const contentMap = buildDayMap(store.contentList);
+
+  async function handleGeneratePresentation() {
+    if (!user?.uid) return;
+    const topic    = contentMap[selectedDay] || store.subject || '';
+    const melcCode = melcMap[selectedDay]    || store.melc    || '';
+
+    setPptLoading(true);
+    setGenError('');
+    try {
+      setPptPhase('Checking tokens…');
+      await deductTokens(user.uid, 'presentation_gen', 3);
+
+      setPptPhase('Generating slide outline…');
+      const outline = await generateOutline({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode,
+        topic,
+        slideCount: 14,
+      });
+
+      setPptPhase('Writing content with AI…');
+      const expanded = await expandSlides({ ...outline, style: 'Academic' });
+
+      setPptPhase('Building your PPTX…');
+      await exportToPptx({
+        title:       topic || store.subject,
+        subject:     store.subject,
+        gradeLevel:  store.gradeLevel,
+        schoolName:  profile?.school,
+        schoolEmail: profile?.email || user?.email,
+        slides:      toExportSlides(expanded),
+        includeNotes: true,
+      });
+
+      addToast('Presentation downloaded! (3 tokens used)', 'success');
+      setSelectedDay(null);
+    } catch (err) {
+      if (err.message?.includes('Insufficient tokens') || err.message?.includes('tokens')) {
+        setGenError('Not enough tokens. You need 3 tokens to generate a presentation.');
+      } else {
+        setGenError(err.message || 'Generation failed. Please try again.');
+      }
+    } finally {
+      setPptLoading(false);
+      setPptPhase('');
+    }
+  }
+
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
   const contentList = (store.contentList || []).filter(c => c.text?.trim());
   const proc        = store.procedure  || {};
@@ -161,10 +219,6 @@ export default function DLLOutputPage() {
     ['Checked by:', profile?.supervisorName || null, profile?.supervisorPosition || 'Master Teacher / Head Teacher'],
     ['Noted by:', null, 'School Principal'],
   ];
-
-  // Pre-compute day data for the modal preview
-  const melcMap    = buildDayMap(store.melcList);
-  const contentMap = buildDayMap(store.contentList);
 
   return (
     <>
@@ -329,9 +383,12 @@ export default function DLLOutputPage() {
                   Learning Objectives
                   <div style={{ fontSize: 9, fontWeight: 400, color: '#555' }}>(per day)</div>
                 </td>
-                {DAY_KEYS.map(dk => (
+                {DAY_KEYS.map((dk, i) => (
                   <td key={dk} style={{ ...base, lineHeight: 1.5 }}>
-                    {objs[dk] || <span style={{ color: '#bbb', fontStyle: 'italic' }}>—</span>}
+                    {objs[dk] || contentMap[i]
+                      ? <span style={{ whiteSpace: 'pre-wrap' }}>{objs[dk] || `Identify and explain key concepts related to ${contentMap[i]}.`}</span>
+                      : <span style={{ color: '#bbb', fontStyle: 'italic' }}>—</span>
+                    }
                   </td>
                 ))}
               </tr>
@@ -524,29 +581,42 @@ export default function DLLOutputPage() {
               Free · DLL data pre-filled · you choose indicators next → then generate
             </p>
 
-            {/* Generate Presentation — coming soon */}
+            {/* Generate Presentation */}
+            {genError && (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', textAlign: 'center' }}>
+                {genError}
+              </p>
+            )}
             <div style={{ position: 'relative', marginTop: 10 }}>
               <button
-                disabled
+                onClick={handleGeneratePresentation}
+                disabled={pptLoading}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  background: '#f9fafb', color: '#d1d5db',
-                  border: '1.5px dashed #e5e7eb', borderRadius: 12,
+                  background: pptLoading ? '#f9fafb' : 'linear-gradient(135deg, #1a3d2b 0%, #2d6a4f 100%)',
+                  color: pptLoading ? '#9ca3af' : '#fff',
+                  border: pptLoading ? '1.5px dashed #e5e7eb' : 'none',
+                  borderRadius: 12,
                   padding: '13px 20px', fontSize: 14, fontWeight: 700,
-                  cursor: 'not-allowed', fontFamily: 'inherit',
+                  cursor: pptLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  transition: 'opacity 0.15s',
                 }}
+                onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.opacity = '0.88'; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
               >
                 <Projector size={16} />
-                Generate Presentation
+                {pptLoading ? pptPhase || 'Generating…' : 'Generate Presentation'}
               </button>
-              <span style={{
-                position: 'absolute', top: -9, right: 14,
-                background: '#f59e0b', color: '#fff',
-                fontSize: 9, fontWeight: 800, borderRadius: 20,
-                padding: '2px 9px', letterSpacing: '0.06em', pointerEvents: 'none',
-              }}>
-                COMING SOON
-              </span>
+              {!pptLoading && (
+                <span style={{
+                  position: 'absolute', top: -9, right: 14,
+                  background: '#2d6a4f', color: '#fff',
+                  fontSize: 9, fontWeight: 800, borderRadius: 20,
+                  padding: '2px 9px', letterSpacing: '0.06em', pointerEvents: 'none',
+                }}>
+                  3 tokens
+                </span>
+              )}
             </div>
           </div>
         </div>

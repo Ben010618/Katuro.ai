@@ -18,6 +18,17 @@ service cloud.firestore {
         (request.auth.uid == userId || isAdmin());
     }
 
+    // Adviser cascade-delete: allow read + delete on a teacher's assignments/gradeSheets
+    // when the document's adviserUid matches the requesting user (the section's adviser).
+    match /teachers/{userId}/assignments/{assignmentId} {
+      allow read, delete: if request.auth != null &&
+        resource.data.adviserUid == request.auth.uid;
+    }
+    match /teachers/{userId}/gradeSheets/{sheetId} {
+      allow read, delete: if request.auth != null &&
+        resource.data.adviserUid == request.auth.uid;
+    }
+
     // ── Admin config — API key lives here, BLOCKED from regular users ───────
     match /adminConfig/{doc} {
       allow read, write: if isAdmin();
@@ -56,8 +67,13 @@ service cloud.firestore {
         allow read, write: if request.auth != null;
       }
 
+      // Grade group docs (parent of per-student grade subcollections)
+      match /grades/{gradeGroupId} {
+        allow read, write: if request.auth != null;
+      }
+
       // Student grades — subject teacher writes; adviser reads via consolidated sheet
-      match /grades/{subject}/students/{studentId} {
+      match /grades/{gradeGroupId}/students/{studentId} {
         allow read, write: if request.auth != null;
       }
     }
