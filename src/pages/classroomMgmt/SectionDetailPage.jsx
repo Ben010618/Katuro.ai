@@ -10,6 +10,7 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Link, Copy, Check,
   Users, BookOpen, BarChart2, Shield, RefreshCw, FileText, ClipboardList,
+  Upload, Download, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import SchoolFormsPanel      from './SchoolFormsPanel';
 import TempReportCardPanel   from './TempReportCardPanel';
@@ -35,6 +36,314 @@ const BTN_GHOST = {
   border: '1px solid rgba(45,106,79,0.2)', borderRadius: 9, padding: '6px 12px',
   fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };
+
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  function parseLine(line) {
+    const out = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    out.push(cur.trim());
+    return out;
+  }
+
+  const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim());
+  return lines.slice(1).map(line => {
+    const vals = parseLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+const CSV_MAP = {
+  'lrn': 'lrn', 'student number': 'studentNumber', 'student no': 'studentNumber',
+  'student no.': 'studentNumber',
+  'surname': 'surname', 'last name': 'surname', 'lastname': 'surname',
+  'given name': 'givenName', 'first name': 'givenName', 'firstname': 'givenName',
+  'middle initial': 'middleInitial', 'mi': 'middleInitial', 'm.i.': 'middleInitial',
+  'gender': 'gender', 'sex': 'gender',
+  'birthdate': 'birthdate', 'birth date': 'birthdate', 'date of birth': 'birthdate',
+  'mother tongue': 'motherTongue', 'mothertongue': 'motherTongue',
+  'religion': 'religion',
+  'ip/ethnic group': 'ipGroup', 'ip group': 'ipGroup', 'ethnic group': 'ipGroup',
+  'house/street/purok': 'houseStreet', 'address': 'houseStreet',
+  'barangay': 'barangay',
+  'municipality': 'municipality', 'municipality/city': 'municipality', 'city': 'municipality',
+  'province': 'province',
+  "father's name": 'fatherName', 'father name': 'fatherName',
+  "mother's maiden name": 'motherMaidenName', 'mother maiden name': 'motherMaidenName',
+  "mother name": 'motherMaidenName',
+  'guardian name': 'guardianName',
+  'relationship': 'guardianRelationship', 'guardian relationship': 'guardianRelationship',
+  'contact number': 'contactNumber', 'contact': 'contactNumber', 'phone': 'contactNumber',
+};
+
+function mapCsvRow(raw) {
+  const s = { ...BLANK_STUDENT };
+  Object.entries(raw).forEach(([h, v]) => {
+    const field = CSV_MAP[h.toLowerCase()];
+    if (field) s[field] = v;
+  });
+  const g = s.gender.toLowerCase();
+  s.gender = g === 'm' || g === 'male' ? 'Male' : g === 'f' || g === 'female' ? 'Female' : s.gender;
+  return s;
+}
+
+function validateCsvRow(s) {
+  const errs = [];
+  if (!s.lrn)      errs.push('LRN required');
+  if (!s.surname)  errs.push('Surname required');
+  if (!s.givenName) errs.push('Given Name required');
+  if (!['Male', 'Female'].includes(s.gender)) errs.push('Gender must be Male or Female');
+  return errs;
+}
+
+const CSV_TEMPLATE_HEADER =
+  'LRN,Student Number,Surname,Given Name,Middle Initial,Gender,Birthdate,' +
+  'Mother Tongue,Religion,IP/Ethnic Group,House/Street/Purok,Barangay,' +
+  'Municipality,Province,Father\'s Name,Mother\'s Maiden Name,' +
+  'Guardian Name,Relationship,Contact Number';
+const CSV_TEMPLATE_SAMPLE =
+  '123456789012,2024-001,Dela Cruz,Juan,R.,Male,2009-05-15,' +
+  'Filipino,Roman Catholic,,123 Rizal St.,Poblacion,' +
+  'Borongan City,Eastern Samar,Dela Cruz Jose R.,Santos Maria C.,' +
+  ',,09171234567';
+
+// ── CSV Upload Modal ──────────────────────────────────────────────────────────
+
+function CsvUploadModal({ sectionId, onClose }) {
+  const { addToast } = useToast();
+  const [step,     setStep]     = useState('pick');   // 'pick' | 'preview' | 'saving'
+  const [rows,     setRows]     = useState([]);
+  const [rowErrs,  setRowErrs]  = useState({});       // index → [string]
+  const [dragOver, setDragOver] = useState(false);
+  const [done,     setDone]     = useState(0);
+  const fileRef = useRef(null);
+
+  function downloadTemplate() {
+    const csv = CSV_TEMPLATE_HEADER + '\n' + CSV_TEMPLATE_SAMPLE;
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    Object.assign(document.createElement('a'), { href: url, download: 'kaTuro_Student_Template.csv' }).click();
+    URL.revokeObjectURL(url);
+  }
+
+  function processFile(file) {
+    if (!file || !file.name.match(/\.(csv|txt)$/i)) {
+      addToast('Please upload a .csv file.', 'error'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const parsed = parseCSV(e.target.result).map(mapCsvRow);
+      const errs = {};
+      parsed.forEach((s, i) => {
+        const e = validateCsvRow(s);
+        if (e.length) errs[i] = e;
+      });
+      setRows(parsed);
+      setRowErrs(errs);
+      setStep('preview');
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleUpload() {
+    const valid = rows.filter((_, i) => !rowErrs[i]);
+    setStep('saving');
+    setDone(0);
+    try {
+      for (const s of valid) {
+        await addStudent(sectionId, s);
+        setDone(d => d + 1);
+      }
+      addToast(`${valid.length} student${valid.length !== 1 ? 's' : ''} imported!`, 'success');
+      onClose();
+    } catch (err) {
+      addToast('Import failed: ' + err.message, 'error');
+      setStep('preview');
+    }
+  }
+
+  const validCount   = rows.filter((_, i) => !rowErrs[i]).length;
+  const invalidCount = rows.length - validCount;
+
+  return (
+    <div
+      onClick={step !== 'saving' ? onClose : undefined}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: step === 'preview' ? 780 : 500, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Upload size={16} color="#d8f3dc" />
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Import Students from CSV</span>
+          </div>
+          {step !== 'saving' && (
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, width: 28, height: 28, cursor: 'pointer', color: '#fff', display: 'grid', placeItems: 'center' }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* ── STEP: pick ── */}
+        {step === 'pick' && (
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Template download */}
+            <div style={{ background: '#f0fdf4', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Step 1 — Download the template</p>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4a6357' }}>Fill it in Excel or Google Sheets, then upload below.</p>
+              </div>
+              <button
+                onClick={downloadTemplate}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#1a3d2b', color: '#fff', border: 'none', borderRadius: 9, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              >
+                <Download size={13} /> Get Template
+              </button>
+            </div>
+
+            {/* Drop zone */}
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Step 2 — Upload your filled CSV</p>
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files?.[0]); }}
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${dragOver ? '#2d6a4f' : 'rgba(45,106,79,0.3)'}`,
+                  borderRadius: 14, padding: '36px 24px', textAlign: 'center',
+                  cursor: 'pointer', background: dragOver ? '#f0fdf4' : '#fafafa',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                <Upload size={30} color={dragOver ? '#2d6a4f' : '#9ca3af'} style={{ marginBottom: 10 }} />
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  {dragOver ? 'Drop it here!' : 'Drag & drop your CSV here'}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>or <span style={{ color: '#2d6a4f', fontWeight: 700 }}>click to browse</span></p>
+                <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
+              </div>
+            </div>
+
+            {/* Required columns note */}
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '10px 14px' }}>
+              <p style={{ margin: 0, fontSize: 11, color: '#92400e' }}>
+                <strong>Required columns:</strong> LRN, Surname, Given Name, Gender (Male/Female).
+                All other columns are optional but populate SF1 automatically.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP: preview ── */}
+        {step === 'preview' && (
+          <>
+            {/* Summary bar */}
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(45,106,79,0.1)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, background: '#f9fafb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <CheckCircle2 size={15} color="#16a34a" />
+                <span style={{ fontWeight: 700, color: '#16a34a' }}>{validCount}</span>
+                <span style={{ color: '#4a6357' }}>ready to import</span>
+              </div>
+              {invalidCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <AlertCircle size={15} color="#dc2626" />
+                  <span style={{ fontWeight: 700, color: '#dc2626' }}>{invalidCount}</span>
+                  <span style={{ color: '#4a6357' }}>rows with errors (will be skipped)</span>
+                </div>
+              )}
+              <button
+                onClick={() => setStep('pick')}
+                style={{ marginLeft: 'auto', ...BTN_GHOST, fontSize: 12, padding: '5px 12px' }}
+              >
+                ← Change file
+              </button>
+            </div>
+
+            {/* Preview table */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f5faf7', zIndex: 1 }}>
+                  <tr>
+                    {['#', 'Surname', 'Given Name', 'M.I.', 'Gender', 'LRN', 'Student No.', 'Status'].map(h => (
+                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.7px', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(45,106,79,0.1)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((s, i) => {
+                    const errs = rowErrs[i];
+                    return (
+                      <tr key={i} style={{ background: errs ? 'rgba(220,38,38,0.04)' : '', borderTop: '1px solid rgba(45,106,79,0.06)' }}>
+                        <td style={{ padding: '8px 12px', color: '#9ca3af' }}>{i + 1}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0d2218' }}>{s.surname || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: '#0d2218' }}>{s.givenName || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          {['Male', 'Female'].includes(s.gender)
+                            ? <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 8px', background: s.gender === 'Male' ? 'rgba(59,130,246,0.1)' : 'rgba(236,72,153,0.1)', color: s.gender === 'Male' ? '#1d4ed8' : '#be185d' }}>{s.gender}</span>
+                            : <span style={{ color: '#dc2626', fontSize: 11 }}>{s.gender || 'missing'}</span>
+                          }
+                        </td>
+                        <td style={{ padding: '8px 12px', fontFamily: '"DM Mono", monospace', color: '#4a6357' }}>{s.lrn || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: '#4a6357' }}>{s.studentNumber || '—'}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          {errs
+                            ? <span title={errs.join(', ')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', fontWeight: 600 }}><AlertCircle size={12} /> {errs[0]}</span>
+                            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#16a34a', fontWeight: 600 }}><CheckCircle2 size={12} /> OK</span>
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(45,106,79,0.1)', display: 'flex', gap: 10, flexShrink: 0 }}>
+              <button onClick={onClose} style={{ ...BTN_GHOST, flex: 1, justifyContent: 'center', padding: 10 }}>Cancel</button>
+              <button
+                onClick={handleUpload}
+                disabled={validCount === 0}
+                style={{ ...BTN_PRIMARY, flex: 2, justifyContent: 'center', padding: 10, opacity: validCount === 0 ? 0.5 : 1 }}
+              >
+                <Upload size={13} /> Import {validCount} Student{validCount !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── STEP: saving ── */}
+        {step === 'saving' && (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#d8f3dc', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+              <Upload size={24} color="#2d6a4f" />
+            </div>
+            <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Importing students…</p>
+            <p style={{ margin: '0 0 24px', fontSize: 13, color: '#4a6357' }}>{done} of {validCount} uploaded</p>
+            <div style={{ background: '#e5e7eb', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${validCount ? Math.round((done / validCount) * 100) : 0}%`, height: '100%', background: '#2d6a4f', borderRadius: 99, transition: 'width 0.2s' }} />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Student form modal ────────────────────────────────────────────────────────
 
@@ -389,7 +698,8 @@ export default function SectionDetailPage() {
   const [loadingSec, setLoadingSec] = useState(true);
 
   // Student modal
-  const [studentModal, setStudentModal] = useState(null); // null | {} (blank) | student doc
+  const [studentModal,  setStudentModal]  = useState(null); // null | {} (blank) | student doc
+  const [csvModal,      setCsvModal]      = useState(false);
 
   // Subjects tab
   const [newSubject, setNewSubject] = useState('');
@@ -523,9 +833,17 @@ export default function SectionDetailPage() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>
               Student Roster <span style={{ fontSize: 12, fontWeight: 500, color: '#4a6357', marginLeft: 6 }}>({students.length})</span>
             </h3>
-            <button onClick={() => setStudentModal({})} style={BTN_PRIMARY}>
-              <Plus size={13} /> Add Student
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setCsvModal(true)}
+                style={{ ...BTN_GHOST, gap: 6 }}
+              >
+                <Upload size={13} /> Upload CSV
+              </button>
+              <button onClick={() => setStudentModal({})} style={BTN_PRIMARY}>
+                <Plus size={13} /> Add Student
+              </button>
+            </div>
           </div>
           {students.length === 0 ? (
             <div style={{ padding: '48px 24px', textAlign: 'center', color: '#4a6357', fontSize: 14 }}>
@@ -779,6 +1097,12 @@ export default function SectionDetailPage() {
       )}
 
       {/* Modals */}
+      {csvModal && (
+        <CsvUploadModal
+          sectionId={sectionId}
+          onClose={() => setCsvModal(false)}
+        />
+      )}
       {studentModal !== null && (
         <StudentModal
           sectionId={sectionId}
