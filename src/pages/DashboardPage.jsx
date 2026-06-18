@@ -8,6 +8,7 @@ import img1 from '../assets/1.png';
 import img2 from '../assets/2.png';
 import img3 from '../assets/3.png';
 import img4 from '../assets/4.png';
+import DailyMotivationalPopup from '../components/DailyMotivationalPopup';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -236,6 +237,7 @@ export default function DashboardPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <DailyMotivationalPopup />
 
       {/* Welcome banner */}
       <div style={{
