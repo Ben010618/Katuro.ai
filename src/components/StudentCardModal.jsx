@@ -29,9 +29,10 @@ export default function StudentCardModal({
   subject,
   onClose,
 }) {
-  const [comments, setComments] = useState([]);
-  const [text,     setText]     = useState('');
-  const [sending,  setSending]  = useState(false);
+  const [comments,  setComments]  = useState([]);
+  const [text,      setText]      = useState('');
+  const [sending,   setSending]   = useState(false);
+  const [sendError, setSendError] = useState('');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function StudentCardModal({
   async function handleSend() {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
+    setSendError('');
     setSending(true);
     try {
       await addStudentComment(sectionId, {
@@ -63,6 +65,8 @@ export default function StudentCardModal({
         subject,
       });
       setText('');
+    } catch (err) {
+      setSendError(err?.message || 'Failed to send. Check your connection.');
     } finally {
       setSending(false);
     }
@@ -181,6 +185,13 @@ export default function StudentCardModal({
           })}
           <div ref={bottomRef} />
         </div>
+
+        {/* ── Send error ── */}
+        {sendError && (
+          <div style={{ padding: '6px 16px', background: '#fef2f2', borderTop: '1px solid #fecaca', flexShrink: 0 }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#dc2626' }}>{sendError}</p>
+          </div>
+        )}
 
         {/* ── Input ── */}
         <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(45,106,79,0.1)', background: '#fff', display: 'flex', gap: 10, flexShrink: 0 }}>

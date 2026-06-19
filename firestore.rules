@@ -62,6 +62,11 @@ service cloud.firestore {
         allow read, write: if request.auth != null;
       }
 
+      // Teacher notes / observations per student — any authenticated user (adviser + teachers)
+      match /studentComments/{commentId} {
+        allow read, write: if request.auth != null;
+      }
+
       // Grade component weights — subject teacher writes; adviser reads
       match /gradeWeights/{subject} {
         allow read, write: if request.auth != null;
