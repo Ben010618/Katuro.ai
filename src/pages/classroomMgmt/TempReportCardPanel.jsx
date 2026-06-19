@@ -11,21 +11,16 @@ const PRINT_OPTIONS = [
   { key: 'term3', label: 'End of Term 3 (Final)', show: ['term1', 'term2', 'term3'] },
 ];
 
-// Fixed subject list — exact order, exact labels, do not change
-const SUBJECTS = [
-  'Filipino',
-  'English',
-  'Mathematics',
-  'Science',
-  'Araling Panlipunan',
-  'Values Education (VE)',
-  'Music and Arts',
-  'PE and Health',
-  'Computer',
-  'Mother Tongue',
-  'Reading',
-  'Makabansa',
+const DEPED_ORDER = [
+  'Filipino', 'English', 'Mathematics', 'Science',
+  'Araling Panlipunan', 'Edukasyon sa Pagpapakatao (EsP)',
+  'Technology and Livelihood Education (TLE)', 'MAPEH',
 ];
+
+function sectionSubjects(section) {
+  const defaults = DEPED_ORDER.filter(s => (section?.subjects || []).includes(s));
+  return [...defaults, ...(section?.specialSubjects || [])];
+}
 
 const KT_DARK = '#1a3d2b';
 const KT_MID  = '#2d6a4f';
@@ -33,7 +28,7 @@ const F = 'Georgia, "Times New Roman", serif';
 
 // ── Single report card ─────────────────────────────────────────────────────────
 
-function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
+function ReportCard({ student, grades, section, schoolProfile, showTerms, subjects }) {
   const name = [student.surname, student.givenName, student.middleInitial]
     .filter(Boolean).join(', ');
 
@@ -51,7 +46,7 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
     return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
   };
 
-  const finals = showFinal ? SUBJECTS.map(s => getFinal(s)).filter(g => g !== '') : [];
+  const finals = showFinal ? subjects.map(s => getFinal(s)).filter(g => g !== '') : [];
   const GA = finals.length
     ? +(finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1)
     : '';
@@ -183,7 +178,7 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
           </thead>
 
           <tbody>
-            {SUBJECTS.map(subj => (
+            {subjects.map(subj => (
               <tr key={subj}>
                 <td style={td({ paddingLeft: 7, fontSize: 8, textAlign: 'left' })}>{subj}</td>
                 <td style={td({ textAlign: 'center' })}>
@@ -240,7 +235,7 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms }) {
 
 // ── A4 page — 2×2 grid ────────────────────────────────────────────────────────
 
-function A4Page({ students, grades, section, schoolProfile, showTerms }) {
+function A4Page({ students, grades, section, schoolProfile, showTerms, subjects }) {
   return (
     <div style={{
       width: 794, height: 1123,
@@ -265,6 +260,7 @@ function A4Page({ students, grades, section, schoolProfile, showTerms }) {
               section={section}
               schoolProfile={schoolProfile}
               showTerms={showTerms}
+              subjects={subjects}
             />
           ) : null}
         </div>
@@ -287,26 +283,27 @@ export default function TempReportCardPanel({ section, students, user }) {
     return subscribeSchoolProfile(user.uid, setSchoolProfile);
   }, [user?.uid]);
 
-  // Subscribe to grades for all fixed subjects × all 3 terms
+  // Subscribe to grades for all section subjects × all 3 terms
   useEffect(() => {
     if (!section?.id) return;
+    const subjects = sectionSubjects(section);
     const unsubs = [];
     TERMS.forEach(term => {
-      SUBJECTS.forEach(subj => {
-        const unsub = subscribeSubjectGrades(section.id, subj, map => {
+      subjects.forEach(subj => {
+        unsubs.push(subscribeSubjectGrades(section.id, subj, map => {
           setAllGrades(prev => ({
             ...prev,
             [term]: { ...(prev[term] || {}), [subj]: map },
           }));
-        }, term);
-        unsubs.push(unsub);
+        }, term));
       });
     });
     return () => unsubs.forEach(fn => fn());
-  }, [section?.id]);
+  }, [section?.id, (section?.subjects || []).join(','), (section?.specialSubjects || []).join(',')]);
 
-  const currentOption = PRINT_OPTIONS.find(o => o.key === selectedPrint) || PRINT_OPTIONS[0];
-  const showTerms = currentOption.show;
+  const currentOption   = PRINT_OPTIONS.find(o => o.key === selectedPrint) || PRINT_OPTIONS[0];
+  const showTerms       = currentOption.show;
+  const displaySubjects = sectionSubjects(section);
 
   const pages = [];
   for (let i = 0; i < students.length; i += 4) {
@@ -440,6 +437,7 @@ export default function TempReportCardPanel({ section, students, user }) {
                   section={sectionData}
                   schoolProfile={schoolProfile}
                   showTerms={showTerms}
+                  subjects={displaySubjects}
                 />
               </div>
             </div>

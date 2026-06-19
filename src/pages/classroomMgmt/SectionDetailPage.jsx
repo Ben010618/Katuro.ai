@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
@@ -36,6 +37,57 @@ const BTN_GHOST = {
   border: '1px solid rgba(45,106,79,0.2)', borderRadius: 9, padding: '6px 12px',
   fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };
+
+// ── Consolidated Grading helpers ──────────────────────────────────────────────
+
+const DEPED_ORDER = [
+  'Filipino', 'English', 'Mathematics', 'Science',
+  'Araling Panlipunan', 'Edukasyon sa Pagpapakatao (EsP)',
+  'Technology and Livelihood Education (TLE)', 'MAPEH',
+];
+
+const SUBJ_ABBR = {
+  'Filipino':                                  'FIL',
+  'English':                                   'ENG',
+  'Mathematics':                               'MATH',
+  'Science':                                   'SCI',
+  'Araling Panlipunan':                        'AP',
+  'Edukasyon sa Pagpapakatao (EsP)':           'EsP',
+  'Technology and Livelihood Education (TLE)': 'TLE',
+  'MAPEH':                                     'MAPEH',
+};
+
+function gradingSubjects(subjects, specialSubjects) {
+  const sorted = DEPED_ORDER.filter(s => (subjects || []).includes(s));
+  return [...sorted, ...(specialSubjects || [])];
+}
+
+async function exportGradingExcel(section, students, subjects, allGrades) {
+  const wb   = XLSX.utils.book_new();
+  const abbrs = subjects.map(s => SUBJ_ABBR[s] || s);
+  const termLabels = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
+
+  ['term1', 'term2', 'term3'].forEach(term => {
+    const header = ['No.', 'Surname', 'Given Name', 'M.I.', ...abbrs, 'GEN. AVG.'];
+    const rows = students.map((s, i) => {
+      const grades = subjects.map(subj => allGrades[term]?.[subj]?.[s.id]?.finalGrade ?? '');
+      const nums = grades.filter(g => g !== '');
+      const ga   = nums.length ? +(nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : '';
+      return [i + 1, s.surname, s.givenName, s.middleInitial || '', ...grades, ga];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!cols'] = [
+      { wch: 4 }, { wch: 20 }, { wch: 16 }, { wch: 5 },
+      ...subjects.map(() => ({ wch: 7 })),
+      { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, termLabels[term]);
+  });
+
+  const name = section.sectionName || 'Section';
+  const sy   = section.academicYear ? `_SY${section.academicYear}` : '';
+  XLSX.writeFile(wb, `Grades_${name}${sy}.xlsx`);
+}
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 
@@ -705,8 +757,8 @@ export default function SectionDetailPage() {
   const [newSubject, setNewSubject] = useState('');
   const [addingSubj, setAddingSubj] = useState(false);
 
-  // Grading sheet tab — grades keyed by subject name
-  const [allGrades, setAllGrades] = useState({});
+  // Grading sheet tab — grades keyed by term → subject → studentId
+  const [allGrades, setAllGrades] = useState({ term1: {}, term2: {}, term3: {} });
   const [activeGradeTerm, setActiveGradeTerm] = useState('term1');
 
   // Invite modal
@@ -722,23 +774,26 @@ export default function SectionDetailPage() {
     return unsub;
   }, [sectionId]);
 
-  // Reset grade map when term changes so stale data doesn't bleed over
-  useEffect(() => {
-    setAllGrades({});
-  }, [activeGradeTerm]);
-
-  // Subscribe to grades for ALL subjects when grading tab is active
+  // Subscribe to grades for all subjects × all 3 terms when grading tab is active
   useEffect(() => {
     if (activeTab !== 'grading' || !section) return;
-    const allSubjects = [...(section.subjects || []), ...(section.specialSubjects || [])];
-    const unsubs = allSubjects.map(subj =>
-      subscribeSubjectGrades(sectionId, subj, gradeMap =>
-        setAllGrades(prev => ({ ...prev, [subj]: gradeMap })),
-        activeGradeTerm,
-      )
-    );
+    const subjects = gradingSubjects(section.subjects, section.specialSubjects);
+    const unsubs = [];
+    ['term1', 'term2', 'term3'].forEach(term => {
+      subjects.forEach(subj =>
+        unsubs.push(
+          subscribeSubjectGrades(sectionId, subj, gradeMap =>
+            setAllGrades(prev => ({
+              ...prev,
+              [term]: { ...prev[term], [subj]: gradeMap },
+            })),
+            term,
+          )
+        )
+      );
+    });
     return () => unsubs.forEach(fn => fn());
-  }, [activeTab, sectionId, section?.subjects?.length, section?.specialSubjects?.length, activeGradeTerm]);
+  }, [activeTab, sectionId, section?.subjects?.length, section?.specialSubjects?.length]);
 
   async function handleAddSpecialSubject() {
     const name = newSubject.trim();
@@ -782,7 +837,8 @@ export default function SectionDetailPage() {
     return <div style={{ textAlign: 'center', padding: 60, color: '#e05c5c', fontSize: 14 }}>Section not found.</div>;
   }
 
-  const allSubjects = [...(section.subjects || []), ...(section.specialSubjects || [])];
+  const allSubjects  = [...(section.subjects || []), ...(section.specialSubjects || [])];
+  const gradingSubjs = gradingSubjects(section.subjects, section.specialSubjects);
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -959,28 +1015,37 @@ export default function SectionDetailPage() {
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Consolidated Grading Sheet</h3>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#4a6357' }}>Click a subject column header to manage the assigned teacher.</p>
             </div>
-            {/* Term pill switcher */}
-            <div style={{ display: 'flex', gap: 3, background: '#f3f4f6', borderRadius: 10, padding: 3 }}>
-              {[
-                { key: 'term1', label: 'Term 1' },
-                { key: 'term2', label: 'Term 2' },
-                { key: 'term3', label: 'Term 3' },
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setActiveGradeTerm(t.key)}
-                  style={{
-                    padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: activeGradeTerm === t.key ? 700 : 500,
-                    fontFamily: 'inherit',
-                    background: activeGradeTerm === t.key ? '#1a3d2b' : 'transparent',
-                    color: activeGradeTerm === t.key ? '#fff' : '#6b7280',
-                    transition: 'background 0.12s, color 0.12s',
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Term pill switcher */}
+              <div style={{ display: 'flex', gap: 3, background: '#f3f4f6', borderRadius: 10, padding: 3 }}>
+                {[
+                  { key: 'term1', label: 'Term 1' },
+                  { key: 'term2', label: 'Term 2' },
+                  { key: 'term3', label: 'Term 3' },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setActiveGradeTerm(t.key)}
+                    style={{
+                      padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                      fontSize: 12, fontWeight: activeGradeTerm === t.key ? 700 : 500,
+                      fontFamily: 'inherit',
+                      background: activeGradeTerm === t.key ? '#1a3d2b' : 'transparent',
+                      color: activeGradeTerm === t.key ? '#fff' : '#6b7280',
+                      transition: 'background 0.12s, color 0.12s',
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => exportGradingExcel(section, students, gradingSubjs, allGrades)}
+                disabled={students.length === 0}
+                style={{ ...BTN_PRIMARY, opacity: students.length === 0 ? 0.5 : 1 }}
+              >
+                <Download size={13} /> Download Excel
+              </button>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -990,7 +1055,7 @@ export default function SectionDetailPage() {
                   <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 120 }}>Surname</th>
                   <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 110 }}>Given Name</th>
                   <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', width: 48 }}>M.I.</th>
-                  {allSubjects.map(subj => (
+                  {gradingSubjs.map(subj => (
                     <th
                       key={subj}
                       onClick={() => setInviteSubject(subj)}
@@ -998,14 +1063,14 @@ export default function SectionDetailPage() {
                       style={{
                         padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#1a3d2b',
                         textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center',
-                        whiteSpace: 'nowrap', cursor: 'pointer', minWidth: 90,
+                        whiteSpace: 'nowrap', cursor: 'pointer', minWidth: 66,
                         borderLeft: '1px solid rgba(45,106,79,0.1)',
                         transition: 'background 0.15s',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#d8f3dc'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; }}
                     >
-                      {subj}
+                      {SUBJ_ABBR[subj] || subj}
                     </th>
                   ))}
                 </tr>
@@ -1013,7 +1078,7 @@ export default function SectionDetailPage() {
               <tbody>
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={3 + allSubjects.length} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
+                    <td colSpan={3 + gradingSubjs.length} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
                       No students enrolled yet.
                     </td>
                   </tr>
@@ -1025,8 +1090,8 @@ export default function SectionDetailPage() {
                     <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0d2218' }}>{s.surname}</td>
                     <td style={{ padding: '9px 14px', color: '#0d2218' }}>{s.givenName}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
-                    {allSubjects.map(subj => {
-                      const grade = allGrades[subj]?.[s.id]?.finalGrade;
+                    {gradingSubjs.map(subj => {
+                      const grade = allGrades[activeGradeTerm]?.[subj]?.[s.id]?.finalGrade;
                       return (
                         <td key={subj} style={{ padding: '9px 12px', textAlign: 'center', borderLeft: '1px solid rgba(45,106,79,0.07)', fontFamily: '"DM Mono", monospace', fontSize: 12, fontWeight: grade ? 700 : 400, color: grade ? '#1a3d2b' : '#9ca3af' }}>
                           {grade !== undefined ? grade : '—'}

@@ -8,14 +8,14 @@ import { db } from '../firebase';
 // ── Default subjects ──────────────────────────────────────────────────────────
 
 export const DEFAULT_SUBJECTS = [
-  'Science',
-  'Mathematics',
-  'English',
   'Filipino',
+  'English',
+  'Mathematics',
+  'Science',
   'Araling Panlipunan',
-  'MAPEH',
-  'Technology and Livelihood Education (TLE)',
   'Edukasyon sa Pagpapakatao (EsP)',
+  'Technology and Livelihood Education (TLE)',
+  'MAPEH',
 ];
 
 export const GRADE_LEVELS = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
