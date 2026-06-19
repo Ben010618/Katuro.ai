@@ -84,7 +84,7 @@ export default function StudentCardModal({
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#fff', borderRadius: 20, width: '100%', maxWidth: 500,
+          background: '#fff', borderRadius: 20, width: '100%', maxWidth: 750,
           maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 32px 100px rgba(0,0,0,0.3)',
         }}
@@ -92,41 +92,41 @@ export default function StudentCardModal({
         {/* ── Header ── */}
         <div style={{
           background: 'linear-gradient(135deg, #0d2218, #1a3d2b, #2d6a4f)',
-          padding: '20px 22px', display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0,
+          padding: '24px 26px', display: 'flex', gap: 22, alignItems: 'flex-start', flexShrink: 0,
         }}>
           {student.photoUrl ? (
             <img
-              src={thumbUrl(student.photoUrl, 120)}
+              src={thumbUrl(student.photoUrl, 320)}
               alt=""
-              style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '2.5px solid rgba(255,255,255,0.3)', flexShrink: 0 }}
+              style={{ width: 160, height: 160, borderRadius: 18, objectFit: 'cover', border: '3px solid rgba(255,255,255,0.3)', flexShrink: 0 }}
             />
           ) : (
             <div style={{
-              width: 64, height: 64, borderRadius: 12, flexShrink: 0,
+              width: 160, height: 160, borderRadius: 18, flexShrink: 0,
               background: 'rgba(255,255,255,0.15)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
-              fontSize: 24, fontWeight: 800, color: '#fff',
+              fontSize: 56, fontWeight: 800, color: '#fff',
             }}>
               {(student.givenName?.[0] || '') + (student.surname?.[0] || '')}
             </div>
           )}
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ flex: 1, minWidth: 0, paddingTop: 6 }}>
+            <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>
               Student Profile
             </p>
-            <h2 style={{ margin: '0 0 5px', fontSize: 17, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <h2 style={{ margin: '0 0 10px', fontSize: 22, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {student.surname}, {student.givenName}{student.middleInitial ? ` ${student.middleInitial}.` : ''}
             </h2>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {student.lrn && (
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>LRN: {student.lrn}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>LRN: {student.lrn}</span>
               )}
               {student.gender && (
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{student.gender}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{student.gender}</span>
               )}
               {student.studentNumber && (
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>#{student.studentNumber}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>#{student.studentNumber}</span>
               )}
             </div>
           </div>
