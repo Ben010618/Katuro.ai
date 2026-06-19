@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
   updateDoc, deleteDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp, writeBatch,
+  onSnapshot, serverTimestamp, writeBatch, arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -387,4 +387,45 @@ export async function submitGradeSheet(teacherUid, sectionId, subject, term) {
   });
 
   await batch.commit();
+}
+
+// ── Student comments ──────────────────────────────────────────────────────────
+// Stored flat in sections/{sectionId}/studentComments/{commentId}
+
+export async function addStudentComment(sectionId, { studentId, text, authorUid, authorName, authorRole, subject }) {
+  await addDoc(collection(db, 'sections', sectionId, 'studentComments'), {
+    studentId,
+    text,
+    authorUid,
+    authorName,
+    authorRole,           // 'adviser' | 'subject_teacher'
+    subject:  subject || null,
+    timestamp: serverTimestamp(),
+    readBy:   [authorUid], // author has read their own comment
+  });
+}
+
+export function subscribeStudentComments(sectionId, studentId, cb) {
+  const q = query(
+    collection(db, 'sections', sectionId, 'studentComments'),
+    where('studentId', '==', studentId),
+  );
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+    cb(docs);
+  });
+}
+
+export function subscribeSectionComments(sectionId, cb) {
+  return onSnapshot(
+    collection(db, 'sections', sectionId, 'studentComments'),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  );
+}
+
+export async function markCommentRead(sectionId, commentId, uid) {
+  await updateDoc(doc(db, 'sections', sectionId, 'studentComments', commentId), {
+    readBy: arrayUnion(uid),
+  });
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { uploadToCloudinary, thumbUrl } from '../../services/cloudinaryUpload';
+import StudentCardModal from '../../components/StudentCardModal';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
@@ -8,11 +9,12 @@ import {
   subscribeSection, subscribeStudents, subscribeSubjectGrades,
   subscribeSubjectInvitation, addStudent, updateStudent, removeStudent,
   addSpecialSubject, removeSpecialSubject, createInvitation,
+  subscribeSectionComments,
 } from '../../services/classroomDb';
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Link, Copy, Check,
   Users, BookOpen, BarChart2, Shield, RefreshCw, FileText, ClipboardList,
-  Upload, Download, AlertCircle, CheckCircle2, Camera,
+  Upload, Download, AlertCircle, CheckCircle2, Camera, Bell,
 } from 'lucide-react';
 import SchoolFormsPanel      from './SchoolFormsPanel';
 import TempReportCardPanel   from './TempReportCardPanel';
@@ -811,6 +813,10 @@ export default function SectionDetailPage() {
   const [allGrades, setAllGrades] = useState({ term1: {}, term2: {}, term3: {} });
   const [activeGradeTerm, setActiveGradeTerm] = useState('term1');
 
+  // Student card modal + comment unread counts
+  const [openStudentCard, setOpenStudentCard] = useState(null); // student object | null
+  const [unreadCounts,    setUnreadCounts]    = useState({});   // { [studentId]: number }
+
   // Invite modal
   const [inviteSubject, setInviteSubject] = useState(null);
 
@@ -823,6 +829,21 @@ export default function SectionDetailPage() {
     const unsub = subscribeStudents(sectionId, setStudents);
     return unsub;
   }, [sectionId]);
+
+  // Subscribe to all section comments to compute per-student unread counts
+  useEffect(() => {
+    if (!sectionId || !user?.uid) return;
+    const unsub = subscribeSectionComments(sectionId, comments => {
+      const counts = {};
+      comments.forEach(c => {
+        if (!(c.readBy || []).includes(user.uid)) {
+          counts[c.studentId] = (counts[c.studentId] || 0) + 1;
+        }
+      });
+      setUnreadCounts(counts);
+    });
+    return unsub;
+  }, [sectionId, user?.uid]);
 
   // Subscribe to grades for all subjects × all 3 terms when grading tab is active
   useEffect(() => {
@@ -936,9 +957,23 @@ export default function SectionDetailPage() {
       {activeTab === 'roster' && (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>
-              Student Roster <span style={{ fontSize: 12, fontWeight: 500, color: '#4a6357', marginLeft: 6 }}>({students.length})</span>
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>
+                Student Roster <span style={{ fontSize: 12, fontWeight: 500, color: '#4a6357', marginLeft: 6 }}>({students.length})</span>
+              </h3>
+              {/* Unread comments bell */}
+              {Object.keys(unreadCounts).length > 0 && (() => {
+                const total = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+                return (
+                  <div style={{ position: 'relative', display: 'inline-flex' }}>
+                    <Bell size={16} color="#e07b39" />
+                    <span style={{ position: 'absolute', top: -6, right: -8, background: '#e07b39', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 800, padding: '1px 4px', lineHeight: '14px' }}>
+                      {total}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setCsvModal(true)}
@@ -985,8 +1020,33 @@ export default function SectionDetailPage() {
                         )}
                       </td>
                       <td style={{ padding: '10px 14px', color: '#6b7280' }}>{i + 1}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0d2218' }}>{s.surname}</td>
-                      <td style={{ padding: '10px 14px', color: '#0d2218' }}>{s.givenName}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => setOpenStudentCard(s)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                          >
+                            {s.surname}
+                          </button>
+                          {unreadCounts[s.id] > 0 && (
+                            <span style={{ background: '#e07b39', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: '14px' }}>
+                              {unreadCounts[s.id]}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 14px', color: '#0d2218' }}>
+                        <button
+                          onClick={() => setOpenStudentCard(s)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                        >
+                          {s.givenName}
+                        </button>
+                      </td>
                       <td style={{ padding: '10px 14px', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 9px', background: s.gender === 'Male' ? 'rgba(59,130,246,0.1)' : 'rgba(236,72,153,0.1)', color: s.gender === 'Male' ? '#1d4ed8' : '#be185d' }}>
@@ -1244,6 +1304,17 @@ export default function SectionDetailPage() {
           section={section}
           subject={inviteSubject}
           onClose={() => setInviteSubject(null)}
+        />
+      )}
+      {openStudentCard && (
+        <StudentCardModal
+          student={openStudentCard}
+          sectionId={sectionId}
+          currentUser={user}
+          authorName={user.displayName || 'Adviser'}
+          authorRole="adviser"
+          subject={null}
+          onClose={() => setOpenStudentCard(null)}
         />
       )}
     </div>

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { subscribeAssignments } from '../../services/classroomDb';
-import { GraduationCap, ChevronRight, BookOpen } from 'lucide-react';
+import { subscribeAssignments, subscribeSectionComments } from '../../services/classroomDb';
+import { GraduationCap, ChevronRight, BookOpen, Bell } from 'lucide-react';
 
 const SUBJECT_COLORS = {
   'Science':                                   { bg: '#e0f2fe', text: '#0369a1' },
@@ -24,8 +24,9 @@ export default function ClassesITeachPage() {
   const { user }      = useAuth();
   const navigate      = useNavigate();
   const { addToast }  = useToast();
-  const [assignments, setAssignments] = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [assignments,  setAssignments]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [sectionUnread, setSectionUnread] = useState({}); // { [sectionId]: count }
 
   // After login redirect: if a pending invite code is in sessionStorage,
   // send the teacher back to the invite confirmation page instead of auto-accepting
@@ -45,6 +46,21 @@ export default function ClassesITeachPage() {
     });
     return unsub;
   }, [user?.uid]);
+
+  // Subscribe to unread comment counts per section
+  useEffect(() => {
+    if (!user?.uid || assignments.length === 0) return;
+    const seen = new Set();
+    const unsubs = assignments
+      .filter(a => { if (seen.has(a.sectionId)) return false; seen.add(a.sectionId); return true; })
+      .map(a =>
+        subscribeSectionComments(a.sectionId, comments => {
+          const count = comments.filter(c => !(c.readBy || []).includes(user.uid)).length;
+          setSectionUnread(prev => ({ ...prev, [a.sectionId]: count }));
+        })
+      );
+    return () => unsubs.forEach(fn => fn());
+  }, [user?.uid, assignments.map(a => a.sectionId).join(',')]);
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -96,7 +112,17 @@ export default function ClassesITeachPage() {
                   <span style={{ background: bg, color: text, borderRadius: 9, padding: '5px 12px', fontSize: 12, fontWeight: 700 }}>
                     {a.subject}
                   </span>
-                  <ChevronRight size={16} color="#4a6357" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {sectionUnread[a.sectionId] > 0 && (
+                      <div style={{ position: 'relative', display: 'inline-flex' }}>
+                        <Bell size={15} color="#e07b39" />
+                        <span style={{ position: 'absolute', top: -5, right: -7, background: '#e07b39', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 800, padding: '1px 4px', lineHeight: '13px' }}>
+                          {sectionUnread[a.sectionId]}
+                        </span>
+                      </div>
+                    )}
+                    <ChevronRight size={16} color="#4a6357" />
+                  </div>
                 </div>
                 <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>
                   {a.gradeLevel} – {a.sectionName}

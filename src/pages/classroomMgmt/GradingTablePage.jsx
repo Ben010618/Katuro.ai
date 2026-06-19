@@ -5,8 +5,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import {
   subscribeGradeSheet, saveGradeSheet, submitGradeSheet, computeFinalGrade,
+  subscribeStudents, subscribeSectionComments,
 } from '../../services/classroomDb';
-import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download } from 'lucide-react';
+import { thumbUrl } from '../../services/cloudinaryUpload';
+import StudentCardModal from '../../components/StudentCardModal';
+import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download, Bell } from 'lucide-react';
 
 const CELL = {
   padding: '7px 6px', border: '1px solid rgba(45,106,79,0.12)',
@@ -38,15 +41,18 @@ export default function GradingTablePage() {
   const { user }       = useAuth();
   const { addToast }   = useToast();
 
-  const [activeTerm,   setActiveTerm]   = useState('term1');
-  const [sheet,        setSheet]        = useState(null);   // gradesheet metadata
-  const [localWeights, setLocalWeights] = useState({ ...DEFAULT_WEIGHTS });
-  const [localGrades,  setLocalGrades]  = useState({});
-  const [dirty,        setDirty]        = useState(false);
-  const [saving,       setSaving]       = useState(false);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [showConfirm,  setShowConfirm]  = useState(false);
-  const [loading,      setLoading]      = useState(true);
+  const [activeTerm,      setActiveTerm]      = useState('term1');
+  const [sheet,           setSheet]           = useState(null);
+  const [localWeights,    setLocalWeights]    = useState({ ...DEFAULT_WEIGHTS });
+  const [localGrades,     setLocalGrades]     = useState({});
+  const [dirty,           setDirty]           = useState(false);
+  const [saving,          setSaving]          = useState(false);
+  const [submitting,      setSubmitting]      = useState(false);
+  const [showConfirm,     setShowConfirm]     = useState(false);
+  const [loading,         setLoading]         = useState(true);
+  const [liveStudents,    setLiveStudents]    = useState([]);
+  const [unreadCounts,    setUnreadCounts]    = useState({});
+  const [openStudentCard, setOpenStudentCard] = useState(null);
   const initializedRef = useRef(false);
 
   // Reset local state when switching terms
@@ -95,9 +101,26 @@ export default function GradingTablePage() {
     return () => { unsub(); clearTimeout(timer); };
   }, [user?.uid, sectionId, decodedSubject, activeTerm]);
 
+  // Subscribe to live student data (photos) and section comments (unread counts)
+  useEffect(() => {
+    const unsubStudents = subscribeStudents(sectionId, setLiveStudents);
+    const unsubComments = subscribeSectionComments(sectionId, comments => {
+      const counts = {};
+      comments.forEach(c => {
+        if (user?.uid && !(c.readBy || []).includes(user.uid)) {
+          counts[c.studentId] = (counts[c.studentId] || 0) + 1;
+        }
+      });
+      setUnreadCounts(counts);
+    });
+    return () => { unsubStudents(); unsubComments(); };
+  }, [sectionId, user?.uid]);
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const students = sheet?.students || [];
+  const students  = sheet?.students || [];
+  const photoMap  = Object.fromEntries(liveStudents.map(s => [s.id, s]));
+  const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
 
   function getGrade(studentId) {
     return localGrades[studentId] || { writtenWorks: [], performanceTask: [], quarterlyExam: '' };
@@ -306,6 +329,15 @@ export default function GradingTablePage() {
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#fff' }}>{decodedSubject}</h2>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Unread comments bell */}
+            {totalUnread > 0 && (
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <Bell size={18} color="#fbbf24" />
+                <span style={{ position: 'absolute', top: -6, right: -8, background: '#e07b39', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 800, padding: '1px 4px', lineHeight: '14px' }}>
+                  {totalUnread}
+                </span>
+              </div>
+            )}
             <button
               onClick={handleDownload}
               style={{
@@ -486,15 +518,50 @@ export default function GradingTablePage() {
                     </td>
                   </tr>
                 ) : students.map(s => {
-                  const g  = getGrade(s.id);
-                  const fg = computeDisplay(s.id);
+                  const g      = getGrade(s.id);
+                  const fg     = computeDisplay(s.id);
+                  const live   = photoMap[s.id];
+                  const unread = unreadCounts[s.id] || 0;
+                  const studentForCard = live ? { ...s, ...live } : s;
                   return (
                     <tr key={s.id}
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fffe'}
                       onMouseLeave={e => e.currentTarget.style.background = ''}
                     >
-                      <td style={{ ...CELL, fontWeight: 600, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>{s.surname}</td>
-                      <td style={{ ...CELL, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>{s.givenName}</td>
+                      <td style={{ ...CELL, fontWeight: 600, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {live?.photoUrl ? (
+                            <img src={thumbUrl(live.photoUrl, 56)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(45,106,79,0.2)' }} />
+                          ) : (
+                            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#2d6a4f', flexShrink: 0 }}>
+                              {(s.givenName?.[0] || '') + (s.surname?.[0] || '')}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setOpenStudentCard(studentForCard)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                          >
+                            {s.surname}
+                          </button>
+                          {unread > 0 && (
+                            <span style={{ background: '#e07b39', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: '14px' }}>
+                              {unread}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ ...CELL, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>
+                        <button
+                          onClick={() => setOpenStudentCard(studentForCard)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                        >
+                          {s.givenName}
+                        </button>
+                      </td>
                       <td style={{ ...CELL, color: '#4a6357', textAlign: 'center' }}>{s.middleInitial || '—'}</td>
                       {Array.from({ length: localWeights.wwCount }, (_, i) => (
                         <td key={i} style={{ ...CELL, background: '#fafcff' }}>
@@ -631,6 +698,18 @@ export default function GradingTablePage() {
           );
         })}
       </div>
+
+      {openStudentCard && (
+        <StudentCardModal
+          student={openStudentCard}
+          sectionId={sectionId}
+          currentUser={user}
+          authorName={user.displayName || 'Subject Teacher'}
+          authorRole="subject_teacher"
+          subject={decodedSubject}
+          onClose={() => setOpenStudentCard(null)}
+        />
+      )}
     </>
   );
 }
