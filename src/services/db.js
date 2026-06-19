@@ -27,9 +27,8 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db, firebaseConfig, functions } from "../firebase";
-import { httpsCallable } from "firebase/functions";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword } from "firebase/auth";
+import { db, firebaseConfig } from "../firebase";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
@@ -619,8 +618,37 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
 // ─── Admin: change a user's password ─────────────────────────────────────────
 
 export async function adminChangePassword(targetUid, newPassword) {
-  const fn = httpsCallable(functions, 'adminChangePassword');
-  await fn({ uid: targetUid, password: newPassword });
+  // Uses a secondary Firebase App to sign in as the target user (same pattern as adminCreateUser),
+  // then calls updatePassword on their session. Requires the stored plaintext password.
+  const snap = await getDoc(teacherRef(targetUid));
+  if (!snap.exists()) throw new Error('User not found.');
+  const { email, password: currentPassword } = snap.data();
+
+  if (!currentPassword) {
+    throw new Error(
+      'No stored password for this account. Ask the teacher to use "Forgot Password" on the login page to reset their password.'
+    );
+  }
+
+  const tempApp  = initializeApp(firebaseConfig, 'admin-pw-' + Date.now());
+  const tempAuth = getAuth(tempApp);
+  try {
+    const cred = await signInWithEmailAndPassword(tempAuth, email, currentPassword);
+    await updatePassword(cred.user, newPassword);
+  } catch (err) {
+    const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+      ? 'Stored password is incorrect — the teacher may have changed it. Ask them to use "Forgot Password" instead.'
+      : (err.message || 'Password change failed.');
+    throw new Error(msg);
+  } finally {
+    await tempAuth.signOut().catch(() => {});
+    await deleteApp(tempApp).catch(() => {});
+  }
+
+  await updateDoc(teacherRef(targetUid), {
+    password:   newPassword,
+    updatedAt:  serverTimestamp(),
+  });
 }
 
 // ─── Action Research helpers ─────────────────────────────────────────────────
