@@ -4,7 +4,8 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
-  getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens, adminChangePassword,
+  getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
+  adminChangePassword, adminSendPasswordReset,
   getAdminNotifications, markAllNotificationsRead,
 } from '../services/db';
 import ktLogo from '../assets/KT Favicon.png';
@@ -187,23 +188,52 @@ function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
 
 // ── Change Password modal ─────────────────────────────────────────────────────
 function ChangePasswordModal({ target, onClose, onSuccess }) {
-  const [newPassword,  setNewPassword]  = useState('');
-  const [showCurrent,  setShowCurrent]  = useState(false);
-  const [showNew,      setShowNew]      = useState(false);
-  const [saving,       setSaving]       = useState(false);
-  const [err,          setErr]          = useState('');
-  const [done,         setDone]         = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew,     setShowNew]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [err,         setErr]         = useState('');
+  const [done,        setDone]        = useState(false);
+  const [doneMsg,     setDoneMsg]     = useState('');
+  // When stored password is stale, offer reset email fallback
+  const [offerReset,  setOfferReset]  = useState(false);
+
+  const hasSavedPassword = !!target.password;
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (newPassword.length < 6) { setErr('Password must be at least 6 characters.'); return; }
-    setSaving(true); setErr('');
+    setSaving(true); setErr(''); setOfferReset(false);
     try {
       await adminChangePassword(target.id, newPassword);
+      setDoneMsg('Password changed successfully.');
       setDone(true);
       onSuccess(target.id, newPassword);
     } catch (ex) {
-      setErr(ex.message || 'Failed to change password.');
+      if (ex.message?.startsWith('RESET_SENT:')) {
+        // Self-registered account — reset email was auto-sent by adminChangePassword
+        const email = ex.message.split(':')[1];
+        setDoneMsg(`Password reset email sent to ${email}. Share the new password with the teacher so they can set it when prompted.`);
+        setDone(true);
+      } else if (ex.message?.includes('outdated')) {
+        setErr(ex.message);
+        setOfferReset(true);
+      } else {
+        setErr(ex.message || 'Failed to change password.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSendReset() {
+    setSaving(true); setErr('');
+    try {
+      await adminSendPasswordReset(target.email);
+      setDoneMsg(`Password reset email sent to ${target.email}. Ask the teacher to click the link and set a new password.`);
+      setDone(true);
+    } catch (ex) {
+      setErr(ex.message || 'Failed to send reset email.');
     } finally {
       setSaving(false);
     }
@@ -220,7 +250,7 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
             <input
               readOnly
               type={showCurrent ? 'text' : 'password'}
-              value={target.password || '(not stored — account self-registered)'}
+              value={target.password || '(self-registered — no stored password)'}
               style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13, color: target.password ? '#163828' : '#9BB8A5' }}
             />
             {target.password && (
@@ -235,13 +265,38 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
           </div>
         </div>
 
-        {/* New password */}
         {done ? (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '12px 14px' }}>
-            <CheckCircle2 size={15} color="#2d6a4f" />
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#163828' }}>Password changed successfully.</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '12px 14px' }}>
+            <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#163828' }}>{doneMsg}</p>
+          </div>
+        ) : !hasSavedPassword ? (
+          /* Self-registered account — can only send a reset email */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.35)', borderRadius: 8, padding: '11px 13px' }}>
+              <AlertCircle size={14} color="#b45309" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 12, color: '#92400e', lineHeight: 1.55 }}>
+                This account was self-registered and has no stored password. A password reset email will be sent to the teacher — coordinate the new password with them directly.
+              </p>
+            </div>
+            {err && (
+              <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
+                <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={onClose} style={btnSecondary}>Cancel</button>
+              <button onClick={handleSendReset} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
+                {saving
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
+                  : <><Lock size={14} /> Send Reset Email</>
+                }
+              </button>
+            </div>
           </div>
         ) : (
+          /* Admin-created account — direct password change */
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={labelStyle}>New Password</label>
@@ -249,7 +304,7 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
                 <input
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
-                  onChange={e => { setNewPassword(e.target.value); setErr(''); }}
+                  onChange={e => { setNewPassword(e.target.value); setErr(''); setOfferReset(false); }}
                   placeholder="Min 6 characters"
                   style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
                   autoFocus
@@ -271,6 +326,12 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
             )}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" onClick={onClose} style={btnSecondary}>Cancel</button>
+              {offerReset && (
+                <button type="button" onClick={handleSendReset} disabled={saving} style={{ ...btnSecondary, color: '#b45309', borderColor: '#d97706' }}>
+                  {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Lock size={14} />}
+                  Send Reset Email
+                </button>
+              )}
               <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
                 {saving
                   ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>

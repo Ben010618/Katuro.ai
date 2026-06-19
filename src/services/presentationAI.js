@@ -192,11 +192,15 @@ Return ONLY this JSON (no markdown, no explanation):
 export function toExportSlides(expandedSlides) {
   return expandedSlides.map(s => {
     const isSection = ['title', 'objectives', 'summary'].includes(s.type);
+    const isVisual  = ['illustration', 'example', 'activity'].includes(s.type);
     return {
-      layout:  isSection ? 'section' : 'content',
-      title:   s.title,
-      bullets: s.bullets?.length ? s.bullets : (s.body ? [s.body] : []),
-      notes:   s.teacherNote || '',
+      layout:          isSection ? 'section' : isVisual ? 'visual' : 'content',
+      type:            s.type,
+      title:           s.title,
+      headline:        s.headline || '',
+      bullets:         s.bullets?.length ? s.bullets : (s.body ? [s.body] : []),
+      notes:           s.teacherNote || '',
+      suggestedVisual: s.suggestedVisual || '',
     };
   });
 }

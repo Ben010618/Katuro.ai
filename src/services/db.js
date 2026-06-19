@@ -27,8 +27,8 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword } from "firebase/auth";
-import { db, firebaseConfig } from "../firebase";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
+import { db, auth, firebaseConfig } from "../firebase";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
@@ -618,18 +618,18 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
 // ─── Admin: change a user's password ─────────────────────────────────────────
 
 export async function adminChangePassword(targetUid, newPassword) {
-  // Uses a secondary Firebase App to sign in as the target user (same pattern as adminCreateUser),
-  // then calls updatePassword on their session. Requires the stored plaintext password.
   const snap = await getDoc(teacherRef(targetUid));
   if (!snap.exists()) throw new Error('User not found.');
   const { email, password: currentPassword } = snap.data();
 
   if (!currentPassword) {
-    throw new Error(
-      'No stored password for this account. Ask the teacher to use "Forgot Password" on the login page to reset their password.'
-    );
+    // Self-registered account — no stored credentials to sign in with.
+    // Send a password reset email so the teacher can set the admin-intended password.
+    await sendPasswordResetEmail(auth, email);
+    throw new Error(`RESET_SENT:${email}`);
   }
 
+  // Admin-created account — sign in via secondary app and change password directly.
   const tempApp  = initializeApp(firebaseConfig, 'admin-pw-' + Date.now());
   const tempAuth = getAuth(tempApp);
   try {
@@ -637,7 +637,7 @@ export async function adminChangePassword(targetUid, newPassword) {
     await updatePassword(cred.user, newPassword);
   } catch (err) {
     const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
-      ? 'Stored password is incorrect — the teacher may have changed it. Ask them to use "Forgot Password" instead.'
+      ? 'Stored password is outdated — the teacher may have changed it themselves. Use "Send Reset Email" to let them set a new one.'
       : (err.message || 'Password change failed.');
     throw new Error(msg);
   } finally {
@@ -645,10 +645,11 @@ export async function adminChangePassword(targetUid, newPassword) {
     await deleteApp(tempApp).catch(() => {});
   }
 
-  await updateDoc(teacherRef(targetUid), {
-    password:   newPassword,
-    updatedAt:  serverTimestamp(),
-  });
+  await updateDoc(teacherRef(targetUid), { password: newPassword, updatedAt: serverTimestamp() });
+}
+
+export async function adminSendPasswordReset(email) {
+  await sendPasswordResetEmail(auth, email);
 }
 
 // ─── Action Research helpers ─────────────────────────────────────────────────
