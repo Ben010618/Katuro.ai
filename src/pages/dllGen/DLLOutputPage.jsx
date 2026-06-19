@@ -121,7 +121,8 @@ export default function DLLOutputPage() {
     const contentMapFn = buildDayMap(store.contentList);
     const dayMelc      = melcMapFn[dayIdx]    || store.melc || '';
     const dayContent   = contentMapFn[dayIdx] || '';
-    const dayObj       = (store.objectives || {})[dayKey] || '';
+    const dayObj       = (store.objectives || {})[dayKey] ||
+      (contentMapFn[dayIdx] ? `Identify and explain key concepts related to ${contentMapFn[dayIdx]}.` : '');
 
     // Build combined materials string from all DLL resources
     const r = store.resources || {};
@@ -172,7 +173,7 @@ export default function DLLOutputPage() {
       await deductTokens(user.uid, 'presentation_gen', 3);
 
       setPptPhase('Generating slide outline…');
-      const outline = await generateOutline({
+      const { outline: outlineSlides } = await generateOutline({
         subject:    store.subject,
         gradeLevel: store.gradeLevel,
         melcCode,
@@ -181,16 +182,23 @@ export default function DLLOutputPage() {
       });
 
       setPptPhase('Writing content with AI…');
-      const expanded = await expandSlides({ ...outline, style: 'Academic' });
+      const { slides: expanded } = await expandSlides({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode,
+        topic,
+        slides:     outlineSlides,
+        style:      'Academic',
+      });
 
       setPptPhase('Building your PPTX…');
       await exportToPptx({
-        title:       topic || store.subject,
-        subject:     store.subject,
-        gradeLevel:  store.gradeLevel,
-        schoolName:  profile?.school,
-        schoolEmail: profile?.email || user?.email,
-        slides:      toExportSlides(expanded),
+        title:        topic || store.subject,
+        subject:      store.subject,
+        gradeLevel:   store.gradeLevel,
+        schoolName:   profile?.school,
+        schoolEmail:  profile?.email || user?.email,
+        slides:       toExportSlides(expanded),
         includeNotes: true,
       });
 
@@ -556,7 +564,12 @@ export default function DLLOutputPage() {
               />
               <InfoRow
                 label="Learning Objective"
-                value={(store.objectives || {})[DAY_KEYS[selectedDay]] || '—'}
+                value={
+                  (store.objectives || {})[DAY_KEYS[selectedDay]] ||
+                  (contentMap[selectedDay]
+                    ? `Identify and explain key concepts related to ${contentMap[selectedDay]}.`
+                    : '')
+                }
               />
             </div>
 
