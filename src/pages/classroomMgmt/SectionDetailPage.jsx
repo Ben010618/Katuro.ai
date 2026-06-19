@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import { uploadToCloudinary, thumbUrl } from '../../services/cloudinaryUpload';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
@@ -11,7 +12,7 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Link, Copy, Check,
   Users, BookOpen, BarChart2, Shield, RefreshCw, FileText, ClipboardList,
-  Upload, Download, AlertCircle, CheckCircle2,
+  Upload, Download, AlertCircle, CheckCircle2, Camera,
 } from 'lucide-react';
 import SchoolFormsPanel      from './SchoolFormsPanel';
 import TempReportCardPanel   from './TempReportCardPanel';
@@ -401,6 +402,7 @@ function CsvUploadModal({ sectionId, onClose }) {
 
 const BLANK_STUDENT = {
   // Basic
+  photoUrl: '',
   lrn: '', studentNumber: '', surname: '', givenName: '', middleInitial: '', gender: 'Male',
   // SF1 Personal
   birthdate: '', motherTongue: '', ipGroup: '', religion: '',
@@ -417,9 +419,25 @@ function StudentModal({ sectionId, initial, onClose }) {
   const [form,      setForm]      = useState({ ...BLANK_STUDENT, ...initial });
   const [tab,       setTab]       = useState('basic'); // 'basic' | 'sf1'
   const [saving,    setSaving]    = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const photoRef = useRef(null);
   const isEdit = !!initial?.id;
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      set('photoUrl', url);
+    } catch (err) {
+      addToast('Photo upload failed: ' + err.message, 'error');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -480,6 +498,38 @@ function StudentModal({ sectionId, initial, onClose }) {
           <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
             {tab === 'basic' && (<>
+              {/* Photo upload */}
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <div
+                  onClick={() => !uploading && photoRef.current?.click()}
+                  style={{
+                    width: 84, height: 84, borderRadius: '50%', overflow: 'hidden',
+                    border: '2.5px dashed rgba(45,106,79,0.35)', background: '#f5faf7',
+                    cursor: uploading ? 'wait' : 'pointer', position: 'relative',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!uploading) e.currentTarget.style.borderColor = '#2d6a4f'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.35)'; }}
+                >
+                  {form.photoUrl ? (
+                    <img src={thumbUrl(form.photoUrl, 168)} alt="student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <Camera size={22} color="#9ca3af" />
+                      <p style={{ margin: '4px 0 0', fontSize: 10, color: '#9ca3af' }}>Add Photo</p>
+                    </div>
+                  )}
+                  {uploading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>Uploading…</span>
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: 10, color: '#9ca3af' }}>{form.photoUrl ? 'Click to change photo' : 'Optional — click to upload'}</span>
+                <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoChange} />
+              </div>
+
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={LABEL}>LRN (Learner Reference Number)</label>
                 <input style={INPUT} type="number" value={form.lrn} onChange={e => set('lrn', e.target.value)} placeholder="123456789012" required />
@@ -910,7 +960,7 @@ export default function SectionDetailPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f5faf7' }}>
-                    {['No.', 'Surname', 'Given Name', 'M.I.', 'Gender', 'LRN', 'Student No.', 'Actions'].map(h => (
+                    {['', 'No.', 'Surname', 'Given Name', 'M.I.', 'Gender', 'LRN', 'Student No.', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -921,6 +971,19 @@ export default function SectionDetailPage() {
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fffe'}
                       onMouseLeave={e => e.currentTarget.style.background = ''}
                     >
+                      <td style={{ padding: '6px 10px 6px 14px' }}>
+                        {s.photoUrl ? (
+                          <img
+                            src={thumbUrl(s.photoUrl, 64)}
+                            alt=""
+                            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '1.5px solid rgba(45,106,79,0.2)' }}
+                          />
+                        ) : (
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>
+                            {(s.givenName?.[0] || '') + (s.surname?.[0] || '')}
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: '10px 14px', color: '#6b7280' }}>{i + 1}</td>
                       <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0d2218' }}>{s.surname}</td>
                       <td style={{ padding: '10px 14px', color: '#0d2218' }}>{s.givenName}</td>
