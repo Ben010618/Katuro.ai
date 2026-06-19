@@ -503,7 +503,7 @@ function StudentModal({ sectionId, initial, onClose }) {
                 <div
                   onClick={() => !uploading && photoRef.current?.click()}
                   style={{
-                    width: 84, height: 84, borderRadius: '50%', overflow: 'hidden',
+                    width: 96, height: 96, borderRadius: 14, overflow: 'hidden',
                     border: '2.5px dashed rgba(45,106,79,0.35)', background: '#f5faf7',
                     cursor: uploading ? 'wait' : 'pointer', position: 'relative',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -513,7 +513,7 @@ function StudentModal({ sectionId, initial, onClose }) {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.35)'; }}
                 >
                   {form.photoUrl ? (
-                    <img src={thumbUrl(form.photoUrl, 168)} alt="student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={thumbUrl(form.photoUrl, 192)} alt="student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ textAlign: 'center' }}>
                       <Camera size={22} color="#9ca3af" />
@@ -974,12 +974,12 @@ export default function SectionDetailPage() {
                       <td style={{ padding: '6px 10px 6px 14px' }}>
                         {s.photoUrl ? (
                           <img
-                            src={thumbUrl(s.photoUrl, 64)}
+                            src={thumbUrl(s.photoUrl, 72)}
                             alt=""
-                            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '1.5px solid rgba(45,106,79,0.2)' }}
+                            style={{ width: 36, height: 36, borderRadius: 7, objectFit: 'cover', display: 'block', border: '1.5px solid rgba(45,106,79,0.2)' }}
                           />
                         ) : (
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 7, background: '#e5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>
                             {(s.givenName?.[0] || '') + (s.surname?.[0] || '')}
                           </div>
                         )}

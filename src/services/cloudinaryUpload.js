@@ -8,9 +8,9 @@ export async function uploadToCloudinary(file) {
   form.append('upload_preset', UPLOAD_PRESET);
   form.append('folder', 'katuro/students');
 
-  const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
-  if (!res.ok) throw new Error('Photo upload failed');
+  const res  = await fetch(UPLOAD_URL, { method: 'POST', body: form });
   const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || 'Upload rejected by Cloudinary');
   return data.secure_url;
 }
 
