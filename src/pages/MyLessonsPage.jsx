@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
@@ -12,12 +12,12 @@ import {
   Pencil, Archive, Trash2, Eye, Loader2,
 } from 'lucide-react';
 
-// ── Mural palette (matches LessonGenGateway) ──────────────────────────────────
+// ── Type config ───────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
   ilaw: {
     label: 'ILAW',
     badgeBg: '#dbeafe', badgeColor: '#1e3a8a',
-    headerBg: 'rgba(29,78,216,0.05)', headerBorder: 'rgba(29,78,216,0.14)',
+    headerBg: 'rgba(29,78,216,0.06)', headerBorder: 'rgba(29,78,216,0.18)',
     accentColor: '#1d4ed8',
     Icon: BookOpen,
     iconBg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
@@ -26,7 +26,7 @@ const TYPE_CONFIG = {
   dll: {
     label: 'DLL',
     badgeBg: '#dcfce7', badgeColor: '#14532d',
-    headerBg: 'rgba(22,163,74,0.05)', headerBorder: 'rgba(22,163,74,0.14)',
+    headerBg: 'rgba(22,163,74,0.06)', headerBorder: 'rgba(22,163,74,0.18)',
     accentColor: '#16a34a',
     Icon: CalendarDays,
     iconBg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
@@ -35,7 +35,7 @@ const TYPE_CONFIG = {
   cot: {
     label: 'COT',
     badgeBg: '#fef3c7', badgeColor: '#92400e',
-    headerBg: 'rgba(217,119,6,0.05)', headerBorder: 'rgba(217,119,6,0.14)',
+    headerBg: 'rgba(217,119,6,0.06)', headerBorder: 'rgba(217,119,6,0.18)',
     accentColor: '#d97706',
     Icon: ShieldCheck,
     iconBg: 'linear-gradient(135deg, #fef3c7, #fde68a)',
@@ -43,6 +43,22 @@ const TYPE_CONFIG = {
   },
 };
 
+// ── Term config ───────────────────────────────────────────────────────────────
+const TERM_COLS = [
+  { key: 'term1', label: '1st Term', short: '1ST' },
+  { key: 'term2', label: '2nd Term', short: '2ND' },
+  { key: 'term3', label: '3rd Term', short: '3RD' },
+];
+
+function toTermKey(quarterField) {
+  const q = String(quarterField || '').toLowerCase();
+  if (/\b1\b|first/.test(q))               return 'term1';
+  if (/\b2\b|second/.test(q))              return 'term2';
+  if (/\b3\b|third|\b4\b|fourth/.test(q))  return 'term3';
+  return 'term1'; // fallback — unrecognised goes to Term 1
+}
+
+// ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   published: { bg: '#d8f3dc',               color: '#1a3d2b', label: 'Published' },
   draft:     { bg: 'rgba(232,163,32,0.12)', color: '#b47a10', label: 'Draft' },
@@ -51,6 +67,7 @@ const STATUS_CONFIG = {
 
 const FILTERS = ['All', 'Published', 'Draft', 'Archived'];
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDateRange(days) {
   if (!days?.length) return '—';
   const fmt = iso => {
@@ -70,7 +87,7 @@ function normalizeLesson(doc) {
   return {
     id:       doc.id,
     type,
-    title:    doc.lessonName  || doc.title   || 'Untitled',
+    title:    doc.lessonName  || doc.title   || doc.topic || 'Untitled',
     subject:  doc.subject     || '—',
     grade:    doc.gradeLevel  || doc.grade   || '—',
     quarter:  doc.term        || doc.quarter || '—',
@@ -86,6 +103,7 @@ function normalizeLesson(doc) {
   };
 }
 
+// ── LessonCard ────────────────────────────────────────────────────────────────
 function LessonCard({ lesson, onAction, loadingId }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isLoading = loadingId === lesson.id;
@@ -95,26 +113,26 @@ function LessonCard({ lesson, onAction, loadingId }) {
   return (
     <div
       style={{
-        background: '#fff', borderRadius: 14,
-        border: '1px solid rgba(45,106,79,0.12)', padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 10,
-        position: 'relative', transition: 'border-color 0.2s, transform 0.2s',
+        background: '#fff', borderRadius: 12,
+        border: '1px solid rgba(45,106,79,0.11)', padding: '13px 14px',
+        display: 'flex', flexDirection: 'column', gap: 8,
+        position: 'relative', transition: 'border-color 0.2s, box-shadow 0.2s',
       }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.12)'; e.currentTarget.style.transform = 'none'; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.3)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(13,34,24,0.06)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.11)'; e.currentTarget.style.boxShadow = 'none'; }}
     >
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, flex: 1 }}>
-          <span style={{ background: cfg.badgeBg, borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: cfg.badgeColor }}>
-            {cfg.label}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1 }}>
+          <span style={{ background: '#d8f3dc', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 700, color: '#0d2218' }}>
+            {lesson.subject}
           </span>
-          <span style={{ background: '#d8f3dc', borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: '#0d2218' }}>
-            {lesson.subject} {lesson.grade}
+          <span style={{ background: '#f5faf7', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 600, color: '#4a6357' }}>
+            {lesson.grade}
           </span>
-          {lesson.type === 'ilaw' && (
-            <span style={{ background: '#f5faf7', borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 600, color: '#4a6357' }}>
-              {lesson.quarter} · Wk {lesson.week}
+          {lesson.type === 'ilaw' && lesson.week !== '—' && (
+            <span style={{ background: '#eff6ff', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 600, color: '#3b82f6' }}>
+              Wk {lesson.week}
             </span>
           )}
         </div>
@@ -124,13 +142,13 @@ function LessonCard({ lesson, onAction, loadingId }) {
             onClick={() => !isLoading && setMenuOpen(v => !v)}
             style={{ background: 'none', border: 'none', cursor: isLoading ? 'default' : 'pointer', padding: 4, color: '#4a6357', borderRadius: 6, display: 'flex', alignItems: 'center' }}
           >
-            {isLoading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <MoreVertical size={15} />}
+            {isLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <MoreVertical size={14} />}
           </button>
 
           {menuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpen(false)} />
-              <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 50, background: '#fff', border: '1px solid rgba(45,106,79,0.12)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: '6px', minWidth: 160 }}>
+              <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 50, background: '#fff', border: '1px solid rgba(45,106,79,0.12)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: '5px', minWidth: 150 }}>
                 {[
                   { icon: Eye,     label: 'View',    action: 'view',    color: '#4a6357' },
                   { icon: Pencil,  label: 'Edit',    action: 'edit',    color: '#4a6357' },
@@ -140,11 +158,11 @@ function LessonCard({ lesson, onAction, loadingId }) {
                   <button
                     key={action}
                     onClick={() => { setMenuOpen(false); onAction(lesson.id, action); }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 10px', borderRadius: 7, fontSize: 13, fontWeight: 600, color, textAlign: 'left', transition: 'background 0.1s' }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px', borderRadius: 7, fontSize: 12, fontWeight: 600, color, textAlign: 'left', transition: 'background 0.1s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#f5faf7'}
                     onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   >
-                    <Icon size={13} /> {label}
+                    <Icon size={12} /> {label}
                   </button>
                 ))}
               </div>
@@ -153,64 +171,100 @@ function LessonCard({ lesson, onAction, loadingId }) {
         </div>
       </div>
 
-      {/* Title */}
+      {/* Title + dates */}
       <div>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0d2218', lineHeight: 1.35 }}>{lesson.title}</p>
-        <p style={{ margin: '3px 0 0', fontSize: 11, color: '#4a6357' }}>{lesson.dates}</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0d2218', lineHeight: 1.35 }}>{lesson.title}</p>
+        <p style={{ margin: '3px 0 0', fontSize: 10, color: '#4a6357' }}>{lesson.dates}</p>
       </div>
 
       {/* Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(45,106,79,0.08)', paddingTop: 8 }}>
-        <span style={{ background: st.bg, borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: st.color }}>{st.label}</span>
-        <span style={{ fontSize: 11, color: '#4a6357' }}>{cfg.footer(lesson)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(45,106,79,0.08)', paddingTop: 7 }}>
+        <span style={{ background: st.bg, borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 700, color: st.color }}>{st.label}</span>
+        <span style={{ fontSize: 10, color: '#4a6357' }}>{cfg.footer(lesson)}</span>
       </div>
     </div>
   );
 }
 
-function TypeColumn({ type, lessons, onAction, loadingId, navigate }) {
+// ── CategoryGroup — ILAW / DLL / COT section within a term column ─────────────
+function CategoryGroup({ type, lessons, onAction, loadingId }) {
+  if (!lessons.length) return null;
   const cfg = TYPE_CONFIG[type];
   const { Icon } = cfg;
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Column header */}
+    <div style={{ marginBottom: 10 }}>
+      {/* Category sub-header */}
       <div style={{
-        background: cfg.headerBg,
-        border: `1.5px solid ${cfg.headerBorder}`,
-        borderRadius: 12, padding: '12px 14px',
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', gap: 7,
+        background: cfg.headerBg, border: `1px solid ${cfg.headerBorder}`,
+        borderRadius: 8, padding: '7px 11px', marginBottom: 7,
       }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: cfg.iconBg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <Icon size={17} color={cfg.accentColor} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{cfg.label}</p>
-          <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>{lessons.length} plan{lessons.length !== 1 ? 's' : ''}</p>
-        </div>
-        <span style={{ background: cfg.badgeBg, color: cfg.badgeColor, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+        <Icon size={12} color={cfg.accentColor} />
+        <span style={{ fontSize: 10, fontWeight: 800, color: cfg.accentColor, textTransform: 'uppercase', letterSpacing: '0.9px', flex: 1 }}>
+          {cfg.label}
+        </span>
+        <span style={{ background: cfg.badgeBg, color: cfg.badgeColor, borderRadius: 20, padding: '1px 7px', fontSize: 9, fontWeight: 700 }}>
           {lessons.length}
         </span>
       </div>
 
-      {/* Cards */}
-      {lessons.length > 0 ? (
-        lessons.map(l => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {lessons.map(l => (
           <LessonCard key={l.id} lesson={l} onAction={onAction} loadingId={loadingId} />
-        ))
-      ) : (
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── TermColumn ────────────────────────────────────────────────────────────────
+function TermColumn({ term, groups, onAction, loadingId }) {
+  const total = groups.ilaw.length + groups.dll.length + groups.cot.length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Term header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0d2218, #1a3d2b, #2d6a4f)',
+        borderRadius: 12, padding: '14px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        boxShadow: '0 4px 12px rgba(13,34,24,0.12)',
+      }}>
+        <div>
+          <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+            MATATAG
+          </p>
+          <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
+            {term.label}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#52b788', lineHeight: 1 }}>{total}</p>
+          <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>plan{total !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+
+      {/* Categories */}
+      {total === 0 ? (
         <div style={{
-          background: '#f5faf7', borderRadius: 12,
-          border: '2px dashed rgba(45,106,79,0.14)',
-          padding: '32px 16px', textAlign: 'center',
+          background: '#f5faf7', borderRadius: 10,
+          border: '2px dashed rgba(45,106,79,0.13)',
+          padding: '28px 14px', textAlign: 'center',
         }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#4a6357', opacity: 0.65 }}>No {cfg.label} plans</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#4a6357', opacity: 0.55 }}>No plans for {term.label}</p>
+        </div>
+      ) : (
+        <div>
+          <CategoryGroup type="ilaw" lessons={groups.ilaw} onAction={onAction} loadingId={loadingId} />
+          <CategoryGroup type="dll"  lessons={groups.dll}  onAction={onAction} loadingId={loadingId} />
+          <CategoryGroup type="cot"  lessons={groups.cot}  onAction={onAction} loadingId={loadingId} />
         </div>
       )}
     </div>
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function MyLessonsPage() {
   const navigate     = useNavigate();
   const { addToast } = useToast();
@@ -225,19 +279,28 @@ export default function MyLessonsPage() {
   const [filter,    setFilter]    = useState('All');
   const [viewingId, setViewingId] = useState(null);
 
-  const lessons = lessonPlans.map(normalizeLesson);
+  const lessons = useMemo(() => lessonPlans.map(normalizeLesson), [lessonPlans]);
 
-  const visible = lessons.filter(l => {
+  const visible = useMemo(() => lessons.filter(l => {
     const matchFilter = filter === 'All' || l.status === filter.toLowerCase();
     const matchSearch = !search ||
       l.title.toLowerCase().includes(search.toLowerCase()) ||
-      l.subject.toLowerCase().includes(search.toLowerCase());
+      l.subject.toLowerCase().includes(search.toLowerCase()) ||
+      l.grade.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
-  });
+  }), [lessons, filter, search]);
 
-  const ilawLessons = visible.filter(l => l.type !== 'dll' && l.type !== 'cot');
-  const dllLessons  = visible.filter(l => l.type === 'dll');
-  const cotLessons  = visible.filter(l => l.type === 'cot');
+  // Group visible lessons by term then by type
+  const termGrouped = useMemo(() => {
+    const g = {};
+    TERM_COLS.forEach(t => { g[t.key] = { ilaw: [], dll: [], cot: [] }; });
+    visible.forEach(l => {
+      const tk = toTermKey(l.quarter);
+      const typeKey = l.type === 'dll' ? 'dll' : l.type === 'cot' ? 'cot' : 'ilaw';
+      g[tk][typeKey].push(l);
+    });
+    return g;
+  }, [visible]);
 
   async function handleAction(id, action) {
     if (action === 'view') {
@@ -288,13 +351,14 @@ export default function MyLessonsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
 
       {/* Page heading */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0d2218' }}>My Lessons</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: '#4a6357' }}>
-            {loading ? 'Loading…' : `${lessons.length} plan${lessons.length !== 1 ? 's' : ''} saved · ${publishedCount} published`}
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#0d2218' }}>My Lessons</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a6357' }}>
+            {loading ? 'Loading…' : `${lessons.length} plan${lessons.length !== 1 ? 's' : ''} · ${publishedCount} published`}
           </p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/lesson-gen')}>
@@ -302,13 +366,13 @@ export default function MyLessonsPage() {
         </button>
       </div>
 
-      {/* Search + filters */}
+      {/* Search + status filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#4a6357', pointerEvents: 'none' }} />
           <input
             type="text"
-            placeholder="Search lessons…"
+            placeholder="Search by title, subject or grade…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="input"
@@ -353,7 +417,6 @@ export default function MyLessonsPage() {
       {/* Content */}
       {!loading && !error && (
         lessons.length === 0 ? (
-          /* ── Truly empty — no plans at all ── */
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: '#fff', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
@@ -369,21 +432,26 @@ export default function MyLessonsPage() {
             </button>
           </div>
         ) : visible.length === 0 ? (
-          /* ── Search/filter yields nothing ── */
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: '#fff', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
             padding: '48px 32px', gap: 8, textAlign: 'center',
           }}>
             <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>No lessons found</p>
-            <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Try a different search term or filter.</p>
+            <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Try a different search or filter.</p>
           </div>
         ) : (
-          /* ── 3-column layout by type ── */
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, alignItems: 'start' }}>
-            <TypeColumn type="ilaw" lessons={ilawLessons} onAction={handleAction} loadingId={viewingId} navigate={navigate} />
-            <TypeColumn type="dll"  lessons={dllLessons}  onAction={handleAction} loadingId={viewingId} navigate={navigate} />
-            <TypeColumn type="cot"  lessons={cotLessons}  onAction={handleAction} loadingId={viewingId} navigate={navigate} />
+          /* ── 3-column term layout ── */
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, alignItems: 'start' }}>
+            {TERM_COLS.map(term => (
+              <TermColumn
+                key={term.key}
+                term={term}
+                groups={termGrouped[term.key]}
+                onAction={handleAction}
+                loadingId={viewingId}
+              />
+            ))}
           </div>
         )
       )}
