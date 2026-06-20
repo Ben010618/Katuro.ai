@@ -374,3 +374,25 @@ Return ONLY this JSON (no markdown, no explanation):
     return { slides: allSlides };
   }
 );
+
+// ── Admin: set any user's password directly via Admin SDK ─────────────────────
+exports.adminSetPassword = onCall(async (request) => {
+  // Verify caller is an admin
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+  const callerSnap = await db.doc(`teachers/${callerUid}`).get();
+  if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+    throw new HttpsError('permission-denied', 'Admin access required.');
+  }
+
+  const { targetUid, newPassword } = request.data;
+  if (!targetUid || !newPassword || newPassword.length < 6) {
+    throw new HttpsError('invalid-argument', 'targetUid and newPassword (min 6 chars) are required.');
+  }
+
+  await admin.auth().updateUser(targetUid, { password: newPassword });
+  await db.doc(`teachers/${targetUid}`).update({ password: newPassword, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  return { success: true };
+});

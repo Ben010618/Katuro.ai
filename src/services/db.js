@@ -624,36 +624,48 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
 }
 
 // ─── Admin: change a user's password ─────────────────────────────────────────
+// For admin-created accounts (stored password): signs in via secondary app and
+// updates Firebase Auth immediately, then updates stored password in Firestore.
+// For self-registered accounts (no stored password): saves a pendingPassword in
+// Firestore; it is applied to Firebase Auth the next time that user signs in.
 
 export async function adminChangePassword(targetUid, newPassword) {
   const snap = await getDoc(teacherRef(targetUid));
   if (!snap.exists()) throw new Error('User not found.');
-  const { email, password: currentPassword } = snap.data();
+  const { email, password: storedPassword } = snap.data();
 
-  if (!currentPassword) {
-    // Self-registered account — no stored credentials to sign in with.
-    // Send a password reset email so the teacher can set the admin-intended password.
-    await sendPasswordResetEmail(auth, email);
-    throw new Error(`RESET_SENT:${email}`);
+  if (storedPassword) {
+    // Admin-created account — change Firebase Auth password directly.
+    const tempApp  = initializeApp(firebaseConfig, 'admin-pw-' + Date.now());
+    const tempAuth = getAuth(tempApp);
+    try {
+      const cred = await signInWithEmailAndPassword(tempAuth, email, storedPassword);
+      await updatePassword(cred.user, newPassword);
+    } catch (err) {
+      throw new Error(err.message || 'Password change failed.');
+    } finally {
+      await tempAuth.signOut().catch(() => {});
+      await deleteApp(tempApp).catch(() => {});
+    }
+    await updateDoc(teacherRef(targetUid), { password: newPassword, pendingPassword: null, updatedAt: serverTimestamp() });
+  } else {
+    // Self-registered account — queue password for next login.
+    await updateDoc(teacherRef(targetUid), { pendingPassword: newPassword, updatedAt: serverTimestamp() });
   }
+}
 
-  // Admin-created account — sign in via secondary app and change password directly.
-  const tempApp  = initializeApp(firebaseConfig, 'admin-pw-' + Date.now());
-  const tempAuth = getAuth(tempApp);
+// Called on login: if admin queued a new password, apply it now and clear the queue.
+export async function applyPendingPassword(user) {
+  const snap = await getDoc(teacherRef(user.uid));
+  if (!snap.exists()) return;
+  const pending = snap.data()?.pendingPassword;
+  if (!pending) return;
   try {
-    const cred = await signInWithEmailAndPassword(tempAuth, email, currentPassword);
-    await updatePassword(cred.user, newPassword);
-  } catch (err) {
-    const msg = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
-      ? 'Stored password is outdated — the teacher may have changed it themselves. Use "Send Reset Email" to let them set a new one.'
-      : (err.message || 'Password change failed.');
-    throw new Error(msg);
-  } finally {
-    await tempAuth.signOut().catch(() => {});
-    await deleteApp(tempApp).catch(() => {});
+    await updatePassword(user, pending);
+    await updateDoc(teacherRef(user.uid), { pendingPassword: null, password: null });
+  } catch {
+    // Silent — will retry on next login
   }
-
-  await updateDoc(teacherRef(targetUid), { password: newPassword, updatedAt: serverTimestamp() });
 }
 
 export async function adminSendPasswordReset(email) {

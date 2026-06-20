@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase';
-import { teacherRef } from '../services/db';
+import { teacherRef, applyPendingPassword } from '../services/db';
 
 export function useAuth() {
   const [user,    setUser]    = useState(null);
@@ -14,7 +14,9 @@ export function useAuth() {
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
       clearTimeout(timeout);
       setUser(currentUser);
-      if (!currentUser) setLoading(false);
+      if (!currentUser) { setLoading(false); return; }
+      // Apply any admin-queued password change on next login
+      applyPendingPassword(currentUser).catch(() => {});
     });
     return () => { unsubAuth(); clearTimeout(timeout); };
   }, []);
