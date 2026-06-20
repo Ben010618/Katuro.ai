@@ -32,38 +32,41 @@ function generateCode() {
 }
 
 export function computeFinalGrade({
-  writtenWorks = [], performanceTask = [], quarterlyExam = 0,
-  writtenWorksWeight = 40, performanceTaskWeight = 40, quarterlyExamWeight = 20,
-  wwMax = [], ptMax = [], qeMax = 100,
+  writtenWorks = [], performanceTask = [],
+  summativeTests = [], quarterlyExam,          // quarterlyExam kept for backward compat
+  writtenWorksWeight = 40, performanceTaskWeight = 40,
+  summativeTestWeight, quarterlyExamWeight,    // support both field names
+  wwMax = [], ptMax = [], stMax = [100, 100], qeMax = 100,
   wwCount, ptCount,
 }) {
-  // Use configured count; fall back to whichever array is longer
   const wwLen = wwCount || Math.max(writtenWorks.length, wwMax.length, 1);
   const ptLen = ptCount || Math.max(performanceTask.length, ptMax.length, 1);
 
-  // Percentage Score iterates over the CONFIGURED count so missing entries = 0
   const percentScore = (scores, maxArr, len) => {
     if (!len) return 0;
     let totalRaw = 0, totalMax = 0;
     for (let i = 0; i < len; i++) {
       totalRaw += Number(scores[i]) || 0;
-      totalMax += Number(maxArr[i]) || 100; // default max per item = 100
+      totalMax += Number(maxArr[i]) || 100;
     }
     return totalMax > 0 ? Math.min(100, (totalRaw / totalMax) * 100) : 0;
   };
 
   const PS_WW = percentScore(writtenWorks, wwMax, wwLen);
   const PS_PT = percentScore(performanceTask, ptMax, ptLen);
-  const qeMaxVal = Number(qeMax) || 100;
-  const PS_QE = Math.min(100, qeMaxVal > 0 ? ((Number(quarterlyExam) || 0) / qeMaxVal) * 100 : 0);
 
-  // Weights stored as integers (40, 40, 20) — divide by 100 only here
+  // Support new summativeTests array OR old single quarterlyExam value
+  const effectiveST    = summativeTests?.length > 0 ? summativeTests : (quarterlyExam !== undefined ? [quarterlyExam] : []);
+  const effectiveSTMax = stMax?.length > 0 ? stMax : [qeMax ?? 100];
+  const PS_ST = percentScore(effectiveST, effectiveSTMax, Math.max(effectiveST.length, 1));
+
+  const effectiveSTWeight = summativeTestWeight ?? quarterlyExamWeight ?? 20;
+
   const IG =
     PS_WW * (writtenWorksWeight / 100) +
     PS_PT * (performanceTaskWeight / 100) +
-    PS_QE * (quarterlyExamWeight / 100);
+    PS_ST * (effectiveSTWeight / 100);
 
-  // DepEd transmutation: TG = 60 + (IG / 100 × 40), capped at 100
   const TG = 60 + (IG / 100 * 40);
   return Math.round(Math.min(100, TG) * 100) / 100;
 }
@@ -320,7 +323,7 @@ export function subscribeGradeWeights(sectionId, subject, cb, term = 'term1') {
   return onSnapshot(wtsDoc(sectionId, subject, term), snap =>
     cb(snap.exists()
       ? snap.data()
-      : { writtenWorksWeight: 40, performanceTaskWeight: 40, quarterlyExamWeight: 20, wwCount: 3, ptCount: 2 }
+      : { writtenWorksWeight: 40, performanceTaskWeight: 40, summativeTestWeight: 20, wwCount: 3, ptCount: 2 }
     )
   );
 }

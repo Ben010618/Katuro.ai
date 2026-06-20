@@ -9,7 +9,7 @@ import {
 } from '../../services/classroomDb';
 import { thumbUrl } from '../../services/cloudinaryUpload';
 import StudentCardModal from '../../components/StudentCardModal';
-import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download, Bell } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download, Bell, Upload } from 'lucide-react';
 
 const CELL = {
   padding: '7px 6px', border: '1px solid rgba(45,106,79,0.12)',
@@ -22,11 +22,11 @@ const SCORE_INPUT = {
 };
 
 const DEFAULT_WEIGHTS = {
-  writtenWorksWeight: 40, performanceTaskWeight: 40, quarterlyExamWeight: 20,
+  writtenWorksWeight: 40, performanceTaskWeight: 40, summativeTestWeight: 20,
   wwCount: 3, ptCount: 2,
   wwMax: [100, 100, 100],
   ptMax: [100, 100],
-  qeMax: 100,
+  stMax: [100, 100],
 };
 const TERMS = [
   { key: 'term1', label: 'Term 1' },
@@ -78,13 +78,16 @@ export default function GradingTablePage() {
         setLocalWeights({
           ...DEFAULT_WEIGHTS,
           ...saved,
+          summativeTestWeight: saved.summativeTestWeight ?? saved.quarterlyExamWeight ?? DEFAULT_WEIGHTS.summativeTestWeight,
           wwMax: saved.wwMax?.length === wwCount
             ? saved.wwMax
             : Array.from({ length: wwCount }, (_, i) => saved.wwMax?.[i] ?? 100),
           ptMax: saved.ptMax?.length === ptCount
             ? saved.ptMax
             : Array.from({ length: ptCount }, (_, i) => saved.ptMax?.[i] ?? 100),
-          qeMax: saved.qeMax ?? 100,
+          stMax: saved.stMax?.length === 2
+            ? saved.stMax
+            : [saved.stMax?.[0] ?? saved.qeMax ?? 100, saved.stMax?.[1] ?? 100],
         });
         setLocalGrades(s?.grades  || {});
         setDirty(false);
@@ -123,20 +126,16 @@ export default function GradingTablePage() {
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
 
   function getGrade(studentId) {
-    return localGrades[studentId] || { writtenWorks: [], performanceTask: [], quarterlyExam: '' };
+    return localGrades[studentId] || { writtenWorks: [], performanceTask: [], summativeTests: ['', ''] };
   }
 
   function setScore(studentId, field, idx, value) {
     setDirty(true);
     setLocalGrades(prev => {
-      const g = { ...(prev[studentId] || { writtenWorks: [], performanceTask: [], quarterlyExam: '' }) };
-      if (field === 'quarterlyExam') {
-        g.quarterlyExam = value;
-      } else {
-        const arr = [...(g[field] || [])];
-        arr[idx] = value === '' ? '' : Number(value);
-        g[field] = arr;
-      }
+      const g = { ...(prev[studentId] || { writtenWorks: [], performanceTask: [], summativeTests: ['', ''] }) };
+      const arr = [...(g[field] || [])];
+      arr[idx] = value === '' ? '' : Number(value);
+      g[field] = arr;
       return { ...prev, [studentId]: g };
     });
   }
@@ -147,25 +146,25 @@ export default function GradingTablePage() {
       ...g, ...localWeights,
       wwMax: (localWeights.wwMax || []).slice(0, localWeights.wwCount),
       ptMax: (localWeights.ptMax || []).slice(0, localWeights.ptCount),
-      qeMax: localWeights.qeMax ?? 100,
+      stMax: localWeights.stMax || [100, 100],
     });
   }
 
   function handleDownload() {
     const termLabel = TERMS.find(t => t.key === activeTerm)?.label || activeTerm;
-    const { wwCount, ptCount, writtenWorksWeight, performanceTaskWeight, quarterlyExamWeight, wwMax, ptMax, qeMax } = localWeights;
+    const { wwCount, ptCount, writtenWorksWeight, performanceTaskWeight, summativeTestWeight, wwMax, ptMax, stMax } = localWeights;
 
     const colHeaders = [
       'Surname', 'Given Name', 'M.I.',
       ...Array.from({ length: wwCount }, (_, i) => `WW ${i + 1}`),
       ...Array.from({ length: ptCount }, (_, i) => `PT ${i + 1}`),
-      'QE', 'Final Grade',
+      'ST 1', 'ST 2', 'Final Grade',
     ];
     const maxRow = [
       'HIGHEST SCORE', '', '',
       ...(wwMax || []).slice(0, wwCount),
       ...(ptMax || []).slice(0, ptCount),
-      qeMax ?? 100, '',
+      (stMax || [])[0] ?? 100, (stMax || [])[1] ?? 100, '',
     ];
     const studentRows = students.map(s => {
       const g  = localGrades[s.id] || {};
@@ -174,25 +173,25 @@ export default function GradingTablePage() {
         s.surname, s.givenName, s.middleInitial || '',
         ...Array.from({ length: wwCount }, (_, i) => (g.writtenWorks || [])[i] ?? ''),
         ...Array.from({ length: ptCount }, (_, i) => (g.performanceTask || [])[i] ?? ''),
-        g.quarterlyExam ?? '',
+        (g.summativeTests || [])[0] ?? '',
+        (g.summativeTests || [])[1] ?? '',
         fg > 0 ? fg : '',
       ];
     });
 
     const ws = XLSX.utils.aoa_to_sheet([
       [`${sheet.gradeLevel} – ${sheet.sectionName} | ${decodedSubject} | ${termLabel}`],
-      [`Component Weights: WW=${writtenWorksWeight}%  PT=${performanceTaskWeight}%  QE=${quarterlyExamWeight}%`],
-      [`Highest Possible Scores: WW=[${(wwMax || []).slice(0, wwCount).join(', ')}]  PT=[${(ptMax || []).slice(0, ptCount).join(', ')}]  QE=${qeMax ?? 100}`],
+      [`Component Weights: WW=${writtenWorksWeight}%  PT=${performanceTaskWeight}%  ST=${summativeTestWeight}%`],
+      [`Highest Possible Scores: WW=[${(wwMax || []).slice(0, wwCount).join(', ')}]  PT=[${(ptMax || []).slice(0, ptCount).join(', ')}]  ST=[${(stMax || [100, 100]).join(', ')}]`],
       [],
       colHeaders,
       maxRow,
       ...studentRows,
     ]);
 
-    // Column widths
     ws['!cols'] = [
       { wch: 18 }, { wch: 16 }, { wch: 5 },
-      ...Array.from({ length: wwCount + ptCount + 2 }, () => ({ wch: 10 })),
+      ...Array.from({ length: wwCount + ptCount + 3 }, () => ({ wch: 10 })),
     ];
 
     const wb = XLSX.utils.book_new();
@@ -209,12 +208,12 @@ export default function GradingTablePage() {
       const updatedGrades = {};
       students.forEach(s => {
         const g = localGrades[s.id] || {};
-        const ww  = (g.writtenWorks   || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
-        const pt  = (g.performanceTask|| []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
-        const qe  = Number(g.quarterlyExam) || 0;
+        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
+        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
+        const st = (g.summativeTests  || []).slice(0, 2).map(v => Number(v) || 0);
         updatedGrades[s.id] = {
-          writtenWorks: ww, performanceTask: pt, quarterlyExam: qe,
-          finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, quarterlyExam: qe, ...localWeights }),
+          writtenWorks: ww, performanceTask: pt, summativeTests: st,
+          finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, summativeTests: st, ...localWeights }),
         };
       });
       setLocalGrades(updatedGrades);
@@ -240,12 +239,12 @@ export default function GradingTablePage() {
       const updatedGrades = {};
       students.forEach(s => {
         const g = localGrades[s.id] || {};
-        const ww  = (g.writtenWorks   || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
-        const pt  = (g.performanceTask|| []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
-        const qe  = Number(g.quarterlyExam) || 0;
+        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
+        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
+        const st = (g.summativeTests  || []).slice(0, 2).map(v => Number(v) || 0);
         updatedGrades[s.id] = {
-          writtenWorks: ww, performanceTask: pt, quarterlyExam: qe,
-          finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, quarterlyExam: qe, ...localWeights }),
+          writtenWorks: ww, performanceTask: pt, summativeTests: st,
+          finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, summativeTests: st, ...localWeights }),
         };
       });
       await saveGradeSheet(user.uid, sectionId, decodedSubject, activeTerm, {
@@ -290,7 +289,7 @@ export default function GradingTablePage() {
     });
   }
 
-  const weightSum    = (localWeights.writtenWorksWeight || 0) + (localWeights.performanceTaskWeight || 0) + (localWeights.quarterlyExamWeight || 0);
+  const weightSum    = (localWeights.writtenWorksWeight || 0) + (localWeights.performanceTaskWeight || 0) + (localWeights.summativeTestWeight || 0);
   const validWeights = weightSum === 100;
   const isSubmitted  = sheet?.status === 'submitted';
 
@@ -338,6 +337,25 @@ export default function GradingTablePage() {
                 </span>
               </div>
             )}
+            {/* Upload Grading Sheet — Coming Soon */}
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <button
+                disabled
+                title="Upload your Grading Sheet — Coming Soon"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 600,
+                  cursor: 'not-allowed', fontFamily: 'inherit',
+                }}
+              >
+                <Upload size={14} /> Upload Sheet
+              </button>
+              <span style={{ position: 'absolute', top: -8, right: -6, background: '#f59e0b', color: '#0d2218', borderRadius: 99, fontSize: 8, fontWeight: 800, padding: '2px 6px', lineHeight: '13px', letterSpacing: '0.3px', whiteSpace: 'nowrap' }}>
+                SOON
+              </span>
+            </div>
             <button
               onClick={handleDownload}
               style={{
@@ -409,7 +427,7 @@ export default function GradingTablePage() {
             {[
               { label: 'Written Works',    wKey: 'writtenWorksWeight',    cKey: 'wwCount' },
               { label: 'Performance Task', wKey: 'performanceTaskWeight', cKey: 'ptCount' },
-              { label: 'Quarterly Exam',   wKey: 'quarterlyExamWeight',   cKey: null      },
+              { label: 'Summative Tests',   wKey: 'summativeTestWeight',   cKey: null      },
             ].map(({ label, wKey, cKey }) => (
               <div key={wKey} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
@@ -450,8 +468,8 @@ export default function GradingTablePage() {
                   <th colSpan={localWeights.ptCount} style={{ ...CELL, background: '#fef9c3', color: '#854d0e', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center' }}>
                     Performance Task ({localWeights.performanceTaskWeight}%)
                   </th>
-                  <th style={{ ...CELL, background: '#d8f3dc', color: '#1a3d2b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center' }}>
-                    Quarterly Exam ({localWeights.quarterlyExamWeight}%)
+                  <th colSpan={2} style={{ ...CELL, background: '#d8f3dc', color: '#1a3d2b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center' }}>
+                    Summative Tests ({localWeights.summativeTestWeight}%)
                   </th>
                   <th style={{ ...CELL, background: '#0d2218', color: '#fff', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center', minWidth: 80 }}>
                     Final Grade
@@ -467,7 +485,8 @@ export default function GradingTablePage() {
                   {Array.from({ length: localWeights.ptCount }, (_, i) => (
                     <th key={i} style={{ ...CELL, background: '#fefce8', fontSize: 11, fontWeight: 700, color: '#a16207', textAlign: 'center', width: 64 }}>PT {i + 1}</th>
                   ))}
-                  <th style={{ ...CELL, background: '#f0fdf4', fontSize: 11, fontWeight: 700, color: '#166534', textAlign: 'center', width: 70 }}>QE</th>
+                  <th style={{ ...CELL, background: '#f0fdf4', fontSize: 11, fontWeight: 700, color: '#166534', textAlign: 'center', width: 70 }}>ST 1</th>
+                  <th style={{ ...CELL, background: '#f0fdf4', fontSize: 11, fontWeight: 700, color: '#166534', textAlign: 'center', width: 70 }}>ST 2</th>
                   <th style={{ ...CELL, background: '#f5faf7', fontSize: 11, fontWeight: 700, color: '#1a3d2b', textAlign: 'center' }}>Grade</th>
                 </tr>
               </thead>
@@ -497,23 +516,22 @@ export default function GradingTablePage() {
                       />
                     </td>
                   ))}
-                  <td style={{ ...CELL, background: '#f0fdf4' }}>
-                    <input
-                      style={{ ...SCORE_INPUT, background: '#f0fdf4', borderColor: 'rgba(22,101,52,0.3)' }}
-                      type="number" min="1"
-                      value={localWeights.qeMax ?? 100}
-                      onChange={e => {
-                        setDirty(true);
-                        setLocalWeights(w => ({ ...w, qeMax: Math.max(1, Number(e.target.value) || 100) }));
-                      }}
-                    />
-                  </td>
+                  {[0, 1].map(i => (
+                    <td key={i} style={{ ...CELL, background: '#f0fdf4' }}>
+                      <input
+                        style={{ ...SCORE_INPUT, background: '#f0fdf4', borderColor: 'rgba(22,101,52,0.3)' }}
+                        type="number" min="1"
+                        value={(localWeights.stMax || [100, 100])[i] ?? 100}
+                        onChange={e => setMaxScore('stMax', i, e.target.value)}
+                      />
+                    </td>
+                  ))}
                   <td style={{ ...CELL, background: '#f5faf7' }} />
                 </tr>
 
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={3 + localWeights.wwCount + localWeights.ptCount + 2} style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
+                    <td colSpan={3 + localWeights.wwCount + localWeights.ptCount + 3} style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
                       No students in roster. Ask the adviser to regenerate the invitation link.
                     </td>
                   </tr>
@@ -585,15 +603,17 @@ export default function GradingTablePage() {
                           />
                         </td>
                       ))}
-                      <td style={{ ...CELL, background: '#f9fff9' }}>
-                        <input
-                          style={SCORE_INPUT}
-                          type="number" min="0" max="100"
-                          value={g.quarterlyExam ?? ''}
-                          onChange={e => setScore(s.id, 'quarterlyExam', null, e.target.value)}
-                          placeholder="—"
-                        />
-                      </td>
+                      {[0, 1].map(i => (
+                        <td key={i} style={{ ...CELL, background: '#f9fff9' }}>
+                          <input
+                            style={SCORE_INPUT}
+                            type="number" min="0" max="100"
+                            value={(g.summativeTests || [])[i] ?? ''}
+                            onChange={e => setScore(s.id, 'summativeTests', i, e.target.value)}
+                            placeholder="—"
+                          />
+                        </td>
+                      ))}
                       <td style={{ ...CELL, background: fg >= 75 ? '#d8f3dc' : fg > 0 ? '#fde8e8' : '#f9fafb', fontWeight: 800, fontSize: 14, color: fg >= 75 ? '#1a3d2b' : fg > 0 ? '#b91c1c' : '#9ca3af', fontFamily: '"DM Mono", monospace', textAlign: 'center' }}>
                         {fg > 0 ? fg : '—'}
                       </td>
