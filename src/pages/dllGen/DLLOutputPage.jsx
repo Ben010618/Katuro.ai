@@ -256,15 +256,24 @@ export default function DLLOutputPage() {
           font-family: Arial, sans-serif;
         }
         @media print {
-          @page { size: A4 landscape; margin: 1.27cm 1.27cm; }
+          @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
           body * { visibility: hidden; }
           .dll-a4, .dll-a4 * { visibility: visible; }
           .dll-a4 {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             padding: 0; border: none; border-radius: 0; box-shadow: none;
             overflow: visible;
+            display: flex; flex-direction: column;
           }
+          .dll-table {
+            min-width: 0 !important;
+            width: 100% !important;
+            font-size: 9px !important;
+            table-layout: fixed !important;
+          }
+          .dll-table td { font-size: 9px !important; padding: 3px 5px !important; }
           .no-print { display: none !important; }
+          tr { page-break-inside: avoid; }
         }
       `}</style>
 

@@ -8,7 +8,7 @@ import { getTeacherProfile, deductTokens } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer } from 'lucide-react';
 
 const baseTd = {
   padding: '10px 12px',
@@ -267,13 +267,28 @@ export default function OutputPage() {
     <>
       <style>{`
         @media print {
+          @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
           .no-print { display: none !important; }
           .shell-sidebar { display: none !important; }
-          body { background: white !important; }
-          .ilaw-wrap { box-shadow: none !important; border: none !important; border-radius: 0 !important; }
-          .ilaw-table { font-size: 11px !important; }
+          body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          .ilaw-page-wrap {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .ilaw-wrap {
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+          }
+          .ilaw-table {
+            font-size: 9.5px !important;
+            min-width: 0 !important;
+            width: 100% !important;
+          }
+          .ilaw-table td { padding: 5px 7px !important; }
           tr { page-break-inside: avoid; }
-          @page { margin: 1.5cm; size: landscape; }
         }
         .ilaw-session-hdr {
           cursor: pointer;
@@ -339,8 +354,8 @@ export default function OutputPage() {
               ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Exporting…</>
               : <><Download size={13} /> Download DOCX</>}
           </button>
-          <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => addToast('PDF export coming soon.', 'info')}>
-            <Download size={13} /> Download PDF
+          <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => window.print()}>
+            <Printer size={13} /> Print / PDF
           </button>
           <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => navigate('/lesson-gen/step-3')}>
             <Pencil size={13} /> Edit Plan
@@ -373,7 +388,7 @@ export default function OutputPage() {
       </div>
 
       {/* Document wrapper */}
-      <div style={{ maxWidth: 1100, margin: '12px auto 0', padding: '0 0 48px' }}>
+      <div className="ilaw-page-wrap" style={{ maxWidth: 1100, margin: '12px auto 0', padding: '0 0 48px' }}>
         <p className="no-print" style={{ fontSize: 12, color: '#4a6357', marginBottom: 8 }}>
           ILAW Lesson Plan · {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} session{N !== 1 ? 's' : ''}
         </p>
