@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
   adminChangePassword, adminSendPasswordReset,
-  getAdminNotifications, markAllNotificationsRead,
+  subscribeAdminNotifications, markAllNotificationsRead,
 } from '../services/db';
 import ktLogo from '../assets/KT Favicon.png';
 import {
@@ -624,7 +624,7 @@ export default function AdminDashboard() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
-    getAdminNotifications().then(setNotifications).catch(() => {});
+    return subscribeAdminNotifications(setNotifications);
   }, []);
 
   async function handleMarkAllRead() {

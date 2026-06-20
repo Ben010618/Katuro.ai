@@ -585,6 +585,14 @@ export async function getAdminNotifications() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+export function subscribeAdminNotifications(cb) {
+  return onSnapshot(
+    query(collection(db, 'adminNotifications'), orderBy('createdAt', 'desc')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    () => {},
+  );
+}
+
 export async function markAllNotificationsRead() {
   const snap = await getDocs(
     query(collection(db, 'adminNotifications'), where('read', '==', false))
