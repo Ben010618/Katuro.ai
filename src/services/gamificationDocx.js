@@ -1,7 +1,7 @@
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle,
-  ShadingType, HeightRule, VerticalAlign,
+  HeightRule, VerticalAlign,
 } from 'docx';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ function makeHeader(profile, lesson, gameLabel, answerKey = false) {
   const title = gameLabel.toUpperCase() + (answerKey ? ' — ANSWER KEY' : '');
   out.push(centered([run(title, { bold: true, size: 28 })], { spacing: { before: 80, after: 40 } }));
 
-  const meta = [lesson?.subject, lesson?.gradeLevel, lesson?.lessonName || lesson?.title]
+  const meta = [lesson?.subject, lesson?.gradeLevel || lesson?.grade, lesson?.lessonName || lesson?.title || lesson?.topic]
     .filter(Boolean).join(' | ');
   if (meta) out.push(centered([run(meta, { size: 20 })], { spacing: { after: 80 } }));
 
@@ -213,10 +213,9 @@ function crosswordBlocks(data, profile, lesson, answerKey) {
       const key  = `${r},${c}`;
       const letter = cells[key];
       if (!letter) {
-        // Black cell
+        // Empty/blocked cell — white background, no visible border
         tCells.push(new TableCell({
           children: [para([run('')])],
-          shading: { type: ShadingType.SOLID, color: '000000' },
           borders: BNoneAll,
           width: { size: cellW, type: WidthType.DXA },
           margins: { top: 0, bottom: 0, left: 0, right: 0 },

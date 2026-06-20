@@ -2,10 +2,29 @@ import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function buildCtx(lesson) {
-  const objs = (lesson.sessions || []).slice(0, 4).map(s => s.objective).filter(Boolean).join('; ');
-  return `Subject: ${lesson.subject || ''} | Grade: ${lesson.gradeLevel || ''} | Topic: ${lesson.lessonName || lesson.title || ''}
-Competency: ${lesson.competencyText || ''}
-Objectives: ${objs || 'Not specified'}`;
+  const grade      = lesson.gradeLevel || lesson.grade || '';
+  const topic      = lesson.lessonName || lesson.title || lesson.topic || '';
+  const competency = lesson.competencyText || lesson.melc || '';
+  let objectives;
+
+  if (lesson.type === 'dll') {
+    // DLL stores objectives[] directly; contentList[] has per-day lesson content
+    const dllObjs = (lesson.objectives || []).filter(Boolean).slice(0, 4).join('; ');
+    const content  = (lesson.contentList || []).filter(Boolean).slice(0, 2).join('; ');
+    objectives = [dllObjs, content].filter(Boolean).join(' | ');
+  } else if (lesson.type === 'cot') {
+    // COT stores the full plan text and MELC
+    objectives = typeof lesson.plan === 'string'
+      ? lesson.plan.substring(0, 500)
+      : (lesson.melc || '');
+  } else {
+    // ILAW: sessions array, each has an objective field
+    objectives = (lesson.sessions || []).slice(0, 4).map(s => s.objective).filter(Boolean).join('; ');
+  }
+
+  return `Subject: ${lesson.subject || ''} | Grade: ${grade} | Topic: ${topic}
+Competency: ${competency}
+Objectives: ${objectives || 'Not specified'}`;
 }
 
 async function callGemini(prompt) {

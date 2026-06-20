@@ -148,7 +148,7 @@ function SheetHeader({ lesson, gameLabel, answerKey }) {
         {gameLabel}{answerKey ? ' — Answer Key' : ''}
       </p>
       <p style={{ margin: 0, textAlign: 'center', fontSize: 11, color: '#333' }}>
-        {[lesson.subject, lesson.gradeLevel, lesson.lessonName || lesson.title].filter(Boolean).join(' | ')}
+        {[lesson.subject, lesson.gradeLevel || lesson.grade, lesson.lessonName || lesson.title || lesson.topic].filter(Boolean).join(' | ')}
       </p>
       {!answerKey && (
         <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
@@ -314,8 +314,8 @@ function CrosswordSheet({ data, lesson, answerKey }) {
                 return (
                   <div key={ci} style={{
                     width: cellPx, height: cellPx, flexShrink: 0,
-                    border: letter ? '1px solid #555' : 'none',
-                    background: letter ? '#fff' : '#1a1a1a',
+                    border: letter ? '1px solid #555' : '1px solid #e5e7eb',
+                    background: '#fff',
                     position: 'relative',
                   }}>
                     {ws && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: Math.max(6, cellPx * 0.28), lineHeight: 1, fontFamily: 'Arial', fontWeight: 600 }}>{ws.num}</span>}
@@ -590,13 +590,21 @@ export default function GamificationPage() {
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', background: plan.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: plan.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
-                    {plan.type === 'dll' ? 'DLL' : 'ILAW'}
+                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px',
+                    background: plan.type === 'dll' ? '#ede9fe' : plan.type === 'cot' ? '#fff7ed' : '#d8f3dc',
+                    color:      plan.type === 'dll' ? '#4f46e5' : plan.type === 'cot' ? '#c2410c' : '#1a3d2b' }}>
+                    {plan.type === 'dll' ? 'DLL' : plan.type === 'cot' ? 'COT' : 'ILAW'}
                   </span>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{plan.lessonName || plan.title || 'Untitled'}</p>
                 </div>
                 <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
-                  {[plan.subject, plan.gradeLevel, plan.type === 'dll' ? plan.teachingDates : (plan.term && plan.weekNumber ? `${plan.term} · Wk ${plan.weekNumber}` : plan.term)].filter(Boolean).join(' · ')}
+                  {[
+                    plan.subject,
+                    plan.gradeLevel || plan.grade,
+                    plan.type === 'dll' ? plan.teachingDates
+                      : plan.type === 'cot' ? plan.quarter
+                      : (plan.term && plan.weekNumber ? `${plan.term} · Wk ${plan.weekNumber}` : plan.term),
+                  ].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <ChevronRight size={16} color="#4a6357" style={{ flexShrink: 0 }} />
@@ -617,8 +625,8 @@ export default function GamificationPage() {
       </button>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(45,106,79,0.12)', padding: '14px 18px', marginBottom: 20 }}>
-        <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{lesson.lessonName || lesson.title}</p>
-        <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>{[lesson.subject, lesson.gradeLevel].filter(Boolean).join(' · ')}</p>
+        <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{lesson.lessonName || lesson.title || lesson.topic}</p>
+        <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>{[lesson.subject, lesson.gradeLevel || lesson.grade].filter(Boolean).join(' · ')}</p>
       </div>
 
       <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Choose Game Type</h3>
@@ -689,7 +697,7 @@ export default function GamificationPage() {
           </button>
           <span style={{ margin: '0 6px', color: 'rgba(45,106,79,0.3)' }}>|</span>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{gameInfo.label}</span>
-          <span style={{ fontSize: 12, color: '#4a6357' }}>· {lesson?.lessonName || lesson?.title}</span>
+          <span style={{ fontSize: 12, color: '#4a6357' }}>· {lesson?.lessonName || lesson?.title || lesson?.topic}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setStep('config')} style={{ background: '#f5faf7', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
