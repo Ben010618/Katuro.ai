@@ -242,6 +242,16 @@ export default function LoginPage() {
     setMode(m); setError(''); setSignedUp(false);
   }
 
+  const signupReady = mode !== 'signup' || (
+    surname.trim() !== '' &&
+    givenName.trim() !== '' &&
+    school.trim() !== '' &&
+    email.trim() !== '' &&
+    password.length >= 6 &&
+    confirmPw.length > 0 &&
+    password === confirmPw
+  );
+
   const eyeStyle = {
     position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', cursor: 'pointer', color: '#7aa392', padding: 2, zIndex: 1,
@@ -603,7 +613,7 @@ export default function LoginPage() {
                 {error && <div className="kt-alert-error">{error}</div>}
 
                 {/* Submit */}
-                <button type="submit" className="kt-btn kt-btn-primary" disabled={loading} style={{ marginTop: 4 }}>
+                <button type="submit" className="kt-btn kt-btn-primary" disabled={loading || !signupReady} style={{ marginTop: 4 }}>
                   {loading
                     ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
                         {mode === 'signup' ? 'Creating account…' : 'Signing in…'}

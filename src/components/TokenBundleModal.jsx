@@ -4,12 +4,21 @@ import ktLogo from '../assets/KT Favicon.png';
 
 const BUNDLES = [
   {
+    id: 'mini',
+    name: 'Mini',
+    tokens: 50,
+    price: 49,
+    perToken: '₱0.98',
+    bestFor: 'Try it out',
+    badge: null,
+  },
+  {
     id: 'starter',
     name: 'Starter',
-    tokens: 100,
+    tokens: 110,
     price: 99,
-    perToken: '₱0.99',
-    bestFor: 'Try it out',
+    perToken: '₱0.90',
+    bestFor: 'New teachers',
     badge: null,
   },
   {
@@ -21,15 +30,6 @@ const BUNDLES = [
     bestFor: '1 month regular use',
     badge: 'Most Popular',
     highlight: true,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    tokens: 600,
-    price: 449,
-    perToken: '₱0.75',
-    bestFor: 'Heavy users / dept head',
-    badge: null,
   },
   {
     id: 'school',
@@ -205,23 +205,22 @@ export default function TokenBundleModal({ onClose }) {
                   textTransform: 'uppercase', letterSpacing: '0.07em',
                 }}>{b.name}</p>
 
+                {/* Price — larger than token count */}
+                <p style={{
+                  margin: '0 0 2px',
+                  fontSize: 34, fontWeight: 900, lineHeight: 1,
+                  color: b.highlight ? '#1a5c3a' : b.valueBadge ? '#92400e' : '#0d2218',
+                  fontFamily: '"DM Mono", monospace',
+                }}>
+                  ₱{b.price}
+                </p>
+
                 {/* Token count */}
                 <p style={{
                   margin: '0 0 4px',
-                  fontSize: 26, fontWeight: 800, color: '#0d2218', lineHeight: 1,
-                  fontFamily: '"DM Mono", monospace',
+                  fontSize: 14, fontWeight: 700, color: '#4a6357', lineHeight: 1,
                 }}>
-                  {b.tokens.toLocaleString()}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#4a6357', marginLeft: 4 }}>tokens</span>
-                </p>
-
-                {/* Price */}
-                <p style={{
-                  margin: '0 0 4px',
-                  fontSize: 20, fontWeight: 800,
-                  color: b.highlight ? '#1a5c3a' : b.valueBadge ? '#92400e' : '#0d2218',
-                }}>
-                  ₱{b.price}
+                  {b.tokens.toLocaleString()} tokens
                 </p>
 
                 {/* Per token */}

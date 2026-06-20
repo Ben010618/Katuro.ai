@@ -417,8 +417,8 @@ export default function PresentationBuilderPage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', flexShrink: 0, background: plan.type === 'dll' ? '#ede9fe' : '#d8f3dc', color: plan.type === 'dll' ? '#4f46e5' : '#1a3d2b' }}>
-                    {plan.type === 'dll' ? 'DLL' : 'ILAW'}
+                  <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', flexShrink: 0, background: plan.type === 'dll' ? '#dcfce7' : plan.type === 'cot' ? '#fef3c7' : '#dbeafe', color: plan.type === 'dll' ? '#14532d' : plan.type === 'cot' ? '#92400e' : '#1e3a8a' }}>
+                    {plan.type === 'dll' ? 'DLL' : plan.type === 'cot' ? 'COT' : 'ILAW'}
                   </span>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {plan.lessonName || 'Untitled Lesson'}

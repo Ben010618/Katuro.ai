@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -568,10 +568,33 @@ export default function AdminDashboard() {
   const [notifications,  setNotifications]  = useState([]);
   const [showNotifs,     setShowNotifs]      = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
+  const prevNotifsLen = useRef(null);
 
   useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
     return subscribeAdminNotifications(setNotifications);
   }, []);
+
+  useEffect(() => {
+    if (prevNotifsLen.current === null) {
+      prevNotifsLen.current = notifications.length;
+      return;
+    }
+    if (notifications.length > prevNotifsLen.current) {
+      const latest = notifications[0];
+      if (latest && !latest.read && 'Notification' in window && Notification.permission === 'granted') {
+        const name = latest.givenName && latest.surname
+          ? `${latest.givenName} ${latest.surname}`
+          : latest.displayName || latest.email;
+        new Notification('New kaTuro Registration!', {
+          body: `${name} from ${latest.school || latest.email} just registered.`,
+        });
+      }
+    }
+    prevNotifsLen.current = notifications.length;
+  }, [notifications]);
 
   async function handleMarkAllRead() {
     await markAllNotificationsRead().catch(() => {});

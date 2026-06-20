@@ -339,9 +339,9 @@ export default function QuizBuilderPage() {
                       {/* Icon */}
                       <div style={{
                         width: 42, height: 42, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center',
-                        background: lesson.type === 'dll' ? 'linear-gradient(135deg,#dcfce7,#bbf7d0)' : lesson.type === 'cot' ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : '#d8f3dc',
+                        background: lesson.type === 'dll' ? 'linear-gradient(135deg,#dcfce7,#bbf7d0)' : lesson.type === 'cot' ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : 'linear-gradient(135deg,#dbeafe,#bfdbfe)',
                       }}>
-                        <BookOpen size={18} color={lesson.type === 'dll' ? '#16a34a' : lesson.type === 'cot' ? '#d97706' : '#2d6a4f'} />
+                        <BookOpen size={18} color={lesson.type === 'dll' ? '#16a34a' : lesson.type === 'cot' ? '#d97706' : '#1d4ed8'} />
                       </div>
 
                       {/* Info */}
@@ -349,8 +349,8 @@ export default function QuizBuilderPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           <span style={{
                             fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '1px 6px',
-                            background: lesson.type === 'dll' ? '#dcfce7' : lesson.type === 'cot' ? '#fef3c7' : '#d8f3dc',
-                            color:      lesson.type === 'dll' ? '#14532d' : lesson.type === 'cot' ? '#92400e' : '#1a3d2b',
+                            background: lesson.type === 'dll' ? '#dcfce7' : lesson.type === 'cot' ? '#fef3c7' : '#dbeafe',
+                            color:      lesson.type === 'dll' ? '#14532d' : lesson.type === 'cot' ? '#92400e' : '#1e3a8a',
                           }}>
                             {lesson.type === 'dll' ? 'DLL' : lesson.type === 'cot' ? 'COT' : 'ILAW'}
                           </span>
