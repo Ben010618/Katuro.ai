@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { getTeacherProfile, updateTeacherProfile } from '../services/db';
 import { useToast } from '../context/ToastContext';
-import { Loader2, CheckCircle, User, CreditCard, Shield } from 'lucide-react';
+import { Loader2, CheckCircle, User, CreditCard, Shield, Lock } from 'lucide-react';
 
 const TABS = [
   { label: 'Profile',      Icon: User },
@@ -42,10 +40,6 @@ export default function SettingsPage() {
   const [saving,        setSaving]        = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const [currentPw,  setCurrentPw]  = useState('');
-  const [newPw,      setNewPw]      = useState('');
-  const [confirmPw,  setConfirmPw]  = useState('');
-  const [changingPw, setChangingPw] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -80,26 +74,6 @@ export default function SettingsPage() {
       addToast('Failed to save profile. Try again.', 'error');
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleChangePassword(e) {
-    e.preventDefault();
-    if (newPw !== confirmPw) { addToast('New passwords do not match.', 'error'); return; }
-    if (newPw.length < 8)   { addToast('Password must be at least 8 characters.', 'warning'); return; }
-
-    setChangingPw(true);
-    try {
-      const credential = EmailAuthProvider.credential(user.email, currentPw);
-      await reauthenticateWithCredential(auth.currentUser, credential);
-      await updatePassword(auth.currentUser, newPw);
-      setCurrentPw(''); setNewPw(''); setConfirmPw('');
-      addToast('Password changed successfully.', 'success');
-    } catch (err) {
-      const isWrongPw = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential';
-      addToast(isWrongPw ? 'Current password is incorrect.' : `Error: ${err.message}`, 'error');
-    } finally {
-      setChangingPw(false);
     }
   }
 
@@ -269,27 +243,25 @@ export default function SettingsPage() {
           {tab === 2 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Change Password</h2>
-                <p style={{ margin: '0 0 16px', fontSize: 14, color: '#4a6357' }}>Use a strong, unique password.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Account Security</h2>
+                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Password management is handled by your administrator.</p>
+              </div>
 
-                <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 400 }}>
-                  <LabeledField label="Current Password">
-                    <input className="input" type="password" value={currentPw}
-                      onChange={e => setCurrentPw(e.target.value)} placeholder="••••••••" required />
-                  </LabeledField>
-                  <LabeledField label="New Password">
-                    <input className="input" type="password" value={newPw}
-                      onChange={e => setNewPw(e.target.value)} placeholder="Min. 8 characters" required />
-                  </LabeledField>
-                  <LabeledField label="Confirm New Password">
-                    <input className="input" type="password" value={confirmPw}
-                      onChange={e => setConfirmPw(e.target.value)} placeholder="••••••••" required />
-                  </LabeledField>
-                  <button type="submit" className="btn-primary" disabled={changingPw} style={{ alignSelf: 'flex-start' }}>
-                    {changingPw && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                    {changingPw ? 'Changing…' : 'Change Password'}
-                  </button>
-                </form>
+              <div style={{
+                display: 'flex', gap: 14, alignItems: 'flex-start',
+                background: '#f5faf7', border: '1px solid rgba(45,106,79,0.15)',
+                borderRadius: 12, padding: '18px 20px',
+              }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <Lock size={18} color="#2d6a4f" />
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Password changes are admin-only</p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+                    Only your kaTuro administrator can change or reset your password.
+                    Please contact your admin if you need a password update.
+                  </p>
+                </div>
               </div>
 
               <div style={{ borderTop: '1px solid rgba(45,106,79,0.12)', paddingTop: 20 }}>

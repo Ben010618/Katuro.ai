@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Loader2, Eye, EyeOff, Gift, GraduationCap } from 'lucide-react';
 import ktLogo from '../assets/KT Favicon.png';
@@ -179,14 +179,13 @@ const CSS = `
 
 export default function LoginPage() {
   const [activeSlide, setActiveSlide] = useState(0);
-  const [mode, setMode]       = useState('login');
-  const [email, setEmail]     = useState('');
+  const [mode, setMode]         = useState('login');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw]   = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [resetSent, setResetSent] = useState(false);
-  const [shake, setShake]     = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [shake, setShake]       = useState(false);
 
   const [surname,   setSurname]   = useState('');
   const [givenName, setGivenName] = useState('');
@@ -220,25 +219,11 @@ export default function LoginPage() {
     }
   }
 
-  async function handleReset(e) {
-    e.preventDefault();
-    if (!email.trim()) { setError('Enter your email address first.'); triggerShake(); return; }
-    setError(''); setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setResetSent(true);
-    } catch (err) {
-      setError(err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, ''));
-      triggerShake();
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleSignup(e) {
     e.preventDefault();
-    if (!surname.trim() || !givenName.trim()) { setError('Surname and Given Name are required.'); triggerShake(); return; }
-    if (!school.trim()) { setError('School name is required.'); triggerShake(); return; }
+    if (!surname.trim())   { setError('Last name (Surname) is required.'); triggerShake(); return; }
+    if (!givenName.trim()) { setError('First name (Given Name) is required.'); triggerShake(); return; }
+    if (!school.trim())    { setError('School name is required.'); triggerShake(); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); triggerShake(); return; }
     if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
     setError(''); setLoading(true);
@@ -254,7 +239,7 @@ export default function LoginPage() {
   }
 
   function switchMode(m) {
-    setMode(m); setError(''); setResetSent(false); setSignedUp(false);
+    setMode(m); setError(''); setSignedUp(false);
   }
 
   const eyeStyle = {
@@ -482,39 +467,23 @@ export default function LoginPage() {
                     margin: 0, fontSize: 22, fontWeight: 700, color: '#0d2218',
                     fontFamily: '"Plus Jakarta Sans", sans-serif', letterSpacing: '-0.3px',
                   }}>
-                    {mode === 'reset'  ? 'Reset Password' :
-                     mode === 'signup' ? 'Create Account'  :
-                                         'Welcome back'}
+                    {mode === 'signup' ? 'Create Account' : 'Welcome back'}
                   </h2>
                   <p style={{ margin: '5px 0 0', fontSize: 13, color: '#6b8a7a', lineHeight: 1.5, fontWeight: 400 }}>
-                    {mode === 'reset'  ? "We'll send a reset link to your email." :
-                     mode === 'signup' ? 'Join kaTuro — get 30 free tokens to start.' :
+                    {mode === 'signup' ? 'Join kaTuro — get 30 free tokens to start.' :
                                          'Sign in to your teaching workspace.'}
                   </p>
                 </div>
-                {mode !== 'reset' && (
-                  <div style={{ display: 'flex', gap: 3, flexShrink: 0, marginLeft: 12 }}>
-                    {['login', 'signup'].map(m => (
-                      <button key={m} onClick={() => switchMode(m)}
-                        className={`kt-tab ${mode === m ? 'kt-tab-active' : 'kt-tab-idle'}`}>
-                        {m === 'login' ? 'Sign in' : 'Register'}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 3, flexShrink: 0, marginLeft: 12 }}>
+                  {['login', 'signup'].map(m => (
+                    <button key={m} onClick={() => switchMode(m)}
+                      className={`kt-tab ${mode === m ? 'kt-tab-active' : 'kt-tab-idle'}`}>
+                      {m === 'login' ? 'Sign in' : 'Register'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            {/* ── Reset success ── */}
-            {resetSent && (
-              <div className="kt-alert-success" style={{ marginBottom: 16 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: '#1a3d2b', margin: '0 0 4px' }}>Reset link sent!</p>
-                <p style={{ fontSize: 13, color: '#4a6357', margin: '0 0 10px' }}>
-                  Check your inbox at <strong>{email}</strong>.
-                </p>
-                <button onClick={() => switchMode('login')} className="kt-link">← Back to sign in</button>
-              </div>
-            )}
 
             {/* ── Signup success — active ── */}
             {signedUp === 'active' && (
@@ -542,9 +511,9 @@ export default function LoginPage() {
             )}
 
             {/* ── Form ── */}
-            {!resetSent && !signedUp && (
+            {!signedUp && (
               <form
-                onSubmit={mode === 'login' ? handleLogin : mode === 'reset' ? handleReset : handleSignup}
+                onSubmit={mode === 'login' ? handleLogin : handleSignup}
                 style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
               >
                 {/* Signup-only: name row */}
@@ -623,19 +592,12 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Forgot / Back links */}
-                <div style={{ display: 'flex', justifyContent: mode === 'reset' ? 'center' : 'flex-end', marginTop: -2 }}>
-                  {mode === 'login' && (
-                    <button type="button" onClick={() => switchMode('reset')} className="kt-link">
-                      Forgot password?
-                    </button>
-                  )}
-                  {mode === 'reset' && (
-                    <button type="button" onClick={() => switchMode('login')} className="kt-link">
-                      ← Back to sign in
-                    </button>
-                  )}
-                </div>
+                {/* Forgot password note */}
+                {mode === 'login' && (
+                  <p style={{ margin: '-4px 0 0', fontSize: 11, color: '#9bb8a5', textAlign: 'right' }}>
+                    Forgot your password? Contact your administrator.
+                  </p>
+                )}
 
                 {/* Error */}
                 {error && <div className="kt-alert-error">{error}</div>}
@@ -644,9 +606,8 @@ export default function LoginPage() {
                 <button type="submit" className="kt-btn kt-btn-primary" disabled={loading} style={{ marginTop: 4 }}>
                   {loading
                     ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
-                        {mode === 'reset' ? 'Sending…' : mode === 'signup' ? 'Creating account…' : 'Signing in…'}
+                        {mode === 'signup' ? 'Creating account…' : 'Signing in…'}
                       </>
-                    : mode === 'reset'  ? 'Send Reset Link'
                     : mode === 'signup' ? <><Gift size={15} /> Create Account — 30 Free Tokens</>
                     :                     'Sign In to kaTuro'
                   }
