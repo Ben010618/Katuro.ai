@@ -124,10 +124,10 @@ const INPUT_STYLE = {
   border: '1px solid rgba(45,106,79,0.2)',
   fontSize: 13,
   fontFamily: 'inherit',
-  background: '#f9fafb',
+  background: 'var(--kt-input-bg)',
   boxSizing: 'border-box',
   outline: 'none',
-  color: '#0d2218',
+  color: 'var(--kt-text-primary)',
   transition: 'border-color 0.15s',
 };
 
@@ -291,8 +291,8 @@ export default function DashboardPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
         <div style={{
-          background: '#fff', borderRadius: 14, padding: '18px 20px',
-          border: '1px solid rgba(45,106,79,0.12)', transition: 'all 0.18s',
+          background: 'var(--kt-card)', borderRadius: 14, padding: '18px 20px',
+          border: '1px solid var(--kt-border)', transition: 'all 0.18s',
           boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
         }}
           onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: '#2d6a4f', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(45,106,79,0.12)' })}
@@ -302,12 +302,12 @@ export default function DashboardPage() {
             <BookOpen size={18} color="#2d6a4f" />
           </div>
           <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#2d6a4f', lineHeight: 1 }}>{loading ? '—' : totalLessons}</p>
-          <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Lesson Plans</p>
+          <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Lesson Plans</p>
         </div>
 
         {!researchLoading && (
           <div style={{
-            background: '#fff', borderRadius: 14, padding: '18px 20px',
+            background: 'var(--kt-card)', borderRadius: 14, padding: '18px 20px',
             border: '1px solid rgba(3,105,161,0.15)', transition: 'all 0.18s', cursor: 'pointer',
             boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}
@@ -319,7 +319,7 @@ export default function DashboardPage() {
               <FlaskConical size={18} color="#0369a1" />
             </div>
             <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0369a1', lineHeight: 1 }}>{researches.length}</p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Research Projects</p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Research Projects</p>
           </div>
         )}
       </div>
@@ -370,12 +370,12 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <div>
-        <h2 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Quick Actions</h2>
+        <h2 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>Quick Actions</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
           {QUICK_ACTIONS.map(({ label, sub, Icon, to, color }) => (
             <button key={to} onClick={() => navigate(to)} style={{
               display: 'flex', alignItems: 'center', gap: 12,
-              background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
+              background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
               borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
               transition: 'all 0.18s',
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
@@ -387,8 +387,8 @@ export default function DashboardPage() {
                 <Icon size={19} color={color} />
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>{label}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357', fontWeight: 400 }}>{sub}</p>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>{label}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', fontWeight: 400 }}>{sub}</p>
               </div>
               <ArrowRight size={14} color="rgba(45,106,79,0.3)" />
             </button>
@@ -398,22 +398,22 @@ export default function DashboardPage() {
 
       {/* Teacher Profile */}
       <div style={{
-        background: '#fff', borderRadius: 14, padding: '24px',
-        border: '1px solid rgba(45,106,79,0.12)',
+        background: 'var(--kt-card)', borderRadius: 14, padding: '24px',
+        border: '1px solid var(--kt-border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
             <User size={18} color="#2d6a4f" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Teacher Profile</h2>
-            <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>Included in lesson plans, quizzes, and game sheets</p>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Teacher Profile</h2>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>Included in lesson plans, quizzes, and game sheets</p>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
               Full Name
             </label>
             <input
@@ -426,7 +426,7 @@ export default function DashboardPage() {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
               Designation / Position
             </label>
             <input
@@ -439,7 +439,7 @@ export default function DashboardPage() {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
               School
             </label>
             <input
@@ -475,7 +475,7 @@ export default function DashboardPage() {
       {/* Recent lesson plans */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Recent Lesson Plans</h2>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>Recent Lesson Plans</h2>
           <button onClick={() => navigate('/my-lessons')} style={{
             display: 'flex', alignItems: 'center', gap: 5,
             background: 'none', border: 'none', cursor: 'pointer',
@@ -490,8 +490,8 @@ export default function DashboardPage() {
             const st = STATUS_COLORS[lesson.status] || STATUS_COLORS.draft;
             return (
               <div key={lesson.id} style={{
-                background: '#fff', borderRadius: 14,
-                border: '1px solid rgba(45,106,79,0.12)',
+                background: 'var(--kt-card)', borderRadius: 14,
+                border: '1px solid var(--kt-border)',
                 padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10,
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
@@ -500,7 +500,7 @@ export default function DashboardPage() {
                 onClick={() => navigate('/my-lessons')}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ background: subjectColor(lesson.subject), borderRadius: 7, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: '#0d2218', flexShrink: 0 }}>
+                  <div style={{ background: subjectColor(lesson.subject), borderRadius: 7, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: 'var(--kt-text-primary)', flexShrink: 0 }}>
                     {lesson.subject} {lesson.grade}
                   </div>
                   <div style={{ background: st.bg, borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, color: st.color, flexShrink: 0 }}>
@@ -508,13 +508,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0d2218', lineHeight: 1.3 }}>{lesson.title}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#4a6357' }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--kt-text-primary)', lineHeight: 1.3 }}>{lesson.title}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
                     {lesson.quarter} · Week {lesson.week} · {lesson.dates}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                  <span style={{ fontSize: 11, color: '#4a6357', fontWeight: 500 }}>
+                  <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontWeight: 500 }}>
                     {lesson.sessions} session{lesson.sessions !== 1 ? 's' : ''}
                   </span>
                   <button onClick={e => { e.stopPropagation(); navigate('/my-lessons'); }} style={{
@@ -531,7 +531,7 @@ export default function DashboardPage() {
 
           {/* New lesson CTA card */}
           <button onClick={() => navigate('/lesson-gen')} style={{
-            background: '#f5faf7', border: '2px dashed rgba(45,106,79,0.25)',
+            background: 'var(--kt-surface)', border: '2px dashed rgba(45,106,79,0.25)',
             borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: 10, minHeight: 140, transition: 'all 0.15s',
@@ -544,7 +544,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#2d6a4f' }}>Create New Lesson</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>AI-powered planning</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>AI-powered planning</p>
             </div>
           </button>
         </div>
@@ -554,7 +554,7 @@ export default function DashboardPage() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>My Action Research</h2>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>My Action Research</h2>
             {researches.length > 0 && (
               <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 9px' }}>
                 {researches.length}
@@ -578,7 +578,7 @@ export default function DashboardPage() {
 
           {researchLoading ? (
             [0, 1].map(i => (
-              <div key={i} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.1)', padding: '18px 20px', height: 180, opacity: 0.5 }}>
+              <div key={i} style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid rgba(45,106,79,0.1)', padding: '18px 20px', height: 180, opacity: 0.5 }}>
                 <div style={{ background: '#f0f0f0', height: 14, borderRadius: 6, width: '60%', marginBottom: 10 }} />
                 <div style={{ background: '#f0f0f0', height: 10, borderRadius: 6, width: '90%', marginBottom: 6 }} />
                 <div style={{ background: '#f0f0f0', height: 10, borderRadius: 6, width: '70%' }} />
@@ -604,7 +604,7 @@ export default function DashboardPage() {
                   key={r.id}
                   onClick={() => navigate(url)}
                   style={{
-                    background: '#fff', borderRadius: 14,
+                    background: 'var(--kt-card)', borderRadius: 14,
                     border: `1px solid ${isComplete ? 'rgba(45,106,79,0.25)' : 'rgba(45,106,79,0.12)'}`,
                     padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10,
                     cursor: 'pointer', transition: 'all 0.15s', position: 'relative',
@@ -641,7 +641,7 @@ export default function DashboardPage() {
 
                   {/* Title */}
                   <p style={{
-                    margin: 0, fontSize: 13, fontWeight: 600, color: '#0d2218', lineHeight: 1.4,
+                    margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)', lineHeight: 1.4,
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                   }}>
                     {title}
@@ -709,7 +709,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0369a1' }}>Start New Research</p>
-              <p style={{ margin: '3px 0 0', fontSize: 11, color: '#4a6357' }}>AI-guided DepEd action research</p>
+              <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>AI-guided DepEd action research</p>
             </div>
           </button>
         </div>

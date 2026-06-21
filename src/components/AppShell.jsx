@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../context/ThemeContext';
 import img1 from '../assets/1.png';
 import img2 from '../assets/2.png';
 import img3 from '../assets/3.png';
@@ -15,7 +16,7 @@ import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, Projector,
   ShieldCheck, Coins, Gamepad2, FlaskConical, Zap,
-  School, GraduationCap,
+  School, GraduationCap, Moon, Sun,
 } from 'lucide-react';
 
 
@@ -49,7 +50,7 @@ const TITLES = {
   '/classes-i-teach':         'Classes I Teach',
 };
 
-function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
+function SidebarContent({ user, tokenBalance, isAdmin, onClose, dark, toggle }) {
   const navigate = useNavigate();
 
   const initials = user?.displayName
@@ -66,8 +67,8 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
   return (
     <div style={{
       width: 220, height: '100%', display: 'flex', flexDirection: 'column',
-      background: '#ffffff',
-      borderRight: '1px solid rgba(45,106,79,0.12)',
+      background: 'var(--kt-sidebar-bg)',
+      borderRight: '1px solid var(--kt-border)',
       padding: '18px 10px',
     }}>
       {/* Logo */}
@@ -78,8 +79,8 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
           style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, objectFit: 'cover' }}
         />
         <div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1a3d2b', lineHeight: 1 }}>kaTuro AI</p>
-          <p style={{ margin: 0, marginTop: 3, fontSize: 10, color: '#4a6357', lineHeight: 1 }}>Teacher Co-pilot</p>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1 }}>kaTuro AI</p>
+          <p style={{ margin: 0, marginTop: 3, fontSize: 10, color: 'var(--kt-text-secondary)', lineHeight: 1 }}>Teacher Co-pilot</p>
         </div>
         {onClose && (
           <button onClick={onClose} style={{
@@ -102,19 +103,19 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
             style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
-              background: isActive ? '#bbf7d0' : 'transparent',
-              color: isActive ? '#14532d' : '#4a6357',
+              background: isActive ? (dark ? 'rgba(34,197,94,0.18)' : '#bbf7d0') : 'transparent',
+              color: isActive ? '#14532d' : 'var(--kt-text-secondary)',
               fontWeight: isActive ? 700 : 500, fontSize: 13,
               transition: 'background 0.14s, color 0.14s',
               borderLeft: isActive ? '3px solid #22c55e' : '3px solid transparent',
             })}
             onMouseEnter={e => {
               if (e.currentTarget.getAttribute('aria-current') !== 'page')
-                Object.assign(e.currentTarget.style, { background: '#dcfce7', color: '#14532d' });
+                Object.assign(e.currentTarget.style, { background: dark ? 'rgba(82,183,136,0.12)' : '#dcfce7', color: '#14532d' });
             }}
             onMouseLeave={e => {
               if (e.currentTarget.getAttribute('aria-current') !== 'page')
-                Object.assign(e.currentTarget.style, { background: 'transparent', color: '#4a6357' });
+                Object.assign(e.currentTarget.style, { background: 'transparent', color: 'var(--kt-text-secondary)' });
             }}
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
@@ -188,7 +189,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
       </nav>
 
       {/* Teacher + logout */}
-      <div style={{ borderTop: '1px solid rgba(45,106,79,0.12)', paddingTop: 10, marginTop: 4 }}>
+      <div style={{ borderTop: '1px solid var(--kt-border)', paddingTop: 10, marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', marginBottom: 2 }}>
           <div style={{
             width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
@@ -198,7 +199,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
           }}>{initials}</div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
             <p style={{
-              margin: 0, fontSize: 12, fontWeight: 700, color: '#0d2218',
+              margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{displayName}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -210,16 +211,33 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
             </div>
           </div>
         </div>
+
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggle}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 10px', borderRadius: 9, border: 'none', cursor: 'pointer',
+            background: 'transparent', color: 'var(--kt-text-secondary)',
+            fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {dark ? <Sun size={13} /> : <Moon size={13} />}
+          {dark ? 'Light Mode' : 'Dark Mode'}
+        </button>
+
         <button
           onClick={handleLogout}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 8,
             padding: '7px 10px', borderRadius: 9, border: 'none', cursor: 'pointer',
-            background: 'transparent', color: '#4a6357',
+            background: 'transparent', color: 'var(--kt-text-secondary)',
             fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#f5faf7'; e.currentTarget.style.color = '#0d2218'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#4a6357'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; e.currentTarget.style.color = 'var(--kt-text-primary)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--kt-text-secondary)'; }}
         >
           <LogOut size={13} />
           Sign Out
@@ -231,6 +249,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose }) {
 
 export default function AppShell() {
   const { user, tokenBalance, isAdmin, loading } = useAuth();
+  const { dark, toggle } = useTheme();
   const location = useLocation();
   const [mobileOpen,   setMobileOpen]   = useState(false);
   const [slideIdx,     setSlideIdx]     = useState(0);
@@ -271,14 +290,14 @@ export default function AppShell() {
         }
       `}</style>
 
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#f5faf7' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--kt-surface)' }}>
 
         {/* Sidebar — desktop */}
         <div className="shell-sidebar" style={{
           width: 220, flexShrink: 0, position: 'sticky', top: 0,
           height: '100vh', overflow: 'hidden',
         }}>
-          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} />
+          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} dark={dark} toggle={toggle} />
         </div>
 
         {/* Mobile sidebar overlay */}
@@ -313,8 +332,8 @@ export default function AppShell() {
 
           {/* Topbar */}
           <header style={{
-            height: 56, background: '#fff',
-            borderBottom: '1px solid rgba(45,106,79,0.12)',
+            height: 56, background: 'var(--kt-topbar-bg)',
+            borderBottom: '1px solid var(--kt-border)',
             display: 'flex', alignItems: 'center',
             padding: '0 20px', gap: 12,
             position: 'sticky', top: 0, zIndex: 40, flexShrink: 0,
@@ -332,9 +351,9 @@ export default function AppShell() {
 
             {/* Breadcrumb */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.08em' }}>kaTuro AI</span>
-              <ChevronRight size={11} color="rgba(45,106,79,0.3)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{pageTitle}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>kaTuro AI</span>
+              <ChevronRight size={11} color="var(--kt-border)" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{pageTitle}</span>
             </div>
 
             {/* Token balance badge / zero-token CTA */}

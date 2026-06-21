@@ -195,10 +195,10 @@ export default function Step3() {
         <span style={{ background: 'rgba(232,163,32,0.12)', color: '#e8a320', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
           Phase 3 — Generate
         </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
+        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
           Ready to generate your ILAW Lesson Plan
         </h2>
-        <p style={{ margin: 0, fontSize: 15, color: '#4a6357', lineHeight: 1.65 }}>
+        <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
           Review your session setup and competency, then click Generate. kaTuro builds your complete {n}-session ILAW document.
         </p>
       </div>
@@ -206,14 +206,14 @@ export default function Step3() {
       {/* Review Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', padding: '16px 18px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             Session Details
           </p>
-          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
             {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber}
           </p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#4a6357', lineHeight: 1.65 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
             Teaching days: {days.slice(0, 4).map(d => formatDayShort(d)).join(' · ')}
             {days.length > 4 ? ` +${days.length - 4}` : ''}
           </p>
@@ -224,14 +224,14 @@ export default function Step3() {
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', padding: '16px 18px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             Competency
           </p>
-          <p style={{ margin: '0 0 6px', fontSize: 13, color: '#0d2218', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {store.competencyText || 'No competency entered'}
           </p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#4a6357' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
             Lesson: <strong>{store.lessonName || 'Untitled'}</strong>
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -248,8 +248,8 @@ export default function Step3() {
       </div>
 
       {/* Declaration of AI Use */}
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', padding: '18px 20px', marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 5, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+      <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '18px 20px', marginBottom: 16 }}>
+        <label style={{ display: 'block', marginBottom: 5, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
           Declaration of AI use{' '}
           <span style={{ fontSize: 11, color: '#4a6357', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(DepEd DO 3, 2026)</span>
         </label>

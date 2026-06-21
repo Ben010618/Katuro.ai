@@ -58,7 +58,7 @@ function Calendar({ selectedDays, onChange }) {
         <button onClick={prevMonth} style={{background:'none',border:'none',cursor:'pointer',padding:4,color:'#4a6357',display:'flex'}}>
           <ChevronLeft size={18}/>
         </button>
-        <span style={{fontSize:14,fontWeight:600,color:'#0d2218'}}>
+        <span style={{fontSize:14,fontWeight:600,color:'var(--kt-text-primary)'}}>
           {MONTH_NAMES[month]} {year}
         </span>
         <button onClick={nextMonth} style={{background:'none',border:'none',cursor:'pointer',padding:4,color:'#4a6357',display:'flex'}}>
@@ -92,8 +92,8 @@ function Calendar({ selectedDays, onChange }) {
                 height:34, display:'grid', placeItems:'center',
                 borderRadius:8, cursor: disabled ? 'default' : 'pointer',
                 fontSize:13, fontWeight: selected ? 700 : 400,
-                background: selected ? '#1a3d2b' : weekend ? '#f5faf7' : 'transparent',
-                color: selected ? '#fff' : past ? 'rgba(45,106,79,0.2)' : weekend ? 'rgba(45,106,79,0.3)' : '#0d2218',
+                background: selected ? '#1a3d2b' : weekend ? 'var(--kt-surface)' : 'transparent',
+                color: selected ? '#fff' : past ? 'rgba(45,106,79,0.2)' : weekend ? 'rgba(45,106,79,0.3)' : 'var(--kt-text-primary)',
                 transition:'all 0.1s',
                 position:'relative',
                 transform: selected ? 'scale(1.05)' : 'none',
@@ -149,7 +149,7 @@ export default function Step1() {
         <span style={{background:'#ccfbf1',color:'#0d9488',borderRadius:20,padding:'4px 12px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'1px'}}>
           Setup
         </span>
-        <h2 style={{margin:'10px 0 6px',fontSize:22,fontWeight:600,color:'#0d2218'}}>Set up your teaching session</h2>
+        <h2 style={{margin:'10px 0 6px',fontSize:22,fontWeight:600,color:'var(--kt-text-primary)'}}>Set up your teaching session</h2>
         <p style={{margin:0,fontSize:15,color:'#4a6357',lineHeight:1.65,maxWidth:520}}>
           Select your subject, grade, term, and week. Then choose which days you will teach — each day you pick becomes one session in your ILAW lesson plan.
         </p>
@@ -159,7 +159,7 @@ export default function Step1() {
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,alignItems:'start'}}>
 
         {/* LEFT: Form */}
-        <div style={{background:'#fff',border:'1px solid rgba(45,106,79,0.12)',borderRadius:14,padding:24,display:'flex',flexDirection:'column',gap:20}}>
+        <div style={{background:'var(--kt-card)',border:'1px solid var(--kt-border)',borderRadius:14,padding:24,display:'flex',flexDirection:'column',gap:20}}>
 
           <div>
             <label style={{display:'block',marginBottom:6,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
@@ -184,7 +184,7 @@ export default function Step1() {
                 <button key={t} onClick={()=>setTerm(t)} style={{
                   flex:1,padding:'9px 4px',borderRadius:10,border:'1.5px solid',
                   borderColor: term===t ? '#1a3d2b' : 'rgba(45,106,79,0.2)',
-                  background:  term===t ? '#1a3d2b' : '#fff',
+                  background:  term===t ? '#1a3d2b' : 'var(--kt-card)',
                   color:       term===t ? '#fff' : '#4a6357',
                   fontSize:13, fontWeight: term===t ? 600 : 400, cursor:'pointer', transition:'all 0.12s',
                 }}>
@@ -210,7 +210,7 @@ export default function Step1() {
               animation:'fadeUp 0.25s ease',
             }}>
               <p style={{margin:'0 0 4px',fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>YOUR LESSON</p>
-              <p style={{margin:0,fontSize:15,fontWeight:600,color:'#0d2218'}}>
+              <p style={{margin:0,fontSize:15,fontWeight:600,color:'var(--kt-text-primary)'}}>
                 {subject} {grade} · {term} · {week}
               </p>
               <p style={{margin:'4px 0 0',fontSize:13,color:'#4a6357'}}>
@@ -224,9 +224,9 @@ export default function Step1() {
         </div>
 
         {/* RIGHT: Calendar */}
-        <div style={{background:'#fff',border:'1px solid rgba(45,106,79,0.12)',borderRadius:14,padding:24}}>
+        <div style={{background:'var(--kt-card)',border:'1px solid var(--kt-border)',borderRadius:14,padding:24}}>
           <div style={{marginBottom:14}}>
-            <p style={{margin:0,fontSize:13,fontWeight:600,color:'#0d2218'}}>
+            <p style={{margin:0,fontSize:13,fontWeight:600,color:'var(--kt-text-primary)'}}>
               Teaching days <span style={{color:'#e05c5c'}}>*</span>
             </p>
             <p style={{margin:'4px 0 0',fontSize:13,color:'#4a6357',lineHeight:1.65}}>
@@ -253,7 +253,7 @@ export default function Step1() {
                 {days.map(iso=>(
                   <span key={iso} style={{
                     display:'flex',alignItems:'center',gap:5,
-                    background:'#fff',border:'1px solid rgba(45,106,79,0.2)',
+                    background:'var(--kt-card)',border:'1px solid rgba(45,106,79,0.2)',
                     borderRadius:20,padding:'4px 10px',fontSize:12,fontWeight:600,color:'#1a3d2b',
                   }}>
                     {formatChip(iso)}
@@ -271,7 +271,7 @@ export default function Step1() {
 
             {days.length > 0 && (
               <div style={{
-                background:'#f5faf7',border:'1px solid rgba(45,106,79,0.12)',
+                background:'var(--kt-surface)',border:'1px solid var(--kt-border)',
                 borderRadius:10,padding:'10px 14px',marginTop:12,
               }}>
                 <p style={{margin:'0 0 6px',fontSize:11,color:'#4a6357',fontWeight:600}}>

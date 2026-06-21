@@ -44,7 +44,7 @@ function StepIndicator({ current }) {
               <div style={{
                 width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
                 display: 'grid', placeItems: 'center',
-                background: done ? '#2d6a4f' : active ? '#d8f3dc' : '#f5faf7',
+                background: done ? '#2d6a4f' : active ? '#d8f3dc' : 'var(--kt-surface)',
                 border: `2px solid ${done ? '#2d6a4f' : active ? '#40916c' : 'rgba(45,106,79,0.18)'}`,
                 fontSize: 12, fontWeight: 700,
                 color: done ? '#fff' : active ? '#2d6a4f' : '#4a6357',
@@ -243,8 +243,8 @@ export default function QuizBuilderPage() {
 
       {/* Page heading */}
       <div>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0d2218' }}>Quiz Builder</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: '#4a6357' }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Quiz Builder</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--kt-text-secondary)' }}>
           AI generates quiz questions directly from your saved lesson plans
         </p>
       </div>
@@ -254,8 +254,8 @@ export default function QuizBuilderPage() {
 
       {/* ── LEFT: wizard card ── */}
       <div style={{
-        background: '#fff', borderRadius: 14,
-        border: '1px solid rgba(45,106,79,0.12)',
+        background: 'var(--kt-card)', borderRadius: 14,
+        border: '1px solid var(--kt-border)',
         padding: '28px',
       }}>
         <StepIndicator current={step} />
@@ -263,16 +263,16 @@ export default function QuizBuilderPage() {
         {/* ══════════ STEP 0 — Select Lesson ══════════ */}
         {step === 0 && (
           <div>
-            <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
               Choose a Lesson Plan
             </h2>
-            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#4a6357' }}>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--kt-text-secondary)' }}>
               The quiz will be generated from the selected lesson's competency and objectives.
             </p>
 
             {/* Search */}
             <div style={{ position: 'relative', marginBottom: 14 }}>
-              <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#4a6357', pointerEvents: 'none' }} />
+              <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--kt-text-secondary)', pointerEvents: 'none' }} />
               <input
                 type="text"
                 placeholder="Search by title, subject, or grade…"
@@ -285,24 +285,24 @@ export default function QuizBuilderPage() {
 
             {/* Lesson list */}
             {lessonsLoading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '28px 0', color: '#4a6357' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '28px 0', color: 'var(--kt-text-secondary)' }}>
                 <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
                 <span style={{ fontSize: 13 }}>Loading your lessons…</span>
               </div>
             ) : filteredLessons.length === 0 ? (
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '48px 24px', background: '#f5faf7', borderRadius: 12,
+                padding: '48px 24px', background: 'var(--kt-surface)', borderRadius: 12,
                 border: '2px dashed rgba(45,106,79,0.18)', gap: 12, textAlign: 'center',
               }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: '#d8f3dc', display: 'grid', placeItems: 'center' }}>
                   <BookOpen size={24} color="#2d6a4f" />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0d2218' }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
                     {search ? 'No lessons match your search' : 'No lesson plans yet'}
                   </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a6357' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--kt-text-secondary)' }}>
                     {search ? 'Try a different search term.' : 'Create a lesson plan in Lesson Gen first.'}
                   </p>
                 </div>
@@ -330,11 +330,11 @@ export default function QuizBuilderPage() {
                         display: 'flex', alignItems: 'center', gap: 14,
                         padding: '14px 16px', borderRadius: 12, textAlign: 'left',
                         border: '1.5px solid rgba(45,106,79,0.14)',
-                        background: '#fff', cursor: 'pointer',
+                        background: 'var(--kt-card)', cursor: 'pointer',
                         transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.35)'; e.currentTarget.style.background = '#f5faf7'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.14)'; e.currentTarget.style.background = '#fff'; }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.35)'; e.currentTarget.style.background = 'var(--kt-surface)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(45,106,79,0.14)'; e.currentTarget.style.background = 'var(--kt-card)'; }}
                     >
                       {/* Icon */}
                       <div style={{
@@ -354,11 +354,11 @@ export default function QuizBuilderPage() {
                           }}>
                             {lesson.type === 'dll' ? 'DLL' : lesson.type === 'cot' ? 'COT' : 'ILAW'}
                           </span>
-                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--kt-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {title}
                           </p>
                         </div>
-                        <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
+                        <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
                           {meta.subject} {meta.grade} · {meta.term}
                           {lesson.type === 'dll' ? (lesson.teachingDates ? ` · ${lesson.teachingDates}` : '') : ` · Wk ${meta.week}`}
                         </p>
@@ -389,16 +389,16 @@ export default function QuizBuilderPage() {
           <div>
             {/* Selected lesson chip */}
             <div style={{
-              background: '#f5faf7', borderRadius: 10, padding: '10px 14px',
+              background: 'var(--kt-surface)', borderRadius: 10, padding: '10px 14px',
               marginBottom: 22, display: 'flex', alignItems: 'center', gap: 10,
-              border: '1px solid rgba(45,106,79,0.12)',
+              border: '1px solid var(--kt-border)',
             }}>
               <BookOpen size={14} color="#2d6a4f" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1a3d2b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {normalizeTitle(selectedLesson)}
                 </p>
-                <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
                   {normalizeMeta(selectedLesson).subject} {normalizeMeta(selectedLesson).grade} · {normalizeMeta(selectedLesson).term}
                 </p>
               </div>
@@ -410,13 +410,13 @@ export default function QuizBuilderPage() {
               </button>
             </div>
 
-            <h2 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Quiz Settings</h2>
+            <h2 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>Quiz Settings</h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
               {/* Quiz title */}
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+                <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
                   Quiz Title
                 </label>
                 <input
@@ -430,7 +430,7 @@ export default function QuizBuilderPage() {
 
               {/* Number of questions */}
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+                <label style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
                   Number of Questions
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -441,8 +441,8 @@ export default function QuizBuilderPage() {
                       style={{
                         padding: '7px 16px', borderRadius: 9, border: '1.5px solid',
                         borderColor: numQuestions === n ? '#2d6a4f' : 'rgba(45,106,79,0.2)',
-                        background: numQuestions === n ? '#2d6a4f' : '#fff',
-                        color: numQuestions === n ? '#fff' : '#4a6357',
+                        background: numQuestions === n ? '#2d6a4f' : 'var(--kt-card)',
+                        color: numQuestions === n ? '#fff' : 'var(--kt-text-secondary)',
                         fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
                       }}
                     >
@@ -450,14 +450,14 @@ export default function QuizBuilderPage() {
                     </button>
                   ))}
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#4a6357', opacity: 0.7 }}>
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', opacity: 0.7 }}>
                   Recommended: 20–25 for a 1-period quiz
                 </p>
               </div>
 
               {/* Number of choices */}
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+                <label style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
                   Choices per Question
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -468,8 +468,8 @@ export default function QuizBuilderPage() {
                       style={{
                         padding: '8px 22px', borderRadius: 9, border: '1.5px solid',
                         borderColor: numChoices === n ? '#2d6a4f' : 'rgba(45,106,79,0.2)',
-                        background: numChoices === n ? '#2d6a4f' : '#fff',
-                        color: numChoices === n ? '#fff' : '#4a6357',
+                        background: numChoices === n ? '#2d6a4f' : 'var(--kt-card)',
+                        color: numChoices === n ? '#fff' : 'var(--kt-text-secondary)',
                         fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
                       }}
                     >
@@ -520,7 +520,7 @@ export default function QuizBuilderPage() {
             </div>
 
             {!generating && (
-              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#4a6357', textAlign: 'center', opacity: 0.7 }}>
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)', textAlign: 'center', opacity: 0.7 }}>
                 Takes ~15–30 seconds · Uses Gemini AI
               </p>
             )}
@@ -533,8 +533,8 @@ export default function QuizBuilderPage() {
             {/* Quiz header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0d2218' }}>{quizTitle}</h2>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a6357' }}>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{quizTitle}</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--kt-text-secondary)' }}>
                   {questions.length} questions · {numChoices} choices each ·{' '}
                   <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12 }}>
                     {normalizeMeta(selectedLesson).subject} {normalizeMeta(selectedLesson).grade}
@@ -575,13 +575,13 @@ export default function QuizBuilderPage() {
                 <div
                   key={idx}
                   style={{
-                    background: '#fff', borderRadius: 12,
-                    border: '1px solid rgba(45,106,79,0.12)',
+                    background: 'var(--kt-card)', borderRadius: 12,
+                    border: '1px solid var(--kt-border)',
                     padding: '16px 18px',
                   }}
                 >
                   {/* Question text */}
-                  <p style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 600, color: '#0d2218', lineHeight: 1.55 }}>
+                  <p style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 600, color: 'var(--kt-text-primary)', lineHeight: 1.55 }}>
                     <span style={{ fontFamily: '"DM Mono", monospace', color: '#2d6a4f', marginRight: 6 }}>
                       {q.num || idx + 1}.
                     </span>
@@ -599,7 +599,7 @@ export default function QuizBuilderPage() {
                           style={{
                             display: 'flex', alignItems: 'flex-start', gap: 10,
                             padding: '8px 12px', borderRadius: 8,
-                            background: isCorrect ? '#d8f3dc' : '#f5faf7',
+                            background: isCorrect ? '#d8f3dc' : 'var(--kt-surface)',
                             border: `1px solid ${isCorrect ? 'rgba(45,106,79,0.3)' : 'transparent'}`,
                             transition: 'background 0.15s',
                           }}
@@ -629,7 +629,7 @@ export default function QuizBuilderPage() {
 
                   {/* Competency tag */}
                   {q.competency && (
-                    <p style={{ margin: '10px 0 0', fontSize: 11, color: '#4a6357', fontStyle: 'italic', opacity: 0.8 }}>
+                    <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', fontStyle: 'italic', opacity: 0.8 }}>
                       Competency: {q.competency}
                     </p>
                   )}
@@ -656,12 +656,12 @@ export default function QuizBuilderPage() {
 
         {/* Panel header */}
         <div style={{
-          background: '#fff', borderRadius: 14,
-          border: '1px solid rgba(45,106,79,0.12)',
+          background: 'var(--kt-card)', borderRadius: 14,
+          border: '1px solid var(--kt-border)',
           padding: '16px 18px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Bubble Sheet Preview</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Bubble Sheet Preview</p>
             <span style={{
               fontSize: 10, fontWeight: 700, background: '#d8f3dc', color: '#1a3d2b',
               borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap',
@@ -669,12 +669,12 @@ export default function QuizBuilderPage() {
               {sheetsPerPage} per A4
             </span>
           </div>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#4a6357' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
             {numQuestions}Q · {numChoices} choices · Print and cut
           </p>
           {/* QR / save status */}
           {saving ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, color: '#4a6357' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
               <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Saving quiz for QR…
             </div>
           ) : savedQuizId ? (
@@ -692,14 +692,14 @@ export default function QuizBuilderPage() {
             border: '1px solid rgba(45,106,79,0.14)',
             borderRadius: 8,
             overflow: 'hidden',
-            background: '#f5faf7',
+            background: 'var(--kt-surface)',
             padding: 4,
           }}>
             <BubbleSheetPreview numQ={previewNumQ} numChoices={numChoices} width={260} uid={teacherUid} />
           </div>
 
           {numQuestions > 20 && (
-            <p style={{ margin: '8px 0 0', fontSize: 10, color: '#4a6357', fontStyle: 'italic' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
               Preview shows 20 items · actual sheet will have {numQuestions}
             </p>
           )}
@@ -741,11 +741,11 @@ export default function QuizBuilderPage() {
         {/* Hint */}
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 8,
-          background: '#f5faf7', borderRadius: 10, padding: '10px 12px',
+          background: 'var(--kt-surface)', borderRadius: 10, padding: '10px 12px',
           border: '1px solid rgba(45,106,79,0.1)',
         }}>
-          <Scissors size={13} style={{ color: '#4a6357', marginTop: 1, flexShrink: 0 }} />
-          <p style={{ margin: 0, fontSize: 11, color: '#4a6357', lineHeight: 1.5 }}>
+          <Scissors size={13} style={{ color: 'var(--kt-text-secondary)', marginTop: 1, flexShrink: 0 }} />
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
             Print on A4 bond paper, then cut along the sheet borders to distribute.
           </p>
         </div>

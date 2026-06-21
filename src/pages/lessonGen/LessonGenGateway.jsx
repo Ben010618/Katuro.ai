@@ -45,10 +45,10 @@ export default function LessonGenGateway() {
             </span>
           </div>
         </div>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0d2218', lineHeight: 1.2 }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1.2 }}>
           What would you like to build?
         </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 15, color: '#4a6357', lineHeight: 1.65 }}>
+        <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
           Choose a document type to get started.
         </p>
       </div>
@@ -60,7 +60,7 @@ export default function LessonGenGateway() {
         <button
           onClick={handleILAW}
           style={{
-            textAlign: 'left', background: '#fff',
+            textAlign: 'left', background: 'var(--kt-card)',
             border: `2px solid rgba(29,78,216,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -84,10 +84,10 @@ export default function LessonGenGateway() {
           </div>
 
           <div>
-            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: '#0d2218' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
               Build your ILAW Lesson Plan
             </p>
-            <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
               AI-generated detailed lesson plans per session. 3 steps, ~5 minutes. Pre-lesson, flow, assessment, extended learning.
             </p>
           </div>
@@ -102,7 +102,7 @@ export default function LessonGenGateway() {
         <button
           onClick={() => navigate('/dll-gen/step-1')}
           style={{
-            textAlign: 'left', background: '#fff',
+            textAlign: 'left', background: 'var(--kt-card)',
             border: `2px solid rgba(22,163,74,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -126,10 +126,10 @@ export default function LessonGenGateway() {
           </div>
 
           <div>
-            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: '#0d2218' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
               Build your Daily Lesson Log
             </p>
-            <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
               DepEd standard DLL format. AI fills in all 10 procedure steps for each day. Exports as landscape A4 Word document.
             </p>
           </div>
@@ -144,7 +144,7 @@ export default function LessonGenGateway() {
         <button
           onClick={() => navigate('/cot-gen/step-1')}
           style={{
-            textAlign: 'left', background: '#fff',
+            textAlign: 'left', background: 'var(--kt-card)',
             border: `2px solid rgba(217,119,6,0.15)`,
             borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
             transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -168,13 +168,13 @@ export default function LessonGenGateway() {
           </div>
 
           <div>
-            <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: '#0d2218' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
               Build your COT Lesson Plan
             </p>
             <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: COT_COLOR, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               COT-optimized · 4As Framework
             </p>
-            <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
               Full PIVOT 4A / IDEA lesson plan with a built-in COT Indicator Evidence Map for your IPCRF defense.
             </p>
           </div>

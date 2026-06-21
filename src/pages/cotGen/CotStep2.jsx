@@ -45,10 +45,10 @@ export default function CotStep2() {
         }}>
           Step 2 — COT Indicators
         </span>
-        <h2 style={{ margin: '10px 0 4px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
+        <h2 style={{ margin: '10px 0 4px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
           Which PPST indicators should this lesson address?
         </h2>
-        <p style={{ margin: 0, fontSize: 14, color: '#4a6357', lineHeight: 1.65 }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
           All 12 standard observable indicators are pre-selected. Deselect any that don't apply to your observation context. The AI will embed visible evidence of each selected indicator into the lesson.
         </p>
       </div>
@@ -56,7 +56,7 @@ export default function CotStep2() {
       {/* Selection controls + counter */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 20, background: '#fff',
+        marginBottom: 20, background: 'var(--kt-card)',
         border: '1px solid rgba(124,58,237,0.15)', borderRadius: 12, padding: '12px 18px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -130,7 +130,7 @@ export default function CotStep2() {
                       style={{
                         display: 'flex', alignItems: 'flex-start', gap: 12,
                         textAlign: 'left',
-                        background: on ? meta.bg : '#fff',
+                        background: on ? meta.bg : 'var(--kt-card)',
                         border: `2px solid ${on ? meta.color : 'rgba(0,0,0,0.08)'}`,
                         borderRadius: 12, padding: '12px 14px',
                         cursor: 'pointer', transition: 'all 0.15s',
@@ -139,7 +139,7 @@ export default function CotStep2() {
                       {/* Checkbox */}
                       <div style={{
                         width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1,
-                        background: on ? meta.color : '#fff',
+                        background: on ? meta.color : 'var(--kt-card)',
                         border: `2px solid ${on ? meta.color : 'rgba(0,0,0,0.2)'}`,
                         display: 'grid', placeItems: 'center',
                         transition: 'all 0.15s',

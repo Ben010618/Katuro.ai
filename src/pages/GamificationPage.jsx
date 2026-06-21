@@ -552,8 +552,8 @@ export default function GamificationPage() {
         <span style={{ background: 'rgba(45,106,79,0.1)', color: '#2d6a4f', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
           Intervention Games
         </span>
-        <h2 style={{ margin: '10px 0 4px', fontSize: 22, fontWeight: 700, color: '#0d2218' }}>Select a Lesson Plan</h2>
-        <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>AI will generate a game worksheet based on your lesson's vocabulary and objectives.</p>
+        <h2 style={{ margin: '10px 0 4px', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Select a Lesson Plan</h2>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)' }}>AI will generate a game worksheet based on your lesson's vocabulary and objectives.</p>
       </div>
 
       <div style={{ position: 'relative', marginBottom: 16 }}>
@@ -561,17 +561,17 @@ export default function GamificationPage() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search lessons…"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px 10px 36px', border: '1.5px solid rgba(45,106,79,0.2)', borderRadius: 9, fontSize: 13, background: '#fff', outline: 'none', fontFamily: 'inherit' }}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px 10px 36px', border: '1.5px solid rgba(45,106,79,0.2)', borderRadius: 9, fontSize: 13, background: 'var(--kt-card)', outline: 'none', fontFamily: 'inherit' }}
         />
       </div>
 
       {plansLoading ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 30, color: '#4a6357' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 30, color: 'var(--kt-text-secondary)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
           <span style={{ fontSize: 13 }}>Loading lessons…</span>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px 20px', color: '#4a6357' }}>
+        <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--kt-text-secondary)' }}>
           <BookOpen size={36} style={{ opacity: 0.25, marginBottom: 12 }} />
           <p style={{ margin: 0, fontWeight: 600 }}>No lesson plans found</p>
           <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.7 }}>Create a lesson plan in Lesson Gen first.</p>
@@ -580,7 +580,7 @@ export default function GamificationPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(plan => (
             <button key={plan.id} onClick={() => selectLesson(plan)} style={{
-              background: '#fff', border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12,
+              background: 'var(--kt-card)', border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12,
               padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               fontFamily: 'inherit', transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -595,9 +595,9 @@ export default function GamificationPage() {
                     color:      plan.type === 'dll' ? '#14532d' : plan.type === 'cot' ? '#92400e' : '#1e3a8a' }}>
                     {plan.type === 'dll' ? 'DLL' : plan.type === 'cot' ? 'COT' : 'ILAW'}
                   </span>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{plan.lessonName || plan.title || 'Untitled'}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{plan.lessonName || plan.title || 'Untitled'}</p>
                 </div>
-                <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
                   {[
                     plan.subject,
                     plan.gradeLevel || plan.grade,
@@ -620,41 +620,41 @@ export default function GamificationPage() {
   if (step === 'config') return (
     <div style={{ maxWidth: 680, margin: '0 auto' }}>
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
-      <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, padding: '0 0 16px', fontFamily: 'inherit' }}>
+      <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, padding: '0 0 16px', fontFamily: 'inherit' }}>
         <ArrowLeft size={15} /> Back to lessons
       </button>
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(45,106,79,0.12)', padding: '14px 18px', marginBottom: 20 }}>
-        <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{lesson.lessonName || lesson.title || lesson.topic}</p>
-        <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>{[lesson.subject, lesson.gradeLevel || lesson.grade].filter(Boolean).join(' · ')}</p>
+      <div style={{ background: 'var(--kt-card)', borderRadius: 12, border: '1px solid var(--kt-border)', padding: '14px 18px', marginBottom: 20 }}>
+        <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{lesson.lessonName || lesson.title || lesson.topic}</p>
+        <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>{[lesson.subject, lesson.gradeLevel || lesson.grade].filter(Boolean).join(' · ')}</p>
       </div>
 
-      <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Choose Game Type</h3>
+      <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Choose Game Type</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 22 }}>
         {GAMES.map(g => (
           <button key={g.id} onClick={() => { setGameType(g.id); setCount(g.defaultCount); }} style={{
-            background: gameType === g.id ? g.bg : '#fff',
+            background: gameType === g.id ? g.bg : 'var(--kt-card)',
             border: `2px solid ${gameType === g.id ? g.color : 'rgba(45,106,79,0.12)'}`,
             borderRadius: 12, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
             transition: 'all 0.15s',
           }}>
-            <p style={{ margin: '0 0 3px', fontSize: 12, fontWeight: 700, color: gameType === g.id ? g.color : '#0d2218' }}>{g.label}</p>
-            <p style={{ margin: 0, fontSize: 10, color: '#4a6357', lineHeight: 1.4 }}>{g.desc}</p>
+            <p style={{ margin: '0 0 3px', fontSize: 12, fontWeight: 700, color: gameType === g.id ? g.color : 'var(--kt-text-primary)' }}>{g.label}</p>
+            <p style={{ margin: 0, fontSize: 10, color: 'var(--kt-text-secondary)', lineHeight: 1.4 }}>{g.desc}</p>
           </button>
         ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}>
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(45,106,79,0.12)', padding: '16px 18px' }}>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Number of Items</label>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 12, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Number of Items</label>
           <input type="number" min={4} max={20} value={count} onChange={e => setCount(+e.target.value)}
             style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid rgba(45,106,79,0.2)', borderRadius: 8, fontSize: 15, fontFamily: 'monospace', fontWeight: 700, outline: 'none' }} />
         </div>
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(45,106,79,0.12)', padding: '16px 18px' }}>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Answer Key</label>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 12, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Answer Key</label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
             <input type="checkbox" checked={inclKey} onChange={e => setInclKey(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2d6a4f' }} />
-            <span style={{ fontSize: 13, color: '#0d2218', fontWeight: 600 }}>Include answer key page</span>
+            <span style={{ fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 600 }}>Include answer key page</span>
           </label>
         </div>
       </div>
@@ -692,15 +692,15 @@ export default function GamificationPage() {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div style={{ display: 'flex', align: 'center', gap: 10 }}>
-          <button onClick={() => setStep('config')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, padding: 0, fontFamily: 'inherit' }}>
+          <button onClick={() => setStep('config')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, padding: 0, fontFamily: 'inherit' }}>
             <ArrowLeft size={15} /> Back
           </button>
           <span style={{ margin: '0 6px', color: 'rgba(45,106,79,0.3)' }}>|</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>{gameInfo.label}</span>
-          <span style={{ fontSize: 12, color: '#4a6357' }}>· {lesson?.lessonName || lesson?.title || lesson?.topic}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{gameInfo.label}</span>
+          <span style={{ fontSize: 12, color: 'var(--kt-text-secondary)' }}>· {lesson?.lessonName || lesson?.title || lesson?.topic}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setStep('config')} style={{ background: '#f5faf7', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button onClick={() => setStep('config')} style={{ background: 'var(--kt-surface)', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
             <RefreshCw size={13} /> Regenerate
           </button>
           <button onClick={handleDownload} disabled={downloading} style={{ background: '#2d6a4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, opacity: downloading ? 0.7 : 1 }}>
@@ -711,8 +711,8 @@ export default function GamificationPage() {
       </div>
 
       {/* Game sheet — student version */}
-      <div style={{ background: '#f5faf7', borderRadius: 14, padding: 16, marginBottom: inclKey ? 16 : 0 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+      <div style={{ background: 'var(--kt-surface)', borderRadius: 14, padding: 16, marginBottom: inclKey ? 16 : 0 }}>
+        <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
           Game Sheet (Student)
         </p>
         <div style={{ overflowX: 'auto' }}>
@@ -724,8 +724,8 @@ export default function GamificationPage() {
 
       {/* Answer key */}
       {inclKey && (
-        <div style={{ background: '#f5faf7', borderRadius: 14, padding: 16 }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+        <div style={{ background: 'var(--kt-surface)', borderRadius: 14, padding: 16 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
             Answer Key
           </p>
           <div style={{ overflowX: 'auto' }}>

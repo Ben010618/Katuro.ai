@@ -81,12 +81,12 @@ export default function ClassesITeachPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#4a6357', fontSize: 14 }}>Loading…</div>
       ) : assignments.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', padding: '56px 32px', textAlign: 'center' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '56px 32px', textAlign: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: 18, background: '#d8f3dc', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
             <GraduationCap size={28} color="#2d6a4f" />
           </div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>No classes yet</h3>
-          <p style={{ margin: 0, fontSize: 14, color: '#4a6357', lineHeight: 1.65 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>No classes yet</h3>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
             Ask your class adviser for an invitation link.<br />
             Once accepted, your class will appear here automatically.
           </p>
@@ -100,8 +100,8 @@ export default function ClassesITeachPage() {
                 key={a.id}
                 onClick={() => navigate(`/classes-i-teach/grade/${a.sectionId}/${encodeURIComponent(a.subject)}`)}
                 style={{
-                  background: '#fff', borderRadius: 14,
-                  border: '1px solid rgba(45,106,79,0.12)',
+                  background: 'var(--kt-card)', borderRadius: 14,
+                  border: '1px solid var(--kt-border)',
                   padding: '20px 22px', cursor: 'pointer',
                   transition: 'border-color 0.15s, transform 0.15s',
                 }}
@@ -124,10 +124,10 @@ export default function ClassesITeachPage() {
                     <ChevronRight size={16} color="#4a6357" />
                   </div>
                 </div>
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
                   {a.gradeLevel} – {a.sectionName}
                 </h3>
-                <p style={{ margin: 0, fontSize: 12, color: '#4a6357', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <BookOpen size={11} /> Subject Teacher
                 </p>
               </div>

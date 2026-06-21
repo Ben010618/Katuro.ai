@@ -108,7 +108,7 @@ export default function TokenBundleModal({ onClose }) {
       >
         {/* Card */}
         <div style={{
-          background: '#fff',
+          background: 'var(--kt-card)',
           borderRadius: 22,
           width: '100%', maxWidth: 520,
           boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)',
@@ -201,7 +201,7 @@ export default function TokenBundleModal({ onClose }) {
                 {/* Bundle name */}
                 <p style={{
                   margin: b.badge ? '6px 0 2px' : '0 0 2px',
-                  fontSize: 11, fontWeight: 700, color: '#4a6357',
+                  fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
                   textTransform: 'uppercase', letterSpacing: '0.07em',
                 }}>{b.name}</p>
 
@@ -246,10 +246,10 @@ export default function TokenBundleModal({ onClose }) {
 
           {/* Facebook CTA */}
           <div style={{ padding: '18px 20px 22px', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
               Ready to get your bundle?
             </p>
-            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#4a6357', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
               Message us on Facebook — tokens sent within minutes after payment.
             </p>
             <a

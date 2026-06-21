@@ -142,10 +142,10 @@ export default function CotStep3() {
         }}>
           Step 3 — Generate
         </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
+        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
           Ready to generate your PPST-aligned lesson plan
         </h2>
-        <p style={{ margin: 0, fontSize: 14, color: '#4a6357', lineHeight: 1.65 }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
           Review your selections below, then click Generate. kaTuro will build a complete PIVOT 4A lesson plan with a COT Indicator Evidence Map embedded.
         </p>
       </div>
@@ -154,15 +154,15 @@ export default function CotStep3() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
 
         {/* Lesson info card */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(124,58,237,0.12)', padding: '16px 18px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid rgba(124,58,237,0.12)', padding: '16px 18px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             Lesson Details
           </p>
-          <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#0d2218' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
             {store.subject} · {store.grade}
           </p>
-          <p style={{ margin: '0 0 4px', fontSize: 12, color: '#4a6357' }}>{store.quarter}</p>
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#4a6357', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>{store.quarter}</p>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--kt-text-secondary)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {store.topic}
           </p>
           {store.teacherName && (
@@ -173,13 +173,13 @@ export default function CotStep3() {
         </div>
 
         {/* Indicators card */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(124,58,237,0.12)', padding: '16px 18px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid rgba(124,58,237,0.12)', padding: '16px 18px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             COT Indicators
           </p>
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 22, fontWeight: 700, color: accentColor }}>{selectedIndicators.length}</span>
-            <span style={{ fontSize: 13, color: '#4a6357', marginLeft: 4 }}>/ 12 selected</span>
+            <span style={{ fontSize: 13, color: 'var(--kt-text-secondary)', marginLeft: 4 }}>/ 12 selected</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {selectedIndicators.map(ind => (
@@ -205,7 +205,7 @@ export default function CotStep3() {
           <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             MELC Competency
           </p>
-          <p style={{ margin: 0, fontSize: 13, color: '#0d2218', lineHeight: 1.65 }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.65 }}>
             {store.melc}
           </p>
         </div>

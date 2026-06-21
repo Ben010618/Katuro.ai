@@ -23,11 +23,11 @@ import TempReportCardPanel   from './TempReportCardPanel';
 
 const INPUT = {
   width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 14,
-  border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7',
-  color: '#0d2218', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-input-bg)',
+  color: 'var(--kt-text-primary)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 };
 const LABEL = {
-  display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357',
+  display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 5,
 };
 const BTN_PRIMARY = {
@@ -36,7 +36,7 @@ const BTN_PRIMARY = {
   cursor: 'pointer', fontFamily: 'inherit',
 };
 const BTN_GHOST = {
-  display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: '#4a6357',
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: 'var(--kt-text-secondary)',
   border: '1px solid rgba(45,106,79,0.2)', borderRadius: 9, padding: '6px 12px',
   fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };
@@ -237,7 +237,7 @@ function CsvUploadModal({ sectionId, onClose }) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: step === 'preview' ? 780 : 500, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}
+        style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: step === 'preview' ? 780 : 500, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}
       >
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -258,8 +258,8 @@ function CsvUploadModal({ sectionId, onClose }) {
             {/* Template download */}
             <div style={{ background: '#f0fdf4', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Step 1 — Download the template</p>
-                <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4a6357' }}>Fill it in Excel or Google Sheets, then upload below.</p>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Step 1 — Download the template</p>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>Fill it in Excel or Google Sheets, then upload below.</p>
               </div>
               <button
                 onClick={downloadTemplate}
@@ -271,7 +271,7 @@ function CsvUploadModal({ sectionId, onClose }) {
 
             {/* Drop zone */}
             <div>
-              <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Step 2 — Upload your filled CSV</p>
+              <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Step 2 — Upload your filled CSV</p>
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
@@ -311,13 +311,13 @@ function CsvUploadModal({ sectionId, onClose }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                 <CheckCircle2 size={15} color="#16a34a" />
                 <span style={{ fontWeight: 700, color: '#16a34a' }}>{validCount}</span>
-                <span style={{ color: '#4a6357' }}>ready to import</span>
+                <span style={{ color: 'var(--kt-text-secondary)' }}>ready to import</span>
               </div>
               {invalidCount > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                   <AlertCircle size={15} color="#dc2626" />
                   <span style={{ fontWeight: 700, color: '#dc2626' }}>{invalidCount}</span>
-                  <span style={{ color: '#4a6357' }}>rows with errors (will be skipped)</span>
+                  <span style={{ color: 'var(--kt-text-secondary)' }}>rows with errors (will be skipped)</span>
                 </div>
               )}
               <button
@@ -331,10 +331,10 @@ function CsvUploadModal({ sectionId, onClose }) {
             {/* Preview table */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead style={{ position: 'sticky', top: 0, background: '#f5faf7', zIndex: 1 }}>
+                <thead style={{ position: 'sticky', top: 0, background: 'var(--kt-surface)', zIndex: 1 }}>
                   <tr>
                     {['#', 'Surname', 'Given Name', 'M.I.', 'Gender', 'LRN', 'Student No.', 'Status'].map(h => (
-                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.7px', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(45,106,79,0.1)' }}>{h}</th>
+                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.7px', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(45,106,79,0.1)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -344,17 +344,17 @@ function CsvUploadModal({ sectionId, onClose }) {
                     return (
                       <tr key={i} style={{ background: errs ? 'rgba(220,38,38,0.04)' : '', borderTop: '1px solid rgba(45,106,79,0.06)' }}>
                         <td style={{ padding: '8px 12px', color: '#9ca3af' }}>{i + 1}</td>
-                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0d2218' }}>{s.surname || <span style={{ color: '#dc2626' }}>—</span>}</td>
-                        <td style={{ padding: '8px 12px', color: '#0d2218' }}>{s.givenName || <span style={{ color: '#dc2626' }}>—</span>}</td>
-                        <td style={{ padding: '8px 12px', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--kt-text-primary)' }}>{s.surname || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--kt-text-primary)' }}>{s.givenName || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--kt-text-secondary)' }}>{s.middleInitial || '—'}</td>
                         <td style={{ padding: '8px 12px' }}>
                           {['Male', 'Female'].includes(s.gender)
                             ? <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 8px', background: s.gender === 'Male' ? 'rgba(59,130,246,0.1)' : 'rgba(236,72,153,0.1)', color: s.gender === 'Male' ? '#1d4ed8' : '#be185d' }}>{s.gender}</span>
                             : <span style={{ color: '#dc2626', fontSize: 11 }}>{s.gender || 'missing'}</span>
                           }
                         </td>
-                        <td style={{ padding: '8px 12px', fontFamily: '"DM Mono", monospace', color: '#4a6357' }}>{s.lrn || <span style={{ color: '#dc2626' }}>—</span>}</td>
-                        <td style={{ padding: '8px 12px', color: '#4a6357' }}>{s.studentNumber || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: '"DM Mono", monospace', color: 'var(--kt-text-secondary)' }}>{s.lrn || <span style={{ color: '#dc2626' }}>—</span>}</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--kt-text-secondary)' }}>{s.studentNumber || '—'}</td>
                         <td style={{ padding: '8px 12px' }}>
                           {errs
                             ? <span title={errs.join(', ')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', fontWeight: 600 }}><AlertCircle size={12} /> {errs[0]}</span>
@@ -388,8 +388,8 @@ function CsvUploadModal({ sectionId, onClose }) {
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#d8f3dc', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
               <Upload size={24} color="#2d6a4f" />
             </div>
-            <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Importing students…</p>
-            <p style={{ margin: '0 0 24px', fontSize: 13, color: '#4a6357' }}>{done} of {validCount} uploaded</p>
+            <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Importing students…</p>
+            <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--kt-text-secondary)' }}>{done} of {validCount} uploaded</p>
             <div style={{ background: '#e5e7eb', borderRadius: 99, height: 8, overflow: 'hidden' }}>
               <div style={{ width: `${validCount ? Math.round((done / validCount) * 100) : 0}%`, height: '100%', background: '#2d6a4f', borderRadius: 99, transition: 'width 0.2s' }} />
             </div>
@@ -472,7 +472,7 @@ function StudentModal({ sectionId, initial, onClose }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
@@ -506,7 +506,7 @@ function StudentModal({ sectionId, initial, onClose }) {
                   onClick={() => !uploading && photoRef.current?.click()}
                   style={{
                     width: 96, height: 96, borderRadius: 14, overflow: 'hidden',
-                    border: '2.5px dashed rgba(45,106,79,0.35)', background: '#f5faf7',
+                    border: '2.5px dashed rgba(45,106,79,0.35)', background: 'var(--kt-surface)',
                     cursor: uploading ? 'wait' : 'pointer', position: 'relative',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'border-color 0.15s',
@@ -563,7 +563,7 @@ function StudentModal({ sectionId, initial, onClose }) {
 
             {tab === 'sf1' && (<>
               {/* Personal */}
-              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
                 Personal Information
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -584,7 +584,7 @@ function StudentModal({ sectionId, initial, onClose }) {
               </div>
 
               {/* Address */}
-              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
                 Address
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -605,7 +605,7 @@ function StudentModal({ sectionId, initial, onClose }) {
               </div>
 
               {/* Parents */}
-              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
                 Parents
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -618,7 +618,7 @@ function StudentModal({ sectionId, initial, onClose }) {
               </div>
 
               {/* Guardian */}
-              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
+              <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 800, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', paddingBottom: 4, borderBottom: '1px solid rgba(45,106,79,0.1)', marginTop: 6 }}>
                 Guardian <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 10, letterSpacing: 0 }}>(if not parent)</span>
               </div>
               <div>
@@ -690,7 +690,7 @@ function InviteModal({ sectionId, section, subject, onClose }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 460, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 460, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -720,7 +720,7 @@ function InviteModal({ sectionId, section, subject, onClose }) {
             ) : (
               <>
                 <Users size={16} color="#6b7280" />
-                <p style={{ margin: 0, fontSize: 13, color: '#4a6357' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)' }}>
                   {invite ? 'Pending — no teacher has accepted yet.' : 'No teacher assigned yet.'}
                 </p>
               </>
@@ -732,7 +732,7 @@ function InviteModal({ sectionId, section, subject, onClose }) {
             <div style={{ marginBottom: 16 }}>
               <label style={LABEL}>Invitation Link</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ flex: 1, background: '#f5faf7', border: '1px solid rgba(45,106,79,0.15)', borderRadius: 9, padding: '9px 12px', fontSize: 12, color: '#4a6357', fontFamily: '"DM Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ flex: 1, background: 'var(--kt-surface)', border: '1px solid rgba(45,106,79,0.15)', borderRadius: 9, padding: '9px 12px', fontSize: 12, color: 'var(--kt-text-secondary)', fontFamily: '"DM Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {invite.inviteLink}
                 </div>
                 <button onClick={handleCopy} style={{ ...BTN_GHOST, padding: '9px 12px', gap: 5 }}>
@@ -902,7 +902,7 @@ export default function SectionDetailPage() {
   }
 
   if (loadingSec) {
-    return <div style={{ textAlign: 'center', padding: 60, color: '#4a6357', fontSize: 14 }}>Loading…</div>;
+    return <div style={{ textAlign: 'center', padding: 60, color: 'var(--kt-text-secondary)', fontSize: 14 }}>Loading…</div>;
   }
   if (!section) {
     return <div style={{ textAlign: 'center', padding: 60, color: '#e05c5c', fontSize: 14 }}>Section not found.</div>;
@@ -934,7 +934,7 @@ export default function SectionDetailPage() {
       </div>
 
       {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 22, background: '#fff', borderRadius: 12, padding: 4, border: '1px solid rgba(45,106,79,0.12)', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 22, background: 'var(--kt-card)', borderRadius: 12, padding: 4, border: '1px solid var(--kt-border)', width: 'fit-content' }}>
         {TABS.map(({ key, label, Icon }) => (
           <button
             key={key}
@@ -955,11 +955,11 @@ export default function SectionDetailPage() {
 
       {/* ── Tab: Student Roster ── */}
       {activeTab === 'roster' && (
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>
-                Student Roster <span style={{ fontSize: 12, fontWeight: 500, color: '#4a6357', marginLeft: 6 }}>({students.length})</span>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+                Student Roster <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--kt-text-secondary)', marginLeft: 6 }}>({students.length})</span>
               </h3>
               {/* Unread comments bell */}
               {Object.keys(unreadCounts).length > 0 && (() => {
@@ -987,16 +987,16 @@ export default function SectionDetailPage() {
             </div>
           </div>
           {students.length === 0 ? (
-            <div style={{ padding: '48px 24px', textAlign: 'center', color: '#4a6357', fontSize: 14 }}>
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--kt-text-secondary)', fontSize: 14 }}>
               No students enrolled yet. Click "Add Student" to begin.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f5faf7' }}>
+                  <tr style={{ background: 'var(--kt-surface)' }}>
                     {['', 'No.', 'Surname', 'Given Name', 'M.I.', 'Gender', 'LRN', 'Student No.', 'Actions'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1024,9 +1024,9 @@ export default function SectionDetailPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button
                             onClick={() => setOpenStudentCard(s)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: 'var(--kt-text-primary)', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
                             onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
-                            onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--kt-text-primary)'; }}
                           >
                             {s.surname}
                           </button>
@@ -1037,27 +1037,27 @@ export default function SectionDetailPage() {
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '10px 14px', color: '#0d2218' }}>
+                      <td style={{ padding: '10px 14px', color: 'var(--kt-text-primary)' }}>
                         <button
                           onClick={() => setOpenStudentCard(s)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--kt-text-primary)', fontSize: 13, fontFamily: 'inherit', textAlign: 'left', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
                           onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--kt-text-primary)'; }}
                         >
                           {s.givenName}
                         </button>
                       </td>
-                      <td style={{ padding: '10px 14px', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--kt-text-secondary)' }}>{s.middleInitial || '—'}</td>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 9px', background: s.gender === 'Male' ? 'rgba(59,130,246,0.1)' : 'rgba(236,72,153,0.1)', color: s.gender === 'Male' ? '#1d4ed8' : '#be185d' }}>
                           {s.gender}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#4a6357' }}>{s.lrn}</td>
-                      <td style={{ padding: '10px 14px', color: '#4a6357' }}>{s.studentNumber}</td>
+                      <td style={{ padding: '10px 14px', fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-secondary)' }}>{s.lrn}</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--kt-text-secondary)' }}>{s.studentNumber}</td>
                       <td style={{ padding: '10px 14px' }}>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => setStudentModal(s)} style={{ background: '#f5faf7', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', color: '#4a6357', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                          <button onClick={() => setStudentModal(s)} style={{ background: 'var(--kt-surface)', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                             <Pencil size={12} /> Edit
                           </button>
                           <button onClick={() => handleRemoveStudent(s.id)} style={{ background: '#fde8e8', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', color: '#e05c5c', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
@@ -1078,11 +1078,11 @@ export default function SectionDetailPage() {
       {activeTab === 'subjects' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Default subjects */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Shield size={15} color="#2d6a4f" />
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Default DepEd Subjects</h3>
-              <span style={{ fontSize: 11, color: '#4a6357', fontStyle: 'italic' }}>— cannot be removed</span>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Default DepEd Subjects</h3>
+              <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>— cannot be removed</span>
             </div>
             <div style={{ padding: '12px 20px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {(section.subjects || []).map(subj => (
@@ -1094,9 +1094,9 @@ export default function SectionDetailPage() {
           </div>
 
           {/* Special subjects */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Special Subjects</h3>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Special Subjects</h3>
             </div>
             <div style={{ padding: 20 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -1132,11 +1132,11 @@ export default function SectionDetailPage() {
 
       {/* ── Tab: Consolidated Grading ── */}
       {activeTab === 'grading' && (
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(45,106,79,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Consolidated Grading Sheet</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#4a6357' }}>Click a subject column header to manage the assigned teacher.</p>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Consolidated Grading Sheet</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>Click a subject column header to manage the assigned teacher.</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {/* Term pill switcher */}
@@ -1174,10 +1174,10 @@ export default function SectionDetailPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ background: '#f5faf7' }}>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 120 }}>Surname</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 110 }}>Given Name</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px', width: 48 }}>M.I.</th>
+                <tr style={{ background: 'var(--kt-surface)' }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 120 }}>Surname</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap', minWidth: 110 }}>Given Name</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', width: 48 }}>M.I.</th>
                   {gradingSubjs.map(subj => (
                     <th
                       key={subj}
@@ -1210,9 +1210,9 @@ export default function SectionDetailPage() {
                     onMouseEnter={e => e.currentTarget.style.background = '#f9fffe'}
                     onMouseLeave={e => e.currentTarget.style.background = ''}
                   >
-                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0d2218' }}>{s.surname}</td>
-                    <td style={{ padding: '9px 14px', color: '#0d2218' }}>{s.givenName}</td>
-                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#4a6357' }}>{s.middleInitial || '—'}</td>
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--kt-text-primary)' }}>{s.surname}</td>
+                    <td style={{ padding: '9px 14px', color: 'var(--kt-text-primary)' }}>{s.givenName}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: 'var(--kt-text-secondary)' }}>{s.middleInitial || '—'}</td>
                     {gradingSubjs.map(subj => {
                       const grade = allGrades[activeGradeTerm]?.[subj]?.[s.id]?.finalGrade;
                       return (

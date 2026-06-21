@@ -76,7 +76,7 @@ export default function ActionResearchPhase4() {
   }
 
   if (pageLoading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--kt-surface)' }}>
       <Loader2 size={24} color="#2d6a4f" style={{ animation:'spin 1s linear infinite' }} />
     </div>
   );
@@ -98,15 +98,15 @@ export default function ActionResearchPhase4() {
       <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
         {/* Context */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'20px 24px' }}>
-          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 24px' }}>
+          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
           <p style={{ margin:'0 0 0', fontSize:14, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
         </div>
 
         {/* Generate button */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>Action Plan</p>
-          <p style={{ margin:'0 0 16px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>AI generates your SMART objectives, intervention description, timeline, resources, and ethical considerations.</p>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'22px 24px' }}>
+          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Action Plan</p>
+          <p style={{ margin:'0 0 16px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.5 }}>AI generates your SMART objectives, intervention description, timeline, resources, and ethical considerations.</p>
           <button onClick={handleGenerate} disabled={generating} style={{
             display:'flex', alignItems:'center', gap:7,
             background:generating?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff',
@@ -124,24 +124,24 @@ export default function ActionResearchPhase4() {
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
             {/* Objectives */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><Target size={13} color="#2d6a4f" /></span>SMART Objectives</p>
               {(actionPlan.objectives ?? []).map((o, i) => (
                 <div key={i} style={{ display:'flex', gap:10, marginBottom:8 }}>
                   <span style={{ background:'#2d6a4f', color:'#fff', width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, flexShrink:0, marginTop:2 }}>{i+1}</span>
-                  <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{o}</p>
+                  <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{o}</p>
                 </div>
               ))}
             </div>
 
             {/* Intervention */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><Sparkles size={13} color="#2d6a4f" /></span>Intervention Description</p>
-              <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.7, textAlign:'justify' }}>{actionPlan.interventionDescription}</p>
+              <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7, textAlign:'justify' }}>{actionPlan.interventionDescription}</p>
             </div>
 
             {/* Timeline */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><Calendar size={13} color="#2d6a4f" /></span>Timeline</p>
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
@@ -156,9 +156,9 @@ export default function ActionResearchPhase4() {
                     {(actionPlan.timeline ?? []).map((row, i) => (
                       <tr key={i} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)' }}>
                         <td style={{ padding:'8px 10px', fontWeight:600, color:'#1a3d2b', verticalAlign:'top', whiteSpace:'nowrap' }}>{row.phase}</td>
-                        <td style={{ padding:'8px 10px', color:'#4a6357', verticalAlign:'top', whiteSpace:'nowrap' }}>{row.duration}</td>
-                        <td style={{ padding:'8px 10px', color:'#163828', verticalAlign:'top' }}>{(row.activities ?? []).join(' • ')}</td>
-                        <td style={{ padding:'8px 10px', color:'#4a6357', verticalAlign:'top' }}>{row.outputs}</td>
+                        <td style={{ padding:'8px 10px', color:'var(--kt-text-secondary)', verticalAlign:'top', whiteSpace:'nowrap' }}>{row.duration}</td>
+                        <td style={{ padding:'8px 10px', color:'var(--kt-text-primary)', verticalAlign:'top' }}>{(row.activities ?? []).join(' • ')}</td>
+                        <td style={{ padding:'8px 10px', color:'var(--kt-text-secondary)', verticalAlign:'top' }}>{row.outputs}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -167,26 +167,26 @@ export default function ActionResearchPhase4() {
             </div>
 
             {/* Resources */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><Package size={13} color="#2d6a4f" /></span>Resources Needed</p>
               {(actionPlan.resources ?? []).map((r, i) => (
-                <p key={i} style={{ margin:'0 0 6px', fontSize:13, color:'#163828', lineHeight:1.55 }}>• {r}</p>
+                <p key={i} style={{ margin:'0 0 6px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.55 }}>• {r}</p>
               ))}
             </div>
 
             {/* Success Indicators */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><CheckCircle2 size={13} color="#2d6a4f" /></span>Success Indicators</p>
               {(actionPlan.successIndicators ?? []).map((s, i) => (
-                <p key={i} style={{ margin:'0 0 6px', fontSize:13, color:'#163828', lineHeight:1.55 }}>✓ {s}</p>
+                <p key={i} style={{ margin:'0 0 6px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.55 }}>✓ {s}</p>
               ))}
             </div>
 
             {/* Ethical */}
             {actionPlan.ethicalConsiderations && (
-              <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+              <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
                 <p style={sectionHead}><span style={iconBox}><ShieldCheck size={13} color="#2d6a4f" /></span>Ethical Considerations</p>
-                <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.7 }}>{actionPlan.ethicalConsiderations}</p>
+                <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7 }}>{actionPlan.ethicalConsiderations}</p>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { useAuth } from './hooks/useAuth';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ensureTeacherProfile } from './services/db';
 import { auth } from './firebase';
 import AppShell from './components/AppShell';
@@ -152,6 +153,7 @@ function PublicRoute({ children }) {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <ToastProvider>
       <BrowserRouter>
         <Routes>
@@ -222,5 +224,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </ToastProvider>
+    </ThemeProvider>
   );
 }

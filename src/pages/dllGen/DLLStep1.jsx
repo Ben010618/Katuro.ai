@@ -16,14 +16,14 @@ const TERMS = ['Term 1', 'Term 2', 'Term 3'];
 
 const labelStyle = {
   display: 'block', marginBottom: 6,
-  fontSize: 11, fontWeight: 700, color: '#4a6357',
+  fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '1.2px',
 };
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   padding: '10px 12px', borderRadius: 8,
   border: '1.5px solid rgba(45,106,79,0.2)',
-  fontSize: 14, color: '#0d2218', background: '#fff',
+  fontSize: 14, color: 'var(--kt-text-primary)', background: 'var(--kt-card)',
   outline: 'none', fontFamily: 'inherit',
 };
 
@@ -45,10 +45,10 @@ export default function DLLStep1() {
         }}>
           Daily Lesson Log
         </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
+        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
           Set up your Daily Lesson Log
         </h2>
-        <p style={{ margin: 0, fontSize: 15, color: '#4a6357', lineHeight: 1.65, maxWidth: 520 }}>
+        <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 520 }}>
           Enter your class details. This information will appear in the DLL header.
         </p>
       </div>
@@ -58,7 +58,7 @@ export default function DLLStep1() {
 
         {/* LEFT — form */}
         <div style={{
-          background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
+          background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
           borderRadius: 14, padding: 24,
           display: 'flex', flexDirection: 'column', gap: 20,
         }}>
@@ -106,7 +106,7 @@ export default function DLLStep1() {
                   style={{
                     flex: 1, padding: '9px 4px', borderRadius: 10, border: '1.5px solid',
                     borderColor: store.term === t ? '#1a3d2b' : 'rgba(45,106,79,0.2)',
-                    background:  store.term === t ? '#1a3d2b' : '#fff',
+                    background:  store.term === t ? '#1a3d2b' : 'var(--kt-card)',
                     color:       store.term === t ? '#fff' : '#4a6357',
                     fontSize: 13, fontWeight: store.term === t ? 600 : 400,
                     cursor: 'pointer', transition: 'all 0.12s',
@@ -141,13 +141,13 @@ export default function DLLStep1() {
 
           {/* Teaching dates card */}
           <div style={{
-            background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
+            background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
             borderRadius: 14, padding: 24,
           }}>
-            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
               Teaching Dates and Time
             </p>
-            <p style={{ margin: '0 0 14px', fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+            <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
               Write the week's date range and your class schedule. This will appear in the DLL header.
             </p>
             <label style={labelStyle}>Dates and Time</label>
@@ -161,7 +161,7 @@ export default function DLLStep1() {
             />
 
             <div style={{
-              marginTop: 14, background: '#f5faf7',
+              marginTop: 14, background: 'var(--kt-surface)',
               border: '1px solid rgba(45,106,79,0.1)',
               borderRadius: 10, padding: '10px 14px',
             }}>
@@ -180,7 +180,7 @@ export default function DLLStep1() {
               <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
                 Your DLL
               </p>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0d2218' }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
                 {[store.subject, store.gradeLevel, store.section].filter(Boolean).join(' · ') || '—'}
               </p>
               {store.term && (

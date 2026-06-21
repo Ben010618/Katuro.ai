@@ -24,7 +24,7 @@ const inputBase = {
   width: '100%', boxSizing: 'border-box',
   padding: '10px 12px', borderRadius: 8,
   border: '1.5px solid rgba(45,106,79,0.2)',
-  fontSize: 13, color: '#0d2218', background: '#fff',
+  fontSize: 13, color: 'var(--kt-text-primary)', background: 'var(--kt-card)',
   outline: 'none', lineHeight: 1.6, fontFamily: 'inherit',
 };
 
@@ -72,16 +72,16 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 14,
-      border: '1px solid rgba(45,106,79,0.12)',
+      background: 'var(--kt-card)', borderRadius: 14,
+      border: '1px solid var(--kt-border)',
       padding: '22px 24px', marginBottom: 18,
     }}>
-      <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>{label}</p>
+      <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{label}</p>
       <p style={{ margin: '0 0 16px', fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>{sublabel}</p>
 
       {/* Budget tracker */}
       <div style={{
-        background: '#f5faf7', borderRadius: 10,
+        background: 'var(--kt-surface)', borderRadius: 10,
         border: '1px solid rgba(45,106,79,0.1)',
         padding: '10px 14px', marginBottom: 16,
       }}>
@@ -114,7 +114,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
                 <div style={{
                   textAlign: 'center', padding: '2px 0',
                   fontSize: 9, fontWeight: 700, color: '#4a6357',
-                  background: '#fff',
+                  background: 'var(--kt-card)',
                 }}>
                   {DAY_LABELS[i]}
                 </div>
@@ -153,7 +153,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
                   style={{
                     border: '1px solid rgba(45,106,79,0.25)', borderRadius: 7,
                     padding: '4px 8px', fontSize: 13, fontWeight: 700,
-                    background: '#f5faf7', color: '#0d2218',
+                    background: 'var(--kt-input-bg)', color: 'var(--kt-text-primary)',
                     cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
                   }}
                 >
@@ -185,7 +185,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
                 placeholder={placeholder(idx)}
                 style={{
                   ...inputBase, resize: 'vertical', fontSize: 13,
-                  border: '1px solid rgba(45,106,79,0.15)', background: '#fff',
+                  border: '1px solid rgba(45,106,79,0.15)', background: 'var(--kt-card)',
                 }}
                 onFocus={e => { e.target.style.borderColor = '#2d6a4f'; }}
                 onBlur={e  => { e.target.style.borderColor = 'rgba(45,106,79,0.15)'; }}
@@ -313,7 +313,7 @@ export default function DLLStep2() {
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Daily Lesson Log · Step 2 of 2
           </p>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0d2218' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
             Standards, MELC &amp; Daily Content
           </h1>
         </div>
@@ -321,7 +321,7 @@ export default function DLLStep2() {
 
       {/* Standards card */}
       <div style={{
-        background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)',
+        background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)',
         padding: '22px 24px', marginBottom: 18,
         display: 'flex', flexDirection: 'column', gap: 18,
       }}>

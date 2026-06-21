@@ -65,7 +65,7 @@ export default function LessonGenLayout() {
       {/* Progress bar — sticky */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: '#fff', borderBottom: '1px solid rgba(45,106,79,0.12)',
+        background: 'var(--kt-card)', borderBottom: '1px solid var(--kt-border)',
         padding: '14px 24px 10px',
       }}>
         {/* 3-step nodes */}
@@ -137,8 +137,8 @@ export default function LessonGenLayout() {
 
       {/* Bottom sticky nav */}
       <div style={{
-        position: 'sticky', bottom: 0, background: '#fff',
-        borderTop: '1px solid rgba(45,106,79,0.12)', padding: '14px 24px',
+        position: 'sticky', bottom: 0, background: 'var(--kt-card)',
+        borderTop: '1px solid var(--kt-border)', padding: '14px 24px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, zIndex: 30,
       }}>

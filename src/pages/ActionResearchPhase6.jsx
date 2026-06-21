@@ -14,7 +14,7 @@ const iconBox = { width:26, height:26, borderRadius:7, background:'#d8f3dc', dis
 const fieldStyle = {
   width:'100%', boxSizing:'border-box', padding:'10px 12px',
   border:'1.5px solid rgba(45,106,79,0.2)', borderRadius:8,
-  fontSize:13, background:'#f5faf7', color:'#163828',
+  fontSize:13, background:'var(--kt-input-bg)', color:'var(--kt-text-primary)',
   outline:'none', fontFamily:'inherit', transition:'border 0.15s', lineHeight:1.6, resize:'vertical',
 };
 
@@ -76,7 +76,7 @@ export default function ActionResearchPhase6() {
   }
 
   if (pageLoading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--kt-surface)' }}>
       <Loader2 size={24} color="#2d6a4f" style={{ animation:'spin 1s linear infinite' }} />
     </div>
   );
@@ -110,8 +110,8 @@ export default function ActionResearchPhase6() {
         )}
 
         {/* Research title + data collection reference */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'20px 24px' }}>
-          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 24px' }}>
+          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
           <p style={{ margin:'0 0 12px', fontSize:14, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
           {docData?.dataCollection?.primaryTool?.name && (
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -128,9 +128,9 @@ export default function ActionResearchPhase6() {
         </div>
 
         {/* Raw data input */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>Input Your Collected Data</p>
-          <p style={{ margin:'0 0 14px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'22px 24px' }}>
+          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Input Your Collected Data</p>
+          <p style={{ margin:'0 0 14px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.5 }}>
             Paste or type your raw data — pre/post-test scores, observation notes, survey results, percentages, or any other collected data.
           </p>
           <textarea
@@ -166,53 +166,53 @@ export default function ActionResearchPhase6() {
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
             {/* Findings per RQ */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><MessageSquare size={13} color="#2d6a4f" /></span>Findings by Research Question</p>
               {(findings.findings ?? []).map((f, i) => (
                 <div key={i} style={{ marginBottom:16, paddingBottom:16, borderBottom:i<findings.findings.length-1?'1px solid rgba(45,106,79,0.08)':'none' }}>
                   <p style={{ margin:'0 0 6px', fontSize:13, fontWeight:700, color:'#2d6a4f' }}>RQ{f.questionNumber}. {f.question}</p>
-                  <p style={{ margin:'0 0 4px', fontSize:13, color:'#163828', lineHeight:1.7 }}>{f.analysis}</p>
-                  {f.significance && <p style={{ margin:0, fontSize:12, color:'#4a6357', lineHeight:1.6, fontStyle:'italic' }}>{f.significance}</p>}
+                  <p style={{ margin:'0 0 4px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7 }}>{f.analysis}</p>
+                  {f.significance && <p style={{ margin:0, fontSize:12, color:'var(--kt-text-secondary)', lineHeight:1.6, fontStyle:'italic' }}>{f.significance}</p>}
                 </div>
               ))}
             </div>
 
             {/* Discussion */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><BookOpen size={13} color="#2d6a4f" /></span>Discussion</p>
               {(findings.discussion ?? '').split('\n').filter(Boolean).map((p, i) => (
-                <p key={i} style={{ margin:'0 0 10px', fontSize:13, color:'#163828', lineHeight:1.7, textAlign:'justify', textIndent:'2em' }}>{p}</p>
+                <p key={i} style={{ margin:'0 0 10px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7, textAlign:'justify', textIndent:'2em' }}>{p}</p>
               ))}
             </div>
 
             {/* Conclusions */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><ListChecks size={13} color="#2d6a4f" /></span>Conclusions</p>
               {(findings.conclusions ?? []).map((c, i) => (
                 <div key={i} style={{ display:'flex', gap:10, marginBottom:8 }}>
                   <span style={{ background:'#2d6a4f', color:'#fff', width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, flexShrink:0, marginTop:2 }}>{i+1}</span>
-                  <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{c}</p>
+                  <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{c}</p>
                 </div>
               ))}
             </div>
 
             {/* Recommendations */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><Lightbulb size={13} color="#2d6a4f" /></span>Recommendations</p>
               {(findings.recommendations ?? []).map((r, i) => (
-                <div key={i} style={{ marginBottom:10, padding:'10px 14px', background:'#f5faf7', borderRadius:8, borderLeft:'3px solid #2d6a4f' }}>
+                <div key={i} style={{ marginBottom:10, padding:'10px 14px', background:'var(--kt-surface)', borderRadius:8, borderLeft:'3px solid #2d6a4f' }}>
                   <p style={{ margin:'0 0 3px', fontSize:11, fontWeight:700, color:'#2d6a4f', textTransform:'uppercase' }}>For {r.for}</p>
-                  <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{r.text}</p>
+                  <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{r.text}</p>
                 </div>
               ))}
             </div>
 
             {/* Reflections */}
             {findings.reflections && (
-              <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+              <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
                 <p style={sectionHead}><span style={iconBox}><Heart size={13} color="#2d6a4f" /></span>Teacher-Researcher's Reflection</p>
                 {(findings.reflections ?? '').split('\n').filter(Boolean).map((p, i) => (
-                  <p key={i} style={{ margin:'0 0 10px', fontSize:13, color:'#163828', lineHeight:1.7, fontStyle:'italic', textIndent:'2em' }}>{p}</p>
+                  <p key={i} style={{ margin:'0 0 10px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7, fontStyle:'italic', textIndent:'2em' }}>{p}</p>
                 ))}
               </div>
             )}

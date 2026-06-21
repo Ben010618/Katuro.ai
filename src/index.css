@@ -11,11 +11,33 @@
   --kt-green-bright:   #52b788;
   --kt-green-tint:     #d8f3dc;
   --kt-surface:        #f5faf7;
+  --kt-card:           #ffffff;
+  --kt-card-2:         #fafafa;
+  --kt-input-bg:       #f6faf8;
   --kt-accent-amber:   #e8a320;
   --kt-danger:         #e05c5c;
   --kt-text-primary:   #0d2218;
   --kt-text-secondary: #4a6357;
+  --kt-muted:          #9bb8a5;
   --kt-border:         rgba(45,106,79,0.15);
+  --kt-sidebar-bg:     #ffffff;
+  --kt-topbar-bg:      #ffffff;
+}
+
+[data-dark="true"] {
+  --kt-surface:        #0c1a13;
+  --kt-card:           #112218;
+  --kt-card-2:         #182b20;
+  --kt-input-bg:       #1a2e22;
+  --kt-text-primary:   #dff0e5;
+  --kt-text-secondary: #7eb895;
+  --kt-muted:          #4a6357;
+  --kt-border:         rgba(82,183,136,0.16);
+  --kt-green-tint:     rgba(82,183,136,0.12);
+  --kt-green-deep:     #dff0e5;
+  --kt-sidebar-bg:     #0a1710;
+  --kt-topbar-bg:      #0e1f17;
+  color-scheme: dark;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -69,9 +91,9 @@ body {
    Card
 ═══════════════════════════════════════════════════════════ */
 .card {
-  background: #ffffff;
+  background: var(--kt-card);
   border-radius: 14px;
-  border: 1px solid rgba(45,106,79,0.12);
+  border: 1px solid var(--kt-border);
   padding: 20px 24px;
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
@@ -178,7 +200,7 @@ body {
 ═══════════════════════════════════════════════════════════ */
 .input {
   width: 100%;
-  background: var(--kt-surface);
+  background: var(--kt-input-bg);
   border: 1px solid rgba(45,106,79,0.2);
   border-radius: 10px;
   padding: 10px 14px;
@@ -197,7 +219,7 @@ body {
 
 .select {
   width: 100%;
-  background: var(--kt-surface);
+  background: var(--kt-input-bg);
   border: 1px solid rgba(45,106,79,0.2);
   border-radius: 10px;
   padding: 10px 14px;

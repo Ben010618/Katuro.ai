@@ -53,7 +53,7 @@ export default function CotLayout() {
       {/* Progress bar — sticky top */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: '#fff', borderBottom: '1px solid rgba(124,58,237,0.12)',
+        background: 'var(--kt-card)', borderBottom: '1px solid rgba(124,58,237,0.12)',
         padding: '14px 24px 10px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', maxWidth: 600, margin: '0 auto' }}>
@@ -115,7 +115,7 @@ export default function CotLayout() {
 
       {/* Bottom sticky nav */}
       <div style={{
-        position: 'sticky', bottom: 0, background: '#fff',
+        position: 'sticky', bottom: 0, background: 'var(--kt-card)',
         borderTop: '1px solid rgba(124,58,237,0.12)', padding: '14px 24px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, zIndex: 30,

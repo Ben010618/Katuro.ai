@@ -43,19 +43,19 @@ const TYPE_META = {
 const typeMeta = t => TYPE_META[t] ?? { bg: '#9BB8A5', fg: '#fff', label: t };
 
 const card = {
-  background: '#fff', borderRadius: 14,
-  border: '1px solid rgba(45,106,79,0.12)', padding: '18px 20px',
+  background: 'var(--kt-card)', borderRadius: 14,
+  border: '1px solid var(--kt-border)', padding: '18px 20px',
 };
 const labelStyle = {
   display: 'block', fontSize: 11, fontWeight: 700,
-  color: '#4a6357', textTransform: 'uppercase',
+  color: 'var(--kt-text-secondary)', textTransform: 'uppercase',
   letterSpacing: '0.07em', marginBottom: 6,
 };
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   padding: '10px 12px', border: '1.5px solid rgba(45,106,79,0.2)',
-  borderRadius: 8, fontSize: 14, background: '#f5faf7',
-  color: '#163828', outline: 'none', fontFamily: '"Plus Jakarta Sans", sans-serif',
+  borderRadius: 8, fontSize: 14, background: 'var(--kt-input-bg)',
+  color: 'var(--kt-text-primary)', outline: 'none', fontFamily: '"Plus Jakarta Sans", sans-serif',
 };
 const selectStyle = { ...inputStyle, cursor: 'pointer', appearance: 'none' };
 
@@ -91,14 +91,14 @@ function OutlineCard({ slide, index, total, onTitleChange, onRemove }) {
           onChange={e => onTitleChange(slide.id, e.target.value)}
           style={{
             ...inputStyle, padding: '6px 10px', fontSize: 13, fontWeight: 600,
-            background: '#f8fbf9', marginBottom: 6,
+            background: 'var(--kt-surface)', marginBottom: 6,
           }}
         />
         {slide.keyPoints?.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {slide.keyPoints.map((kp, i) => (
               <span key={i} style={{
-                fontSize: 10, background: '#f0f4f2', color: '#4a6357',
+                fontSize: 10, background: '#f0f4f2', color: 'var(--kt-text-secondary)',
                 borderRadius: 4, padding: '2px 7px',
               }}>{kp}</span>
             ))}
@@ -145,24 +145,24 @@ function PreviewCard({ slide, index, includeNotes }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>{slide.title}</p>
+        <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{slide.title}</p>
         {slide.headline && (
-          <p style={{ margin: '0 0 6px', fontSize: 12, color: '#4a6357', fontStyle: 'italic' }}>{slide.headline}</p>
+          <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>{slide.headline}</p>
         )}
 
         {isSection ? (
           slide.bullets?.length > 0 && slide.bullets.map((b, i) => (
-            <p key={i} style={{ margin: '2px 0', fontSize: 12, color: '#4a6357' }}>• {b}</p>
+            <p key={i} style={{ margin: '2px 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>• {b}</p>
           ))
         ) : (
           <>
             {slide.body && (
-              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#163828', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--kt-text-primary)', lineHeight: 1.5 }}>
                 {slide.body.slice(0, 140)}{slide.body.length > 140 ? '…' : ''}
               </p>
             )}
             {slide.bullets?.slice(0, 3).map((b, i) => (
-              <p key={i} style={{ margin: '2px 0', fontSize: 12, color: '#4a6357' }}>• {b.slice(0, 90)}{b.length > 90 ? '…' : ''}</p>
+              <p key={i} style={{ margin: '2px 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>• {b.slice(0, 90)}{b.length > 90 ? '…' : ''}</p>
             ))}
             {slide.bullets?.length > 3 && (
               <p style={{ margin: '2px 0', fontSize: 11, color: '#9BB8A5' }}>+{slide.bullets.length - 3} more bullets</p>
@@ -310,17 +310,17 @@ export default function PresentationBuilderPage() {
         {store.source && (
           <button onClick={goBack} style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            color: '#4a6357', display: 'flex', alignItems: 'center', gap: 4,
+            color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 4,
             fontSize: 13, fontWeight: 600, padding: '4px 0', flexShrink: 0,
           }}>
             <ChevronLeft size={16} /> Back
           </button>
         )}
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#0d2218' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--kt-text-primary)' }}>
             Presentation Builder
           </h1>
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: '#4a6357' }}>
+          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
             {step === 'source'  && 'Create an AI-powered lesson presentation'}
             {step === 'pick'    && 'Select a lesson to use as the content base'}
             {step === 'input'   && 'Set lesson details — outline generation is free'}
@@ -371,8 +371,8 @@ export default function PresentationBuilderPage() {
                 <Icon size={22} color="#163828" />
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>{title}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 13, color: '#4a6357', lineHeight: 1.4 }}>{desc}</p>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{title}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.4 }}>{desc}</p>
               </div>
               <ChevronRight size={18} color="#9BB8A5" style={{ flexShrink: 0 }} />
             </button>
@@ -394,13 +394,13 @@ export default function PresentationBuilderPage() {
           </div>
 
           {plansLoading ? (
-            <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, color: '#4a6357', fontSize: 13 }}>
+            <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--kt-text-secondary)', fontSize: 13 }}>
               <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Loading your lessons…
             </div>
           ) : filteredPlans.length === 0 ? (
             <div style={{ ...card, textAlign: 'center', padding: '36px 20px' }}>
               <BookOpen size={30} color="#9BB8A5" style={{ marginBottom: 10 }} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#4a6357' }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--kt-text-secondary)' }}>
                 {lessonPlans.length === 0 ? 'No saved lessons yet.' : 'No lessons match your search.'}
               </p>
             </div>
@@ -420,11 +420,11 @@ export default function PresentationBuilderPage() {
                   <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px', flexShrink: 0, background: plan.type === 'dll' ? '#dcfce7' : plan.type === 'cot' ? '#fef3c7' : '#dbeafe', color: plan.type === 'dll' ? '#14532d' : plan.type === 'cot' ? '#92400e' : '#1e3a8a' }}>
                     {plan.type === 'dll' ? 'DLL' : plan.type === 'cot' ? 'COT' : 'ILAW'}
                   </span>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {plan.lessonName || 'Untitled Lesson'}
                   </p>
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
                   {[plan.gradeLevel, plan.subject].filter(Boolean).join(' · ')}
                 </p>
               </div>
@@ -441,7 +441,7 @@ export default function PresentationBuilderPage() {
           {store.lesson && (
             <div style={{ background: '#d8f3dc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0 }} />
-              <p style={{ margin: 0, fontSize: 13, color: '#163828', fontWeight: 600 }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 600 }}>
                 Using: {store.lesson.lessonName}
               </p>
             </div>
@@ -508,7 +508,7 @@ export default function PresentationBuilderPage() {
               <div>
                 <label style={labelStyle}>
                   Number of Slides —{' '}
-                  <span style={{ color: '#163828', fontWeight: 800 }}>{store.slideCount}</span>
+                  <span style={{ color: 'var(--kt-text-primary)', fontWeight: 800 }}>{store.slideCount}</span>
                   <span style={{ color: '#9BB8A5', fontWeight: 600 }}> (+ auto title & closing)</span>
                 </label>
                 <input
@@ -545,7 +545,7 @@ export default function PresentationBuilderPage() {
 
               {/* School footer */}
               <div style={{ borderTop: '1px solid rgba(45,106,79,0.1)', paddingTop: 14 }}>
-                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                   Slide Footer (saved automatically)
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -579,7 +579,7 @@ export default function PresentationBuilderPage() {
                   style={{ width: 16, height: 16, accentColor: '#163828', cursor: 'pointer' }}
                 />
                 <div>
-                  <span style={{ fontSize: 13, color: '#163828', fontWeight: 600 }}>Include speaker notes</span>
+                  <span style={{ fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 600 }}>Include speaker notes</span>
                   <p style={{ margin: '1px 0 0', fontSize: 11, color: '#9BB8A5' }}>
                     kaTuro writes what the teacher says for each slide
                   </p>
@@ -622,12 +622,12 @@ export default function PresentationBuilderPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Info bar */}
-          <div style={{ ...card, padding: '12px 16px', background: '#f8fbf9', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ ...card, padding: '12px 16px', background: 'var(--kt-surface)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0d2218' }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
                 {store.topic} · {store.gradeLevel} · {store.subject}
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357' }}>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
                 {store.outline.length} slides · {expandCount} need AI expansion · {store.outline.length - expandCount} template
               </p>
             </div>
@@ -635,7 +635,7 @@ export default function PresentationBuilderPage() {
               <span style={{ fontSize: 10, background: '#ede9fe', color: '#6d28d9', borderRadius: 6, padding: '3px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Cpu size={10} /> {expandCount} AI slides
               </span>
-              <span style={{ fontSize: 10, background: '#f0f4f2', color: '#4a6357', borderRadius: 6, padding: '3px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10, background: '#f0f4f2', color: 'var(--kt-text-secondary)', borderRadius: 6, padding: '3px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <FileText size={10} /> {store.outline.length - expandCount} template
               </span>
             </div>
@@ -680,7 +680,7 @@ export default function PresentationBuilderPage() {
             }
           </button>
           {isExpanding && (
-            <p style={{ margin: 0, fontSize: 12, color: '#4a6357', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
               kaTuro is expanding {expandCount} slides simultaneously — usually 15–30 seconds
             </p>
           )}
@@ -692,8 +692,8 @@ export default function PresentationBuilderPage() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               width: '100%', padding: '11px 0', borderRadius: 10,
-              border: '1.5px solid rgba(45,106,79,0.22)', background: '#f5faf7',
-              color: '#163828', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              border: '1.5px solid rgba(45,106,79,0.22)', background: 'var(--kt-surface)',
+              color: 'var(--kt-text-primary)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
               fontFamily: '"Plus Jakarta Sans", sans-serif',
             }}
           >
@@ -752,8 +752,8 @@ export default function PresentationBuilderPage() {
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '12px 0', borderRadius: 10,
-                border: '1.5px solid rgba(45,106,79,0.22)', background: '#f5faf7',
-                color: '#163828', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: '1.5px solid rgba(45,106,79,0.22)', background: 'var(--kt-surface)',
+                color: 'var(--kt-text-primary)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 fontFamily: '"Plus Jakarta Sans", sans-serif',
               }}
             >
@@ -764,8 +764,8 @@ export default function PresentationBuilderPage() {
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 padding: '12px 0', borderRadius: 10,
-                border: '1.5px solid rgba(45,106,79,0.22)', background: '#f5faf7',
-                color: '#163828', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: '1.5px solid rgba(45,106,79,0.22)', background: 'var(--kt-surface)',
+                color: 'var(--kt-text-primary)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 fontFamily: '"Plus Jakarta Sans", sans-serif',
               }}
             >

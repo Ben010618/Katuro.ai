@@ -113,7 +113,7 @@ function LessonCard({ lesson, onAction, loadingId }) {
   return (
     <div
       style={{
-        background: '#fff', borderRadius: 12,
+        background: 'var(--kt-card)', borderRadius: 12,
         border: '1px solid rgba(45,106,79,0.11)', padding: '13px 14px',
         display: 'flex', flexDirection: 'column', gap: 8,
         position: 'relative', transition: 'border-color 0.2s, box-shadow 0.2s',
@@ -124,10 +124,10 @@ function LessonCard({ lesson, onAction, loadingId }) {
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1 }}>
-          <span style={{ background: '#d8f3dc', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 700, color: '#0d2218' }}>
+          <span style={{ background: '#d8f3dc', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
             {lesson.subject}
           </span>
-          <span style={{ background: '#f5faf7', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 600, color: '#4a6357' }}>
+          <span style={{ background: 'var(--kt-surface)', borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 600, color: 'var(--kt-text-secondary)' }}>
             {lesson.grade}
           </span>
           {lesson.type === 'ilaw' && lesson.week !== '—' && (
@@ -140,7 +140,7 @@ function LessonCard({ lesson, onAction, loadingId }) {
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => !isLoading && setMenuOpen(v => !v)}
-            style={{ background: 'none', border: 'none', cursor: isLoading ? 'default' : 'pointer', padding: 4, color: '#4a6357', borderRadius: 6, display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', cursor: isLoading ? 'default' : 'pointer', padding: 4, color: 'var(--kt-text-secondary)', borderRadius: 6, display: 'flex', alignItems: 'center' }}
           >
             {isLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <MoreVertical size={14} />}
           </button>
@@ -148,10 +148,10 @@ function LessonCard({ lesson, onAction, loadingId }) {
           {menuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpen(false)} />
-              <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 50, background: '#fff', border: '1px solid rgba(45,106,79,0.12)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: '5px', minWidth: 150 }}>
+              <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 50, background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: '5px', minWidth: 150 }}>
                 {[
-                  { icon: Eye,     label: 'View',    action: 'view',    color: '#4a6357' },
-                  { icon: Pencil,  label: 'Edit',    action: 'edit',    color: '#4a6357' },
+                  { icon: Eye,     label: 'View',    action: 'view',    color: 'var(--kt-text-secondary)' },
+                  { icon: Pencil,  label: 'Edit',    action: 'edit',    color: 'var(--kt-text-secondary)' },
                   { icon: Archive, label: 'Archive', action: 'archive', color: '#e8a320' },
                   { icon: Trash2,  label: 'Delete',  action: 'delete',  color: '#e05c5c' },
                 ].map(({ icon: Icon, label, action, color }) => (
@@ -173,14 +173,14 @@ function LessonCard({ lesson, onAction, loadingId }) {
 
       {/* Title + dates */}
       <div>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0d2218', lineHeight: 1.35 }}>{lesson.title}</p>
-        <p style={{ margin: '3px 0 0', fontSize: 10, color: '#4a6357' }}>{lesson.dates}</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)', lineHeight: 1.35 }}>{lesson.title}</p>
+        <p style={{ margin: '3px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)' }}>{lesson.dates}</p>
       </div>
 
       {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(45,106,79,0.08)', paddingTop: 7 }}>
         <span style={{ background: st.bg, borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 700, color: st.color }}>{st.label}</span>
-        <span style={{ fontSize: 10, color: '#4a6357' }}>{cfg.footer(lesson)}</span>
+        <span style={{ fontSize: 10, color: 'var(--kt-text-secondary)' }}>{cfg.footer(lesson)}</span>
       </div>
     </div>
   );
@@ -247,11 +247,11 @@ function TermColumn({ term, groups, onAction, loadingId }) {
       {/* Categories */}
       {total === 0 ? (
         <div style={{
-          background: '#f5faf7', borderRadius: 10,
+          background: 'var(--kt-surface)', borderRadius: 10,
           border: '2px dashed rgba(45,106,79,0.13)',
           padding: '28px 14px', textAlign: 'center',
         }}>
-          <p style={{ margin: 0, fontSize: 11, color: '#4a6357', opacity: 0.55 }}>No plans for {term.label}</p>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)', opacity: 0.55 }}>No plans for {term.label}</p>
         </div>
       ) : (
         <div>
@@ -356,8 +356,8 @@ export default function MyLessonsPage() {
       {/* Page heading */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#0d2218' }}>My Lessons</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a6357' }}>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)' }}>My Lessons</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--kt-text-secondary)' }}>
             {loading ? 'Loading…' : `${lessons.length} plan${lessons.length !== 1 ? 's' : ''} · ${publishedCount} published`}
           </p>
         </div>
@@ -369,7 +369,7 @@ export default function MyLessonsPage() {
       {/* Search + status filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#4a6357', pointerEvents: 'none' }} />
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--kt-text-secondary)', pointerEvents: 'none' }} />
           <input
             type="text"
             placeholder="Search by title, subject or grade…"
@@ -401,7 +401,7 @@ export default function MyLessonsPage() {
 
       {/* Loading */}
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 10, color: '#4a6357' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 10, color: 'var(--kt-text-secondary)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
           <span style={{ fontSize: 13, fontWeight: 600 }}>Loading your lesson plans…</span>
         </div>
@@ -419,14 +419,14 @@ export default function MyLessonsPage() {
         lessons.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: '#fff', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
+            background: 'var(--kt-card)', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
             padding: '60px 32px', gap: 12, textAlign: 'center',
           }}>
             <div style={{ width: 52, height: 52, borderRadius: 14, background: '#d8f3dc', display: 'grid', placeItems: 'center' }}>
               <BookOpen size={26} color="#2d6a4f" />
             </div>
-            <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>No lessons yet</p>
-            <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Create your first AI-powered lesson plan.</p>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>No lessons yet</p>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)' }}>Create your first AI-powered lesson plan.</p>
             <button className="btn-primary" onClick={() => navigate('/lesson-gen')} style={{ marginTop: 8 }}>
               <Plus size={14} /> Create Lesson Plan
             </button>
@@ -434,11 +434,11 @@ export default function MyLessonsPage() {
         ) : visible.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: '#fff', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
+            background: 'var(--kt-card)', borderRadius: 16, border: '2px dashed rgba(45,106,79,0.2)',
             padding: '48px 32px', gap: 8, textAlign: 'center',
           }}>
-            <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0d2218' }}>No lessons found</p>
-            <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Try a different search or filter.</p>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>No lessons found</p>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)' }}>Try a different search or filter.</p>
           </div>
         ) : (
           /* ── 3-column term layout ── */

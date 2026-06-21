@@ -13,12 +13,12 @@ import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, Refres
 
 const CELL = {
   padding: '7px 6px', border: '1px solid rgba(45,106,79,0.12)',
-  textAlign: 'center', background: '#fff',
+  textAlign: 'center', background: 'var(--kt-card)',
 };
 const SCORE_INPUT = {
   width: 52, textAlign: 'center', border: '1px solid rgba(45,106,79,0.2)',
   borderRadius: 7, padding: '5px 4px', fontSize: 13, fontFamily: '"DM Mono", monospace',
-  background: '#f5faf7', outline: 'none', color: '#0d2218',
+  background: 'var(--kt-input-bg)', outline: 'none', color: 'var(--kt-text-primary)',
 };
 
 const DEFAULT_WEIGHTS = {
@@ -415,9 +415,9 @@ export default function GradingTablePage() {
         )}
 
         {/* Weight controls */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', padding: '18px 22px', marginBottom: 18 }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '18px 22px', marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Component Weights</h3>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Component Weights</h3>
             {validWeights
               ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2d6a4f', fontWeight: 600 }}><CheckCircle2 size={13} /> Total: 100%</span>
               : <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#e05c5c', fontWeight: 600 }}><AlertTriangle size={13} /> Total: {weightSum}% — must equal 100%</span>
@@ -432,16 +432,16 @@ export default function GradingTablePage() {
               <div key={wKey} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button onClick={() => changeWeight(wKey, -5)} style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Minus size={12} /></button>
-                  <span style={{ width: 44, textAlign: 'center', fontWeight: 700, fontSize: 14, color: '#0d2218', fontFamily: '"DM Mono", monospace' }}>{localWeights[wKey]}%</span>
-                  <button onClick={() => changeWeight(wKey, 5)} style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Plus size={12} /></button>
+                  <button onClick={() => changeWeight(wKey, -5)} style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-surface)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Minus size={12} /></button>
+                  <span style={{ width: 44, textAlign: 'center', fontWeight: 700, fontSize: 14, color: 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>{localWeights[wKey]}%</span>
+                  <button onClick={() => changeWeight(wKey, 5)} style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-surface)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Plus size={12} /></button>
                 </div>
                 {cKey && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     <span style={{ fontSize: 11, color: '#6b7280' }}>Items:</span>
-                    <button onClick={() => changeCount(cKey, -1)} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Minus size={10} /></button>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: '#0d2218', minWidth: 18, textAlign: 'center' }}>{localWeights[cKey]}</span>
-                    <button onClick={() => changeCount(cKey, 1)} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Plus size={10} /></button>
+                    <button onClick={() => changeCount(cKey, -1)} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-surface)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Minus size={10} /></button>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--kt-text-primary)', minWidth: 18, textAlign: 'center' }}>{localWeights[cKey]}</span>
+                    <button onClick={() => changeCount(cKey, 1)} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-surface)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#4a6357' }}><Plus size={10} /></button>
                   </div>
                 )}
               </div>
@@ -456,12 +456,12 @@ export default function GradingTablePage() {
         )}
 
         {/* Grade table */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 13, width: '100%' }}>
               <thead>
-                <tr style={{ background: '#f5faf7' }}>
-                  <th colSpan={3} style={{ ...CELL, background: '#f5faf7' }} />
+                <tr style={{ background: 'var(--kt-surface)' }}>
+                  <th colSpan={3} style={{ ...CELL, background: 'var(--kt-surface)' }} />
                   <th colSpan={localWeights.wwCount} style={{ ...CELL, background: '#dbeafe', color: '#1e3a8a', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', textAlign: 'center' }}>
                     Written Works ({localWeights.writtenWorksWeight}%)
                   </th>
@@ -487,7 +487,7 @@ export default function GradingTablePage() {
                   ))}
                   <th style={{ ...CELL, background: '#f0fdf4', fontSize: 11, fontWeight: 700, color: '#166534', textAlign: 'center', width: 70 }}>ST 1</th>
                   <th style={{ ...CELL, background: '#f0fdf4', fontSize: 11, fontWeight: 700, color: '#166534', textAlign: 'center', width: 70 }}>ST 2</th>
-                  <th style={{ ...CELL, background: '#f5faf7', fontSize: 11, fontWeight: 700, color: '#1a3d2b', textAlign: 'center' }}>Grade</th>
+                  <th style={{ ...CELL, background: 'var(--kt-surface)', fontSize: 11, fontWeight: 700, color: '#1a3d2b', textAlign: 'center' }}>Grade</th>
                 </tr>
               </thead>
               <tbody>
@@ -526,7 +526,7 @@ export default function GradingTablePage() {
                       />
                     </td>
                   ))}
-                  <td style={{ ...CELL, background: '#f5faf7' }} />
+                  <td style={{ ...CELL, background: 'var(--kt-surface)' }} />
                 </tr>
 
                 {students.length === 0 ? (
@@ -546,7 +546,7 @@ export default function GradingTablePage() {
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fffe'}
                       onMouseLeave={e => e.currentTarget.style.background = ''}
                     >
-                      <td style={{ ...CELL, fontWeight: 600, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>
+                      <td style={{ ...CELL, fontWeight: 600, color: 'var(--kt-text-primary)', textAlign: 'left', padding: '8px 12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {live?.photoUrl ? (
                             <img src={thumbUrl(live.photoUrl, 56)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(45,106,79,0.2)' }} />
@@ -557,9 +557,9 @@ export default function GradingTablePage() {
                           )}
                           <button
                             onClick={() => setOpenStudentCard(studentForCard)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: 'var(--kt-text-primary)', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
                             onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
-                            onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--kt-text-primary)'; }}
                           >
                             {s.surname}
                           </button>
@@ -570,12 +570,12 @@ export default function GradingTablePage() {
                           )}
                         </div>
                       </td>
-                      <td style={{ ...CELL, color: '#0d2218', textAlign: 'left', padding: '8px 12px' }}>
+                      <td style={{ ...CELL, color: 'var(--kt-text-primary)', textAlign: 'left', padding: '8px 12px' }}>
                         <button
                           onClick={() => setOpenStudentCard(studentForCard)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#0d2218', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--kt-text-primary)', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'rgba(45,106,79,0.3)' }}
                           onMouseEnter={e => { e.currentTarget.style.color = '#2d6a4f'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = '#0d2218'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--kt-text-primary)'; }}
                         >
                           {s.givenName}
                         </button>
@@ -629,7 +629,7 @@ export default function GradingTablePage() {
       {/* Submit confirmation overlay */}
       {showConfirm && (
         <div onClick={() => setShowConfirm(false)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)' }}>
             <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '20px 24px' }}>
               <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px' }}>Submit Grades</p>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff' }}>

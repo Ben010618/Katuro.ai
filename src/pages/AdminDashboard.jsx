@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -13,24 +14,24 @@ import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
-  Bell, UserPlus, Clock,
+  Bell, UserPlus, Clock, Moon, Sun,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
-  background: '#fff', borderRadius: 14,
-  border: '1px solid rgba(45,106,79,0.12)', padding: '20px 22px',
+  background: 'var(--kt-card)', borderRadius: 14,
+  border: '1px solid var(--kt-border)', padding: '20px 22px',
 };
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   padding: '10px 12px', border: '1.5px solid rgba(45,106,79,0.2)',
-  borderRadius: 8, fontSize: 14, background: '#f5faf7',
-  color: '#163828', outline: 'none', fontFamily: 'inherit',
+  borderRadius: 8, fontSize: 14, background: 'var(--kt-input-bg)',
+  color: 'var(--kt-text-primary)', outline: 'none', fontFamily: 'inherit',
 };
 const labelStyle = {
   display: 'block', fontSize: 11, fontWeight: 700,
-  color: '#4a6357', textTransform: 'uppercase',
+  color: 'var(--kt-text-secondary)', textTransform: 'uppercase',
   letterSpacing: '0.07em', marginBottom: 6,
 };
 const btnPrimary = {
@@ -40,7 +41,7 @@ const btnPrimary = {
   display: 'flex', alignItems: 'center', gap: 6,
 };
 const btnSecondary = {
-  background: '#f5faf7', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)',
+  background: 'var(--kt-surface)', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)',
   borderRadius: 8, padding: '8px 14px', fontSize: 12,
   fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
   display: 'flex', alignItems: 'center', gap: 5,
@@ -56,12 +57,12 @@ function Modal({ onClose, title, children }) {
       padding: 20,
     }} onClick={onClose}>
       <div style={{
-        background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+        background: 'var(--kt-card)', borderRadius: 16, padding: '28px 28px 24px',
         width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(13,34,24,0.18)',
       }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0d2218' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 4 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 4 }}>
             <X size={18} />
           </button>
         </div>
@@ -109,7 +110,7 @@ function AddUserModal({ adminUid, onClose, onSuccess }) {
         <div>
           <label style={labelStyle}>Initial Tokens</label>
           <input style={inputStyle} type="number" min={0} value={tokens} onChange={e => setTokens(e.target.value)} placeholder="0" />
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: '#4a6357' }}>3 tokens = 1 Lesson Plan, 1 Quiz, or 1 Presentation</p>
+          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 Lesson Plan, 1 Quiz, or 1 Presentation</p>
         </div>
         {err && (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
@@ -154,16 +155,16 @@ function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
   return (
     <Modal onClose={onClose} title={`Add Tokens — ${target.email}`}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ background: '#f5faf7', borderRadius: 8, padding: '10px 14px' }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>Current balance</p>
-          <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: '#0d2218', fontFamily: '"DM Mono", monospace' }}>
-            {target.tokenBalance ?? 0} <span style={{ fontSize: 12, fontWeight: 500, color: '#4a6357' }}>tokens</span>
+        <div style={{ background: 'var(--kt-surface)', borderRadius: 8, padding: '10px 14px' }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>Current balance</p>
+          <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>
+            {target.tokenBalance ?? 0} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--kt-text-secondary)' }}>tokens</span>
           </p>
         </div>
         <div>
           <label style={labelStyle}>Tokens to Add</label>
           <input style={inputStyle} type="number" min={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 9" required />
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: '#4a6357' }}>3 tokens = 1 AI action</p>
+          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 AI action</p>
         </div>
         <div>
           <label style={labelStyle}>Note (optional)</label>
@@ -229,7 +230,7 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
               <button
                 type="button"
                 onClick={() => setShowCurrent(v => !v)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
               >
                 {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
@@ -242,9 +243,9 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '12px 14px' }}>
               <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
-                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#163828' }}>Password set successfully.</p>
+                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Password set successfully.</p>
                 {!target.password && (
-                  <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
                     This user self-registered — the new password will take effect the next time they sign in.
                   </p>
                 )}
@@ -270,7 +271,7 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={() => setShowNew(v => !v)}
-                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
                 >
                   {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -313,7 +314,7 @@ function UserDetailsModal({ teacher: t, onClose }) {
     return (
       <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
         <span style={{ ...labelStyle, marginBottom: 0, width: 120, flexShrink: 0, lineHeight: '1.4' }}>{label}</span>
-        <span style={{ fontSize: 13, color: '#0d2218', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{value || '—'}</span>
+        <span style={{ fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{value || '—'}</span>
       </div>
     );
   }
@@ -326,7 +327,7 @@ function UserDetailsModal({ teacher: t, onClose }) {
       padding: 20, overflowY: 'auto',
     }} onClick={onClose}>
       <div style={{
-        background: '#fff', borderRadius: 18, padding: 0,
+        background: 'var(--kt-card)', borderRadius: 18, padding: 0,
         width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(13,34,24,0.22)',
         overflow: 'hidden',
       }} onClick={e => e.stopPropagation()}>
@@ -440,8 +441,8 @@ function ApiKeySection({ adminUid }) {
           <Key size={17} color="#6d28d9" />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Gemini API Settings</h2>
-          <p style={{ margin: 0, fontSize: 11, color: '#4a6357' }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Gemini API Settings</h2>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
             Key stored in Firestore — teachers cannot read it
           </p>
         </div>
@@ -464,9 +465,9 @@ function ApiKeySection({ adminUid }) {
 
       {/* Current key preview */}
       {status?.hasKey && (
-        <div style={{ background: '#f5faf7', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ background: 'var(--kt-surface)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Key size={12} color="#4a6357" />
-          <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#163828', flex: 1 }}>{status.preview}</span>
+          <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-primary)', flex: 1 }}>{status.preview}</span>
           {formattedDate && (
             <span style={{ fontSize: 10, color: '#9BB8A5' }}>Updated {formattedDate}</span>
           )}
@@ -488,7 +489,7 @@ function ApiKeySection({ adminUid }) {
             <button
               type="button"
               onClick={() => setShowKey(v => !v)}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 0 }}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
             >
               {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
@@ -554,6 +555,7 @@ function ApiKeySection({ adminUid }) {
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
+  const { dark, toggle } = useTheme();
 
   const [teachers,       setTeachers]       = useState([]);
   const [loadingList,    setLoadingList]     = useState(true);
@@ -652,22 +654,32 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5faf7', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--kt-surface)', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
       {/* Topbar */}
       <header style={{
-        height: 56, background: '#fff', borderBottom: '1px solid rgba(45,106,79,0.12)',
+        height: 56, background: 'var(--kt-card)', borderBottom: '1px solid var(--kt-border)',
         display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14,
         position: 'sticky', top: 0, zIndex: 40,
       }}>
         <img src={ktLogo} alt="kaTuro AI" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'cover' }} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#0d2218' }}>kaTuro AI</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>kaTuro AI</span>
         <span style={{ fontSize: 12, color: 'rgba(45,106,79,0.4)', margin: '0 2px' }}>›</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#2d6a4f' }}>Admin Dashboard</span>
         <div style={{ flex: 1 }} />
+
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggle}
+          style={{ ...btnSecondary, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+          title={dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {dark ? <Sun size={14} /> : <Moon size={14} />}
+          {dark ? 'Light' : 'Dark'}
+        </button>
 
         {/* Bell notification button */}
         <div style={{ position: 'relative' }}>
@@ -697,8 +709,8 @@ export default function AdminDashboard() {
           {showNotifs && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              width: 340, background: '#fff', borderRadius: 14,
-              border: '1px solid rgba(45,106,79,0.12)',
+              width: 340, background: 'var(--kt-card)', borderRadius: 14,
+              border: '1px solid var(--kt-border)',
               boxShadow: '0 12px 40px rgba(13,34,24,0.16)',
               zIndex: 100, overflow: 'hidden',
             }}>
@@ -706,7 +718,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <Bell size={13} color="#2d6a4f" />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0d2218' }}>Notifications</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Notifications</span>
                   {unreadCount > 0 && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: '#e05c5c', color: '#fff', borderRadius: 20, padding: '1px 7px' }}>
                       {unreadCount} new
@@ -722,7 +734,7 @@ export default function AdminDashboard() {
                       Mark all read
                     </button>
                   )}
-                  <button onClick={() => setShowNotifs(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 2 }}>
+                  <button onClick={() => setShowNotifs(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 2 }}>
                     <X size={14} />
                   </button>
                 </div>
@@ -758,10 +770,10 @@ export default function AdminDashboard() {
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Registration</span>
                         {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05c5c', flexShrink: 0 }} />}
                       </div>
-                      <p style={{ margin: '0 0 2px', fontSize: 12, fontWeight: 700, color: '#0d2218' }}>
+                      <p style={{ margin: '0 0 2px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
                         {n.givenName && n.surname ? `${n.givenName} ${n.surname}` : n.displayName || n.email}
                       </p>
-                      <p style={{ margin: '0 0 4px', fontSize: 11, color: '#4a6357' }}>{n.school || n.email}</p>
+                      <p style={{ margin: '0 0 4px', fontSize: 11, color: 'var(--kt-text-secondary)' }}>{n.school || n.email}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {n.pendingApproval && (
                           <span style={{ fontSize: 9, fontWeight: 700, borderRadius: 20, padding: '2px 7px', background: '#fef9e7', color: '#d97706' }}>
@@ -806,8 +818,8 @@ export default function AdminDashboard() {
                 <Icon size={18} color={iconColor} />
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: '#0d2218', fontFamily: '"DM Mono", monospace' }}>{value}</p>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>{value}</p>
               </div>
             </div>
           ))}
@@ -819,7 +831,7 @@ export default function AdminDashboard() {
         {/* Users table */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Users</h2>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Users</h2>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={fetchTeachers} style={btnSecondary} title="Refresh">
                 <RefreshCw size={13} />
@@ -843,12 +855,12 @@ export default function AdminDashboard() {
           )}
 
           {loadingList ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10, color: '#4a6357' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10, color: 'var(--kt-text-secondary)' }}>
               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
               <span style={{ fontSize: 13, fontWeight: 600 }}>Loading users…</span>
             </div>
           ) : teachers.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#4a6357' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--kt-text-secondary)' }}>
               <Users size={32} style={{ opacity: 0.3, marginBottom: 10 }} />
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No users yet</p>
               <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.7 }}>Click "Add User" to create the first teacher account.</p>
@@ -859,7 +871,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
                     {['Email', 'Tokens', 'Status', 'Actions'].map(h => (
-                      <th key={h} style={{ textAlign: 'left', padding: '6px 12px 10px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ textAlign: 'left', padding: '6px 12px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -886,18 +898,18 @@ export default function AdminDashboard() {
                             </div>
                             <div>
                               {(t.givenName || t.surname) && (
-                                <p style={{ margin: '0 0 1px', fontWeight: 700, fontSize: 13, color: '#0d2218' }}>
+                                <p style={{ margin: '0 0 1px', fontWeight: 700, fontSize: 13, color: 'var(--kt-text-primary)' }}>
                                   {[t.givenName, t.mi ? `${t.mi}.` : '', t.surname].filter(Boolean).join(' ')}
                                 </p>
                               )}
-                              <p style={{ margin: 0, fontWeight: 600, color: '#4a6357', fontSize: 12, textDecoration: 'underline dotted' }}>{t.email}</p>
+                              <p style={{ margin: 0, fontWeight: 600, color: 'var(--kt-text-secondary)', fontSize: 12, textDecoration: 'underline dotted' }}>{t.email}</p>
                               {t.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: '#b47a10', background: 'rgba(232,163,32,0.12)', borderRadius: 4, padding: '1px 5px' }}>Admin</span>}
                             </div>
                           </div>
                         </button>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
-                        <span style={{ fontFamily: '"DM Mono", monospace', fontWeight: 700, fontSize: 15, color: '#0d2218' }}>
+                        <span style={{ fontFamily: '"DM Mono", monospace', fontWeight: 700, fontSize: 15, color: 'var(--kt-text-primary)' }}>
                           {t.tokenBalance ?? 0}
                         </span>
                       </td>
@@ -966,7 +978,7 @@ export default function AdminDashboard() {
           <p style={{ margin: 0, fontSize: 12, color: '#7a5a10', lineHeight: 1.65 }}>
             Add this to your Firestore rules so admins can read/write all teacher docs:
           </p>
-          <pre style={{ margin: '8px 0 0', fontSize: 11, background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '10px 14px', overflowX: 'auto', color: '#0d2218', lineHeight: 1.7 }}>{`function isAdmin() {
+          <pre style={{ margin: '8px 0 0', fontSize: 11, background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '10px 14px', overflowX: 'auto', color: 'var(--kt-text-primary)', lineHeight: 1.7 }}>{`function isAdmin() {
   return get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.isAdmin == true;
 }
 match /teachers/{uid} {

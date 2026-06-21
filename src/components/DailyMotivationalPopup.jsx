@@ -128,7 +128,7 @@ export default function DailyMotivationalPopup() {
 
               <p style={{
                 margin: '0 0 12px',
-                fontSize: 18, fontWeight: 700, color: '#0d2218',
+                fontSize: 18, fontWeight: 700, color: 'var(--kt-text-primary)',
                 lineHeight: 1.55, fontStyle: 'italic',
               }}>
                 "{item.text}"
@@ -173,7 +173,7 @@ export default function DailyMotivationalPopup() {
 
               <p style={{
                 margin: '0 0 14px',
-                fontSize: 18, fontWeight: 700, color: '#0d2218',
+                fontSize: 18, fontWeight: 700, color: 'var(--kt-text-primary)',
                 lineHeight: 1.55, fontStyle: 'italic',
               }}>
                 "{item.text}"
@@ -204,7 +204,7 @@ export default function DailyMotivationalPopup() {
 
               <p style={{
                 margin: '0 0 6px',
-                fontSize: 21, fontWeight: 800, color: '#0d2218', lineHeight: 1.2,
+                fontSize: 21, fontWeight: 800, color: 'var(--kt-text-primary)', lineHeight: 1.2,
               }}>
                 Anong magagawa ng{' '}
                 <span style={{
@@ -229,7 +229,7 @@ export default function DailyMotivationalPopup() {
                   'Daily Lesson Log (DLL)',
                   'Mas maraming quality time kasama ang pamilya',
                 ].map(line => (
-                  <div key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#0d2218' }}>
+                  <div key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--kt-text-primary)' }}>
                     <span style={{ color: '#16a34a', fontWeight: 800, flexShrink: 0 }}>✅</span>
                     {line}
                   </div>

@@ -53,12 +53,12 @@ function RenderQuestionnaire({ data }) {
         <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#fff' }}>{data.title}</p>
       </div>
       {data.instructions && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.65 }}>{data.instructions}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.65 }}>{data.instructions}</p>
         </div>
       )}
       {(data.sections ?? []).map((section, si) => (
-        <div key={si} style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'16px 20px' }}>
+        <div key={si} style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'16px 20px' }}>
           <p style={{ margin:'0 0 10px', fontSize:13, fontWeight:700, color:'#1a3d2b' }}>{section.sectionTitle}</p>
           {section.scale && (
             <p style={{ margin:'0 0 12px', fontSize:11, fontWeight:600, color:'#1a3d2b', background:'#d8f3dc', padding:'6px 12px', borderRadius:6 }}>
@@ -78,8 +78,8 @@ function RenderQuestionnaire({ data }) {
                 </thead>
                 <tbody>
                   {(section.items ?? []).map((item, ii) => (
-                    <tr key={ii} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)', background: ii%2===0?'#fff':'#fafafa' }}>
-                      <td style={{ padding:'8px 10px', color:'#163828', lineHeight:1.5 }}>{item.num}. {item.text}</td>
+                    <tr key={ii} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)', background: ii%2===0?'var(--kt-card)':'var(--kt-card-2)' }}>
+                      <td style={{ padding:'8px 10px', color:'var(--kt-text-primary)', lineHeight:1.5 }}>{item.num}. {item.text}</td>
                       {['5','4','3','2','1'].map(n => (
                         <td key={n} style={{ padding:'8px', textAlign:'center' }}>
                           <div style={{ width:16, height:16, borderRadius:'50%', border:'1.5px solid rgba(45,106,79,0.3)', margin:'0 auto' }} />
@@ -94,7 +94,7 @@ function RenderQuestionnaire({ data }) {
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               {(section.items ?? []).map((item, ii) => (
                 <div key={ii}>
-                  <p style={{ margin:'0 0 6px', fontSize:13, color:'#163828', fontWeight:500 }}>{item.num}. {item.text}</p>
+                  <p style={{ margin:'0 0 6px', fontSize:13, color:'var(--kt-text-primary)', fontWeight:500 }}>{item.num}. {item.text}</p>
                   {section.type === 'open' && (
                     <div style={{ borderBottom:'1px solid rgba(45,106,79,0.25)', paddingBottom:2, marginBottom:6 }}>
                       <div style={{ borderBottom:'1px solid rgba(45,106,79,0.15)', paddingBottom:2, marginBottom:6 }} />
@@ -122,9 +122,9 @@ function RenderInterviewGuide({ data }) {
         {data.estimatedTime && <p style={{ margin:0, fontSize:11, color:'rgba(255,255,255,0.65)' }}>Estimated time: {data.estimatedTime}</p>}
       </div>
       {data.purpose && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Purpose</p>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{data.purpose}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Purpose</p>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{data.purpose}</p>
         </div>
       )}
       {data.introduction && (
@@ -134,19 +134,19 @@ function RenderInterviewGuide({ data }) {
         </div>
       )}
       {(data.sections ?? []).map((section, si) => (
-        <div key={si} style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'16px 20px' }}>
+        <div key={si} style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'16px 20px' }}>
           <p style={{ margin:'0 0 14px', fontSize:13, fontWeight:700, color:'#1a3d2b' }}>{section.sectionTitle}</p>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             {(section.questions ?? []).map((q, qi) => (
               <div key={qi} style={{ paddingLeft:12, borderLeft:'3px solid #52b788' }}>
-                <p style={{ margin:'0 0 8px', fontSize:13, fontWeight:600, color:'#0d2218', lineHeight:1.55 }}>
+                <p style={{ margin:'0 0 8px', fontSize:13, fontWeight:600, color:'var(--kt-text-primary)', lineHeight:1.55 }}>
                   <span style={{ color:'#2d6a4f', fontWeight:700, marginRight:5 }}>Q{q.num}.</span>{q.mainQuestion}
                 </p>
                 {q.probes?.length > 0 && (
                   <div>
-                    <p style={{ margin:'0 0 4px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.05em' }}>Probing questions:</p>
+                    <p style={{ margin:'0 0 4px', fontSize:10, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Probing questions:</p>
                     {q.probes.map((probe, pi) => (
-                      <p key={pi} style={{ margin:'0 0 2px', fontSize:12, color:'#4a6357', paddingLeft:10 }}>• {probe}</p>
+                      <p key={pi} style={{ margin:'0 0 2px', fontSize:12, color:'var(--kt-text-secondary)', paddingLeft:10 }}>• {probe}</p>
                     ))}
                   </div>
                 )}
@@ -172,15 +172,15 @@ function RenderChecklist({ data }) {
         <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#fff' }}>{data.title}</p>
       </div>
       {data.purpose && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Purpose</p>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{data.purpose}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Purpose</p>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{data.purpose}</p>
         </div>
       )}
       {data.instructions && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Instructions</p>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{data.instructions}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Instructions</p>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{data.instructions}</p>
         </div>
       )}
       {data.scale && (
@@ -189,7 +189,7 @@ function RenderChecklist({ data }) {
         </div>
       )}
       {(data.sections ?? []).map((section, si) => (
-        <div key={si} style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'16px 20px' }}>
+        <div key={si} style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'16px 20px' }}>
           <p style={{ margin:'0 0 12px', fontSize:13, fontWeight:700, color:'#1a3d2b' }}>{section.sectionTitle}</p>
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
@@ -204,9 +204,9 @@ function RenderChecklist({ data }) {
               </thead>
               <tbody>
                 {(section.indicators ?? []).map((item, ii) => (
-                  <tr key={ii} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)', background: ii%2===0?'#fff':'#fafafa' }}>
-                    <td style={{ padding:'8px', textAlign:'center', color:'#4a6357', fontWeight:600 }}>{item.num}</td>
-                    <td style={{ padding:'8px 10px', color:'#163828', lineHeight:1.5 }}>{item.indicator}</td>
+                  <tr key={ii} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)', background: ii%2===0?'var(--kt-card)':'var(--kt-card-2)' }}>
+                    <td style={{ padding:'8px', textAlign:'center', color:'var(--kt-text-secondary)', fontWeight:600 }}>{item.num}</td>
+                    <td style={{ padding:'8px 10px', color:'var(--kt-text-primary)', lineHeight:1.5 }}>{item.indicator}</td>
                     {['4','3','2','1'].map(n => (
                       <td key={n} style={{ padding:'8px', textAlign:'center' }}>
                         <div style={{ width:15, height:15, borderRadius:3, border:'1.5px solid rgba(45,106,79,0.3)', margin:'0 auto' }} />
@@ -220,9 +220,9 @@ function RenderChecklist({ data }) {
         </div>
       ))}
       {data.scoringGuide && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Scoring Guide</p>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6 }}>{data.scoringGuide}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Scoring Guide</p>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6 }}>{data.scoringGuide}</p>
         </div>
       )}
     </div>
@@ -237,14 +237,14 @@ function RenderPretest({ data }) {
         {data.timeAllotment && <p style={{ margin:0, fontSize:11, color:'rgba(255,255,255,0.65)' }}>Time allotment: {data.timeAllotment}</p>}
       </div>
       {data.instructions && (
-        <div style={{ background:'#f5faf7', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 16px' }}>
-          <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.6, fontWeight:500 }}>{data.instructions}</p>
+        <div style={{ background:'var(--kt-surface)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'12px 16px' }}>
+          <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.6, fontWeight:500 }}>{data.instructions}</p>
         </div>
       )}
       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
         {(data.items ?? []).map((item, ii) => (
-          <div key={ii} style={{ background:'#fff', borderRadius:10, border:'1px solid rgba(45,106,79,0.12)', padding:'14px 18px' }}>
-            <p style={{ margin:'0 0 10px', fontSize:13, fontWeight:600, color:'#0d2218', lineHeight:1.55 }}>
+          <div key={ii} style={{ background:'var(--kt-card)', borderRadius:10, border:'1px solid var(--kt-border)', padding:'14px 18px' }}>
+            <p style={{ margin:'0 0 10px', fontSize:13, fontWeight:600, color:'var(--kt-text-primary)', lineHeight:1.55 }}>
               <span style={{ fontFamily:'"DM Mono", monospace', color:'#2d6a4f', marginRight:6 }}>{item.num}.</span>
               {item.question}
             </p>
@@ -254,11 +254,11 @@ function RenderPretest({ data }) {
                 return (
                   <div key={letter} style={{
                     display:'flex', alignItems:'flex-start', gap:8, padding:'7px 10px',
-                    borderRadius:7, background: isAns ? '#d8f3dc' : '#f5faf7',
+                    borderRadius:7, background: isAns ? '#d8f3dc' : 'var(--kt-surface)',
                     border: `1px solid ${isAns ? 'rgba(45,106,79,0.3)' : 'transparent'}`,
                   }}>
-                    <span style={{ fontFamily:'"DM Mono", monospace', fontWeight:700, fontSize:11, color: isAns ? '#1a3d2b' : '#4a6357', flexShrink:0, marginTop:1 }}>{letter}.</span>
-                    <span style={{ fontSize:12, color: isAns ? '#0d2218' : '#4a6357', fontWeight: isAns ? 600 : 400 }}>{text}</span>
+                    <span style={{ fontFamily:'"DM Mono", monospace', fontWeight:700, fontSize:11, color: isAns ? '#1a3d2b' : 'var(--kt-text-secondary)', flexShrink:0, marginTop:1 }}>{letter}.</span>
+                    <span style={{ fontSize:12, color: isAns ? 'var(--kt-text-primary)' : 'var(--kt-text-secondary)', fontWeight: isAns ? 600 : 400 }}>{text}</span>
                   </div>
                 );
               })}
@@ -404,7 +404,7 @@ export default function ActionResearchPhase5() {
   }
 
   if (pageLoading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--kt-surface)' }}>
       <Loader2 size={24} color="#2d6a4f" style={{ animation:'spin 1s linear infinite' }} />
     </div>
   );
@@ -427,20 +427,20 @@ export default function ActionResearchPhase5() {
       <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
         {/* Context */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'20px 24px' }}>
-          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 24px' }}>
+          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
           <p style={{ margin:'0 0 0', fontSize:14, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
         </div>
 
         {/* ── Step 1: Data Collection Methodology ─────────────────────────── */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
+        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'22px 24px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
             <div style={{ width:26, height:26, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center', flexShrink:0 }}>
               <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>1</span>
             </div>
-            <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#0d2218' }}>Data Collection Methodology</p>
+            <p style={{ margin:0, fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Data Collection Methodology</p>
           </div>
-          <p style={{ margin:'0 0 16px', fontSize:13, color:'#4a6357', lineHeight:1.5, paddingLeft:36 }}>AI recommends the best data collection tools, statistical formulas, and analysis approach for your research.</p>
+          <p style={{ margin:'0 0 16px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.5, paddingLeft:36 }}>AI recommends the best data collection tools, statistical formulas, and analysis approach for your research.</p>
           <button onClick={handleGenerate} disabled={generating} style={{
             display:'flex', alignItems:'center', gap:7,
             background:generating?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff',
@@ -457,41 +457,41 @@ export default function ActionResearchPhase5() {
         {dc && (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             {/* Primary tool */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><ClipboardList size={13} color="#2d6a4f" /></span>Primary Data Collection Tool</p>
               <div style={{ display:'flex', gap:8, marginBottom:10 }}>
                 {dc.primaryTool?.name && tag(dc.primaryTool.name)}
                 {dc.primaryTool?.type && tag(dc.primaryTool.type)}
               </div>
-              <p style={{ margin:'0 0 8px', fontSize:13, color:'#163828', lineHeight:1.65 }}>{dc.primaryTool?.description}</p>
-              {dc.primaryTool?.rationale && <p style={{ margin:'0 0 8px', fontSize:13, color:'#4a6357', lineHeight:1.6, fontStyle:'italic' }}><strong style={{color:'#1a3d2b',fontStyle:'normal'}}>Rationale:</strong> {dc.primaryTool.rationale}</p>}
-              {dc.primaryTool?.administration && <p style={{ margin:'0 0 8px', fontSize:13, color:'#4a6357', lineHeight:1.6 }}><strong style={{color:'#1a3d2b'}}>Administration:</strong> {dc.primaryTool.administration}</p>}
+              <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.65 }}>{dc.primaryTool?.description}</p>
+              {dc.primaryTool?.rationale && <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.6, fontStyle:'italic' }}><strong style={{color:'#1a3d2b',fontStyle:'normal'}}>Rationale:</strong> {dc.primaryTool.rationale}</p>}
+              {dc.primaryTool?.administration && <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.6 }}><strong style={{color:'#1a3d2b'}}>Administration:</strong> {dc.primaryTool.administration}</p>}
               {dc.primaryTool?.sampleItems?.length > 0 && (
                 <>
-                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items</p>
-                  {dc.primaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'#163828' }}>{i+1}. {s}</p>)}
+                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items</p>
+                  {dc.primaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'var(--kt-text-primary)' }}>{i+1}. {s}</p>)}
                 </>
               )}
             </div>
 
             {/* Secondary tool */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><FlaskConical size={13} color="#2d6a4f" /></span>Secondary Data Collection Tool</p>
               <div style={{ display:'flex', gap:8, marginBottom:10 }}>
                 {dc.secondaryTool?.name && tag(dc.secondaryTool.name)}
                 {dc.secondaryTool?.type && tag(dc.secondaryTool.type)}
               </div>
-              <p style={{ margin:'0 0 8px', fontSize:13, color:'#163828', lineHeight:1.65 }}>{dc.secondaryTool?.description}</p>
+              <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.65 }}>{dc.secondaryTool?.description}</p>
               {dc.secondaryTool?.sampleItems?.length > 0 && (
                 <>
-                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items / criteria</p>
-                  {dc.secondaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'#163828' }}>{i+1}. {s}</p>)}
+                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items / criteria</p>
+                  {dc.secondaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'var(--kt-text-primary)' }}>{i+1}. {s}</p>)}
                 </>
               )}
             </div>
 
             {/* Stats table */}
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
               <p style={sectionHead}><span style={iconBox}><BarChart2 size={13} color="#2d6a4f" /></span>Statistical Treatment</p>
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
@@ -506,8 +506,8 @@ export default function ActionResearchPhase5() {
                     {(dc.statisticalTreatment ?? []).map((row, i) => (
                       <tr key={i} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)' }}>
                         <td style={{ padding:'8px 10px', fontWeight:600, color:'#1a3d2b', verticalAlign:'top' }}>{row.formula}</td>
-                        <td style={{ padding:'8px 10px', color:'#163828', verticalAlign:'top' }}>{row.purpose}</td>
-                        <td style={{ padding:'8px 10px', color:'#4a6357', verticalAlign:'top' }}>{row.interpretation}</td>
+                        <td style={{ padding:'8px 10px', color:'var(--kt-text-primary)', verticalAlign:'top' }}>{row.purpose}</td>
+                        <td style={{ padding:'8px 10px', color:'var(--kt-text-secondary)', verticalAlign:'top' }}>{row.interpretation}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -517,9 +517,9 @@ export default function ActionResearchPhase5() {
 
             {/* Analysis approach */}
             {dc.analysisApproach && (
-              <div style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
+              <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
                 <p style={{ margin:'0 0 10px', fontSize:13, fontWeight:700, color:'#1a3d2b' }}>Data Analysis Approach</p>
-                <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.7, textAlign:'justify' }}>{dc.analysisApproach}</p>
+                <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7, textAlign:'justify' }}>{dc.analysisApproach}</p>
               </div>
             )}
           </div>
@@ -527,7 +527,7 @@ export default function ActionResearchPhase5() {
 
         {/* ── Step 2: Research Instrument Generator ─────────────────────────── */}
         <div style={{
-          background:'#fff', borderRadius:14,
+          background:'var(--kt-card)', borderRadius:14,
           border:'2px solid rgba(45,106,79,0.15)', padding:'22px 24px',
         }}>
           {/* Section header */}
@@ -536,8 +536,8 @@ export default function ActionResearchPhase5() {
               <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>2</span>
             </div>
             <div style={{ flex:1 }}>
-              <p style={{ margin:0, fontSize:15, fontWeight:700, color:'#0d2218' }}>Auto-Generate Research Instruments</p>
-              <p style={{ margin:0, fontSize:11, color:'#4a6357' }}>
+              <p style={{ margin:0, fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Auto-Generate Research Instruments</p>
+              <p style={{ margin:0, fontSize:11, color:'var(--kt-text-secondary)' }}>
                 {aiRecommended
                   ? 'AI suggests and highlights the best instrument below — choose and generate.'
                   : 'AI drafts a complete, ready-to-use instrument — select one type below, then generate.'}
@@ -563,13 +563,13 @@ export default function ActionResearchPhase5() {
                   onClick={() => setInstrumentType(id)}
                   style={{
                     textAlign:'left', fontFamily:'inherit', cursor:'pointer',
-                    background: active ? '#f0f9f4' : '#fafafa',
+                    background: active ? '#f0f9f4' : 'var(--kt-card-2)',
                     border: active ? '2px solid #2d6a4f' : '1.5px solid rgba(45,106,79,0.15)',
                     borderRadius:10, padding:'13px 14px',
                     transition:'border 0.15s, background 0.15s', position:'relative',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background='#f5faf7'; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background='#fafafa'; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background='var(--kt-surface)'; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background='var(--kt-card-2)'; }}
                 >
                   {/* AI Recommended badge — top-left */}
                   {isAiPick && (
@@ -621,7 +621,7 @@ export default function ActionResearchPhase5() {
 
         {/* Instrument output */}
         {instrument && (
-          <div style={{ background:'#f5faf7', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'20px 22px' }}>
+          <div style={{ background:'var(--kt-surface)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 22px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
               {(() => { const t = INSTRUMENT_TYPES.find(x => x.id === instrumentType); return t ? <t.Icon size={14} color="#2d6a4f" /> : null; })()}
               <p style={{ margin:0, fontSize:13, fontWeight:700, color:'#1a3d2b' }}>

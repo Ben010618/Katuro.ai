@@ -9,12 +9,12 @@ import { Plus, School, ChevronRight, Users, BookOpen, Trash2, AlertTriangle } fr
 
 const INPUT = {
   width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 14,
-  border: '1px solid rgba(45,106,79,0.2)', background: '#f5faf7',
-  color: '#0d2218', fontFamily: 'inherit', outline: 'none',
+  border: '1px solid rgba(45,106,79,0.2)', background: 'var(--kt-input-bg)',
+  color: 'var(--kt-text-primary)', fontFamily: 'inherit', outline: 'none',
   boxSizing: 'border-box',
 };
 const LABEL = {
-  display: 'block', fontSize: 11, fontWeight: 700, color: '#4a6357',
+  display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 6,
 };
 
@@ -46,7 +46,7 @@ function CreateClassModal({ onClose, onCreated }) {
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
     >
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
         {/* Modal header */}
         <div style={{ background: 'linear-gradient(135deg, #1a3d2b, #2d6a4f)', padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -75,7 +75,7 @@ function CreateClassModal({ onClose, onCreated }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, background: '#f5faf7', color: '#4a6357', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 10, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: 'var(--kt-surface)', color: '#4a6357', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 10, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
               Cancel
             </button>
             <button type="submit" disabled={saving} style={{ flex: 1, background: '#2d6a4f', color: '#fff', border: 'none', borderRadius: 10, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
@@ -156,14 +156,14 @@ export default function ClassroomManagementPage() {
         <div style={{ textAlign: 'center', padding: 60, color: '#4a6357', fontSize: 14 }}>Loading…</div>
       ) : sections.length === 0 ? (
         <div style={{
-          background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)',
+          background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)',
           padding: '56px 32px', textAlign: 'center',
         }}>
           <div style={{ width: 60, height: 60, borderRadius: 18, background: '#d8f3dc', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
             <School size={28} color="#2d6a4f" />
           </div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>No classes yet</h3>
-          <p style={{ margin: '0 0 20px', fontSize: 14, color: '#4a6357' }}>Click "Create a Class" to set up your first section.</p>
+          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 600, color: 'var(--kt-text-primary)' }}>No classes yet</h3>
+          <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--kt-text-secondary)' }}>Click "Create a Class" to set up your first section.</p>
           <button
             onClick={() => setShowModal(true)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#2d6a4f', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
@@ -178,8 +178,8 @@ export default function ClassroomManagementPage() {
               key={sec.id}
               onClick={() => navigate(`/classroom-management/section/${sec.id}`)}
               style={{
-                background: '#fff', borderRadius: 14,
-                border: '1px solid rgba(45,106,79,0.12)',
+                background: 'var(--kt-card)', borderRadius: 14,
+                border: '1px solid var(--kt-border)',
                 padding: '20px 22px', cursor: 'pointer',
                 transition: 'border-color 0.15s, transform 0.15s',
               }}
@@ -209,10 +209,10 @@ export default function ClassroomManagementPage() {
                 </div>
               </div>
 
-              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0d2218' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
                 {sec.gradeLevel} – {sec.sectionName}
               </h3>
-              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#4a6357' }}>SY {sec.academicYear}</p>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>SY {sec.academicYear}</p>
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#4a6357' }}>
@@ -242,13 +242,13 @@ export default function ClassroomManagementPage() {
           onClick={() => !deleting && setConfirmDel(null)}
           style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
         >
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.2)' }}>
             <div style={{ background: 'rgba(220,38,38,0.06)', borderBottom: '1px solid rgba(220,38,38,0.15)', padding: '20px 24px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(220,38,38,0.12)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <AlertTriangle size={20} color="#dc2626" />
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0d2218' }}>Delete Class?</p>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Delete Class?</p>
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
                   <strong>{confirmDel.gradeLevel} – {confirmDel.sectionName}</strong> · SY {confirmDel.academicYear}
                 </p>
@@ -263,7 +263,7 @@ export default function ClassroomManagementPage() {
                 <button
                   onClick={() => setConfirmDel(null)}
                   disabled={deleting}
-                  style={{ flex: 1, background: '#f5faf7', color: '#4a6357', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: deleting ? 0.5 : 1 }}
+                  style={{ flex: 1, background: 'var(--kt-surface)', color: '#4a6357', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: deleting ? 0.5 : 1 }}
                 >
                   Cancel
                 </button>

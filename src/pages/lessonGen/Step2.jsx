@@ -25,8 +25,8 @@ const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   border: '1px solid rgba(45,106,79,0.2)',
   borderRadius: 10, padding: '10px 14px',
-  fontSize: 15, color: '#0d2218',
-  background: '#f5faf7',
+  fontSize: 15, color: 'var(--kt-text-primary)',
+  background: 'var(--kt-input-bg)',
   outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s',
   fontFamily: 'inherit',
 };
@@ -250,37 +250,37 @@ export default function Step2() {
           <span style={{ background: '#ede9fe', color: '#7c3aed', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
             Phase 2 — Competency
           </span>
-          <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: '#0d2218' }}>
+          <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
             What will you teach this week?
           </h2>
-          <p style={{ margin: 0, fontSize: 15, color: '#4a6357', lineHeight: 1.65, maxWidth: 600 }}>
+          <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 600 }}>
             Add each learning competency from your MATATAG Curriculum Guide and assign how many days
             each needs. kaTuro AI will unpack them across your{' '}
-            <strong style={{ color: '#0d2218' }}>{n > 0 ? n : '—'}</strong>{' '}
+            <strong style={{ color: 'var(--kt-text-primary)' }}>{n > 0 ? n : '—'}</strong>{' '}
             selected teaching day{n !== 1 ? 's' : ''}.
           </p>
         </div>
 
         {/* ── Main card ────────────────────────────────────────────────────── */}
         <div style={{
-          background: '#fff', borderRadius: 14,
-          border: '1px solid rgba(45,106,79,0.12)', borderTop: '3px solid #1a3d2b',
+          background: 'var(--kt-card)', borderRadius: 14,
+          border: '1px solid var(--kt-border)', borderTop: '3px solid #1a3d2b',
           padding: '24px', marginBottom: 20,
         }}>
-          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
             MATATAG Curriculum Guide Reference
           </p>
-          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#4a6357' }}>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--kt-text-secondary)' }}>
             Based on {store.subject || 'your subject'} · {store.gradeLevel || 'your grade'} · {store.term || 'your term'} from Step 1
           </p>
           <div style={{ borderTop: '1px solid rgba(45,106,79,0.08)', marginBottom: 20 }} />
 
           {/* Content Standards */}
           <div style={{ marginBottom: 18 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
               Content Standards
             </label>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#4a6357', lineHeight: 1.65 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
               Paste the content standards from the Curriculum Guide (optional but improves AI output).
             </p>
             <textarea
@@ -296,10 +296,10 @@ export default function Step2() {
 
           {/* Content */}
           <div style={{ marginBottom: 22 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
               Content
             </label>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#4a6357', lineHeight: 1.65 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
               The specific subject matter / topic from the Curriculum Guide (optional).
             </p>
             <input
@@ -318,10 +318,10 @@ export default function Step2() {
           {/* ── MULTI-COMPETENCY SECTION ────────────────────────────────────── */}
           <div style={{ marginBottom: 22 }}>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', marginBottom: 3, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+              <label style={{ display: 'block', marginBottom: 3, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
                 Learning Competencies <span style={{ color: '#e05c5c' }}>*</span>
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
                 Add each competency from your Budget of Work. Assign how many teaching days each one needs — the total cannot exceed your {n}-day week.
               </p>
             </div>
@@ -329,8 +329,8 @@ export default function Step2() {
             {/* Week Budget Tracker */}
             {n > 0 && (
               <div style={{
-                background: '#f5faf7', borderRadius: 10,
-                border: '1px solid rgba(45,106,79,0.12)',
+                background: 'var(--kt-surface)', borderRadius: 10,
+                border: '1px solid var(--kt-border)',
                 padding: '12px 14px', marginBottom: 16,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -372,7 +372,7 @@ export default function Step2() {
                         <div style={{
                           textAlign: 'center', padding: '2px 0',
                           fontSize: 9, fontWeight: 700, color: '#4a6357',
-                          background: '#fff',
+                          background: 'var(--kt-card)',
                         }}>
                           {dayLabel}
                         </div>
@@ -420,7 +420,7 @@ export default function Step2() {
                           style={{
                             border: '1px solid rgba(45,106,79,0.25)', borderRadius: 7,
                             padding: '4px 8px', fontSize: 13, fontWeight: 700,
-                            background: '#f5faf7', color: '#0d2218',
+                            background: 'var(--kt-input-bg)', color: 'var(--kt-text-primary)',
                             cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
                           }}
                         >
@@ -508,7 +508,7 @@ export default function Step2() {
           {/* Learning Context */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#0d2218' }}>Learning Context</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>Learning Context</label>
               <span style={{
                 background: 'rgba(232,163,32,0.15)', color: '#92400e',
                 borderRadius: 20, padding: '2px 9px',
@@ -517,7 +517,7 @@ export default function Step2() {
                 Optional — Personalizes the AI output
               </span>
             </div>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#4a6357', lineHeight: 1.65 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
               Describe your school, classroom, or community situation. The AI will tailor activities,
               examples, and assessments to your specific context.
             </p>
@@ -529,7 +529,7 @@ export default function Step2() {
               style={{
                 ...inputStyle, resize: 'vertical', lineHeight: 1.65,
                 borderColor: learningContext.trim() ? 'rgba(232,163,32,0.5)' : 'rgba(45,106,79,0.2)',
-                background:  learningContext.trim() ? '#fffbeb' : '#f5faf7',
+                background:  learningContext.trim() ? '#fffbeb' : 'var(--kt-input-bg)',
               }}
               onFocus={e => { e.target.style.borderColor = '#d97706'; e.target.style.boxShadow = '0 0 0 2px rgba(217,119,6,0.2)'; }}
               onBlur={e  => { e.target.style.borderColor = learningContext.trim() ? 'rgba(232,163,32,0.5)' : 'rgba(45,106,79,0.2)'; e.target.style.boxShadow = 'none'; }}
@@ -543,7 +543,7 @@ export default function Step2() {
 
           {/* Name of Lesson */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#0d2218' }}>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
               Name of Lesson <span style={{ color: '#e05c5c' }}>*</span>
             </label>
             <input
@@ -555,13 +555,13 @@ export default function Step2() {
               style={{
                 ...inputStyle,
                 border: `1px solid ${lnError ? '#e05c5c' : 'rgba(45,106,79,0.2)'}`,
-                background: lnError ? '#fde8e8' : '#f5faf7',
+                background: lnError ? '#fde8e8' : 'var(--kt-input-bg)',
               }}
               onFocus={e => { if (!lnError) { e.target.style.borderColor = '#52b788'; e.target.style.boxShadow = '0 0 0 2px rgba(82,183,136,0.25)'; } }}
               onBlur={e  => { if (!lnError) { e.target.style.borderColor = 'rgba(45,106,79,0.2)'; e.target.style.boxShadow = 'none'; } }}
             />
             {lnError && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#e05c5c', fontWeight: 600 }}>This is required</p>}
-            <p style={{ margin: '5px 0 0', fontSize: 12, color: '#4a6357' }}>
+            <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
               This will appear as the lesson title in your ILAW document.
             </p>
           </div>
@@ -668,7 +668,7 @@ export default function Step2() {
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#0d2218' }}>Weekly Teaching Plan</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Weekly Teaching Plan</span>
                 <span style={{ marginLeft: 10, fontSize: 12, color: '#4a6357' }}>
                   {sessions.length} session{sessions.length !== 1 ? 's' : ''} · AI-sequenced by Bloom's Taxonomy
                 </span>
@@ -734,8 +734,8 @@ export default function Step2() {
 
                   return (
                     <div key={i} style={{
-                      background: '#fff',
-                      border: '1px solid rgba(45,106,79,0.12)',
+                      background: 'var(--kt-card)',
+                      border: '1px solid var(--kt-border)',
                       borderTop: `3px solid ${lc.solid}`,
                       borderRadius: 10,
                       padding: '14px 13px',
@@ -743,7 +743,7 @@ export default function Step2() {
                     }}>
                       {/* Day header */}
                       <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: '#0d2218', lineHeight: 1 }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--kt-text-primary)', lineHeight: 1 }}>
                           {dayAbbr}
                         </div>
                         {dateSub && (
@@ -778,7 +778,7 @@ export default function Step2() {
                         <p style={{ margin: '0 0 3px', fontSize: 9, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                           Learning Objective
                         </p>
-                        <p style={{ margin: 0, fontSize: 12, color: '#0d2218', lineHeight: 1.6 }}>
+                        <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', lineHeight: 1.6 }}>
                           {session.objective}
                         </p>
                       </div>
