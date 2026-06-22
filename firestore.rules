@@ -9,9 +9,14 @@ service cloud.firestore {
     }
 
     // ── Teacher documents (own data only, or admin) ─────────────────────────
+    // create is intentionally blocked for all clients — teacher documents are
+    // only ever created by the registerUser Cloud Function (Admin SDK), which
+    // bypasses these rules. This prevents rogue registrations via REST API.
     match /teachers/{userId} {
-      allow read, write: if request.auth != null &&
-        (request.auth.uid == userId || isAdmin());
+      allow read:   if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if false;
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if false;
     }
     match /teachers/{userId}/{document=**} {
       allow read, write: if request.auth != null &&

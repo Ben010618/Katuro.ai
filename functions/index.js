@@ -375,18 +375,18 @@ Return ONLY this JSON (no markdown, no explanation):
   }
 );
 
-// ── Self-registration (server-enforced validation) ────────────────────────────
+// ── Self-registration (server-enforced, multi-layer) ─────────────────────────
 exports.registerUser = onCall(
   { region: 'us-central1' },
   async (req) => {
     const { email, password, surname, givenName, mi, school } = req.data || {};
 
-    // Server-side validation — runs on the actual server, cannot be bypassed by any client
-    if (!surname?.trim())                    throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
-    if (!givenName?.trim())                  throw new HttpsError('invalid-argument', 'First name (Given Name) is required.');
-    if (!school?.trim())                     throw new HttpsError('invalid-argument', 'School name is required.');
-    if (!email?.trim())                      throw new HttpsError('invalid-argument', 'Email address is required.');
-    if (!password || password.length < 6)    throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+    // Layer 1: Server-side field validation — cannot be bypassed by any client or cached bundle
+    if (!surname?.trim())                 throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
+    if (!givenName?.trim())               throw new HttpsError('invalid-argument', 'First name (Given Name) is required.');
+    if (!school?.trim())                  throw new HttpsError('invalid-argument', 'School name is required.');
+    if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email address is required.');
+    if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
 
     const MAX_ACCOUNTS   = 250;
     const WELCOME_TOKENS = 30;
@@ -398,24 +398,10 @@ exports.registerUser = onCall(
     const displayName = [givenName.trim(), mi?.trim() ? mi.trim() + '.' : '', surname.trim()]
       .filter(Boolean).join(' ');
 
-    // Create Firebase Auth user using Admin SDK
-    let userRecord;
-    try {
-      userRecord = await admin.auth().createUser({
-        email:       email.trim().toLowerCase(),
-        password,
-        displayName,
-      });
-    } catch (err) {
-      const msg = err.code === 'auth/email-already-exists'
-        ? 'An account with this email already exists.'
-        : (err.message || 'Registration failed.');
-      throw new HttpsError('already-exists', msg);
-    }
+    // Layer 2: Pre-generate the UID and write Firestore BEFORE creating the Auth user.
+    // This ensures the enforceRegistrationSecurity trigger always finds a complete doc.
+    const uid = crypto.randomBytes(14).toString('hex'); // 28-char hex — valid Firebase UID format
 
-    const uid = userRecord.uid;
-
-    // Create Firestore profile
     await db.doc(`teachers/${uid}`).set({
       email:           email.trim().toLowerCase(),
       displayName,
@@ -428,7 +414,19 @@ exports.registerUser = onCall(
       disabled:        atCap,
       pendingApproval: atCap,
       createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+      _registeredViaFunction: true, // marker — enforceRegistrationSecurity checks this
     });
+
+    // Create Auth user with the pre-determined UID — if this fails, clean up Firestore
+    try {
+      await admin.auth().createUser({ uid, email: email.trim().toLowerCase(), password, displayName });
+    } catch (err) {
+      await db.doc(`teachers/${uid}`).delete().catch(() => {});
+      const msg = err.code === 'auth/email-already-exists'
+        ? 'An account with this email already exists.'
+        : (err.message || 'Registration failed.');
+      throw new HttpsError('already-exists', msg);
+    }
 
     if (!atCap) {
       await db.collection(`teachers/${uid}/tokenLogs`).add({
@@ -458,6 +456,30 @@ exports.registerUser = onCall(
     return { customToken, pendingApproval: atCap };
   }
 );
+
+// ── Layer 3: Auth onCreate guard — auto-delete rogue accounts ────────────────
+// Fires every time a Firebase Auth user is created.
+// Any user NOT created through registerUser (e.g. direct REST API call, old
+// cached bundle, or external tool) will have no valid Firestore teacher doc
+// and gets immediately deleted.
+const functionsV1 = require('firebase-functions/v1');
+exports.enforceRegistrationSecurity = functionsV1.auth.user().onCreate(async (user) => {
+  const uid  = user.uid;
+  const snap = await db.doc(`teachers/${uid}`).get();
+
+  const valid = snap.exists &&
+    snap.data()?._registeredViaFunction === true &&
+    snap.data()?.surname?.trim()   &&
+    snap.data()?.givenName?.trim() &&
+    snap.data()?.school?.trim()    &&
+    snap.data()?.email?.trim();
+
+  if (!valid) {
+    // Delete any partial Firestore document and the Auth user
+    if (snap.exists) await db.doc(`teachers/${uid}`).delete().catch(() => {});
+    await admin.auth().deleteUser(uid).catch(() => {});
+  }
+});
 
 // ── Admin: permanently delete a user account and all their data ───────────────
 exports.adminDeleteUser = onCall(
