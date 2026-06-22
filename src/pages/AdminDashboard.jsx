@@ -647,10 +647,12 @@ export default function AdminDashboard() {
   const activeCount   = teachers.filter(t => !t.disabled).length;
   const pendingCount  = teachers.filter(t => t.pendingApproval).length;
 
-  // Pending users appear first, then active, then manually-disabled
+  // Pending users appear first, then sort all groups by registration date (oldest → newest)
+  const toMs = ts => ts?.toDate?.()?.getTime() ?? (ts?.seconds ? ts.seconds * 1000 : 0);
   const sortedTeachers = [...teachers].sort((a, b) => {
     const rank = t => t.pendingApproval ? 0 : t.disabled ? 2 : 1;
-    return rank(a) - rank(b) || (a.email || '').localeCompare(b.email || '');
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    return toMs(a.createdAt) - toMs(b.createdAt);
   });
 
   return (

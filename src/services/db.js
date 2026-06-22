@@ -516,6 +516,13 @@ const MAX_ACCOUNTS    = 250;
 const WELCOME_TOKENS  = 30;
 
 export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
+  // Validate required fields before touching Firebase — prevents bypassing the frontend gate
+  if (!surname?.trim())   throw new Error('Last name (Surname) is required.');
+  if (!givenName?.trim()) throw new Error('First name (Given Name) is required.');
+  if (!school?.trim())    throw new Error('School name is required.');
+  if (!email?.trim())     throw new Error('Email address is required.');
+  if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
+
   const { auth: firebaseAuth } = await import('../firebase');
   const { updateProfile } = await import('firebase/auth');
 
