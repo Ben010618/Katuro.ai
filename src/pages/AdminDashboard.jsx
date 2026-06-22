@@ -6,7 +6,7 @@ import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
-  adminChangePassword, adminSendPasswordReset,
+  adminChangePassword, adminSendPasswordReset, adminDeleteUser,
   subscribeAdminNotifications, markAllNotificationsRead,
 } from '../services/db';
 import ktLogo from '../assets/KT Favicon.png';
@@ -14,7 +14,7 @@ import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
-  Bell, UserPlus, Clock, Moon, Sun,
+  Bell, UserPlus, Clock, Moon, Sun, Trash2,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -565,6 +565,9 @@ export default function AdminDashboard() {
   const [togglingUid,    setTogglingUid]     = useState(null);
   const [pwTarget,       setPwTarget]        = useState(null);
   const [detailUser,     setDetailUser]      = useState(null);
+  const [deleteTarget,   setDeleteTarget]    = useState(null);
+  const [deleting,       setDeleting]        = useState(false);
+  const [deleteError,    setDeleteError]     = useState('');
 
   // Notifications
   const [notifications,  setNotifications]  = useState([]);
@@ -635,6 +638,20 @@ export default function AdminDashboard() {
       setTeachers(prev => prev.map(t => t.id === teacher.id ? { ...t, disabled: !t.disabled } : t));
     } finally {
       setTogglingUid(null);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    setDeleting(true); setDeleteError('');
+    try {
+      await adminDeleteUser(deleteTarget.id);
+      setTeachers(prev => prev.filter(t => t.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete account.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -964,6 +981,18 @@ export default function AdminDashboard() {
                               }
                             </button>
                           )}
+                          {!t.isAdmin && (
+                            <button
+                              onClick={() => { setDeleteTarget(t); setDeleteError(''); }}
+                              style={{
+                                ...btnSecondary, padding: '5px 10px', fontSize: 11,
+                                color: '#c0392b', borderColor: 'rgba(224,92,92,0.25)',
+                              }}
+                              title="Delete account permanently"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1026,6 +1055,73 @@ match /teachers/{uid} {
           teacher={detailUser}
           onClose={() => setDetailUser(null)}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(13,34,24,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20,
+        }} onClick={() => !deleting && setDeleteTarget(null)}>
+          <div style={{
+            background: 'var(--kt-card)', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(13,34,24,0.22)',
+          }} onClick={e => e.stopPropagation()}>
+            {/* Icon */}
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(224,92,92,0.1)', display: 'grid', placeItems: 'center', marginBottom: 16 }}>
+              <Trash2 size={22} color="#c0392b" />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+              Delete Account?
+            </h3>
+            <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
+              This will permanently delete:
+            </p>
+            <div style={{ background: 'rgba(224,92,92,0.06)', border: '1px solid rgba(224,92,92,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+              <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#c0392b' }}>
+                {[deleteTarget.givenName, deleteTarget.mi ? `${deleteTarget.mi}.` : '', deleteTarget.surname].filter(Boolean).join(' ') || deleteTarget.email}
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>{deleteTarget.email}</p>
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#c0392b' }}>
+                All lessons, quizzes, token logs, and classroom data will be erased. This cannot be undone.
+              </p>
+            </div>
+            {deleteError && (
+              <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px', marginBottom: 14 }}>
+                <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{deleteError}</p>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                style={{ ...btnSecondary }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                style={{
+                  background: deleting ? 'rgba(192,57,43,0.5)' : '#c0392b',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '10px 20px', fontSize: 13, fontWeight: 600,
+                  cursor: deleting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {deleting
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Deleting…</>
+                  : <><Trash2 size={14} /> Yes, Delete Account</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

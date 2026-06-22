@@ -630,6 +630,16 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
   });
 }
 
+// ─── Admin: permanently delete a user account and all their data ─────────────
+
+export async function adminDeleteUser(targetUid) {
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions } = await import('../firebase');
+  const fn = httpsCallable(functions, 'adminDeleteUser');
+  const result = await fn({ uid: targetUid });
+  return result.data;
+}
+
 // ─── Admin: change a user's password ─────────────────────────────────────────
 // For admin-created accounts (stored password): signs in via secondary app and
 // updates Firebase Auth immediately, then updates stored password in Firestore.

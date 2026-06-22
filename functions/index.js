@@ -375,6 +375,36 @@ Return ONLY this JSON (no markdown, no explanation):
   }
 );
 
+// ── Admin: permanently delete a user account and all their data ───────────────
+exports.adminDeleteUser = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+
+    const { uid } = req.data;
+    if (!uid) throw new HttpsError('invalid-argument', 'uid is required.');
+    if (uid === req.auth.uid) throw new HttpsError('invalid-argument', 'You cannot delete your own account.');
+
+    const targetSnap = await db.doc(`teachers/${uid}`).get();
+    if (targetSnap.exists && targetSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin accounts cannot be deleted.');
+    }
+
+    // Delete all Firestore data under teachers/{uid} including all subcollections
+    await db.recursiveDelete(db.doc(`teachers/${uid}`));
+
+    // Delete the Firebase Auth user
+    await admin.auth().deleteUser(uid);
+
+    return { success: true };
+  }
+);
+
 // ── Admin: set any user's password directly via Admin SDK ─────────────────────
 exports.adminSetPassword = onCall(async (request) => {
   // Verify caller is an admin
