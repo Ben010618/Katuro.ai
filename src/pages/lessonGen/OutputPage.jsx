@@ -8,7 +8,9 @@ import { getTeacherProfile, deductTokens } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2 } from 'lucide-react';
+import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
+import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 
 const baseTd = {
   padding: '10px 12px',
@@ -162,6 +164,11 @@ export default function OutputPage() {
   const [selectedSession,  setSelectedSession] = useState(null);
   const [pptLoading,       setPptLoading]      = useState(false);
   const [pptPhase,         setPptPhase]        = useState('');
+  const [gameModal,        setGameModal]       = useState(null); // null | 'pick' | 'loading' | 'result'
+  const [selGameType,      setSelGameType]     = useState('matching');
+  const [gameCount,        setGameCount]       = useState(10);
+  const [gameLoading,      setGameLoading]     = useState(false);
+  const [gameResult,       setGameResult]      = useState(null);
 
   function handleGoToCOT() {
     if (selectedSession === null) return;
@@ -241,6 +248,62 @@ export default function OutputPage() {
       setPptLoading(false);
       setPptPhase('');
     }
+  }
+
+  async function handleGenerateGame() {
+    if (selectedSession === null) return;
+    const s = sessions[selectedSession];
+    const lesson = {
+      type: 'ilaw',
+      subject: store.subject || '',
+      gradeLevel: store.gradeLevel || '',
+      lessonName: store.lessonName || store.content || '',
+      competencyText: s.competencyText || store.competencyText || '',
+      topic: s.keyContentFocus || store.content || '',
+      sessions: [s],
+    };
+    setGameLoading(true);
+    setGameModal('loading');
+    try {
+      await deductTokens(user.uid, 'game_gen', 0.5);
+      let data;
+      if (selGameType === 'matching') {
+        const pairs = await genMatching(lesson, gameCount);
+        data = { type: 'matching', pairs, shuffledDefs: gShuffle(pairs.map(p => ({ definition: p.definition }))) };
+      } else if (selGameType === 'jumbled') {
+        const raw = await genJumbled(lesson, gameCount);
+        data = { type: 'jumbled', items: raw.map(r => ({ ...r, jumbled: gScramble(r.word) })) };
+      } else if (selGameType === 'truefalse') {
+        data = { type: 'truefalse', items: await genTrueFalse(lesson, gameCount) };
+      } else if (selGameType === 'crossword') {
+        const pairs = await genCrossword(lesson, gameCount);
+        data = { type: 'crossword', pairs, layout: buildCrossword(pairs) };
+      } else if (selGameType === 'wordhunt') {
+        const words = await genWordHunt(lesson, gameCount);
+        data = { type: 'wordhunt', words, wsGrid: buildWordSearch(words) };
+      } else if (selGameType === 'fillblanks') {
+        const raw = await genFillBlanks(lesson, gameCount);
+        data = { type: 'fillblanks', items: raw.map(r => ({ ...r, shuffledChoices: gShuffle(r.choices) })) };
+      }
+      setGameResult(data);
+      setGameModal('result');
+      addToast('Game generated! (0.5 tokens used)', 'success');
+    } catch (err) {
+      addToast(err.message || 'Game generation failed.', 'error');
+      setGameModal('pick');
+    } finally {
+      setGameLoading(false);
+    }
+  }
+
+  function handlePrintGame() {
+    const el = document.getElementById('game-worksheet-content');
+    if (!el) return;
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111;font-size:13px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:5px 8px;}h2{margin:6px 0 2px;}ol{padding-left:18px;}@media print{body{margin:0;padding:16px;}}</style></head><body>${el.innerHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
   }
 
   useEffect(() => {
@@ -574,11 +637,134 @@ export default function OutputPage() {
                     : <><Presentation size={14} /> Generate Presentation <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>3 tokens</span></>
                   }
                 </button>
+
+                <button
+                  onClick={() => { setSelGameType('matching'); setGameCount(10); setGameModal('pick'); }}
+                  style={{
+                    width: '100%',
+                    background: '#1d4ed8',
+                    color: '#fff',
+                    border: 'none', borderRadius: 10, padding: '11px 20px',
+                    fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    fontFamily: 'inherit', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#1e40af'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#1d4ed8'}
+                >
+                  <Gamepad2 size={14} /> Generate Games <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                </button>
               </div>
             </div>
           </div>
         );
       })()}
+
+        {/* Game picker / result modal */}
+        {gameModal && (
+          <div
+            onClick={() => { if (gameModal !== 'loading') setGameModal(null); }}
+            style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.28)', width: '100%', maxWidth: gameModal === 'result' ? 720 : 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            >
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)', padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Gamepad2 size={16} color="#93c5fd" />
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                    {gameModal === 'pick' ? 'Choose Game Type' : gameModal === 'loading' ? 'Generating Game…' : 'Game Worksheet'}
+                  </span>
+                </div>
+                {gameModal !== 'loading' && (
+                  <button
+                    onClick={() => setGameModal(null)}
+                    style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Pick step */}
+              {gameModal === 'pick' && (
+                <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+                  <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate. Costs 0.5 token.</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
+                    {GAME_TYPES.map(gt => (
+                      <button
+                        key={gt.id}
+                        onClick={() => { setSelGameType(gt.id); setGameCount(gt.defaultCount); }}
+                        style={{
+                          background: selGameType === gt.id ? gt.bg : '#f9fafb',
+                          border: `2px solid ${selGameType === gt.id ? gt.color : '#e5e7eb'}`,
+                          borderRadius: 10, padding: '11px 13px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.12s',
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 700, color: selGameType === gt.id ? gt.color : '#1f2937' }}>{gt.label}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{gt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Number of items:</label>
+                    <input
+                      type="number" min={5} max={30} value={gameCount}
+                      onChange={e => setGameCount(Math.max(5, Math.min(30, +e.target.value)))}
+                      style={{ width: 68, border: '1.5px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit', textAlign: 'center', outline: 'none' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleGenerateGame}
+                    disabled={gameLoading}
+                    style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  >
+                    <Gamepad2 size={15} /> Generate Game <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Loading step */}
+              {gameModal === 'loading' && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 20px', gap: 14 }}>
+                  <Loader2 size={38} color="#1d4ed8" style={{ animation: 'spin 1s linear infinite' }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>AI is generating your game…</p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>This may take a few seconds</p>
+                </div>
+              )}
+
+              {/* Result step */}
+              {gameModal === 'result' && gameResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 20px', display: 'flex', gap: 8, borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+                    <button
+                      onClick={() => setGameModal('pick')}
+                      style={{ background: '#f3f4f6', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}
+                    >
+                      ← New Game
+                    </button>
+                    <button
+                      onClick={handlePrintGame}
+                      style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Printer size={13} /> Print / Save
+                    </button>
+                  </div>
+                  <div id="game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
+                    <GameWorksheetDisplay
+                      data={gameResult}
+                      lesson={{ subject: store.subject || '', gradeLevel: store.gradeLevel || '', lessonName: store.lessonName || store.content || '' }}
+                      session={selectedSession !== null ? sessions[selectedSession] : null}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Signature block */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
