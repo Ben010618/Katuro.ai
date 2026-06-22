@@ -509,78 +509,30 @@ export async function adminCreateUser(email, password, initialTokens, adminUid) 
 }
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
-// After MAX_ACCOUNTS enabled users, new registrations are auto-disabled
-// (pendingApproval: true) until the admin manually enables them.
-
-const MAX_ACCOUNTS    = 250;
-const WELCOME_TOKENS  = 30;
 
 export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
-  // Validate required fields before touching Firebase — prevents bypassing the frontend gate
-  if (!surname?.trim())   throw new Error('Last name (Surname) is required.');
-  if (!givenName?.trim()) throw new Error('First name (Given Name) is required.');
-  if (!school?.trim())    throw new Error('School name is required.');
-  if (!email?.trim())     throw new Error('Email address is required.');
-  if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
+  // Registration is handled by a Cloud Function — validation runs server-side so it
+  // cannot be bypassed by any client version or cached bundle.
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions }     = await import('../firebase');
+  const { signInWithCustomToken } = await import('firebase/auth');
+  const { auth }          = await import('../firebase');
 
-  const { auth: firebaseAuth } = await import('../firebase');
-  const { updateProfile } = await import('firebase/auth');
-
-  // Create auth user FIRST so all subsequent Firestore reads are authenticated
-  const cred = await createUserWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
-
-  // Count active teachers NOW that we are authenticated
-  const countSnap   = await getDocs(collection(db, "teachers"));
-  const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
-  const atCap       = activeCount >= MAX_ACCOUNTS;
-  const uid         = cred.user.uid;
-
-  const displayName = [givenName.trim(), mi ? mi.trim() + '.' : '', surname.trim()]
-    .filter(Boolean).join(' ');
-
-  await updateProfile(cred.user, { displayName });
-
-  await setDoc(teacherRef(uid), {
-    email:           email.trim().toLowerCase(),
-    displayName,
-    surname:         surname.trim(),
-    givenName:       givenName.trim(),
-    mi:              mi?.trim() || '',
-    school:          school.trim(),
-    tokenBalance:    atCap ? 0 : WELCOME_TOKENS,
-    isAdmin:         false,
-    disabled:        atCap,
-    pendingApproval: atCap,
-    createdAt:       serverTimestamp(),
-  });
-
-  if (!atCap) {
-    await addDoc(tokenLogsRef(uid), {
-      uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
-      note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
-      createdAt: serverTimestamp(),
-    });
-  }
-
-  // Notify admin of new registration — non-fatal if rules block it
+  const registerFn = httpsCallable(functions, 'registerUser');
+  let result;
   try {
-    await addDoc(collection(db, 'adminNotifications'), {
-      type:            'new_user',
-      uid,
-      email:           email.trim().toLowerCase(),
-      displayName,
-      givenName:       givenName.trim(),
-      surname:         surname.trim(),
-      school:          school.trim(),
-      pendingApproval: atCap,
-      read:            false,
-      createdAt:       serverTimestamp(),
-    });
-  } catch {
-    // Non-fatal — account already created, notification failure shouldn't block signup
+    result = await registerFn({ email, password, surname, givenName, mi, school });
+  } catch (err) {
+    // Re-throw with the Cloud Function's message (already user-friendly)
+    throw new Error(err.message?.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, '') || 'Registration failed.');
   }
 
-  return { user: cred.user, pendingApproval: atCap };
+  const { customToken, pendingApproval } = result.data;
+
+  // Sign in with the custom token returned by the server
+  await signInWithCustomToken(auth, customToken);
+
+  return { pendingApproval };
 }
 
 // ─── Admin notifications ──────────────────────────────────────────────────────

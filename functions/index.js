@@ -375,6 +375,90 @@ Return ONLY this JSON (no markdown, no explanation):
   }
 );
 
+// ── Self-registration (server-enforced validation) ────────────────────────────
+exports.registerUser = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    const { email, password, surname, givenName, mi, school } = req.data || {};
+
+    // Server-side validation — runs on the actual server, cannot be bypassed by any client
+    if (!surname?.trim())                    throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
+    if (!givenName?.trim())                  throw new HttpsError('invalid-argument', 'First name (Given Name) is required.');
+    if (!school?.trim())                     throw new HttpsError('invalid-argument', 'School name is required.');
+    if (!email?.trim())                      throw new HttpsError('invalid-argument', 'Email address is required.');
+    if (!password || password.length < 6)    throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+
+    const MAX_ACCOUNTS   = 250;
+    const WELCOME_TOKENS = 30;
+
+    const countSnap   = await db.collection('teachers').get();
+    const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
+    const atCap       = activeCount >= MAX_ACCOUNTS;
+
+    const displayName = [givenName.trim(), mi?.trim() ? mi.trim() + '.' : '', surname.trim()]
+      .filter(Boolean).join(' ');
+
+    // Create Firebase Auth user using Admin SDK
+    let userRecord;
+    try {
+      userRecord = await admin.auth().createUser({
+        email:       email.trim().toLowerCase(),
+        password,
+        displayName,
+      });
+    } catch (err) {
+      const msg = err.code === 'auth/email-already-exists'
+        ? 'An account with this email already exists.'
+        : (err.message || 'Registration failed.');
+      throw new HttpsError('already-exists', msg);
+    }
+
+    const uid = userRecord.uid;
+
+    // Create Firestore profile
+    await db.doc(`teachers/${uid}`).set({
+      email:           email.trim().toLowerCase(),
+      displayName,
+      surname:         surname.trim(),
+      givenName:       givenName.trim(),
+      mi:              mi?.trim() || '',
+      school:          school.trim(),
+      tokenBalance:    atCap ? 0 : WELCOME_TOKENS,
+      isAdmin:         false,
+      disabled:        atCap,
+      pendingApproval: atCap,
+      createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (!atCap) {
+      await db.collection(`teachers/${uid}/tokenLogs`).add({
+        uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
+        note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Notify admin — non-fatal
+    try {
+      await db.collection('adminNotifications').add({
+        type: 'new_user', uid,
+        email:           email.trim().toLowerCase(),
+        displayName,
+        givenName:       givenName.trim(),
+        surname:         surname.trim(),
+        school:          school.trim(),
+        pendingApproval: atCap,
+        read:            false,
+        createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch {}
+
+    // Return a custom token so the client can sign in immediately
+    const customToken = await admin.auth().createCustomToken(uid);
+    return { customToken, pendingApproval: atCap };
+  }
+);
+
 // ── Admin: permanently delete a user account and all their data ───────────────
 exports.adminDeleteUser = onCall(
   { region: 'us-central1' },
