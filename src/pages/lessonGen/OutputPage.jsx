@@ -8,9 +8,10 @@ import { getTeacherProfile, deductTokens } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
+import { downloadGameDocx } from '../../services/gamificationDocx';
 
 const baseTd = {
   padding: '10px 12px',
@@ -169,6 +170,7 @@ export default function OutputPage() {
   const [gameCount,        setGameCount]       = useState(10);
   const [gameLoading,      setGameLoading]     = useState(false);
   const [gameResult,       setGameResult]      = useState(null);
+  const [gameDownloading,  setGameDownloading] = useState(false);
 
   function handleGoToCOT() {
     if (selectedSession === null) return;
@@ -300,10 +302,31 @@ export default function OutputPage() {
     const el = document.getElementById('game-worksheet-content');
     if (!el) return;
     const w = window.open('', '_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111;font-size:13px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:5px 8px;}h2{margin:6px 0 2px;}ol{padding-left:18px;}@media print{body{margin:0;padding:16px;}}</style></head><body>${el.innerHTML}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:16px;color:#111;font-size:12px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:4px 7px;}h2{margin:5px 0 2px;}ol{padding-left:16px;}@page{size:A4;margin:12.7mm;}@media print{body{margin:0;padding:0;}}</style></head><body>${el.innerHTML}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
+  }
+
+  async function handleDownloadGame() {
+    if (!gameResult) return;
+    const s = selectedSession !== null ? sessions[selectedSession] : null;
+    const lesson = {
+      type: 'ilaw',
+      subject: store.subject || '',
+      gradeLevel: store.gradeLevel || '',
+      lessonName: s?.keyContentFocus || store.lessonName || store.content || '',
+      topic: s?.keyContentFocus || store.content || '',
+    };
+    setGameDownloading(true);
+    try {
+      await downloadGameDocx({ gameData: gameResult, lesson, inclKey: true, profile: teacherProfile });
+      addToast('Game worksheet downloaded!', 'success');
+    } catch (err) {
+      addToast('Download failed: ' + err.message, 'error');
+    } finally {
+      setGameDownloading(false);
+    }
   }
 
   useEffect(() => {
@@ -546,8 +569,8 @@ export default function OutputPage() {
             style={{
               position: 'fixed', inset: 0, zIndex: 200,
               background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: 20,
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+              padding: '72px 24px 24px',
             }}
           >
             <div
@@ -555,7 +578,8 @@ export default function OutputPage() {
               style={{
                 background: '#fff', borderRadius: 18,
                 boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
-                width: '100%', maxWidth: 440, overflow: 'hidden',
+                width: '100%', maxWidth: 520, overflow: 'hidden',
+                maxHeight: 'calc(100vh - 96px)', overflowY: 'auto',
               }}
             >
               {/* Modal header */}
@@ -751,6 +775,13 @@ export default function OutputPage() {
                       style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       <Printer size={13} /> Print / Save
+                    </button>
+                    <button
+                      onClick={handleDownloadGame}
+                      disabled={gameDownloading}
+                      style={{ background: gameDownloading ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: gameDownloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <FileDown size={13} /> {gameDownloading ? 'Downloading…' : 'Download DOCX'}
                     </button>
                   </div>
                   <div id="game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>

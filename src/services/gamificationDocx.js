@@ -4,11 +4,12 @@ import {
   HeightRule, VerticalAlign,
 } from 'docx';
 
-// ── Layout constants ──────────────────────────────────────────────────────────
-// A4 portrait, 1-inch (25.4mm) margins → content = 159.2mm
-const DXA = v => Math.round(v * 56.7);      // mm → DXA (1/1440 inch)
-const PAGE_W = DXA(159.2);                   // content width
-const MARGIN  = DXA(25.4);
+// ── Layout constants — A4 portrait, narrow margins (12.7mm / 0.5 in) ─────────
+const DXA    = v => Math.round(v * 56.7);   // mm → DXA (1/1440 inch)
+const A4_W   = DXA(210);                    // A4 width  in DXA
+const A4_H   = DXA(297);                    // A4 height in DXA
+const MARGIN = DXA(12.7);                   // narrow = 12.7 mm = 0.5 inch
+const PAGE_W = DXA(184.6);                  // content width = 210 - 2×12.7
 
 // ── Primitive helpers ─────────────────────────────────────────────────────────
 function run(text, { bold = false, italic = false, size = 22, color } = {}) {
@@ -371,7 +372,10 @@ function buildBlocks(gameData, profile, lesson, answerKey) {
 // ── Public API ────────────────────────────────────────────────────────────────
 export async function downloadGameDocx({ gameData, lesson, inclKey, profile }) {
   const pageProps = {
-    page: { margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } },
+    page: {
+      size:   { width: A4_W, height: A4_H },
+      margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    },
   };
 
   const sections = [

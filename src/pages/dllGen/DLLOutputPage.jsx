@@ -11,6 +11,7 @@ import { exportToPptx } from '../../services/pptxExport';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
+import { downloadGameDocx } from '../../services/gamificationDocx';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -93,8 +94,9 @@ export default function DLLOutputPage() {
   const [gameModal,    setGameModal]    = useState(null);
   const [selGameType,  setSelGameType]  = useState('matching');
   const [gameCount,    setGameCount]    = useState(10);
-  const [gameLoading,  setGameLoading]  = useState(false);
-  const [gameResult,   setGameResult]   = useState(null);
+  const [gameLoading,      setGameLoading]      = useState(false);
+  const [gameResult,       setGameResult]       = useState(null);
+  const [gameDownloading,  setGameDownloading]  = useState(false);
 
   if (!store.procedure) {
     return (
@@ -272,10 +274,31 @@ export default function DLLOutputPage() {
     const el = document.getElementById('dll-game-worksheet-content');
     if (!el) return;
     const w = window.open('', '_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111;font-size:13px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:5px 8px;}h2{margin:6px 0 2px;}ol{padding-left:18px;}@media print{body{margin:0;padding:16px;}}</style></head><body>${el.innerHTML}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:16px;color:#111;font-size:12px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:4px 7px;}h2{margin:5px 0 2px;}ol{padding-left:16px;}@page{size:A4;margin:12.7mm;}@media print{body{margin:0;padding:0;}}</style></head><body>${el.innerHTML}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 400);
+  }
+
+  async function handleDownloadGame() {
+    if (!gameResult) return;
+    const dayContent = selectedDay !== null ? (contentMap[selectedDay] || '') : '';
+    const lesson = {
+      type: 'dll',
+      subject: store.subject || '',
+      gradeLevel: store.gradeLevel || '',
+      lessonName: dayContent || store.subject || '',
+      topic: dayContent || '',
+    };
+    setGameDownloading(true);
+    try {
+      await downloadGameDocx({ gameData: gameResult, lesson, inclKey: true, profile });
+      addToast('Game worksheet downloaded!', 'success');
+    } catch (err) {
+      addToast('Download failed: ' + err.message, 'error');
+    } finally {
+      setGameDownloading(false);
+    }
   }
 
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
@@ -569,16 +592,17 @@ export default function DLLOutputPage() {
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
             background: 'rgba(13,34,24,0.6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '72px 24px 24px',
           }}
           onClick={() => setSelectedDay(null)}
         >
           <div
             style={{
               background: '#fff', borderRadius: 20, padding: '28px 28px 24px',
-              width: '100%', maxWidth: 480, position: 'relative',
+              width: '100%', maxWidth: 520, position: 'relative',
               boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+              maxHeight: 'calc(100vh - 96px)', overflowY: 'auto',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -795,6 +819,13 @@ export default function DLLOutputPage() {
                   <button onClick={() => setGameModal('pick')} style={{ background: '#f3f4f6', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}>← New Game</button>
                   <button onClick={handlePrintGame} style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Printer size={13} /> Print / Save
+                  </button>
+                  <button
+                    onClick={handleDownloadGame}
+                    disabled={gameDownloading}
+                    style={{ background: gameDownloading ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: gameDownloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <FileDown size={13} /> {gameDownloading ? 'Downloading…' : 'Download DOCX'}
                   </button>
                 </div>
                 <div id="dll-game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
