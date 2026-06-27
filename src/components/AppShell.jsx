@@ -50,7 +50,7 @@ const TITLES = {
   '/classes-i-teach':         'Classes I Teach',
 };
 
-function SidebarContent({ user, tokenBalance, isAdmin, onClose, dark, toggle }) {
+function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle }) {
   const navigate = useNavigate();
 
   const initials = user?.displayName
@@ -202,13 +202,20 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose, dark, toggle }) 
               margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{displayName}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-              <Coins size={10} color="#b47a10" />
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#c0392b' : '#b47a10',
-                fontFamily: '"DM Mono", monospace',
-              }}>{tokenBalance} tokens</span>
-            </div>
+            {!freeMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <Coins size={10} color="#b47a10" />
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#c0392b' : '#b47a10',
+                  fontFamily: '"DM Mono", monospace',
+                }}>{tokenBalance} tokens</span>
+              </div>
+            )}
+            {freeMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>✦ Free Mode ON</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -248,7 +255,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, onClose, dark, toggle }) 
 }
 
 export default function AppShell() {
-  const { user, tokenBalance, isAdmin, loading } = useAuth();
+  const { user, tokenBalance, isAdmin, freeMode, loading } = useAuth();
   const { dark, toggle } = useTheme();
   const location = useLocation();
   const [mobileOpen,   setMobileOpen]   = useState(false);
@@ -263,11 +270,11 @@ export default function AppShell() {
 
   // Auto-show once per session — only after profile is fully loaded AND balance is truly zero
   useEffect(() => {
-    if (!loading && tokenBalance === 0 && !shownOnLogin.current) {
+    if (!loading && !freeMode && tokenBalance === 0 && !shownOnLogin.current) {
       shownOnLogin.current = true;
       setShowBundle(true);
     }
-  }, [loading, tokenBalance]);
+  }, [loading, freeMode, tokenBalance]);
 
   // Show bundle when a generate action fails due to zero tokens
   useEffect(() => {
@@ -297,7 +304,7 @@ export default function AppShell() {
           width: 220, flexShrink: 0, position: 'sticky', top: 0,
           height: '100vh', overflow: 'hidden',
         }}>
-          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} dark={dark} toggle={toggle} />
+          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} dark={dark} toggle={toggle} />
         </div>
 
         {/* Mobile sidebar overlay */}
@@ -308,7 +315,7 @@ export default function AppShell() {
               onClick={() => setMobileOpen(false)}
             />
             <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
-              <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} onClose={() => setMobileOpen(false)} />
+              <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} onClose={() => setMobileOpen(false)} />
             </div>
           </div>
         )}
@@ -357,7 +364,15 @@ export default function AppShell() {
             </div>
 
             {/* Token balance badge / zero-token CTA */}
-            {tokenBalance === 0 ? (
+            {freeMode ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: 'rgba(5,150,105,0.12)', borderRadius: 20, padding: '4px 12px',
+                fontSize: 11, fontWeight: 700, color: '#059669',
+              }}>
+                ✦ Free Mode
+              </div>
+            ) : tokenBalance === 0 ? (
               <button
                 onClick={() => setShowBundle(true)}
                 style={{
