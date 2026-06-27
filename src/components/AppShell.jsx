@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, Projector,
   ShieldCheck, Coins, Gamepad2, FlaskConical, Zap,
-  School, GraduationCap, Moon, Sun,
+  School, GraduationCap, Moon, Sun, MessageSquare,
 } from 'lucide-react';
 
 
@@ -28,6 +28,7 @@ const MAIN_NAV = [
   { to: '/presentations',          label: 'Presentation Builder',  Icon: Projector       },
   { to: '/gamification',           label: 'Gamification',          Icon: Gamepad2        },
   { to: '/action-research/phase-1',label: 'Action Research',       Icon: FlaskConical    },
+  { to: '/collab',                  label: 'KaTuro Collab',         Icon: MessageSquare   },
 ];
 
 const CLASSROOM_NAV = [

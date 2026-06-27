@@ -52,6 +52,7 @@ import ClassesITeachPage       from './pages/classroomMgmt/ClassesITeachPage';
 import GradingTablePage        from './pages/classroomMgmt/GradingTablePage';
 import InvitePage              from './pages/classroomMgmt/InvitePage';
 import SharedPlanPage          from './pages/SharedPlanPage';
+import CollabPage              from './pages/collab/CollabPage';
 
 function LoadingScreen() {
   return (
@@ -223,6 +224,9 @@ export default function App() {
 
           {/* Public shared plan preview — no auth required */}
           <Route path="/shared/:shareId" element={<SharedPlanPage />} />
+
+          {/* KaTuro Collab — standalone, no AppShell */}
+          <Route path="/collab" element={<ProtectedRoute><CollabPage /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

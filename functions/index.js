@@ -727,6 +727,67 @@ exports.autoGrantSeasonalTokens = onSchedule(
   }
 );
 
+// ── KaTuro Collab: AI reply when @KaTuro is mentioned ─────────────────────────
+exports.collabAIReply = onCall(
+  { region: 'us-central1', maxInstances: 20 },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+    const { channelId, dmId, messageText } = req.data || {};
+    if (!messageText) return { ok: true };
+
+    const key = await getGeminiKey();
+
+    // Get caller's display name for personalised response
+    let callerName = 'Teacher';
+    try {
+      const snap = await db.doc(`teachers/${uid}`).get();
+      callerName = snap.data()?.displayName || snap.data()?.givenName || 'Teacher';
+    } catch (_) {}
+
+    const prompt = `You are KaTuro AI, the intelligent assistant inside KaTuro Collab — a real-time collaboration workspace for Filipino public school teachers in the Philippines DepEd system.
+
+The teacher "${callerName}" mentioned you in a chat and said:
+"${messageText.replace(/@KaTuro/gi, '').trim()}"
+
+Respond helpfully and concisely as if chatting in a group channel. Rules:
+- Keep your response under 150 words
+- Use Filipino/Tagalog naturally when it fits
+- Be warm and collegial (these are your ka-teachers)
+- If it's a DepEd/curriculum/lesson plan question, give a specific, useful answer
+- Do NOT add "KaTuro AI:" or any prefix — just the response text`;
+
+    const reply = await callGemini(key, prompt, { temperature: 0.7, maxTokens: 350 });
+
+    const msg = {
+      uid:         'katuro-ai',
+      displayName: 'KaTuro AI',
+      photoURL:    null,
+      text:        reply.trim(),
+      isAI:        true,
+      replyTo:     uid,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (channelId) {
+      await db.collection('collabChannels').doc(channelId).collection('messages').add(msg);
+      await db.doc(`collabChannels/${channelId}`).update({
+        lastMessage: reply.slice(0, 80),
+        lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    } else if (dmId) {
+      await db.collection('collabDMs').doc(dmId).collection('messages').add(msg);
+      await db.doc(`collabDMs/${dmId}`).update({
+        lastMessage: reply.slice(0, 80),
+        lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
+
+    return { ok: true };
+  }
+);
+
 // ── MELC code validation — AI checks whether generated MELC codes look real ───
 exports.validateMelcCode = onCall(
   { region: 'us-central1', maxInstances: 20 },
