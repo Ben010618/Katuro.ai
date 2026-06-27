@@ -495,7 +495,7 @@ export async function adminCreateUser(email, password, initialTokens, _adminUid)
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
 
-export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
+export async function selfSignUp({ email, password, surname, givenName, mi, school, referredBy }) {
   // Registration is handled by a Cloud Function — validation runs server-side so it
   // cannot be bypassed by any client version or cached bundle.
   const { httpsCallable } = await import('firebase/functions');
@@ -505,7 +505,7 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const registerFn = httpsCallable(functions, 'registerUser');
   let result;
   try {
-    result = await registerFn({ email, password, surname, givenName, mi, school });
+    result = await registerFn({ email, password, surname, givenName, mi, school, referredBy: referredBy || null });
   } catch (err) {
     // Surface the Cloud Function's user-friendly message; hide opaque internal codes
     const raw = err?.message ?? '';
@@ -730,4 +730,30 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
   await addDoc(tokenLogsRef(uid), {
     uid, amount: -cost, action, createdAt: serverTimestamp(),
   });
+}
+
+// ─── MELC Validation ──────────────────────────────────────────────────────────
+
+export async function validateMelcCode({ subject, gradeLevel, quarter, melcCodes }) {
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions }     = await import('../firebase');
+  const fn = httpsCallable(functions, 'validateMelcCode');
+  const result = await fn({ subject, gradeLevel, quarter, melcCodes });
+  return result.data;
+}
+
+// ─── Shareable plan link ──────────────────────────────────────────────────────
+
+export async function createSharedPlan({ planType, ownerName, school, subject, gradeLevel, term, melc, preview }) {
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions }     = await import('../firebase');
+  const fn = httpsCallable(functions, 'createSharedPlan');
+  const result = await fn({ planType, ownerName, school, subject, gradeLevel, term, melc, preview });
+  return result.data; // { shareId }
+}
+
+export async function getSharedPlan(shareId) {
+  const snap = await getDoc(doc(db, 'sharedPlans', shareId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
 }

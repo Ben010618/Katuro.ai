@@ -4,11 +4,11 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
-import { getTeacherProfile, deductTokens } from '../../services/db';
+import { getTeacherProfile, deductTokens, createSharedPlan } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
@@ -163,6 +163,7 @@ export default function OutputPage() {
 
   const [teacherProfile,   setTeacherProfile]  = useState(null);
   const [docxLoading,      setDocxLoading]     = useState(false);
+  const [sharing,          setSharing]          = useState(false);
   const [selectedSession,  setSelectedSession] = useState(null);
   const [pptLoading,       setPptLoading]      = useState(false);
   const [pptPhase,         setPptPhase]        = useState('');
@@ -449,6 +450,38 @@ export default function OutputPage() {
           </button>
           <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => navigate('/lesson-gen/step-3')}>
             <Pencil size={13} /> Edit Plan
+          </button>
+          <button
+            className="btn-outline"
+            disabled={sharing || N === 0}
+            style={{ fontSize: 12, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 5, opacity: sharing ? 0.7 : 1 }}
+            onClick={async () => {
+              setSharing(true);
+              try {
+                const firstSession = sessions[0];
+                const preview = { session_1_topic: firstSession?.keyContentFocus || store.content || '' };
+                const { shareId } = await createSharedPlan({
+                  planType: 'ilaw',
+                  ownerName: teacherProfile?.displayName || teacherProfile?.name || user?.displayName || '',
+                  school: teacherProfile?.school || '',
+                  subject: store.subject,
+                  gradeLevel: store.gradeLevel,
+                  term: store.term,
+                  melc: store.competencyText,
+                  preview,
+                });
+                const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
+                await navigator.clipboard.writeText(url);
+                addToast('Share link copied! Send via Viber or Messenger.', 'success');
+              } catch {
+                addToast('Could not create share link. Try again.', 'error');
+              } finally {
+                setSharing(false);
+              }
+            }}
+          >
+            {sharing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={12} />}
+            {sharing ? 'Creating…' : 'Share'}
           </button>
           <button
             style={{

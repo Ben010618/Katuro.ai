@@ -51,6 +51,7 @@ import SectionDetailPage       from './pages/classroomMgmt/SectionDetailPage';
 import ClassesITeachPage       from './pages/classroomMgmt/ClassesITeachPage';
 import GradingTablePage        from './pages/classroomMgmt/GradingTablePage';
 import InvitePage              from './pages/classroomMgmt/InvitePage';
+import SharedPlanPage          from './pages/SharedPlanPage';
 
 function LoadingScreen() {
   return (
@@ -219,6 +220,9 @@ export default function App() {
 
           {/* Public invite route — handles logged-in and not-logged-in */}
           <Route path="/invite/:inviteCode" element={<InvitePage />} />
+
+          {/* Public shared plan preview — no auth required */}
+          <Route path="/shared/:shareId" element={<SharedPlanPage />} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

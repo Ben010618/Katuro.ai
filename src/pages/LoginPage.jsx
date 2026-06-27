@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Loader2, Eye, EyeOff, Gift, GraduationCap } from 'lucide-react';
@@ -178,8 +179,11 @@ const CSS = `
 `;
 
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
+  const referredBy = searchParams.get('ref') || '';
+
   const [activeSlide, setActiveSlide] = useState(0);
-  const [mode, setMode]         = useState('login');
+  const [mode, setMode]         = useState(referredBy ? 'signup' : 'login');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
@@ -229,7 +233,7 @@ export default function LoginPage() {
     if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
     setError(''); setLoading(true);
     try {
-      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
+      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school, referredBy });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
       setError((err?.message ?? 'Registration failed. Please try again.')

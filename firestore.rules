@@ -50,6 +50,12 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // ── Shared plan snapshots — public read (no auth), Cloud Function writes ──
+    match /sharedPlans/{shareId} {
+      allow read:  if true;
+      allow write: if false; // Admin SDK only
+    }
+
     // ── Admin notifications — any auth user can create (e.g. on self-signup); admin reads/updates ──
     match /adminNotifications/{notifId} {
       allow create: if request.auth != null;

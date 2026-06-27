@@ -413,7 +413,7 @@ Return ONLY this JSON (no markdown, no explanation):
 exports.registerUser = onCall(
   { region: 'us-central1' },
   async (req) => {
-    const { email, password, surname, givenName, mi, school } = req.data || {};
+    const { email, password, surname, givenName, mi, school, referredBy } = req.data || {};
 
     // Layer 1: Server-side field validation — cannot be bypassed by any client or cached bundle
     if (!surname?.trim())                 throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
@@ -489,6 +489,26 @@ exports.registerUser = onCall(
         createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (_e) {}
+
+    // Referral bonus — credit 20 tokens to the referrer (non-fatal)
+    if (referredBy && typeof referredBy === 'string' && referredBy !== uid) {
+      try {
+        const referrerSnap = await db.doc(`teachers/${referredBy}`).get();
+        if (referrerSnap.exists && !referrerSnap.data()?.disabled) {
+          const REFERRAL_BONUS = 20;
+          await db.doc(`teachers/${referredBy}`).update({
+            tokenBalance: admin.firestore.FieldValue.increment(REFERRAL_BONUS),
+            updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
+          });
+          await db.collection(`teachers/${referredBy}/tokenLogs`).add({
+            uid: referredBy, amount: REFERRAL_BONUS,
+            action: 'referral_bonus', referredUid: uid,
+            note: `Referral bonus — ${displayName} signed up via your link.`,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_e) {}
+    }
 
     // Client will sign in with email+password — no custom token needed
     return { pendingApproval: atCap };
@@ -704,5 +724,89 @@ exports.autoGrantSeasonalTokens = onSchedule(
       month, read: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+  }
+);
+
+// ── MELC code validation — AI checks whether generated MELC codes look real ───
+exports.validateMelcCode = onCall(
+  { region: 'us-central1', maxInstances: 20 },
+  async (req) => {
+    if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+    const { subject, gradeLevel, quarter, melcCodes } = req.data || {};
+    if (!melcCodes?.length || !subject) return { results: [] };
+
+    const key = await getGeminiKey();
+    const codeList = melcCodes.map((c, i) => `${i + 1}. ${c}`).join('\n');
+
+    const prompt = `You are a DepEd Philippines curriculum expert with knowledge of the official Most Essential Learning Competencies (MELC) document released in 2020.
+
+A teacher used these MELC codes in a lesson plan:
+Subject: ${subject}
+Grade Level: ${gradeLevel || 'Not specified'}
+Quarter: ${quarter || 'Not specified'}
+
+MELC codes to validate:
+${codeList}
+
+DepEd MELC code format examples:
+- Math Grade 5: M5NS-Ia-93.1 (Subject+Grade+Strand-Quarter/Week-Item)
+- English Grade 6: EN6RC-IIIa-2.6.2
+- Science Grade 5: S5LT-Ia-1
+- Filipino Grade 5: F5PN-Ia-a-5
+- Araling Panlipunan Grade 5: AP5PKB-Ia-6
+- MAPEH: MUSIC5-Ia-h-1
+
+For each code, evaluate:
+1. Is the format consistent with DepEd MELC naming conventions?
+2. Is it appropriate for this subject and grade level?
+3. Does it look like a real code (not hallucinated)?
+
+Respond ONLY with valid JSON — no markdown, no explanation outside the JSON:
+{
+  "results": [
+    {
+      "code": "exact code as provided",
+      "isValid": true,
+      "confidence": "high",
+      "suggestedCode": null,
+      "note": "Brief note under 12 words"
+    }
+  ]
+}`;
+
+    try {
+      const raw    = await callGemini(key, prompt, { temperature: 0.1, maxTokens: 400 });
+      const parsed = parseJSON(raw, 'melc-validation');
+      return { results: parsed.results ?? [] };
+    } catch {
+      return { results: melcCodes.map(code => ({ code, isValid: null, confidence: 'low', suggestedCode: null, note: 'Validation unavailable.' })) };
+    }
+  }
+);
+
+// ── Create a shareable read-only plan snapshot ────────────────────────────────
+exports.createSharedPlan = onCall(
+  { region: 'us-central1', maxInstances: 20 },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+    const { planType, ownerName, school, subject, gradeLevel, term, melc, preview } = req.data || {};
+    if (!planType || !subject) throw new HttpsError('invalid-argument', 'planType and subject are required.');
+
+    const shareRef = db.collection('sharedPlans').doc();
+    await shareRef.set({
+      type:      planType,
+      ownerUid:  uid,
+      ownerName: ownerName || 'A kaTuro Teacher',
+      school:    school    || '',
+      subject, gradeLevel, term,
+      melc:      melc      || '',
+      preview:   preview   || {},
+      viewCount: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { shareId: shareRef.id };
   }
 );

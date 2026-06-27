@@ -5,10 +5,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
-import { deductTokens } from '../../services/db';
+import { deductTokens, createSharedPlan } from '../../services/db';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
-import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2 } from 'lucide-react';
+import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2, Share2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
@@ -88,6 +88,7 @@ export default function DLLOutputPage() {
   const { addToast } = useToast();
 
   const [downloading,  setDownloading]  = useState(false);
+  const [sharing,      setSharing]      = useState(false);
   const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
   const [pptLoading,   setPptLoading]   = useState(false);
   const [pptPhase,     setPptPhase]     = useState('');
@@ -387,6 +388,39 @@ export default function DLLOutputPage() {
         </button>
         <button onClick={() => window.print()} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Printer size={14} /> Print
+        </button>
+        <button
+          onClick={async () => {
+            if (!store.objectives && !store.procedure) return;
+            setSharing(true);
+            try {
+              const firstDay = DAY_KEYS[0];
+              const preview = { monday_objectives: store.objectives?.[firstDay] || '' };
+              const { shareId } = await createSharedPlan({
+                planType: 'dll',
+                ownerName: profile?.displayName || user?.displayName || '',
+                school: profile?.school || '',
+                subject: store.subject,
+                gradeLevel: store.gradeLevel,
+                term: store.term,
+                melc: store.melc,
+                preview,
+              });
+              const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
+              await navigator.clipboard.writeText(url);
+              addToast('Share link copied! Send via Viber or Messenger.', 'success');
+            } catch {
+              addToast('Could not create share link. Try again.', 'error');
+            } finally {
+              setSharing(false);
+            }
+          }}
+          disabled={sharing}
+          className="btn-outline"
+          style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6, opacity: sharing ? 0.7 : 1 }}
+        >
+          {sharing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={13} />}
+          {sharing ? 'Creating…' : 'Share'}
         </button>
         <button onClick={() => navigate('/dll-gen/step-2')} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px' }}>
           Edit Inputs
