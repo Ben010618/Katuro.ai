@@ -12,6 +12,7 @@ import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Ga
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
+import AIOutputGuard from '../../components/AIOutputGuard';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -362,6 +363,8 @@ export default function DLLOutputPage() {
         }
       `}</style>
 
+      <AIOutputGuard feature="dll" inputContext={{ subject: store.subject, gradeLevel: store.gradeLevel, melc: store.melc }} />
+
       {/* ── Action bar (hidden when printing) ─────────────────────────── */}
       <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -372,17 +375,18 @@ export default function DLLOutputPage() {
             {store.subject} — {store.gradeLevel}
           </h1>
         </div>
-        <button onClick={() => window.print()} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Printer size={14} /> Print
-        </button>
         <button
           onClick={handleDownload}
           disabled={downloading}
           className="btn-primary"
-          style={{ fontSize: 13, padding: '9px 18px', opacity: downloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+          title="Save as Word document — required for DepEd submission"
+          style={{ fontSize: 13, padding: '10px 20px', opacity: downloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
         >
           <FileDown size={14} />
           {downloading ? 'Preparing…' : 'Download DOCX'}
+        </button>
+        <button onClick={() => window.print()} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Printer size={14} /> Print
         </button>
         <button onClick={() => navigate('/dll-gen/step-2')} className="btn-outline" style={{ fontSize: 13, padding: '9px 18px' }}>
           Edit Inputs

@@ -8,6 +8,7 @@ import { getTeacherProfile } from '../../services/db';
 import {
   FileDown, Sparkles, ChevronDown, ChevronUp, RotateCcw, BookOpenCheck,
 } from 'lucide-react';
+import AIOutputGuard from '../../components/AIOutputGuard';
 
 const KRA_COLOR = {
   'KRA 1': { text: '#0369a1', bg: '#e0f2fe' },
@@ -206,6 +207,8 @@ export default function CotOutputPage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
+      <AIOutputGuard feature="cot" inputContext={{ subject: store.generatedPlan?.plan?.subject, grade: store.generatedPlan?.plan?.grade, melc: store.generatedPlan?.plan?.melc }} />
+
       {/* Top header */}
       <div style={{
         background: 'linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)',
@@ -230,12 +233,13 @@ export default function CotOutputPage() {
           <button
             onClick={handleExportDocx}
             disabled={exporting}
+            title="Save as Word document — required for DepEd submission"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: '#fff', color: '#4c1d95',
               border: 'none', borderRadius: 10,
-              padding: '10px 16px', cursor: exporting ? 'not-allowed' : 'pointer',
-              fontSize: 13, fontWeight: 600,
+              padding: '10px 20px', cursor: exporting ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 700,
               opacity: exporting ? 0.7 : 1,
             }}
           >

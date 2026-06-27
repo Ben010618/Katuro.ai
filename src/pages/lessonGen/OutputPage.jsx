@@ -12,6 +12,7 @@ import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Prese
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
+import AIOutputGuard from '../../components/AIOutputGuard';
 
 const baseTd = {
   padding: '10px 12px',
@@ -391,6 +392,8 @@ export default function OutputPage() {
         }
       `}</style>
 
+      <AIOutputGuard feature="ilaw" inputContext={{ subject: store.subject, gradeLevel: store.gradeLevel }} />
+
       {/* Action bar */}
       <div className="no-print" style={{
         position: 'sticky', top: 0, zIndex: 40,
@@ -408,7 +411,8 @@ export default function OutputPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="btn-primary"
-            style={{ fontSize: 12, padding: '7px 14px' }}
+            title="Save as Word document — required for DepEd submission"
+            style={{ fontSize: 12, padding: '9px 18px', fontWeight: 700 }}
             disabled={docxLoading}
             onClick={async () => {
               setDocxLoading(true);

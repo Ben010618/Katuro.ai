@@ -8,13 +8,17 @@ import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
   adminChangePassword, adminSendPasswordReset, adminDeleteUser,
   subscribeAdminNotifications, markAllNotificationsRead,
+  adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
+import { collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import ktLogo from '../assets/KT Favicon.png';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
+  ToggleLeft, ToggleRight, Bug, Gift,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -552,6 +556,179 @@ function ApiKeySection({ adminUid }) {
   );
 }
 
+// ── Free Mode control section ─────────────────────────────────────────────────
+function FreeModeSection({ adminUid }) {
+  const [freeMode, setFreeMode] = useState(false);
+  const [note,     setNote]     = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const [err,      setErr]      = useState('');
+  const [ok,       setOk]       = useState('');
+
+  useEffect(() => subscribeFreeModeStatus(setFreeMode), []);
+
+  async function handleToggle() {
+    setSaving(true); setErr(''); setOk('');
+    try {
+      const next = !freeMode;
+      await adminSetFreeMode(next, note.trim() || undefined);
+      setOk(next ? 'Free mode enabled — all AI features are now free for all teachers.' : 'Free mode disabled — tokens are now required.');
+      setNote('');
+    } catch (e) {
+      setErr(e.message || 'Failed to update free mode.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ ...card, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: freeMode ? '#d8f3dc' : '#fef3c7', display: 'grid', placeItems: 'center' }}>
+          <Gift size={16} color={freeMode ? '#2d6a4f' : '#d97706'} />
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Free Mode</h3>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+            When ON, all AI features are completely free — no tokens deducted. Use during the launch phase to build habit.
+          </p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: freeMode ? '#2d6a4f' : '#9bb8a5' }}>
+            {freeMode ? 'ON' : 'OFF'}
+          </span>
+          <button
+            onClick={handleToggle}
+            disabled={saving}
+            style={{ background: 'none', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', padding: 0, opacity: saving ? 0.6 : 1 }}
+            title={freeMode ? 'Disable free mode' : 'Enable free mode'}
+          >
+            {freeMode
+              ? <ToggleRight size={38} color="#2d6a4f" />
+              : <ToggleLeft  size={38} color="#9bb8a5" />
+            }
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>Note (optional — shown in logs)</label>
+          <input
+            style={inputStyle}
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 500 active users'}
+          />
+        </div>
+      </div>
+
+      {ok && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 12px' }}>
+          <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#163828' }}>{ok}</p>
+        </div>
+      )}
+      {err && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AI Error reports section ──────────────────────────────────────────────────
+function AIErrorSection() {
+  const [reports,  setReports]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [open,     setOpen]     = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'aiErrorReports'), orderBy('createdAt', 'desc'), limit(30))
+      );
+      setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (_e) {}
+    finally { setLoading(false); }
+  }
+
+  async function markResolved(id) {
+    await updateDoc(doc(db, 'aiErrorReports', id), { resolved: true }).catch(() => {});
+    setReports(prev => prev.map(r => r.id === id ? { ...r, resolved: true } : r));
+  }
+
+  function ts(t) {
+    if (!t) return '';
+    const d = t.toDate ? t.toDate() : new Date(t);
+    return d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  const unresolved = reports.filter(r => !r.resolved).length;
+
+  return (
+    <div style={{ ...card, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: open ? 14 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: unresolved > 0 ? 'rgba(224,92,92,0.1)' : '#f5faf7', display: 'grid', placeItems: 'center' }}>
+            <Bug size={16} color={unresolved > 0 ? '#e05c5c' : '#9bb8a5'} />
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+              AI Error Reports
+              {unresolved > 0 && <span style={{ marginLeft: 8, fontSize: 11, background: '#fef0f0', color: '#e05c5c', border: '1px solid rgba(224,92,92,0.2)', borderRadius: 20, padding: '1px 8px' }}>{unresolved} open</span>}
+            </h3>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>Teacher-reported AI errors (wrong MELC codes, bad outputs, etc.)</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { setOpen(v => !v); if (!open) load(); }}
+          style={{ ...btnSecondary, fontSize: 12 }}
+        >
+          {open ? 'Hide' : 'View Reports'}
+        </button>
+      </div>
+
+      {open && (
+        loading
+          ? <div style={{ textAlign: 'center', padding: 20 }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>
+          : reports.length === 0
+            ? <p style={{ margin: 0, fontSize: 12, color: '#9bb8a5', textAlign: 'center', padding: 16 }}>No error reports yet.</p>
+            : reports.map(r => (
+              <div key={r.id} style={{
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+                padding: '10px 12px', borderRadius: 8, marginBottom: 6,
+                background: r.resolved ? 'var(--kt-surface)' : 'rgba(224,92,92,0.05)',
+                border: `1px solid ${r.resolved ? 'var(--kt-border)' : 'rgba(224,92,92,0.15)'}`,
+                opacity: r.resolved ? 0.65 : 1,
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f7ee', color: '#2d6a4f', borderRadius: 4, padding: '1px 6px' }}>{r.feature}</span>
+                    <span style={{ fontSize: 10, color: '#9bb8a5' }}>{ts(r.createdAt)}</span>
+                    {r.resolved && <span style={{ fontSize: 10, color: '#9bb8a5' }}>✓ Resolved</span>}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{r.errorMessage || '(no message)'}</p>
+                  {r.inputContext && Object.keys(r.inputContext).length > 0 && (
+                    <p style={{ margin: '3px 0 0', fontSize: 10, color: '#9bb8a5', fontFamily: 'monospace' }}>
+                      {JSON.stringify(r.inputContext).slice(0, 120)}
+                    </p>
+                  )}
+                </div>
+                {!r.resolved && (
+                  <button onClick={() => markResolved(r.id)} style={{ ...btnSecondary, fontSize: 10, padding: '4px 10px', flexShrink: 0 }}>
+                    <CheckCircle2 size={11} /> Resolve
+                  </button>
+                )}
+              </div>
+            ))
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -846,6 +1023,12 @@ export default function AdminDashboard() {
 
         {/* API Key settings */}
         <ApiKeySection adminUid={user?.uid} />
+
+        {/* Free Mode control */}
+        <FreeModeSection adminUid={user?.uid} />
+
+        {/* AI Error Reports */}
+        <AIErrorSection />
 
         {/* Users table */}
         <div style={card}>

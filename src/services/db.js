@@ -636,6 +636,22 @@ export async function adminSendPasswordReset(email) {
   await sendPasswordResetEmail(auth, email);
 }
 
+export async function adminSetFreeMode(enabled, note = '') {
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions }     = await import('../firebase');
+  const fn = httpsCallable(functions, 'adminSetFreeMode');
+  const result = await fn({ enabled, note });
+  return result.data;
+}
+
+export function subscribeFreeModeStatus(cb) {
+  return onSnapshot(
+    doc(db, 'adminConfig', 'billing'),
+    (s) => cb(s.data()?.freeMode === true),
+    ()  => cb(false),
+  );
+}
+
 // ─── Action Research helpers ─────────────────────────────────────────────────
 
 export const actionResearchColRef = (uid) => collection(db, 'teachers', uid, 'actionResearch');
@@ -664,12 +680,41 @@ export async function deleteActionResearch(uid, docId) {
   return deleteDoc(actionResearchDocRef(uid, docId));
 }
 
+// ─── Free mode ────────────────────────────────────────────────────────────────
+
+export async function getFreeMode() {
+  const snap = await getDoc(doc(db, 'adminConfig', 'billing'));
+  return snap.data()?.freeMode === true;
+}
+
+// ─── AI error reporting ───────────────────────────────────────────────────────
+
+export async function reportAIError({ uid, feature, errorMessage, inputContext }) {
+  return addDoc(collection(db, 'aiErrorReports'), {
+    uid:          uid   || null,
+    feature:      feature       || 'unknown',
+    errorMessage: errorMessage  || '',
+    inputContext: inputContext  || {},
+    resolved:     false,
+    createdAt:    serverTimestamp(),
+  });
+}
+
 // ─── Token deduction ──────────────────────────────────────────────────────────
 // cost defaults to 3; pass a custom value for cheaper actions (e.g. 0.5 for gamification)
 
 const TOKEN_COST = 3;
 
 export async function deductTokens(uid, action, cost = TOKEN_COST) {
+  // Free-mode: skip deduction, just log
+  const freeMode = await getFreeMode();
+  if (freeMode) {
+    await addDoc(tokenLogsRef(uid), {
+      uid, amount: 0, action, freeMode: true, createdAt: serverTimestamp(),
+    }).catch(() => {});
+    return;
+  }
+
   const ref = teacherRef(uid);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -678,7 +723,7 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
     const balance = data.tokenBalance ?? 0;
     if (balance < cost) {
       window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
-      throw new Error("Not enough tokens. Contact your administrator to add tokens.");
+      throw new Error("Not enough tokens. Ask your administrator to add tokens.");
     }
     tx.update(ref, { tokenBalance: balance - cost, updatedAt: serverTimestamp() });
   });

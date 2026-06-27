@@ -1,6 +1,9 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-export const useDLLStore = create((set) => ({
+export const useDLLStore = create(
+  persist(
+    (set) => ({
   // Step 1 — basic info
   subject:       '',
   gradeLevel:    '',
@@ -81,4 +84,25 @@ export const useDLLStore = create((set) => ({
     resources:  null,
     savedId:    null,
   }),
-}));
+}),
+{
+  name: 'katuro-dll-draft',
+    partialize: (s) => ({
+      subject:              s.subject,
+      gradeLevel:           s.gradeLevel,
+      term:                 s.term,
+      teachingDates:        s.teachingDates,
+      section:              s.section,
+      contentStandards:     s.contentStandards,
+      performanceStandards: s.performanceStandards,
+      melcList:             s.melcList,
+      contentList:          s.contentList,
+      melc:                 s.melc,
+      dailyContent:         s.dailyContent,
+      objectives:           s.objectives,
+      procedure:            s.procedure,
+      resources:            s.resources,
+      savedId:              s.savedId,
+    }),
+  }
+));

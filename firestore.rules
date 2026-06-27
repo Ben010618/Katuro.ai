@@ -35,8 +35,19 @@ service cloud.firestore {
     }
 
     // ── Admin config — API key lives here, BLOCKED from regular users ───────
+    // billing doc exposes freeMode flag — all authenticated teachers need to read it
+    match /adminConfig/billing {
+      allow read:  if request.auth != null;
+      allow write: if isAdmin();
+    }
     match /adminConfig/{doc} {
       allow read, write: if isAdmin();
+    }
+
+    // ── AI error reports — any auth user submits; admin reads/resolves ────────
+    match /aiErrorReports/{reportId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if isAdmin();
     }
 
     // ── Admin notifications — any auth user can create (e.g. on self-signup); admin reads/updates ──

@@ -10,6 +10,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -88,15 +89,20 @@ function cacheKey(obj) {
   return crypto.createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 32);
 }
 
-// ── Per-user daily usage limiter ────────────────────────────────────────────
+// ── Per-user daily limits (applied in free mode too — abuse prevention) ────────
 const DAILY_LIMITS = {
-  outline_gen: 15,  // generateOutline calls per day (free endpoint, must guard)
+  outline_gen:      15,  // generateOutline
+  expand_slides:     5,  // expandSlides (most expensive)
+  dll_gen:          10,  // DLL generation (client calls server via usageLimit, but also guard here)
+  cot_gen:           8,
+  quiz_gen:         10,
+  gamification_gen: 10,
 };
 
 async function checkAndIncrementDailyUsage(uid, action) {
   const limit = DAILY_LIMITS[action];
   if (!limit) return;
-  const today = new Date().toISOString().slice(0, 10); // "2026-06-13"
+  const today = new Date().toISOString().slice(0, 10);
   const ref   = db.doc(`teachers/${uid}/usage/${today}`);
 
   await db.runTransaction(async tx => {
@@ -105,7 +111,7 @@ async function checkAndIncrementDailyUsage(uid, action) {
     if (current >= limit) {
       throw new HttpsError(
         'resource-exhausted',
-        `Daily limit of ${limit} reached for this feature. Try again tomorrow.`
+        `You've reached today's limit (${limit}) for this feature. kaTuro resets at midnight. Come back tomorrow!`
       );
     }
     tx.set(ref, {
@@ -115,15 +121,42 @@ async function checkAndIncrementDailyUsage(uid, action) {
   });
 }
 
+// ── Global free-mode flag — reads adminConfig/billing ───────────────────────
+// Cached per instance for 5 minutes to avoid a Firestore read on every call.
+let _freeModeCache = null;
+let _freeModeExpiry = 0;
+
+async function isFreeModeEnabled() {
+  const now = Date.now();
+  if (_freeModeCache !== null && now < _freeModeExpiry) return _freeModeCache;
+  const snap = await db.doc('adminConfig/billing').get();
+  _freeModeCache  = snap.data()?.freeMode === true;
+  _freeModeExpiry = now + 5 * 60 * 1000; // 5-min TTL
+  return _freeModeCache;
+}
+
 async function deductTokensServer(uid, action, cost) {
   if (!cost || cost <= 0) return;
+
+  // Free-mode: skip deduction entirely but still log the action
+  if (await isFreeModeEnabled()) {
+    await db.collection(`teachers/${uid}/tokenLogs`).add({
+      uid, amount: 0, action, freeMode: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+    return;
+  }
+
   const ref = db.doc(`teachers/${uid}`);
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new HttpsError('not-found', 'User profile not found.');
     const balance = snap.data().tokenBalance ?? 0;
     if (balance < cost) {
-      throw new HttpsError('resource-exhausted', 'Not enough tokens. Contact your administrator to add tokens.');
+      throw new HttpsError(
+        'resource-exhausted',
+        'Not enough tokens. Ask your administrator to add tokens, or wait — kaTuro will be free during our launch period.'
+      );
     }
     tx.update(ref, {
       tokenBalance: admin.firestore.FieldValue.increment(-cost),
@@ -257,6 +290,7 @@ exports.expandSlides = onCall(
       throw new HttpsError('invalid-argument', 'subject, gradeLevel, topic, and slides array are required.');
     }
 
+    await checkAndIncrementDailyUsage(req.auth.uid, 'expand_slides');
     await deductTokensServer(req.auth.uid, 'presentation-expand', EXPAND_TOKENS);
 
     const lang      = isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
@@ -598,5 +632,77 @@ exports.adminCreateUserFn = onCall(
     }
 
     return { uid, email: email.trim().toLowerCase() };
+  }
+);
+
+// ── Admin: toggle global free mode ───────────────────────────────────────────
+exports.adminSetFreeMode = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+    const { enabled, note = '' } = req.data;
+    await db.doc('adminConfig/billing').set({
+      freeMode:      enabled === true,
+      freeModeNote:  note || (enabled ? 'Launch phase — all AI features free' : 'Free mode ended'),
+      freeModeSetBy: req.auth.uid,
+      freeModeSetAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    _freeModeCache  = null; // bust instance cache immediately
+    _freeModeExpiry = 0;
+    return { freeMode: enabled === true };
+  }
+);
+
+// ── Scheduled: auto-grant bonus tokens before DepEd inspection seasons ────────
+// Runs Feb 1 and Sep 1 at 6 AM Philippine time (UTC+8).
+// Sep 1  → ahead of Q2 inspections (Oct–Nov)
+// Feb 1  → ahead of Q4 inspections (Mar–Apr)
+exports.autoGrantSeasonalTokens = onSchedule(
+  { schedule: '0 6 1 2,9 *', timeZone: 'Asia/Manila', region: 'us-central1' },
+  async () => {
+    const BONUS = 30;
+    const month = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long' });
+    const note  = `Inspection season bonus — ${month}`;
+
+    const snap  = await db.collection('teachers')
+      .where('disabled', '==', false)
+      .where('pendingApproval', '==', false)
+      .get();
+
+    // Firestore batch limit is 500 writes; chunk if needed
+    const chunks = [];
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      chunks.push(snap.docs.slice(i, i + 400));
+    }
+
+    for (const chunk of chunks) {
+      const batch = db.batch();
+      chunk.forEach(d => {
+        batch.update(d.ref, {
+          tokenBalance: admin.firestore.FieldValue.increment(BONUS),
+          updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+
+      // Log token grants (non-fatal if fails)
+      await Promise.allSettled(chunk.map(d =>
+        db.collection(`teachers/${d.id}/tokenLogs`).add({
+          uid: d.id, amount: BONUS, action: 'seasonal_bonus', note,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      ));
+    }
+
+    await db.collection('adminNotifications').add({
+      type: 'seasonal_tokens',
+      message: `Granted ${BONUS} inspection-season tokens to ${snap.docs.length} teachers.`,
+      month, read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   }
 );

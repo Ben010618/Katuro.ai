@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { onSnapshot } from 'firebase/firestore';
-import { auth } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { teacherRef, applyPendingPassword } from '../services/db';
 
 export function useAuth() {
-  const [user,    setUser]    = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,     setUser]     = useState(null);
+  const [profile,  setProfile]  = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [freeMode, setFreeMode] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 5_000);
@@ -15,7 +16,6 @@ export function useAuth() {
       clearTimeout(timeout);
       setUser(currentUser);
       if (!currentUser) { setLoading(false); return; }
-      // Apply any admin-queued password change on next login
       applyPendingPassword(currentUser).catch(() => {});
     });
     return () => { unsubAuth(); clearTimeout(timeout); };
@@ -29,18 +29,26 @@ export function useAuth() {
         setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null);
         setLoading(false);
       },
-      (_err) => {
-        // Permission denied or network error — stop loading, show app anyway
-        setLoading(false);
-      }
+      () => setLoading(false),
     );
     return unsub;
   }, [user?.uid]);
+
+  // Subscribe to global free-mode flag (adminConfig/billing)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, 'adminConfig', 'billing'),
+      (snap) => setFreeMode(snap.data()?.freeMode === true),
+      ()     => setFreeMode(false),
+    );
+    return unsub;
+  }, []);
 
   return {
     user,
     loading,
     profile,
+    freeMode,
     isAdmin:         profile?.isAdmin         ?? false,
     tokenBalance:    profile?.tokenBalance     ?? 0,
     disabled:        profile?.disabled         ?? false,
