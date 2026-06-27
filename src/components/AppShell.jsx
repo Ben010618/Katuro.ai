@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { subscribeToCollabUnread } from '../services/collabService';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
@@ -51,7 +52,7 @@ const TITLES = {
   '/classes-i-teach':         'Classes I Teach',
 };
 
-function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle }) {
+function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread }) {
   const navigate = useNavigate();
 
   const initials = user?.displayName
@@ -120,7 +121,13 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
             }}
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
-            {label}
+            <span style={{ flex: 1 }}>{label}</span>
+            {to === '/collab' && collabUnread > 0 && (
+              <span style={{
+                background: '#ed4245', color: '#fff', borderRadius: 10,
+                fontSize: 10, padding: '1px 6px', fontWeight: 700, lineHeight: '16px',
+              }}>{collabUnread}</span>
+            )}
           </NavLink>
         ))}
 
@@ -262,7 +269,14 @@ export default function AppShell() {
   const [mobileOpen,   setMobileOpen]   = useState(false);
   const [slideIdx,     setSlideIdx]     = useState(0);
   const [showBundle,   setShowBundle]   = useState(false);
+  const [collabUnread, setCollabUnread] = useState(0);
   const shownOnLogin = useRef(false);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeToCollabUnread(user.uid, setCollabUnread);
+    return unsub;
+  }, [user?.uid]);
 
   useEffect(() => {
     const id = setInterval(() => setSlideIdx(i => (i + 1) % 4), 10000);
@@ -305,7 +319,7 @@ export default function AppShell() {
           width: 220, flexShrink: 0, position: 'sticky', top: 0,
           height: '100vh', overflow: 'hidden',
         }}>
-          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} dark={dark} toggle={toggle} />
+          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} dark={dark} toggle={toggle} collabUnread={collabUnread} />
         </div>
 
         {/* Mobile sidebar overlay */}
@@ -316,7 +330,7 @@ export default function AppShell() {
               onClick={() => setMobileOpen(false)}
             />
             <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
-              <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} onClose={() => setMobileOpen(false)} />
+              <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} onClose={() => setMobileOpen(false)} collabUnread={collabUnread} />
             </div>
           </div>
         )}

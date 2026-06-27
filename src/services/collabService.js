@@ -122,9 +122,15 @@ export async function openOrCreateDM(myUid, theirUid, myInfo, theirInfo) {
 }
 
 export function subscribeToMyDMs(uid, cb) {
+  // No orderBy — array-contains + orderBy on a different field needs a composite index.
+  // Sort client-side instead.
   return onSnapshot(
-    query(collection(db, 'collabDMs'), where('participants', 'array-contains', uid), orderBy('lastMessageAt', 'desc')),
-    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    query(collection(db, 'collabDMs'), where('participants', 'array-contains', uid)),
+    snap => cb(
+      snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.lastMessageAt?.toMillis?.() ?? 0) - (a.lastMessageAt?.toMillis?.() ?? 0))
+    )
   );
 }
 
@@ -141,8 +147,38 @@ export async function sendDM(id, { uid, displayName, photoURL, text }) {
     createdAt: serverTimestamp(),
   });
   await updateDoc(doc(db, 'collabDMs', id), {
-    lastMessage: text.slice(0, 80), lastMessageAt: serverTimestamp(),
+    lastMessage: text.slice(0, 80),
+    lastMessageAt: serverTimestamp(),
+    lastSenderUid: uid,
   }).catch(() => {});
+}
+
+// ── Unread tracking (localStorage) ───────────────────────────────────────────
+
+export function markConversationRead(id) {
+  try {
+    const reads = JSON.parse(localStorage.getItem('collabReads') || '{}');
+    reads[id] = Date.now();
+    localStorage.setItem('collabReads', JSON.stringify(reads));
+  } catch (_) {}
+}
+
+export function subscribeToCollabUnread(uid, cb) {
+  return onSnapshot(
+    query(collection(db, 'collabDMs'), where('participants', 'array-contains', uid)),
+    snap => {
+      try {
+        const reads = JSON.parse(localStorage.getItem('collabReads') || '{}');
+        const count = snap.docs.filter(d => {
+          const data = d.data();
+          if (!data.lastMessageAt || !data.lastMessage) return false;
+          if (data.lastSenderUid === uid) return false;
+          return (data.lastMessageAt?.toMillis?.() ?? 0) > (reads[d.id] ?? 0);
+        }).length;
+        cb(count);
+      } catch (_) { cb(0); }
+    }
+  );
 }
 
 // ── Profile photo ─────────────────────────────────────────────────────────────
@@ -171,6 +207,6 @@ export async function setStatus(uid, status) {
 // ── All teachers (DM picker) ──────────────────────────────────────────────────
 
 export async function fetchAllTeachers() {
-  const snap = await getDocs(query(collection(db, 'teachers'), where('disabled', '==', false)));
+  const snap = await getDocs(collection(db, 'teachers'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }

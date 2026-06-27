@@ -18,6 +18,7 @@ import {
   dmId, openOrCreateDM, subscribeToMyDMs,
   subscribeToDMMessages, sendDM,
   uploadProfilePhoto, setStatus, fetchAllTeachers,
+  markConversationRead,
 } from '../../services/collabService';
 
 // ── Colour tokens (Discord-inspired, kaTuro branded) ─────────────────────────
@@ -513,6 +514,7 @@ export default function CollabPage() {
   useEffect(() => {
     if (!uid) return;
     ensureCommunityChannel().catch(() => {});
+    markConversationRead(COMMUNITY_ID);
     const unsub = subscribeToMyChannels(uid, setChannels);
     return unsub;
   }, [uid]);
@@ -570,14 +572,16 @@ export default function CollabPage() {
     setActiveChannel(id);
     setActiveDM(null);
     setActiveDMPeer(null);
+    markConversationRead(id);
   }
 
   function selectDM(id, dm) {
     const peer = dm.participants.find(p => p !== uid);
     const info = dm.participantInfo?.[peer] ?? {};
     setActiveDM(id);
-    setActiveDMPeer({ uid: peer, ...info });
+    setActiveDMPeer({ uid: peer, name: info.name || 'Unknown', photoURL: info.photoURL || null, status: info.status || 'offline' });
     setActiveChannel(null);
+    markConversationRead(id);
   }
 
   const activeChannelObj = channels.find(c => c.id === activeChannel);
@@ -805,7 +809,7 @@ export default function CollabPage() {
       {/* Modals */}
       {modal === 'create'     && <CreateChannelModal uid={uid} onCreated={r => selectChannel(r.id)} onClose={() => setModal(null)} />}
       {modal === 'join'       && <JoinModal uid={uid} onJoined={selectChannel} onClose={() => setModal(null)} />}
-      {modal === 'dm-picker'  && <DMPicker myUid={uid} myProfile={{ displayName: myName, photoURL: myPhoto, school: mySchool }} onDMOpen={(id, t) => { setActiveDM(id); setActiveDMPeer({ uid: t.id, name: t.displayName || t.email, photoURL: t.photoURL }); setActiveChannel(null); }} onClose={() => setModal(null)} />}
+      {modal === 'dm-picker'  && <DMPicker myUid={uid} myProfile={{ displayName: myName, photoURL: myPhoto, school: mySchool }} onDMOpen={(id, t) => { setActiveDM(id); setActiveDMPeer({ uid: t.id, name: t.displayName || t.email, photoURL: t.photoURL || null, status: t.status || 'offline' }); setActiveChannel(null); markConversationRead(id); }} onClose={() => setModal(null)} />}
       {modal?.type === 'invite' && <InviteModal channel={modal.channel} onClose={() => setModal(null)} />}
     </>
   );
