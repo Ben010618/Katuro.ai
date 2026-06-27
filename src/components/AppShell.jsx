@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { subscribeToCollabUnread, uploadProfilePhoto, getTeacherProfile } from '../services/collabService';
-import { db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
@@ -22,24 +21,21 @@ import {
   Settings, Camera, Loader2,
 } from 'lucide-react';
 
-
 const MAIN_NAV = [
-  { to: '/dashboard',              label: 'Dashboard',             Icon: LayoutDashboard },
-  { to: '/lesson-gen',             label: 'Lesson Gen',            Icon: Sparkles        },
-  { to: '/my-lessons',             label: 'My Lessons',            Icon: BookOpen        },
-  { to: '/quiz-builder',           label: 'Quiz Builder',          Icon: ClipboardList   },
-  { to: '/presentations',          label: 'Presentation Builder',  Icon: Projector       },
-  { to: '/gamification',           label: 'Gamification',          Icon: Gamepad2        },
-  { to: '/action-research/phase-1',label: 'Action Research',       Icon: FlaskConical    },
-  { to: '/collab',                  label: 'KaTuro Collab',         Icon: MessageSquare   },
+  { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
+  { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
+  { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
+  { to: '/quiz-builder',            label: 'Quiz Builder',         Icon: ClipboardList   },
+  { to: '/presentations',           label: 'Presentation Builder', Icon: Projector       },
+  { to: '/gamification',            label: 'Gamification',         Icon: Gamepad2        },
+  { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
+  { to: '/collab',                   label: 'KaTuro Collab',        Icon: MessageSquare   },
 ];
 
 const CLASSROOM_NAV = [
-  { to: '/classroom-management',   label: 'Classroom Management',  Icon: School          },
-  { to: '/classes-i-teach',        label: 'Classes I Teach',       Icon: GraduationCap   },
+  { to: '/classroom-management', label: 'Classroom Management', Icon: School       },
+  { to: '/classes-i-teach',      label: 'Classes I Teach',      Icon: GraduationCap },
 ];
-
-const NAV = [...MAIN_NAV, ...CLASSROOM_NAV];
 
 const TITLES = {
   '/dashboard':               'Dashboard',
@@ -54,14 +50,11 @@ const TITLES = {
   '/classes-i-teach':         'Classes I Teach',
 };
 
-function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread }) {
+// ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
+function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread, onProfileOpen }) {
   const navigate = useNavigate();
-  const [gearOpen,       setGearOpen]       = useState(false);
-  const [profileOpen,    setProfileOpen]    = useState(false);
-  const [profileData,    setProfileData]    = useState(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const gearRef  = useRef(null);
-  const photoRef = useRef(null);
+  const [gearOpen, setGearOpen] = useState(false);
+  const gearRef = useRef(null);
 
   const initials    = user?.displayName
     ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -73,39 +66,25 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
   async function openProfile() {
     try {
       const prof = await getTeacherProfile(user.uid);
-      setProfileData({
+      onProfileOpen({
         displayName: prof?.displayName || displayName,
-        email:       user.email || prof?.email || '',
-        photoURL:    prof?.photoURL || user.photoURL || null,
-        school:      prof?.school || '',
+        email:    user.email || prof?.email || '',
+        photoURL: prof?.photoURL || user.photoURL || null,
+        school:   prof?.school || '',
       });
     } catch (_) {
-      setProfileData({ displayName, email: user.email || '', photoURL: user.photoURL || null, school: '' });
+      onProfileOpen({ displayName, email: user.email || '', photoURL: user.photoURL || null, school: '' });
     }
-    setProfileOpen(true);
   }
 
-  async function handlePhotoUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file || !user.uid) return;
-    setPhotoUploading(true);
-    try {
-      await uploadProfilePhoto(user.uid, file);
-      const prof = await getTeacherProfile(user.uid);
-      if (prof) setProfileData(prev => ({ ...prev, photoURL: prof.photoURL }));
-    } catch (_) {}
-    finally { setPhotoUploading(false); }
-  }
-
-  // Close gear dropdown when clicking outside
   useEffect(() => {
     if (!gearOpen) return;
-    const handler = e => { if (!gearRef.current?.contains(e.target)) setGearOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = e => { if (!gearRef.current?.contains(e.target)) setGearOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, [gearOpen]);
 
-  const btnBase = {
+  const btn = {
     width: '100%', display: 'flex', alignItems: 'center', gap: 8,
     padding: '7px 10px', borderRadius: 7, border: 'none', cursor: 'pointer',
     background: 'transparent', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -186,11 +165,12 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
         )}
       </nav>
 
-      {/* ── Bottom panel ───────────────────────────────────────────────────── */}
+      {/* ── Bottom panel ─────────────────────────────────────────────────────── */}
       <div style={{ borderTop: '1px solid var(--kt-border)', paddingTop: 10, marginTop: 4 }}>
 
-        {/* Avatar + name row — click to open profile card */}
-        <button onClick={openProfile} style={{ ...btnBase, gap: 9, padding: '6px 10px', marginBottom: 6, borderRadius: 9, color: 'var(--kt-text-secondary)' }}
+        {/* Avatar + name — click to open profile card */}
+        <button onClick={openProfile}
+          style={{ ...btn, gap: 9, padding: '6px 10px', marginBottom: 6, borderRadius: 9, color: 'var(--kt-text-secondary)' }}
           onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >
@@ -210,7 +190,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
           </div>
         </button>
 
-        {/* Gear / Settings — roll-up dropdown */}
+        {/* Gear — roll-up dropdown (icon only, no label) */}
         <div ref={gearRef} style={{ position: 'relative' }}>
           {gearOpen && (
             <div style={{
@@ -219,14 +199,16 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
               borderRadius: 10, boxShadow: '0 -6px 24px rgba(0,0,0,0.18)',
               border: '1px solid var(--kt-border)', padding: 6, zIndex: 50,
             }}>
-              <button onClick={() => { toggle(); setGearOpen(false); }} style={{ ...btnBase, color: 'var(--kt-text-secondary)' }}
+              <button onClick={() => { toggle(); setGearOpen(false); }}
+                style={{ ...btn, color: 'var(--kt-text-secondary)' }}
                 onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
                 {dark ? <Sun size={13} /> : <Moon size={13} />}
                 {dark ? 'Light Mode' : 'Dark Mode'}
               </button>
-              <button onClick={handleLogout} style={{ ...btnBase, color: '#c0392b' }}
+              <button onClick={handleLogout}
+                style={{ ...btn, color: '#c0392b' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
@@ -234,30 +216,165 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
               </button>
             </div>
           )}
-          <button onClick={() => setGearOpen(v => !v)} style={{ ...btnBase, color: 'var(--kt-text-secondary)', background: gearOpen ? (dark ? 'rgba(82,183,136,0.1)' : '#f0faf4') : 'transparent' }}
+          <button onClick={() => setGearOpen(v => !v)}
+            style={{ ...btn, color: 'var(--kt-text-secondary)', background: gearOpen ? (dark ? 'rgba(82,183,136,0.1)' : '#f0faf4') : 'transparent' }}
             onMouseEnter={e => { if (!gearOpen) e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
             onMouseLeave={e => { if (!gearOpen) e.currentTarget.style.background = 'transparent'; }}
           >
             <Settings size={13} />
-            <span style={{ flex: 1 }}>Settings</span>
-            <ChevronDown size={11} style={{ transform: gearOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            <ChevronDown size={11} style={{ marginLeft: 'auto', transform: gearOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ── Profile Card ─────────────────────────────────────────────────────── */}
-      {profileOpen && profileData && (
+// ── AppShell ──────────────────────────────────────────────────────────────────
+export default function AppShell() {
+  const { user, tokenBalance, isAdmin, freeMode, loading } = useAuth();
+  const { dark, toggle } = useTheme();
+  const location = useLocation();
+  const [mobileOpen,     setMobileOpen]     = useState(false);
+  const [slideIdx,       setSlideIdx]       = useState(0);
+  const [showBundle,     setShowBundle]     = useState(false);
+  const [collabUnread,   setCollabUnread]   = useState(0);
+  const [profileData,    setProfileData]    = useState(null); // lifted out of sidebar
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const shownOnLogin = useRef(false);
+  const photoRef     = useRef(null);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    return subscribeToCollabUnread(user.uid, setCollabUnread);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const id = setInterval(() => setSlideIdx(i => (i + 1) % 4), 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !freeMode && tokenBalance === 0 && !shownOnLogin.current) {
+      shownOnLogin.current = true;
+      setShowBundle(true);
+    }
+  }, [loading, freeMode, tokenBalance]);
+
+  useEffect(() => {
+    const handler = () => setShowBundle(true);
+    window.addEventListener('kt-zero-tokens', handler);
+    return () => window.removeEventListener('kt-zero-tokens', handler);
+  }, []);
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+    setPhotoUploading(true);
+    try {
+      await uploadProfilePhoto(user.uid, file);
+      const prof = await getTeacherProfile(user.uid);
+      if (prof) setProfileData(prev => prev ? { ...prev, photoURL: prof.photoURL } : prev);
+    } catch (_) {}
+    finally { setPhotoUploading(false); }
+  }
+
+  const initials    = user?.displayName
+    ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : (user?.email?.[0] || 'T').toUpperCase();
+
+  const pageTitle = Object.keys(TITLES).find(k => location.pathname.startsWith(k))
+    ? TITLES[Object.keys(TITLES).find(k => location.pathname.startsWith(k))]
+    : 'kaTuro AI';
+
+  return (
+    <>
+      <style>{`
+        @keyframes kt-spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+          .shell-sidebar { display: none !important; }
+          .shell-menu-btn { display: flex !important; }
+        }
+      `}</style>
+
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--kt-surface)' }}>
+
+        {/* Sidebar — desktop */}
+        <div className="shell-sidebar" style={{ width: 220, flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
+          <SidebarContent
+            user={user} tokenBalance={tokenBalance} isAdmin={isAdmin}
+            freeMode={freeMode} dark={dark} toggle={toggle}
+            collabUnread={collabUnread} onProfileOpen={setProfileData}
+          />
+        </div>
+
+        {/* Mobile sidebar overlay */}
+        {mobileOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,34,24,0.45)' }} onClick={() => setMobileOpen(false)} />
+            <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
+              <SidebarContent
+                user={user} tokenBalance={tokenBalance} isAdmin={isAdmin}
+                freeMode={freeMode} dark={dark} toggle={toggle}
+                collabUnread={collabUnread} onProfileOpen={setProfileData}
+                onClose={() => setMobileOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Right: topbar + content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+          {SLIDE_IMGS.map((src, i) => (
+            <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.07 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
+          ))}
+
+          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
+            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#1a3d2b', alignItems: 'center' }}>
+              <Menu size={20} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>kaTuro AI</span>
+              <ChevronRight size={11} color="var(--kt-border)" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{pageTitle}</span>
+            </div>
+            {freeMode ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(5,150,105,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#059669' }}>✦ Free Mode</div>
+            ) : tokenBalance === 0 ? (
+              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1877f2', color: '#fff', border: 'none', borderRadius: 20, padding: '5px 13px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+                <Zap size={12} /> Get Tokens
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(232,163,32,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#b47a10' }}>
+                <Coins size={12} />
+                <span style={{ fontFamily: '"DM Mono", monospace' }}>{tokenBalance}</span>
+                <span style={{ fontWeight: 500 }}>tokens</span>
+              </div>
+            )}
+          </header>
+
+          <main style={{ flex: 1, overflow: 'auto', padding: 24, position: 'relative', zIndex: 1 }}>
+            <Outlet />
+          </main>
+        </div>
+      </div>
+
+      {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
+
+      {/* ── Profile card — rendered at root level, never clipped ─────────────── */}
+      {profileData && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}
-          onClick={() => setProfileOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setProfileData(null)}
         >
           <div
-            style={{ background: dark ? '#1c2e22' : '#fff', borderRadius: 18, width: 300, overflow: 'hidden', boxShadow: '0 12px 48px rgba(0,0,0,0.25)', border: '1px solid var(--kt-border)' }}
+            style={{ background: dark ? '#1c2e22' : '#fff', borderRadius: 18, width: 300, overflow: 'hidden', boxShadow: '0 16px 56px rgba(0,0,0,0.28)', border: '1px solid var(--kt-border)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Banner */}
             <div style={{ height: 60, background: 'linear-gradient(135deg, #2d6a4f 0%, #00c974 100%)', position: 'relative' }}>
-              <button onClick={() => setProfileOpen(false)} style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.25)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+              <button onClick={() => setProfileData(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.25)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
                 <X size={14} />
               </button>
             </div>
@@ -288,9 +405,9 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
             {/* Info */}
             <div style={{ padding: '10px 16px 20px' }}>
               <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--kt-text-primary)', margin: '0 0 4px', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>{profileData.displayName}</p>
-              {isAdmin && <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(232,163,32,0.15)', color: '#b47a10', borderRadius: 6, padding: '2px 8px', display: 'inline-block', marginBottom: 10 }}>Admin</span>}
+              {isAdmin && <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(232,163,32,0.15)', color: '#b47a10', borderRadius: 6, padding: '2px 8px', display: 'inline-block', marginBottom: 8 }}>Admin</span>}
 
-              <div style={{ background: dark ? 'rgba(255,255,255,0.05)' : '#f9fafb', borderRadius: 10, padding: '12px', marginTop: isAdmin ? 4 : 10 }}>
+              <div style={{ background: dark ? 'rgba(255,255,255,0.05)' : '#f9fafb', borderRadius: 10, padding: '12px', marginTop: 10 }}>
                 {profileData.school && (
                   <div style={{ marginBottom: profileData.email ? 10 : 0 }}>
                     <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 2px' }}>School</p>
@@ -314,172 +431,6 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-export default function AppShell() {
-  const { user, tokenBalance, isAdmin, freeMode, loading } = useAuth();
-  const { dark, toggle } = useTheme();
-  const location = useLocation();
-  const [mobileOpen,   setMobileOpen]   = useState(false);
-  const [slideIdx,     setSlideIdx]     = useState(0);
-  const [showBundle,   setShowBundle]   = useState(false);
-  const [collabUnread, setCollabUnread] = useState(0);
-  const shownOnLogin = useRef(false);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = subscribeToCollabUnread(user.uid, setCollabUnread);
-    return unsub;
-  }, [user?.uid]);
-
-  useEffect(() => {
-    const id = setInterval(() => setSlideIdx(i => (i + 1) % 4), 10000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Auto-show once per session — only after profile is fully loaded AND balance is truly zero
-  useEffect(() => {
-    if (!loading && !freeMode && tokenBalance === 0 && !shownOnLogin.current) {
-      shownOnLogin.current = true;
-      setShowBundle(true);
-    }
-  }, [loading, freeMode, tokenBalance]);
-
-  // Show bundle when a generate action fails due to zero tokens
-  useEffect(() => {
-    const handler = () => setShowBundle(true);
-    window.addEventListener('kt-zero-tokens', handler);
-    return () => window.removeEventListener('kt-zero-tokens', handler);
-  }, []);
-
-
-  const pageTitle = Object.keys(TITLES).find(k => location.pathname.startsWith(k))
-    ? TITLES[Object.keys(TITLES).find(k => location.pathname.startsWith(k))]
-    : 'kaTuro AI';
-
-  return (
-    <>
-      <style>{`
-        @media (max-width: 768px) {
-          .shell-sidebar { display: none !important; }
-          .shell-menu-btn { display: flex !important; }
-        }
-      `}</style>
-
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--kt-surface)' }}>
-
-        {/* Sidebar — desktop */}
-        <div className="shell-sidebar" style={{
-          width: 220, flexShrink: 0, position: 'sticky', top: 0,
-          height: '100vh', overflow: 'hidden',
-        }}>
-          <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} dark={dark} toggle={toggle} collabUnread={collabUnread} />
-        </div>
-
-        {/* Mobile sidebar overlay */}
-        {mobileOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
-            <div
-              style={{ position: 'absolute', inset: 0, background: 'rgba(13,34,24,0.45)' }}
-              onClick={() => setMobileOpen(false)}
-            />
-            <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
-              <SidebarContent user={user} tokenBalance={tokenBalance} isAdmin={isAdmin} freeMode={freeMode} onClose={() => setMobileOpen(false)} collabUnread={collabUnread} />
-            </div>
-          </div>
-        )}
-
-        {/* Right: topbar + content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
-
-          {/* background slideshow — sits behind topbar and page content */}
-          {SLIDE_IMGS.map((src, i) => (
-            <div key={i} style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: `url(${src})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: i === slideIdx ? 0.07 : 0,
-              transition: 'opacity 1.8s ease-in-out',
-              pointerEvents: 'none',
-              zIndex: 0,
-            }} />
-          ))}
-
-          {/* Topbar */}
-          <header style={{
-            height: 56, background: 'var(--kt-topbar-bg)',
-            borderBottom: '1px solid var(--kt-border)',
-            display: 'flex', alignItems: 'center',
-            padding: '0 20px', gap: 12,
-            position: 'sticky', top: 0, zIndex: 40, flexShrink: 0,
-          }}>
-            <button
-              className="shell-menu-btn"
-              onClick={() => setMobileOpen(true)}
-              style={{
-                display: 'none', background: 'none', border: 'none', cursor: 'pointer',
-                padding: 4, color: '#1a3d2b', alignItems: 'center',
-              }}
-            >
-              <Menu size={20} />
-            </button>
-
-            {/* Breadcrumb */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>kaTuro AI</span>
-              <ChevronRight size={11} color="var(--kt-border)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{pageTitle}</span>
-            </div>
-
-            {/* Token balance badge / zero-token CTA */}
-            {freeMode ? (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                background: 'rgba(5,150,105,0.12)', borderRadius: 20, padding: '4px 12px',
-                fontSize: 11, fontWeight: 700, color: '#059669',
-              }}>
-                ✦ Free Mode
-              </div>
-            ) : tokenBalance === 0 ? (
-              <button
-                onClick={() => setShowBundle(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: '#1877f2', color: '#fff', border: 'none',
-                  borderRadius: 20, padding: '5px 13px',
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: 'inherit', transition: 'opacity 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-              >
-                <Zap size={12} />
-                Get Tokens
-              </button>
-            ) : (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                background: 'rgba(232,163,32,0.12)', borderRadius: 20, padding: '4px 12px',
-                fontSize: 11, fontWeight: 700, color: '#b47a10',
-              }}>
-                <Coins size={12} />
-                <span style={{ fontFamily: '"DM Mono", monospace' }}>{tokenBalance}</span>
-                <span style={{ fontWeight: 500 }}>tokens</span>
-              </div>
-            )}
-          </header>
-
-          {/* Page content */}
-          <main style={{ flex: 1, overflow: 'auto', padding: 24, position: 'relative', zIndex: 1 }}>
-            <Outlet />
-          </main>
-        </div>
-      </div>
-
-      {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
     </>
   );
 }
