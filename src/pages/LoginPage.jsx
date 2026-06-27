@@ -212,7 +212,8 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      setError(err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, ''));
+      setError((err?.message ?? 'Sign-in failed. Please try again.')
+        .replace('Firebase: ', '').replace(/ \(auth\/[\w-]+\)\.?/g, '').trim());
       triggerShake();
     } finally {
       setLoading(false);
@@ -231,7 +232,8 @@ export default function LoginPage() {
       const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
-      setError(err.message.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, ''));
+      setError((err?.message ?? 'Registration failed. Please try again.')
+        .replace('Firebase: ', '').replace(/ \(auth\/[\w-]+\)\.?/g, '').trim());
       triggerShake();
     } finally {
       setLoading(false);

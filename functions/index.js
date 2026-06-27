@@ -422,21 +422,26 @@ exports.registerUser = onCall(
       await admin.auth().createUser({ uid, email: email.trim().toLowerCase(), password, displayName });
     } catch (err) {
       await db.doc(`teachers/${uid}`).delete().catch(() => {});
-      const msg = err.code === 'auth/email-already-exists'
-        ? 'An account with this email already exists.'
-        : (err.message || 'Registration failed.');
-      throw new HttpsError('already-exists', msg);
+      if (err.code === 'auth/email-already-exists') {
+        throw new HttpsError('already-exists', 'An account with this email already exists.');
+      }
+      if (err.code === 'auth/invalid-email') {
+        throw new HttpsError('invalid-argument', 'The email address is not valid.');
+      }
+      throw new HttpsError('internal', err.message || 'Registration failed. Please try again.');
     }
 
-    if (!atCap) {
-      await db.collection(`teachers/${uid}/tokenLogs`).add({
-        uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
-        note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
+    // Token log and admin notification — both non-fatal
+    try {
+      if (!atCap) {
+        await db.collection(`teachers/${uid}/tokenLogs`).add({
+          uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
+          note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (_e) {}
 
-    // Notify admin — non-fatal
     try {
       await db.collection('adminNotifications').add({
         type: 'new_user', uid,
@@ -449,11 +454,10 @@ exports.registerUser = onCall(
         read:            false,
         createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
-    } catch {}
+    } catch (_e) {}
 
-    // Return a custom token so the client can sign in immediately
-    const customToken = await admin.auth().createCustomToken(uid);
-    return { customToken, pendingApproval: atCap };
+    // Client will sign in with email+password — no custom token needed
+    return { pendingApproval: atCap };
   }
 );
 
@@ -466,16 +470,21 @@ const functionsV1 = require('firebase-functions/v1');
 exports.enforceRegistrationSecurity = functionsV1.auth.user().onCreate(async (user) => {
   const uid  = user.uid;
   const snap = await db.doc(`teachers/${uid}`).get();
+  const data = snap.exists ? snap.data() : null;
 
-  const valid = snap.exists &&
-    snap.data()?._registeredViaFunction === true &&
-    snap.data()?.surname?.trim()   &&
-    snap.data()?.givenName?.trim() &&
-    snap.data()?.school?.trim()    &&
-    snap.data()?.email?.trim();
+  // Self-registered: must have _registeredViaFunction + all required fields
+  const isSelfRegistered = data?._registeredViaFunction === true &&
+    data?.surname?.trim()   &&
+    data?.givenName?.trim() &&
+    data?.school?.trim()    &&
+    data?.email?.trim();
 
-  if (!valid) {
-    // Delete any partial Firestore document and the Auth user
+  // Admin-created: must have _registeredViaFunction + createdBy (admin uid)
+  const isAdminCreated = data?._registeredViaFunction === true &&
+    data?.createdBy &&
+    data?.email?.trim();
+
+  if (!isSelfRegistered && !isAdminCreated) {
     if (snap.exists) await db.doc(`teachers/${uid}`).delete().catch(() => {});
     await admin.auth().deleteUser(uid).catch(() => {});
   }
@@ -532,3 +541,62 @@ exports.adminSetPassword = onCall(async (request) => {
 
   return { success: true };
 });
+
+// ── Admin: create a new user account (server-side, bypasses client Firestore rules) ──
+exports.adminCreateUserFn = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+
+    const { email, password, initialTokens = 0 } = req.data || {};
+    if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email is required.');
+    if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+
+    const tokens = Math.max(0, Number(initialTokens) || 0);
+    const uid    = crypto.randomBytes(14).toString('hex');
+
+    // Write Firestore BEFORE creating Auth user (same ordering as registerUser)
+    await db.doc(`teachers/${uid}`).set({
+      email:           email.trim().toLowerCase(),
+      displayName:     email.trim().toLowerCase(),
+      password,
+      tokenBalance:    tokens,
+      isAdmin:         false,
+      disabled:        false,
+      pendingApproval: false,
+      createdBy:       req.auth.uid,
+      createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+      _registeredViaFunction: true,
+    });
+
+    try {
+      await admin.auth().createUser({ uid, email: email.trim().toLowerCase(), password });
+    } catch (err) {
+      await db.doc(`teachers/${uid}`).delete().catch(() => {});
+      if (err.code === 'auth/email-already-exists') {
+        throw new HttpsError('already-exists', 'An account with this email already exists.');
+      }
+      if (err.code === 'auth/invalid-email') {
+        throw new HttpsError('invalid-argument', 'The email address is not valid.');
+      }
+      throw new HttpsError('internal', err.message || 'Failed to create account.');
+    }
+
+    if (tokens > 0) {
+      try {
+        await db.collection(`teachers/${uid}/tokenLogs`).add({
+          uid, amount: tokens, action: 'top_up', note: 'Initial balance',
+          addedBy: req.auth.uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (_e) {}
+    }
+
+    return { uid, email: email.trim().toLowerCase() };
+  }
+);

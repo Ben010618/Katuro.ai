@@ -27,7 +27,7 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, firebaseConfig } from "../firebase";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
@@ -476,36 +476,21 @@ export async function getAllTeachers() {
 // ─── Admin: create a new user account ────────────────────────────────────────
 // Uses a secondary Firebase App instance so the admin stays logged in.
 
-export async function adminCreateUser(email, password, initialTokens, adminUid) {
-  const tempApp  = initializeApp(firebaseConfig, "admin-tmp-" + Date.now());
-  const tempAuth = getAuth(tempApp);
-  let uid;
+export async function adminCreateUser(email, password, initialTokens, _adminUid) {
+  const { httpsCallable } = await import('firebase/functions');
+  const { functions }     = await import('../firebase');
+  const fn = httpsCallable(functions, 'adminCreateUserFn');
   try {
-    const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
-    uid = cred.user.uid;
-    await tempAuth.signOut();
-  } finally {
-    await deleteApp(tempApp);
+    const result = await fn({ email, password, initialTokens });
+    return result.data; // { uid, email }
+  } catch (err) {
+    const raw   = err?.message ?? '';
+    const clean = raw
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/\s*\(functions\/[\w-]+\)\.?$/i, '')
+      .trim();
+    throw new Error(clean || 'Failed to create account.');
   }
-
-  await setDoc(teacherRef(uid), {
-    email,
-    password,
-    tokenBalance: initialTokens,
-    isAdmin:  false,
-    disabled: false,
-    createdAt: serverTimestamp(),
-    createdBy: adminUid,
-  });
-
-  if (initialTokens > 0) {
-    await addDoc(tokenLogsRef(uid), {
-      uid, amount: initialTokens, note: "Initial balance",
-      action: "top_up", addedBy: adminUid, createdAt: serverTimestamp(),
-    });
-  }
-
-  return { uid, email };
 }
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
@@ -515,7 +500,6 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   // cannot be bypassed by any client version or cached bundle.
   const { httpsCallable } = await import('firebase/functions');
   const { functions }     = await import('../firebase');
-  const { signInWithCustomToken } = await import('firebase/auth');
   const { auth }          = await import('../firebase');
 
   const registerFn = httpsCallable(functions, 'registerUser');
@@ -523,14 +507,25 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   try {
     result = await registerFn({ email, password, surname, givenName, mi, school });
   } catch (err) {
-    // Re-throw with the Cloud Function's message (already user-friendly)
-    throw new Error(err.message?.replace('Firebase: ', '').replace(/ \(auth.*\)\.?/, '') || 'Registration failed.');
+    // Surface the Cloud Function's user-friendly message; hide opaque internal codes
+    const raw = err?.message ?? '';
+    const clean = raw
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/\s*\(functions\/[\w-]+\)\.?$/i, '')
+      .replace(/\s*\(auth\/[\w-]+\)\.?$/i, '')
+      .trim();
+    throw new Error(clean || 'Registration failed. Please try again.');
   }
 
-  const { customToken, pendingApproval } = result.data;
+  const { pendingApproval } = result.data;
 
-  // Sign in with the custom token returned by the server
-  await signInWithCustomToken(auth, customToken);
+  // Auth user was created server-side — sign in directly with the supplied credentials
+  const { signInWithEmailAndPassword } = await import('firebase/auth');
+  try {
+    await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+  } catch (_signInErr) {
+    throw new Error('Account created! Sign-in failed due to a network issue. Please sign in manually.');
+  }
 
   return { pendingApproval };
 }
