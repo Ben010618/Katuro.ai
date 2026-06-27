@@ -210,3 +210,8 @@ export async function fetchAllTeachers() {
   const snap = await getDocs(collection(db, 'teachers'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+export async function getTeacherProfile(uid) {
+  const snap = await getDoc(doc(db, 'teachers', uid));
+  return snap.exists() ? { id: uid, ...snap.data() } : null;
+}
