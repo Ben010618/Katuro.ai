@@ -6,7 +6,7 @@ import { PhotoGrid }    from './PhotoGrid';
 import { PhotoLightbox } from './PhotoLightbox';
 import { ReactionBar }  from './ReactionBar';
 import { CommentThread } from './CommentThread';
-import { timeAgo, avatarColor, getInitials } from '../services/sharesService';
+import { timeAgo, avatarColor, getInitials, deletePost } from '../services/sharesService';
 
 function renderCaption(caption) {
   if (!caption) return null;
@@ -22,17 +22,26 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
   const [lightbox,      setLightbox]      = useState(null);
   const [showMenu,      setShowMenu]      = useState(false);
   const [showComments,  setShowComments]  = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
 
   const isOwn = post.authorUid === uid;
   const bg    = post.avatarColor || avatarColor(post.authorUid);
 
   async function handleDelete() {
     setShowMenu(false);
-    if (window.confirm('Delete this post?')) onDelete?.(post.id);
+    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      await deletePost(post.id, uid);
+      onDelete?.(post.id);
+    } catch (e) {
+      setDeleting(false);
+      alert('Could not delete post. Please try again.');
+    }
   }
 
   return (
-    <article className="sh-card">
+    <article className="sh-card" style={deleting ? { opacity: 0.4, pointerEvents: 'none' } : {}}>
 
       {/* Header */}
       <div className="sh-card-header">
