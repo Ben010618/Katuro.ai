@@ -30,7 +30,7 @@ const MAIN_NAV = [
   { to: '/gamification',            label: 'Gamification',         Icon: Gamepad2        },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
   { to: '/collab',                   label: 'KaTuro Collab',        Icon: MessageSquare   },
-  { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images          },
+  { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, isNew: true },
 ];
 
 const CLASSROOM_NAV = [
@@ -111,22 +111,52 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
-        {MAIN_NAV.map(({ to, label, Icon }) => (
+        {MAIN_NAV.map(({ to, label, Icon, isNew }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
-              background: isActive ? (dark ? 'rgba(34,197,94,0.18)' : '#bbf7d0') : 'transparent',
-              color: isActive ? '#14532d' : 'var(--kt-text-secondary)',
-              fontWeight: isActive ? 700 : 500, fontSize: 13,
+              background: isActive
+                ? isNew
+                  ? (dark ? 'rgba(83,74,183,0.22)' : '#ede9ff')
+                  : (dark ? 'rgba(34,197,94,0.18)' : '#bbf7d0')
+                : isNew
+                  ? (dark ? 'rgba(83,74,183,0.10)' : 'rgba(83,74,183,0.06)')
+                  : 'transparent',
+              color: isActive
+                ? isNew ? '#534AB7' : '#14532d'
+                : isNew ? '#534AB7' : 'var(--kt-text-secondary)',
+              fontWeight: isActive ? 700 : isNew ? 600 : 500, fontSize: 13,
               transition: 'background 0.14s, color 0.14s',
-              borderLeft: isActive ? '3px solid #22c55e' : '3px solid transparent',
+              borderLeft: isActive
+                ? `3px solid ${isNew ? '#534AB7' : '#22c55e'}`
+                : isNew ? '3px solid rgba(83,74,183,0.3)' : '3px solid transparent',
             })}
-            onMouseEnter={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: dark ? 'rgba(82,183,136,0.12)' : '#dcfce7', color: '#14532d' }); }}
-            onMouseLeave={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'transparent', color: 'var(--kt-text-secondary)' }); }}
+            onMouseEnter={e => {
+              if (e.currentTarget.getAttribute('aria-current') !== 'page') {
+                Object.assign(e.currentTarget.style, isNew
+                  ? { background: dark ? 'rgba(83,74,183,0.18)' : '#ede9ff', color: '#534AB7' }
+                  : { background: dark ? 'rgba(82,183,136,0.12)' : '#dcfce7', color: '#14532d' });
+              }
+            }}
+            onMouseLeave={e => {
+              if (e.currentTarget.getAttribute('aria-current') !== 'page') {
+                Object.assign(e.currentTarget.style, isNew
+                  ? { background: dark ? 'rgba(83,74,183,0.10)' : 'rgba(83,74,183,0.06)', color: '#534AB7' }
+                  : { background: 'transparent', color: 'var(--kt-text-secondary)' });
+              }
+            }}
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
             <span style={{ flex: 1 }}>{label}</span>
+            {isNew && (
+              <span style={{
+                background: 'linear-gradient(135deg, #534AB7 0%, #1D9E75 100%)',
+                color: '#fff', borderRadius: 10, fontSize: 9, padding: '2px 7px',
+                fontWeight: 800, letterSpacing: '0.04em', lineHeight: '15px',
+                textTransform: 'uppercase',
+              }}>NEW</span>
+            )}
             {to === '/collab' && collabUnread > 0 && (
               <span style={{ background: '#ed4245', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700, lineHeight: '16px' }}>{collabUnread}</span>
             )}
