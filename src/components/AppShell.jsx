@@ -18,7 +18,7 @@ import {
   LogOut, Menu, X, ChevronRight, ChevronDown, Projector,
   ShieldCheck, Coins, Gamepad2, FlaskConical, Zap,
   School, GraduationCap, Moon, Sun, MessageSquare,
-  Settings, Camera, Loader2,
+  Settings, Camera, Loader2, Images,
 } from 'lucide-react';
 
 const MAIN_NAV = [
@@ -30,6 +30,7 @@ const MAIN_NAV = [
   { to: '/gamification',            label: 'Gamification',         Icon: Gamepad2        },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
   { to: '/collab',                   label: 'KaTuro Collab',        Icon: MessageSquare   },
+  { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images          },
 ];
 
 const CLASSROOM_NAV = [
