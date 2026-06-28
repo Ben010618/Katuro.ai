@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal, Trash2, MessageCircle } from 'lucide-react';
@@ -8,7 +8,20 @@ import { ReactionBar }  from './ReactionBar';
 import { CommentThread } from './CommentThread';
 import { timeAgo, avatarColor, getInitials, deletePost } from '../services/sharesService';
 
-function renderCaption(caption) {
+const isHTMLCaption = str => /<[a-z][\s\S]*>/i.test(str);
+
+function sanitizeHTML(html) {
+  if (typeof window === 'undefined') return html;
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  el.querySelectorAll('script,style,iframe,object,embed,form').forEach(n => n.remove());
+  el.querySelectorAll('*').forEach(n => {
+    ['onclick','onerror','onload','onmouseover'].forEach(a => n.removeAttribute(a));
+  });
+  return el.innerHTML;
+}
+
+function renderPlainCaption(caption) {
   if (!caption) return null;
   const parts = caption.split(/(#\w+)/g);
   return parts.map((part, i) =>
@@ -23,6 +36,9 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
   const [showMenu,      setShowMenu]      = useState(false);
   const [showComments,  setShowComments]  = useState(false);
   const [deleting,      setDeleting]      = useState(false);
+
+  const captionIsHTML = useMemo(() => isHTMLCaption(post.caption || ''), [post.caption]);
+  const safeHTML      = useMemo(() => captionIsHTML ? sanitizeHTML(post.caption) : '', [captionIsHTML, post.caption]);
 
   const isOwn = post.authorUid === uid;
   const bg    = post.avatarColor || avatarColor(post.authorUid);
@@ -109,7 +125,9 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
 
       {/* Caption */}
       {post.caption && (
-        <p className="sh-caption">{renderCaption(post.caption)}</p>
+        captionIsHTML
+          ? <div className="sh-caption sh-caption--rich" dangerouslySetInnerHTML={{ __html: safeHTML }} />
+          : <p className="sh-caption">{renderPlainCaption(post.caption)}</p>
       )}
 
       {/* Reactions */}

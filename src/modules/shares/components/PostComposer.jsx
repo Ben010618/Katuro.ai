@@ -3,13 +3,17 @@ import PropTypes from 'prop-types';
 import { X, ImagePlus, Loader2, Plus } from 'lucide-react';
 import { usePost } from '../hooks/usePost';
 import { validateImageFile, createPreviewUrl } from '../services/storageService';
+import { RichTextEditor } from './RichTextEditor';
 
-const GRADE_LEVELS  = ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
-const SUBJECTS      = ['English','Filipino','Mathematics','Science','Araling Panlipunan','MAPEH','TLE','Values Education','Edukasyon sa Pagpapakatao (EsP)','Other'];
-const WORD_LIMIT    = 250;
+const WORD_LIMIT = 250;
+
+function stripHTML(html) {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 function countWords(text) {
-  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  const plain = stripHTML(text);
+  return plain === '' ? 0 : plain.split(/\s+/).length;
 }
 
 export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGrade, subject: defaultSubject, onSuccess, onClose }) {
@@ -126,53 +130,20 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
             </p>
           )}
 
-          {/* Caption */}
+          {/* Rich text editor */}
           <div className="sh-composer-field">
-            <label className="sh-composer-label">Caption</label>
-            <textarea
-              className="sh-composer-textarea"
-              placeholder="Share what's happening in your classroom… #DLL #MELC"
-              value={caption}
-              onChange={e => {
-                const val = e.target.value;
-                // Block new words beyond the limit; still allow editing/deleting
-                if (countWords(val) <= WORD_LIMIT) {
-                  setCaption(val);
-                } else {
-                  // Allow the update only if they're removing characters (not adding words)
-                  if (val.length < caption.length) setCaption(val);
+            <label className="sh-composer-label">Share Your Thoughts!</label>
+            <RichTextEditor
+              onChange={html => {
+                if (countWords(html) <= WORD_LIMIT) {
+                  setCaption(html);
+                } else if (html.length < caption.length) {
+                  setCaption(html);
                 }
               }}
-              rows={3}
+              placeholder="What's happening in your classroom? #DLL #MELC"
+              initialValue=""
             />
-          </div>
-
-          {/* Tags */}
-          <div className="sh-tag-fields">
-            <div>
-              <label className="sh-composer-label">School</label>
-              <input
-                className="sh-composer-select"
-                placeholder="Your school name"
-                value={school}
-                onChange={e => setSchool(e.target.value)}
-                style={{ border: '1.5px solid #e5e7eb', borderRadius: 10, padding: '9px 12px', width: '100%', fontFamily: 'inherit', fontSize: 13, outline: 'none' }}
-              />
-            </div>
-            <div>
-              <label className="sh-composer-label">Grade Level</label>
-              <select className="sh-composer-select" value={gradeLevel} onChange={e => setGradeLevel(e.target.value)}>
-                <option value="">Select…</option>
-                {GRADE_LEVELS.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="sh-composer-label">Subject</label>
-              <select className="sh-composer-select" value={subject} onChange={e => setSubject(e.target.value)}>
-                <option value="">Select…</option>
-                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
           </div>
 
           <div className="sh-composer-footer">
