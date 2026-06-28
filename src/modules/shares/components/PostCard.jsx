@@ -38,7 +38,9 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
       <div className="sh-card-header">
         <Link to={`/shares/profile/${post.authorUid}`} style={{ textDecoration: 'none' }}>
           <div className="sh-avatar sh-avatar--md" style={{ background: bg, color: '#fff' }}>
-            {post.authorInitials || getInitials(post.authorName)}
+            {post.authorPhotoURL
+              ? <img src={post.authorPhotoURL} alt={post.authorName || 'Teacher'} />
+              : post.authorInitials || getInitials(post.authorName)}
           </div>
         </Link>
         <div className="sh-card-header-info">

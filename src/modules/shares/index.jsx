@@ -29,7 +29,7 @@ function NavItem({ to, icon: Icon, label, badge }) {
 }
 
 export default function SharesModule() {
-  const { user }           = useAuth();
+  const { user, photoURL } = useAuth();
   const navigate           = useNavigate();
   const location           = useLocation();
   const [profile,  setProfile]  = useState(null);
@@ -52,7 +52,7 @@ export default function SharesModule() {
     }).then(setProfile).catch(() => {});
   }, [user?.uid]);
 
-  const pageProps = { uid, displayName, initials, school, gradeLevel, subject };
+  const pageProps = { uid, displayName, initials, photoURL, school, gradeLevel, subject };
 
   return (
     <div className="sh-root">
@@ -60,7 +60,7 @@ export default function SharesModule() {
       {/* ── Desktop left sidebar ──────────────────────────────────────── */}
       <aside className="sh-sidebar">
         <div className="sh-logo-row">
-          <SharesLogoFull height={28} />
+          <SharesLogoFull height={40} />
         </div>
 
         <nav className="sh-nav">
@@ -95,7 +95,7 @@ export default function SharesModule() {
           borderBottom: '1px solid var(--sh-border-neutral)',
           position: 'sticky', top: 0, zIndex: 40,
         }} className="sh-mobile-topbar">
-          <SharesLogoFull height={22} />
+          <SharesLogoFull height={30} />
           <button className="sh-nav-post-btn" style={{ width: 'auto', padding: '8px 14px' }} onClick={() => setComposer(true)} type="button">
             <PlusSquare size={14} /> Post
           </button>

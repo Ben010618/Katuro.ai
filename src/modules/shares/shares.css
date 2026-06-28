@@ -40,7 +40,10 @@
 .sh-root {
   display: flex;
   min-height: 100vh;
-  background: var(--sh-bg);
+  /* 4.png decorative background at 7% opacity blended with the page green */
+  background:
+    linear-gradient(rgba(240,250,245,0.93), rgba(240,250,245,0.93)),
+    url('../../../assets/4.png') center / cover fixed;
   font-family: var(--sh-font);
   color: var(--sh-text-primary);
 }
@@ -62,9 +65,9 @@
 }
 
 .sh-logo-row {
-  padding: 4px 10px 22px;
+  padding: 8px 10px 24px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 /* ── Sidebar Nav ─────────────────────────────────────────────────── */
@@ -810,6 +813,36 @@
 .sh-widget-title {
   font-size: 11px; font-weight: 700; color: var(--sh-text-secondary);
   text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 12px;
+}
+
+/* My Profile mini-card */
+.sh-my-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sh-my-card-btn {
+  width: 100%;
+  background: var(--sh-primary-light);
+  color: var(--sh-primary);
+  border: 1px solid rgba(45,106,79,0.22);
+  border-radius: 8px;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.sh-my-card-btn:hover { background: #bbf7d0; }
+
+/* Announcement card */
+.sh-announcement-card {
+  border-left: 3px solid var(--sh-primary-bright);
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
 }
 
 .sh-trending-tag {

@@ -32,11 +32,12 @@ export function useFeed(mode, uid, extra = null) {
     const prof = profileCache.current[post.authorUid];
     return {
       ...post,
-      authorName:     prof?.displayName || post.authorName || 'Teacher',
-      authorInitials: prof?.initials    || post.authorInitials || 'T',
-      school:         prof?.school      || post.school  || '',
-      gradeLevel:     prof?.gradeLevel  || post.gradeLevel || '',
-      subject:        prof?.subject     || post.subject  || '',
+      authorName:     prof?.displayName  || post.authorName     || 'Teacher',
+      authorInitials: prof?.initials     || post.authorInitials || 'T',
+      authorPhotoURL: prof?.photoURL     || post.authorPhotoURL || null,
+      school:         prof?.school       || post.school         || '',
+      gradeLevel:     prof?.gradeLevel   || post.gradeLevel     || '',
+      subject:        prof?.subject      || post.subject        || '',
       avatarColor:    avatarColor(post.authorUid),
     };
   }, []);

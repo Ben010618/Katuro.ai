@@ -191,6 +191,20 @@ export async function searchTeachers(q) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/** Fetch teachers currently marked as online. */
+export async function fetchOnlineTeachers(excludeUid, maxCount = 8) {
+  const snap = await getDocs(
+    query(collection(db, 'teachers'),
+      where('status', '==', 'online'),
+      limit(maxCount + 1)
+    )
+  );
+  return snap.docs
+    .filter(d => d.id !== excludeUid)
+    .slice(0, maxCount)
+    .map(d => ({ id: d.id, ...d.data() }));
+}
+
 /** Fetch teacher suggestions (same school or same grade). */
 export async function fetchSuggestions(uid, school, gradeLevel) {
   if (!school && !gradeLevel) return [];
