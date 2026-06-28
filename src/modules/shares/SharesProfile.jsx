@@ -77,12 +77,14 @@ export default function SharesProfile({ myUid, myDisplayName, myInitials }) {
   const bg = avatarColor(profileUid);
 
   if (loading) return (
-    <div>
-      <div className="sh-skeleton" style={{ height: 180, borderRadius: 0 }} />
-      <div style={{ padding: '0 20px 20px' }}>
-        <div className="sh-skeleton sh-skeleton-avatar sh-avatar sh-avatar--xl" style={{ marginTop: -48, marginBottom: 14, border: '4px solid #fff' }} />
-        <div className="sh-skeleton" style={{ height: 22, width: '35%', marginBottom: 8 }} />
-        <div className="sh-skeleton" style={{ height: 14, width: '55%' }} />
+    <div className="sh-profile-page">
+      <div className="sh-profile-header">
+        <div className="sh-skeleton" style={{ height: 160, borderRadius: 0 }} />
+        <div style={{ padding: '0 20px 20px', position: 'relative', zIndex: 2, marginTop: -44 }}>
+          <div className="sh-skeleton sh-skeleton-avatar sh-avatar sh-avatar--xl" style={{ marginBottom: 14, border: '4px solid #fff' }} />
+          <div className="sh-skeleton" style={{ height: 22, width: '35%', marginBottom: 8 }} />
+          <div className="sh-skeleton" style={{ height: 14, width: '55%' }} />
+        </div>
       </div>
     </div>
   );
@@ -94,7 +96,7 @@ export default function SharesProfile({ myUid, myDisplayName, myInitials }) {
   );
 
   return (
-    <div>
+    <div className="sh-profile-page">
       {/* ── Profile header card ──────────────────────────────────── */}
       <div className="sh-profile-header">
 

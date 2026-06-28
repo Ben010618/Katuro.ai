@@ -731,18 +731,27 @@
 .sh-load-more-btn:hover { background: var(--sh-primary-light); }
 
 /* ── Profile ─────────────────────────────────────────────────────── */
+/* Profile page wrapper — max-width centered, padded */
+.sh-profile-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
 .sh-profile-header {
   background: var(--sh-surface);
   border: 1px solid var(--sh-border-neutral);
   border-radius: var(--sh-radius-md);
   overflow: hidden; margin-bottom: 16px;
+  box-shadow: var(--sh-shadow-sm);
 }
 
 .sh-profile-banner {
-  height: 180px;
+  height: 160px;
   background: linear-gradient(135deg, #0d2218 0%, #2d6a4f 50%, #22c55e 100%);
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 
 .sh-cover-btn {
@@ -767,7 +776,7 @@
 .sh-cover-btn:hover   { background: rgba(0,0,0,0.72); }
 .sh-cover-btn:disabled { opacity: 0.6; cursor: default; }
 
-.sh-profile-info { padding: 0 20px 20px; margin-top: -44px; }
+.sh-profile-info { padding: 0 20px 20px; margin-top: -44px; position: relative; z-index: 2; }
 
 .sh-profile-avatar-wrap {
   display: flex; align-items: flex-end;
