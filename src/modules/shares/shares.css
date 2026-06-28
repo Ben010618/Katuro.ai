@@ -309,7 +309,7 @@
   background: linear-gradient(135deg, #d1fae5 0%, #f0faf5 100%);
 }
 
-.sh-photo-grid--1 .sh-photo-item { aspect-ratio: 4 / 3; max-height: 520px; }
+.sh-photo-grid--1 .sh-photo-item { height: 500px; }
 .sh-photo-grid--2 .sh-photo-item { aspect-ratio: 1; }
 .sh-photo-grid--3 .sh-photo-item:first-child { aspect-ratio: 16 / 9; }
 .sh-photo-grid--3 .sh-photo-item:not(:first-child) { aspect-ratio: 1; }

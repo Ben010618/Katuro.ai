@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-d
 import {
   Images, Compass, PlusSquare, Bell, User, ArrowLeft,
 } from 'lucide-react';
+// Images kept for mobile feed nav; Compass used for renamed "Explore" (main feed)
 import { useAuth } from '../../hooks/useAuth';
 import { ensureSharesProfile, getInitials } from './services/sharesService';
 import { useNotifications } from './hooks/useNotifications';
@@ -64,8 +65,7 @@ export default function SharesModule() {
         </div>
 
         <nav className="sh-nav">
-          <NavItem to="/shares"              icon={Images}  label="Feed" />
-          <NavItem to="/shares/explore"      icon={Compass} label="Explore" />
+          <NavItem to="/shares"              icon={Compass} label="Explore" />
           <NavItem to="/shares/notifications" icon={Bell}   label="Notifications" badge={unreadCount} />
           <NavItem to={`/shares/profile/${uid}`} icon={User} label="My Profile" />
         </nav>
@@ -116,9 +116,6 @@ export default function SharesModule() {
       <nav className="sh-mobile-nav">
         <div className="sh-mobile-nav-inner">
           <NavLink to="/shares" end className={({ isActive }) => `sh-mobile-nav-btn ${isActive ? 'active' : ''}`}>
-            <Images size={22} /><span>Feed</span>
-          </NavLink>
-          <NavLink to="/shares/explore" className={({ isActive }) => `sh-mobile-nav-btn ${isActive ? 'active' : ''}`}>
             <Compass size={22} /><span>Explore</span>
           </NavLink>
           <button className="sh-mobile-fab" onClick={() => setComposer(true)} type="button" aria-label="New Post">
