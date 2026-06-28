@@ -52,7 +52,7 @@ const TITLES = {
 };
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
-function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread, onProfileOpen }) {
+function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread, onProfileOpen }) {
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -207,11 +207,11 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
         >
           <div style={{
             width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-            background: user?.photoURL ? 'transparent' : 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
-            backgroundImage: user?.photoURL ? `url(${user.photoURL})` : undefined,
+            background: photoURL ? 'transparent' : 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+            backgroundImage: photoURL ? `url(${photoURL})` : undefined,
             backgroundSize: 'cover', backgroundPosition: 'center',
             display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 11, color: '#fff',
-          }}>{!user?.photoURL && initials}</div>
+          }}>{!photoURL && initials}</div>
           <div style={{ overflow: 'hidden', flex: 1, textAlign: 'left' }}>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
             {!freeMode
@@ -263,7 +263,7 @@ function SidebarContent({ user, tokenBalance, isAdmin, freeMode, onClose, dark, 
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
 export default function AppShell() {
-  const { user, tokenBalance, isAdmin, freeMode, loading } = useAuth();
+  const { user, tokenBalance, isAdmin, freeMode, loading, photoURL } = useAuth();
   const { dark, toggle } = useTheme();
   const location = useLocation();
   const [mobileOpen,     setMobileOpen]     = useState(false);
@@ -333,7 +333,7 @@ export default function AppShell() {
         {/* Sidebar — desktop */}
         <div className="shell-sidebar" style={{ width: 220, flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
           <SidebarContent
-            user={user} tokenBalance={tokenBalance} isAdmin={isAdmin}
+            user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
             freeMode={freeMode} dark={dark} toggle={toggle}
             collabUnread={collabUnread} onProfileOpen={setProfileData}
           />

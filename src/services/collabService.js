@@ -187,8 +187,13 @@ export async function uploadProfilePhoto(uid, file) {
   const storageRef = ref(storage, `profilePhotos/${uid}/avatar.jpg`);
   const snap = await uploadBytes(storageRef, file, { contentType: file.type });
   const url  = await getDownloadURL(snap.ref);
+  // Update all Firestore locations so every module sees the new photo immediately
   await updateDoc(doc(db, 'teachers', uid), { photoURL: url });
-  if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url }).catch(() => {});
+  await updateDoc(doc(db, 'shares_profiles', uid), { photoURL: url }).catch(() => {});
+  if (auth.currentUser) {
+    await updateProfile(auth.currentUser, { photoURL: url }).catch(() => {});
+    await auth.currentUser.reload().catch(() => {});
+  }
   return url;
 }
 

@@ -49,7 +49,9 @@ export function useAuth() {
     loading,
     profile,
     freeMode,
-    isAdmin:         profile?.isAdmin         ?? false,
+    // photoURL prefers Firestore (real-time after upload) over stale Firebase Auth value
+    photoURL:        profile?.photoURL         || user?.photoURL || null,
+    isAdmin:         profile?.isAdmin          ?? false,
     tokenBalance:    profile?.tokenBalance     ?? 0,
     disabled:        profile?.disabled         ?? false,
     pendingApproval: profile?.pendingApproval  ?? false,

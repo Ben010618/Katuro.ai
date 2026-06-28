@@ -28,10 +28,10 @@ export default function SharesFeed({ uid, displayName, initials, school, gradeLe
   }, [uid, school, gradeLevel]);
 
   return (
-    <div style={{ display: 'flex', gap: 0 }}>
+    <div className="sh-feed-layout">
 
-      {/* Feed */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Feed column — fills all available space */}
+      <div className="sh-feed-col">
         <div className="sh-feed">
           {/* Filter tabs */}
           <div className="sh-filter-tabs">
