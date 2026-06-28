@@ -1,30 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Send, Heart, Trash2, Pencil, X, CornerDownRight } from 'lucide-react';
+import { Send, Trash2, Pencil, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
-import { timeAgo, avatarColor } from '../services/sharesService';
+import { timeAgo, avatarColor, getInitials } from '../services/sharesService';
+import { subscribeToReplies } from '../services/sharesService';
 
-const PREVIEW_COUNT = 2;
+const PREVIEW_COUNT = 3;
 
-function Avatar({ uid, initials, size = 'sm' }) {
+function Avatar({ uid, photoURL, initials, size = 'sm' }) {
   return (
     <div
       className={`sh-avatar sh-avatar--${size}`}
       style={{ background: avatarColor(uid), color: '#fff', flexShrink: 0 }}
     >
-      {initials || 'T'}
+      {photoURL ? <img src={photoURL} alt={initials || 'T'} /> : (initials || 'T')}
     </div>
   );
 }
 
-function CommentRow({ c, uid, postId, onReply, addReply, deleteComment, editComment }) {
-  const [editing,   setEditing]   = useState(false);
-  const [editText,  setEditText]  = useState(c.text);
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [liked,     setLiked]     = useState(false);
+function ReplyRow({ r, uid, onDelete }) {
+  const isOwn = r.authorUid === uid;
+  return (
+    <div className="sh-comment" style={{ marginBottom: 6 }}>
+      <Avatar uid={r.authorUid} initials={r.authorInitials || getInitials(r.authorName)} size="sm" />
+      <div className="sh-comment-body">
+        <div className="sh-comment-bubble">
+          <div className="sh-comment-author">{r.authorName || 'Teacher'}</div>
+          <div className="sh-comment-text">{r.text}</div>
+        </div>
+        <div className="sh-comment-actions">
+          <span className="sh-comment-time">{timeAgo(r.createdAt)}</span>
+          {isOwn && (
+            <button
+              className="sh-comment-action-btn"
+              style={{ color: '#ef4444' }}
+              onClick={() => onDelete(r.id)}
+              type="button"
+            >
+              <Trash2 size={10} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const isOwn = c.authorUid === uid;
+function CommentRow({ c, uid, postId, myDisplayName, myInitials, addReply, deleteComment, editComment }) {
+  const [editing,     setEditing]     = useState(false);
+  const [editText,    setEditText]    = useState(c.text);
+  const [replyOpen,   setReplyOpen]   = useState(false);
+  const [replyText,   setReplyText]   = useState('');
+  const [replies,     setReplies]     = useState([]);
+  const [showReplies, setShowReplies] = useState(false);
+
+  const isOwn      = c.authorUid === uid;
+  const replyCount = c.replyCount || 0;
+
+  // Subscribe to replies only when the user expands them
+  useEffect(() => {
+    if (!showReplies) return;
+    const unsub = subscribeToReplies(postId, c.id, setReplies);
+    return unsub;
+  }, [showReplies, postId, c.id]);
 
   async function submitEdit() {
     if (!editText.trim() || editText === c.text) { setEditing(false); return; }
@@ -34,17 +72,18 @@ function CommentRow({ c, uid, postId, onReply, addReply, deleteComment, editComm
 
   async function submitReply() {
     if (!replyText.trim()) return;
-    await addReply(c.id, c.authorUid, '', '', replyText);
+    await addReply(c.id, c.authorUid, myDisplayName, myInitials, replyText);
     setReplyText('');
     setReplyOpen(false);
+    setShowReplies(true);
   }
 
   return (
     <div className="sh-comment">
-      <Avatar uid={c.authorUid} initials={c.authorInitials} />
+      <Avatar uid={c.authorUid} initials={c.authorInitials || getInitials(c.authorName)} size="sm" />
       <div className="sh-comment-body">
         <div className="sh-comment-bubble">
-          <div className="sh-comment-author">{c.authorName}</div>
+          <div className="sh-comment-author">{c.authorName || 'Teacher'}</div>
           {editing ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginTop: 4 }}>
               <textarea
@@ -68,18 +107,23 @@ function CommentRow({ c, uid, postId, onReply, addReply, deleteComment, editComm
             <div className="sh-comment-text">{c.text}</div>
           )}
         </div>
+
         <div className="sh-comment-actions">
           <span className="sh-comment-time">{timeAgo(c.createdAt)}</span>
-          <button
-            className={`sh-comment-action-btn ${liked ? 'liked' : ''}`}
-            onClick={() => setLiked(l => !l)}
-            type="button"
-          >
-            {liked ? '❤️' : '♡'} {(c.likes || 0) + (liked ? 1 : 0) > 0 && ((c.likes || 0) + (liked ? 1 : 0))}
-          </button>
           <button className="sh-comment-action-btn" onClick={() => setReplyOpen(v => !v)} type="button">
             Reply
           </button>
+          {replyCount > 0 && (
+            <button
+              className="sh-comment-action-btn"
+              onClick={() => setShowReplies(v => !v)}
+              type="button"
+              style={{ display: 'flex', alignItems: 'center', gap: 3 }}
+            >
+              {showReplies ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </button>
+          )}
           {isOwn && (
             <>
               <button className="sh-comment-action-btn" onClick={() => { setEditing(true); setEditText(c.text); }} type="button">
@@ -91,19 +135,36 @@ function CommentRow({ c, uid, postId, onReply, addReply, deleteComment, editComm
             </>
           )}
         </div>
+
+        {/* Reply input */}
         {replyOpen && (
           <div className="sh-comment-input-row" style={{ marginLeft: 0, marginTop: 6 }}>
             <textarea
               className="sh-comment-input"
-              placeholder={`Reply to ${c.authorName}…`}
+              placeholder={`Reply to ${c.authorName || 'Teacher'}…`}
               value={replyText}
               onChange={e => setReplyText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitReply(); } }}
               rows={1}
               autoFocus
             />
             <button className="sh-comment-send-btn" onClick={submitReply} disabled={!replyText.trim()} type="button">
               <Send size={13} />
             </button>
+          </div>
+        )}
+
+        {/* Replies */}
+        {showReplies && replies.length > 0 && (
+          <div className="sh-replies">
+            {replies.map(r => (
+              <ReplyRow
+                key={r.id}
+                r={r}
+                uid={uid}
+                onDelete={() => {}}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -113,15 +174,18 @@ function CommentRow({ c, uid, postId, onReply, addReply, deleteComment, editComm
 
 export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, commentCount }) {
   const { comments, loading, addComment, addReply, deleteComment, editComment } = useComments(postId, uid, postAuthorUid);
-  const [expanded,  setExpanded]  = useState(false);
-  const [text, setText] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const [text,     setText]     = useState('');
+  const [sending,  setSending]  = useState(false);
 
   const visible = expanded ? comments : comments.slice(0, PREVIEW_COUNT);
 
   async function submitComment() {
-    if (!text.trim()) return;
+    if (!text.trim() || sending) return;
+    setSending(true);
     await addComment(displayName, initials, text);
     setText('');
+    setSending(false);
   }
 
   return (
@@ -143,14 +207,17 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
           c={c}
           uid={uid}
           postId={postId}
+          myDisplayName={displayName}
+          myInitials={initials}
           addReply={addReply}
           deleteComment={deleteComment}
           editComment={editComment}
         />
       ))}
 
+      {/* New comment input */}
       <div className="sh-comment-input-row">
-        <Avatar uid={uid} initials={initials} />
+        <Avatar uid={uid} initials={initials} size="sm" />
         <textarea
           className="sh-comment-input"
           placeholder="Add a comment…"
@@ -162,7 +229,7 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
         <button
           className="sh-comment-send-btn"
           onClick={submitComment}
-          disabled={!text.trim()}
+          disabled={!text.trim() || sending}
           type="button"
           aria-label="Send comment"
         >

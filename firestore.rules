@@ -147,13 +147,24 @@ service cloud.firestore {
     match /shares_posts/{postId} {
       allow read:   if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null &&
+      // Authors can update/delete freely; anyone auth can increment reactions + commentCount
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.authorUid ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['reactions', 'commentCount', 'updatedAt'])
+      );
+      allow delete: if request.auth != null &&
         request.auth.uid == resource.data.authorUid;
 
       match /comments/{commentId} {
         allow read:   if request.auth != null;
         allow create: if request.auth != null;
-        allow update, delete: if request.auth != null &&
+        // Authors edit/delete; anyone auth can increment replyCount
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.authorUid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyCount'])
+        );
+        allow delete: if request.auth != null &&
           request.auth.uid == resource.data.authorUid;
 
         match /replies/{replyId} {
