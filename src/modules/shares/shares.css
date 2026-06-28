@@ -739,9 +739,33 @@
 }
 
 .sh-profile-banner {
-  height: 120px;
+  height: 180px;
   background: linear-gradient(135deg, #0d2218 0%, #2d6a4f 50%, #22c55e 100%);
+  position: relative;
+  overflow: hidden;
 }
+
+.sh-cover-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 16px;
+  background: rgba(0,0,0,0.52);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s;
+}
+.sh-cover-btn:hover   { background: rgba(0,0,0,0.72); }
+.sh-cover-btn:disabled { opacity: 0.6; cursor: default; }
 
 .sh-profile-info { padding: 0 20px 20px; margin-top: -44px; }
 

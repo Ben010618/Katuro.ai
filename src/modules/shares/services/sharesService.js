@@ -72,6 +72,11 @@ export async function updateSharesProfile(uid, { displayName, school, gradeLevel
   });
 }
 
+/** Save a cover photo URL to the shares_profile document. */
+export async function setCoverPhoto(uid, url) {
+  await updateDoc(doc(db, 'shares_profiles', uid), { coverPhotoURL: url });
+}
+
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
 /** Create a new photo post. Returns the new document ID. */
