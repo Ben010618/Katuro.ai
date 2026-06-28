@@ -673,7 +673,8 @@
 }
 
 .sh-char-count { font-size: 12px; color: var(--sh-text-muted); font-family: var(--sh-mono); }
-.sh-char-count.over { color: var(--sh-red); }
+.sh-char-count.warn { color: var(--sh-gold); font-weight: 700; }
+.sh-char-count.over { color: var(--sh-red); font-weight: 700; }
 
 .sh-post-btn {
   background: linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%);

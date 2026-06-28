@@ -4,8 +4,13 @@ import { X, ImagePlus, Loader2, Plus } from 'lucide-react';
 import { usePost } from '../hooks/usePost';
 import { validateImageFile, createPreviewUrl } from '../services/storageService';
 
-const GRADE_LEVELS = ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
-const SUBJECTS     = ['English','Filipino','Mathematics','Science','Araling Panlipunan','MAPEH','TLE','Values Education','Edukasyon sa Pagpapakatao (EsP)','Other'];
+const GRADE_LEVELS  = ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
+const SUBJECTS      = ['English','Filipino','Mathematics','Science','Araling Panlipunan','MAPEH','TLE','Values Education','Edukasyon sa Pagpapakatao (EsP)','Other'];
+const WORD_LIMIT    = 250;
+
+function countWords(text) {
+  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+}
 
 export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGrade, subject: defaultSubject, onSuccess, onClose }) {
   const { uploading, progress, error: postError, publish } = usePost(uid);
@@ -57,8 +62,10 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
     }
   }
 
-  const canPost   = files.length > 0 && !uploading;
-  const charLeft  = 500 - caption.length;
+  const wordCount  = countWords(caption);
+  const wordsLeft  = WORD_LIMIT - wordCount;
+  const isOverLimit = wordCount > WORD_LIMIT;
+  const canPost    = files.length > 0 && !uploading && !isOverLimit;
 
   return (
     <div className="sh-composer-overlay" onClick={onClose}>
@@ -126,7 +133,16 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
               className="sh-composer-textarea"
               placeholder="Share what's happening in your classroom… #DLL #MELC"
               value={caption}
-              onChange={e => setCaption(e.target.value.slice(0, 500))}
+              onChange={e => {
+                const val = e.target.value;
+                // Block new words beyond the limit; still allow editing/deleting
+                if (countWords(val) <= WORD_LIMIT) {
+                  setCaption(val);
+                } else {
+                  // Allow the update only if they're removing characters (not adding words)
+                  if (val.length < caption.length) setCaption(val);
+                }
+              }}
               rows={3}
             />
           </div>
@@ -160,7 +176,10 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
           </div>
 
           <div className="sh-composer-footer">
-            <span className={`sh-char-count ${charLeft < 0 ? 'over' : ''}`}>{charLeft} characters left</span>
+            <span className={`sh-char-count ${isOverLimit ? 'over' : wordsLeft <= 20 ? 'warn' : ''}`}>
+              {wordCount} / {WORD_LIMIT} words{wordsLeft <= 20 && !isOverLimit ? ` (${wordsLeft} left)` : ''}
+              {isOverLimit ? ` — ${-wordsLeft} over limit` : ''}
+            </span>
             <button className="sh-post-btn" onClick={handlePost} disabled={!canPost} type="button">
               {uploading
                 ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> Posting {progress.uploaded}/{progress.total}…</>
