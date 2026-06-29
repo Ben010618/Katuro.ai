@@ -365,7 +365,9 @@ export async function downloadDLLDocx({ store, profile }) {
     sections: [{
       properties: {
         page: {
-          size: { width: PAGE_W, height: PAGE_H, orientation: PageOrientation.LANDSCAPE },
+          // docx.js v9 swaps width↔height when LANDSCAPE — pass portrait dims
+          // so it outputs w:w=16838 (landscape physical width), not w:w=11906.
+          size: { width: PAGE_H, height: PAGE_W, orientation: PageOrientation.LANDSCAPE },
           margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
         },
       },

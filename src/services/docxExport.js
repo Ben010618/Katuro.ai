@@ -222,7 +222,9 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
     sections: [{
       properties: {
         page: {
-          size:   { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE },
+          // docx.js v9 swaps width↔height when LANDSCAPE — pass portrait dims
+          // so it outputs w:w=16838 (landscape physical width), not w:w=11906.
+          size:   { width: 11906, height: 16838, orientation: PageOrientation.LANDSCAPE },
           margin: { top: 720, bottom: 720, left: 720, right: 720 },
         },
       },
