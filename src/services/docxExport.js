@@ -222,8 +222,8 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
     sections: [{
       properties: {
         page: {
-          size:   { orientation: PageOrientation.LANDSCAPE },
-          margin: { top: 720, bottom: 720, left: 1080, right: 1080 },
+          size:   { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE },
+          margin: { top: 720, bottom: 720, left: 720, right: 720 },
         },
       },
       children: [

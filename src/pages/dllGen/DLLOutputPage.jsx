@@ -345,15 +345,21 @@ export default function DLLOutputPage() {
           font-family: Arial, sans-serif;
         }
         @media print {
-          @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
-          body * { visibility: hidden; }
-          .dll-a4, .dll-a4 * { visibility: visible; }
+          @page { size: A4 landscape; margin: 1cm 1.5cm; }
+          .shell-sidebar, header, .no-print { display: none !important; }
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          main { padding: 0 !important; overflow: visible !important; }
           .dll-a4 {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            padding: 0; border: none; border-radius: 0; box-shadow: none;
-            overflow: visible;
-            display: flex; flex-direction: column;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
           }
+          .dll-a4 > div { overflow: visible !important; }
+          .dll-day-hdr { cursor: default !important; box-shadow: none !important; }
+          .dll-day-hdr svg { display: none !important; }
           .dll-table {
             min-width: 0 !important;
             width: 100% !important;
@@ -361,7 +367,6 @@ export default function DLLOutputPage() {
             table-layout: fixed !important;
           }
           .dll-table td { font-size: 9px !important; padding: 3px 5px !important; }
-          .no-print { display: none !important; }
           tr { page-break-inside: avoid; }
         }
       `}</style>
@@ -486,7 +491,7 @@ export default function DLLOutputPage() {
                 {DAY_NAMES.map((d, i) => (
                   <td
                     key={d}
-                    className="dll-day-hdr no-print"
+                    className="dll-day-hdr"
                     style={{ ...hdr, position: 'relative' }}
                     onClick={() => { setSelectedDay(i); setGenError(''); }}
                     title={`Generate COT 4As Lesson Plan for ${d}`}

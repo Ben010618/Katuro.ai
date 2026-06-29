@@ -358,10 +358,10 @@ export default function OutputPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
-          .no-print { display: none !important; }
-          .shell-sidebar { display: none !important; }
-          body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          @page { size: A4 landscape; margin: 1cm 1.5cm; }
+          .shell-sidebar, header, .no-print { display: none !important; }
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          main { padding: 0 !important; overflow: visible !important; }
           .ilaw-page-wrap {
             max-width: none !important;
             margin: 0 !important;
@@ -373,6 +373,7 @@ export default function OutputPage() {
             border-radius: 0 !important;
             overflow: visible !important;
           }
+          .ilaw-wrap > div { overflow: visible !important; }
           .ilaw-table {
             font-size: 9.5px !important;
             min-width: 0 !important;
