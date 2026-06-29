@@ -9,6 +9,7 @@ import { useLessonPlans } from '../hooks/useLessonPlans';
 import { generateOutline, expandSlides, toExportSlides } from '../services/presentationAI';
 import { exportToPptx } from '../services/pptxExport';
 import { deductTokens } from '../services/db';
+import { trackEvent } from '../services/usageTracker';
 import { usePresentationStore } from '../store/presentationStore';
 import { useToast } from '../context/ToastContext';
 import { useState } from 'react';
@@ -249,6 +250,7 @@ export default function PresentationBuilderPage() {
 
     try {
       await deductTokens(user.uid, 'presentation', 3);
+      trackEvent(user.uid, 'presentation_built', { subject: store.subject, grade: store.gradeLevel });
     } catch (err) {
       store.setError(err.message);
       return;

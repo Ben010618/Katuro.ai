@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateIlawSession } from '../../services/ai';
 import { saveIlawPlan, deductTokens } from '../../services/db';
+import { trackEvent } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 
 function formatDayShort(iso) {
@@ -159,6 +160,7 @@ export default function Step3() {
     await new Promise(r => setTimeout(r, 500));
 
     navigate('/lesson-gen/output/new');
+    trackEvent(user.uid, 'ilaw_generated', { subject: store.subject, grade: store.gradeLevel });
 
     if (user?.uid) {
       const planData = {

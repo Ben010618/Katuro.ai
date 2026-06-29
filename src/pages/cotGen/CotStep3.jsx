@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateCotLesson } from '../../services/cotAI';
 import { deductTokens, saveCotPlan } from '../../services/db';
+import { trackEvent } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const KRA_COLOR = {
@@ -106,6 +107,7 @@ export default function CotStep3() {
     await new Promise(r => setTimeout(r, 500));
 
     navigate('/cot-gen/output');
+    trackEvent(user.uid, 'cot_generated', { subject: store.subject, grade: store.grade });
 
     if (user?.uid) {
       const planData = {

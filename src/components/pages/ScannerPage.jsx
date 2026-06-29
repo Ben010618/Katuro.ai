@@ -9,6 +9,7 @@ import { useClasses } from "../../hooks/useClasses";
 import { useLearners } from "../../hooks/useLearners";
 import { useSheets } from "../../hooks/useSheets";
 import { useQuiz } from "../../hooks/useQuiz";
+import { trackEvent } from "../../services/usageTracker";
 
 const Q_OPTIONS = [10, 15, 20, 25, 30, 40, 50];
 
@@ -179,6 +180,7 @@ export default function ScannerPage({ user }) {
       perLearner,
     });
     setSheetId(id);
+    trackEvent(user.uid, 'bubble_sheet_generated');
     setShowPreview(true);
     setFlashId(id);
     setTimeout(() => setFlashId(null), 2500);

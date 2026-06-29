@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { deductTokens, saveDLLPlan } from '../../services/db';
+import { trackEvent } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
 import { useToast } from '../../context/ToastContext';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
@@ -293,6 +294,7 @@ export default function DLLStep2() {
       }
 
       navigate('/dll-gen/output');
+      trackEvent(user.uid, 'dll_generated', { subject: store.subject, grade: store.gradeLevel });
     } catch (err) {
       setGenError(err.message || 'Generation failed. Try again.');
     } finally {

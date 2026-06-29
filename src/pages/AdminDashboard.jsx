@@ -10,15 +10,19 @@ import {
   subscribeAdminNotifications, markAllNotificationsRead,
   adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
-import { collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import {
+  BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts';
 import ktLogo from '../assets/KT Favicon.png';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
-  ToggleLeft, ToggleRight, Bug, Gift,
+  ToggleLeft, ToggleRight, Bug, Gift, BarChart2,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -386,6 +390,216 @@ function UserDetailsModal({ teacher: t, onClose }) {
   );
 }
 
+// ── Analytics Section ─────────────────────────────────────────────────────────
+const FEATURE_LABELS = {
+  ilaw_generated:        'ILAW Lesson',
+  dll_generated:         'Daily Lesson Log',
+  cot_generated:         'COT Plan',
+  quiz_generated:        'Quiz',
+  presentation_built:    'Presentation',
+  gamification_used:     'Game Worksheet',
+  bubble_sheet_generated:'Bubble Sheet',
+  lesson_exported_docx:  'DOCX Export',
+  lesson_shared:         'Share Link',
+};
+
+const FEATURE_COLORS = [
+  '#2d6a4f','#40916c','#52b788','#74c69d',
+  '#e8a320','#6d28d9','#0284c7','#e05c5c','#16a34a',
+];
+
+function buildDailyData(events, days = 30) {
+  const counts = {};
+  const now = Date.now();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    counts[key] = 0;
+  }
+  events.forEach(e => {
+    const d = e.ts?.toDate ? e.ts.toDate() : new Date(e.ts);
+    const key = d.toISOString().slice(0, 10);
+    if (key in counts) counts[key]++;
+  });
+  return Object.entries(counts).map(([date, count]) => ({
+    date: date.slice(5), // MM-DD
+    count,
+  }));
+}
+
+function buildHourData(events) {
+  const counts = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}:00`, count: 0 }));
+  events.forEach(e => {
+    const d = e.ts?.toDate ? e.ts.toDate() : new Date(e.ts);
+    counts[d.getHours()].count++;
+  });
+  return counts;
+}
+
+function buildFeatureData(events) {
+  const counts = {};
+  events.forEach(e => {
+    const label = FEATURE_LABELS[e.feature] || e.feature;
+    counts[label] = (counts[label] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }));
+}
+
+function StatChip({ label, value, color }) {
+  return (
+    <div style={{
+      background: 'var(--kt-surface)', borderRadius: 10,
+      padding: '12px 18px', border: '1px solid var(--kt-border)',
+      display: 'flex', flexDirection: 'column', gap: 2,
+    }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</span>
+      <span style={{ fontSize: 24, fontWeight: 700, color: color || 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>{value}</span>
+    </div>
+  );
+}
+
+function AnalyticsSection() {
+  const [events,   setEvents]   = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [range,    setRange]    = useState(30);
+
+  async function load(days) {
+    setLoading(true);
+    try {
+      const cutoff = Timestamp.fromMillis(Date.now() - days * 86400000);
+      const snap = await getDocs(
+        query(
+          collection(db, 'usageEvents'),
+          where('ts', '>=', cutoff),
+          orderBy('ts', 'asc'),
+        )
+      );
+      setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (_) {}
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(range); }, [range]);
+
+  const featureData = buildFeatureData(events);
+  const dailyData   = buildDailyData(events, range);
+  const hourData    = buildHourData(events);
+
+  const totalEvents  = events.length;
+  const uniqueUsers  = new Set(events.map(e => e.uid)).size;
+  const topFeature   = featureData[0]?.name || '—';
+  const peakHour     = hourData.reduce((best, h) => h.count > best.count ? h : best, { hour: '—', count: 0 }).hour;
+
+  const chartHeight = 220;
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Usage Analytics</h2>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[7, 30, 90].map(d => (
+            <button
+              key={d}
+              onClick={() => setRange(d)}
+              style={{
+                ...btnSecondary,
+                fontSize: 11,
+                padding: '5px 12px',
+                background: range === d ? '#d8f3dc' : undefined,
+                color: range === d ? '#1a3d2b' : undefined,
+                fontWeight: range === d ? 700 : 500,
+              }}
+            >
+              {d}d
+            </button>
+          ))}
+          <button onClick={() => load(range)} style={{ ...btnSecondary, fontSize: 11, padding: '5px 10px' }} title="Refresh">
+            <RefreshCw size={12} />
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+          <Loader2 size={24} color="#2d6a4f" style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : events.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--kt-text-secondary)' }}>
+          <BarChart2 size={36} style={{ opacity: 0.25, marginBottom: 12 }} />
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No usage data yet</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, opacity: 0.7 }}>Events will appear here once teachers start using the app.</p>
+        </div>
+      ) : (
+        <>
+          {/* KPI chips */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+            <StatChip label="Total Events"   value={totalEvents}  color="#2d6a4f" />
+            <StatChip label="Unique Users"   value={uniqueUsers}  color="#0284c7" />
+            <StatChip label="Top Feature"    value={topFeature}   color="#e8a320" />
+            <StatChip label="Peak Hour"      value={peakHour}     color="#6d28d9" />
+          </div>
+
+          {/* Chart 1 — Most Used Features */}
+          <div style={{ ...card, marginBottom: 20 }}>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Most Used Features</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart data={featureData} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }}
+                  cursor={{ fill: 'rgba(45,106,79,0.05)' }}
+                />
+                <Bar dataKey="count" name="Uses" radius={[0, 4, 4, 0]}>
+                  {featureData.map((_, i) => (
+                    <Cell key={i} fill={FEATURE_COLORS[i % FEATURE_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Chart 2 — Daily Usage Trend */}
+          <div style={{ ...card, marginBottom: 20 }}>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Daily Usage — Last {range} Days</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <LineChart data={dailyData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#4a6357' }} tickLine={false} axisLine={false} interval={Math.floor(dailyData.length / 8)} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }}
+                />
+                <Line type="monotone" dataKey="count" name="Events" stroke="#2d6a4f" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#2d6a4f' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Chart 3 — Hour of Day Distribution */}
+          <div style={card}>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Activity by Hour of Day</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart data={hourData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#4a6357' }} tickLine={false} axisLine={false} interval={2} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }}
+                />
+                <Bar dataKey="count" name="Events" fill="#52b788" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // ── API Key section ───────────────────────────────────────────────────────────
 function ApiKeySection({ adminUid }) {
@@ -734,6 +948,7 @@ export default function AdminDashboard() {
   const { user, isAdmin } = useAuth();
   const { dark, toggle } = useTheme();
 
+  const [activeTab,      setActiveTab]       = useState('users');
   const [teachers,       setTeachers]       = useState([]);
   const [loadingList,    setLoadingList]     = useState(true);
   const [listErr,        setListErr]         = useState('');
@@ -1001,6 +1216,30 @@ export default function AdminDashboard() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
 
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--kt-card)', borderRadius: 12, padding: 4, border: '1px solid var(--kt-border)', width: 'fit-content' }}>
+          {[
+            { id: 'users',     label: 'Users',     Icon: Users },
+            { id: 'analytics', label: 'Analytics', Icon: BarChart2 },
+          ].map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: activeTab === id ? 700 : 500,
+                fontFamily: 'inherit',
+                background: activeTab === id ? '#2d6a4f' : 'transparent',
+                color: activeTab === id ? '#fff' : 'var(--kt-text-secondary)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
           {[
@@ -1020,6 +1259,14 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
+
+        {activeTab === 'analytics' && (
+          <div style={card}>
+            <AnalyticsSection />
+          </div>
+        )}
+
+        {activeTab === 'users' && <>
 
         {/* API Key settings */}
         <ApiKeySection adminUid={user?.uid} />
@@ -1189,6 +1436,7 @@ export default function AdminDashboard() {
         {/* Firestore rules reminder */}
         <div style={{ marginTop: 18, background: 'rgba(232,163,32,0.08)', border: '1px solid rgba(232,163,32,0.25)', borderRadius: 12, padding: '14px 18px' }}>
           <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#b47a10' }}>Firestore Security Rules</p>
+          {/* also allow admin to read usageEvents */}
           <p style={{ margin: 0, fontSize: 12, color: '#7a5a10', lineHeight: 1.65 }}>
             Add this to your Firestore rules so admins can read/write all teacher docs:
           </p>
@@ -1200,8 +1448,14 @@ match /teachers/{uid} {
   match /{col}/{docId} {
     allow read, write: if request.auth.uid == uid || isAdmin();
   }
+}
+match /usageEvents/{docId} {
+  allow create: if request.auth != null;
+  allow read: if isAdmin();
 }`}</pre>
         </div>
+
+        </> }
 
       </div>
 

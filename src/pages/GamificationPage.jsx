@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { deductTokens } from '../services/db';
+import { trackEvent } from '../services/usageTracker';
 import { downloadGameDocx } from '../services/gamificationDocx';
 import { useToast } from '../context/ToastContext';
 import {
@@ -493,6 +494,7 @@ export default function GamificationPage() {
     setGenerating(true); setGenError('');
     try {
       await deductTokens(user.uid, 'gamification', 0.5);
+      trackEvent(user.uid, 'gamification_used', { gameType, subject: lesson?.subject });
     } catch (err) {
       setGenError(err.message); setGenerating(false); return;
     }

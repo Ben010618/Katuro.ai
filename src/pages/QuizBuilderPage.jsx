@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { generateQuizAI } from '../services/ai';
 import { createQuiz, deductTokens } from '../services/db';
+import { trackEvent } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
 import {
   Search, ChevronRight, Loader2, RefreshCw,
@@ -126,6 +127,7 @@ export default function QuizBuilderPage() {
 
     try {
       await deductTokens(user.uid, 'quiz');
+      trackEvent(user.uid, 'quiz_generated', { subject: selectedLesson?.subject });
     } catch (err) {
       setGenError(err.message);
       setGenerating(false);

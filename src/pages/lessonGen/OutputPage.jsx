@@ -6,6 +6,7 @@ import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
 import { getTeacherProfile, deductTokens, createSharedPlan } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
+import { trackEvent } from '../../services/usageTracker';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
 import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2 } from 'lucide-react';
@@ -433,6 +434,7 @@ export default function OutputPage() {
                   teacherProfile,
                   user,
                 });
+                trackEvent(user?.uid, 'lesson_exported_docx', { subject: store.subject });
               } catch (err) {
                 addToast('DOCX export failed. Try again.', 'error');
                 console.error('DOCX error:', err);
@@ -472,6 +474,7 @@ export default function OutputPage() {
                 });
                 const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
                 await navigator.clipboard.writeText(url);
+                trackEvent(user?.uid, 'lesson_shared', { subject: store.subject });
                 addToast('Share link copied! Send via Viber or Messenger.', 'success');
               } catch {
                 addToast('Could not create share link. Try again.', 'error');
