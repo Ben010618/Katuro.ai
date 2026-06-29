@@ -14,6 +14,7 @@ import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFi
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
 import AIOutputGuard from '../../components/AIOutputGuard';
+import ShareModal from '../../components/ShareModal';
 
 const baseTd = {
   padding: '10px 12px',
@@ -165,6 +166,7 @@ export default function OutputPage() {
   const [teacherProfile,   setTeacherProfile]  = useState(null);
   const [docxLoading,      setDocxLoading]     = useState(false);
   const [sharing,          setSharing]          = useState(false);
+  const [shareUrl,         setShareUrl]         = useState(null);
   const [selectedSession,  setSelectedSession] = useState(null);
   const [pptLoading,       setPptLoading]      = useState(false);
   const [pptPhase,         setPptPhase]        = useState('');
@@ -458,6 +460,7 @@ export default function OutputPage() {
             disabled={sharing || N === 0}
             style={{ fontSize: 12, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 5, opacity: sharing ? 0.7 : 1 }}
             onClick={async () => {
+              if (shareUrl) { return; }
               setSharing(true);
               try {
                 const firstSession = sessions[0];
@@ -473,9 +476,8 @@ export default function OutputPage() {
                   preview,
                 });
                 const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
-                await navigator.clipboard.writeText(url);
                 trackEvent(user?.uid, 'lesson_shared', { subject: store.subject });
-                addToast('Share link copied! Send via Viber or Messenger.', 'success');
+                setShareUrl(url);
               } catch {
                 addToast('Could not create share link. Try again.', 'error');
               } finally {
@@ -866,6 +868,15 @@ export default function OutputPage() {
           </div>
         </div>
       </div>
+
+      {shareUrl && (
+        <ShareModal
+          url={shareUrl}
+          title={store.lessonName || store.content || 'Lesson Plan'}
+          subject={store.subject ? `kaTuro AI — ${store.subject} Lesson Plan` : 'kaTuro AI Lesson Plan'}
+          onClose={() => setShareUrl(null)}
+        />
+      )}
     </>
   );
 }

@@ -13,6 +13,7 @@ import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFi
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import { downloadGameDocx } from '../../services/gamificationDocx';
 import AIOutputGuard from '../../components/AIOutputGuard';
+import ShareModal from '../../components/ShareModal';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -89,6 +90,7 @@ export default function DLLOutputPage() {
 
   const [downloading,  setDownloading]  = useState(false);
   const [sharing,      setSharing]      = useState(false);
+  const [shareUrl,     setShareUrl]     = useState(null);
   const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
   const [pptLoading,   setPptLoading]   = useState(false);
   const [pptPhase,     setPptPhase]     = useState('');
@@ -392,6 +394,7 @@ export default function DLLOutputPage() {
         <button
           onClick={async () => {
             if (!store.objectives && !store.procedure) return;
+            if (shareUrl) return;
             setSharing(true);
             try {
               const firstDay = DAY_KEYS[0];
@@ -407,8 +410,7 @@ export default function DLLOutputPage() {
                 preview,
               });
               const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
-              await navigator.clipboard.writeText(url);
-              addToast('Share link copied! Send via Viber or Messenger.', 'success');
+              setShareUrl(url);
             } catch {
               addToast('Could not create share link. Try again.', 'error');
             } finally {
@@ -877,6 +879,15 @@ export default function DLLOutputPage() {
             )}
           </div>
         </div>
+      )}
+
+      {shareUrl && (
+        <ShareModal
+          url={shareUrl}
+          title={`${store.subject || 'DLL'} — ${store.gradeLevel || ''}`}
+          subject={store.subject ? `kaTuro AI — ${store.subject} Daily Lesson Log` : 'kaTuro AI Daily Lesson Log'}
+          onClose={() => setShareUrl(null)}
+        />
       )}
     </>
   );
