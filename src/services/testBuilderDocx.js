@@ -6,12 +6,17 @@
 // Matching Type uses a random shuffle for its Column B — buildTestPaperParts()
 // must be called ONCE and its result reused for both the Test Questions and
 // Answer Key downloads, or the two documents' letters would disagree.
+//
+// Every static string (directions, headers, answer-key labels) is bilingual —
+// Filipino, ESP, and Araling Panlipunan render in Tagalog, everything else in
+// English (deriveLanguage), so a Filipino-medium test doesn't end up with
+// Tagalog questions next to English "Directions:".
 
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle,
 } from 'docx';
-import { COGNITIVE_LEVELS, testTypeLabel } from '../config/testBuilderConfig';
+import { COGNITIVE_LEVELS, testTypeLabel, deriveLanguage } from '../config/testBuilderConfig';
 import { gShuffle } from '../components/GameWorksheet';
 
 // ── Layout constants — A4 portrait, narrow margins (12.7mm / 0.5 in) ─────────
@@ -44,34 +49,88 @@ const pageProps = {
   },
 };
 
+// ── Bilingual static text ─────────────────────────────────────────────────────
+const STRINGS = {
+  en: {
+    docLabels: { testQuestions: 'TEST QUESTIONS', answerKey: 'ANSWER KEY', tos: 'TABLE OF SPECIFICATIONS' },
+    nameLine: 'Name: _______________________________   Section: _______________   Date: _______________   Score: ______',
+    competency: 'Competency',
+    untitledCompetency: 'Untitled competency',
+    total: 'TOTAL',
+    totalColumn: 'Total',
+    totalItems: (n, c) => `Total items: ${n} of ${c}`,
+    formatLabel: {
+      'Multiple Choice': 'Multiple Choice', 'True or False': 'True or False', 'Matching Type': 'Matching Type',
+      'Identification': 'Identification', 'Enumeration': 'Enumeration', 'Essay': 'Essay',
+    },
+    directions: {
+      'Multiple Choice': 'Read each question carefully and write the letter of the correct answer.',
+      'True or False':   'Write TRUE if the statement is correct and FALSE if it is not.',
+      'Matching Type':   'Match Column A with Column B. Write the letter of the correct answer on the blank.',
+      'Identification':  'Identify what is being described or asked in each item.',
+      'Enumeration':      'List/enumerate what is being asked in each item.',
+      'Essay':            'Answer the following completely and clearly.',
+    },
+    columnA: 'Column A', columnB: 'Column B',
+    answerKeyLabel: 'Answer Key', suggestedAnswersLabel: 'Suggested Answers',
+    trueLabel: 'TRUE', falseLabel: 'FALSE',
+    partWord: 'PART',
+  },
+  fil: {
+    docLabels: { testQuestions: 'MGA TANONG SA PAGSUSULIT', answerKey: 'SUSI SA PAGWAWASTO', tos: 'TALAAN NG ESPESIPIKASYON' },
+    nameLine: 'Pangalan: _______________________________   Seksyon: _______________   Petsa: _______________   Marka: ______',
+    competency: 'Kasanayan',
+    untitledCompetency: 'Walang pamagat na kasanayan',
+    total: 'KABUUAN',
+    totalColumn: 'Kabuuan',
+    totalItems: (n, c) => `Kabuuang bilang ng aytem: ${n} sa ${c}`,
+    formatLabel: {
+      'Multiple Choice': 'Maramihang Pagpipilian', 'True or False': 'Tama o Mali', 'Matching Type': 'Pagtutugma',
+      'Identification': 'Pagtukoy', 'Enumeration': 'Paglilista', 'Essay': 'Sanaysay',
+    },
+    directions: {
+      'Multiple Choice': 'Basahing mabuti ang bawat tanong at isulat ang letra ng tamang sagot.',
+      'True or False':   'Isulat ang TAMA kung wasto ang pahayag at MALI kung hindi.',
+      'Matching Type':   'Itugma ang Hanay A sa Hanay B. Isulat ang letra ng tamang sagot sa patlang.',
+      'Identification':  'Tukuyin ang tinutukoy o tinatanong sa bawat bilang.',
+      'Enumeration':      'Ilista ang hinihingi sa bawat bilang.',
+      'Essay':            'Sagutin nang lubusan at malinaw ang sumusunod.',
+    },
+    columnA: 'Hanay A', columnB: 'Hanay B',
+    answerKeyLabel: 'Susi sa Pagwawasto', suggestedAnswersLabel: 'Mga Mungkahing Sagot',
+    trueLabel: 'TAMA', falseLabel: 'MALI',
+    partWord: 'BAHAGI',
+  },
+};
+
 // ── Page header ───────────────────────────────────────────────────────────────
-function makeHeader(profile, meta, docLabel) {
+function makeHeader(profile, meta, docLabelKey) {
+  const T = STRINGS[deriveLanguage(meta.subject)];
   const out = [];
   if (profile?.school) out.push(centered([run(profile.school, { bold: true, size: 26 })]));
   const nameDesig = [profile?.name, profile?.designation].filter(Boolean).join(' · ');
   if (nameDesig) out.push(centered([run(nameDesig, { size: 20 })]));
 
+  const docLabel = docLabelKey ? T.docLabels[docLabelKey] : '';
   const title = `${meta.subject || 'Test'} — ${meta.testTypeLabel}`.toUpperCase() + (docLabel ? ` (${docLabel})` : '');
   out.push(centered([run(title, { bold: true, size: 28 })], { spacing: { before: 80, after: 40 } }));
 
   const sub = [meta.gradeLevel, meta.terms].filter(Boolean).join(' | ');
   if (sub) out.push(centered([run(sub, { size: 20 })], { spacing: { after: 80 } }));
 
-  if (docLabel === 'TEST QUESTIONS' || !docLabel) {
-    out.push(para(
-      [run('Name: _______________________________   Section: _______________   Date: _______________   Score: ______', { size: 20 })],
-      { spacing: { before: 120, after: 120 } },
-    ));
+  if (docLabelKey === 'testQuestions' || !docLabelKey) {
+    out.push(para([run(T.nameLine, { size: 20 })], { spacing: { before: 120, after: 120 } }));
   }
   out.push(para([], { spacing: { before: 60, after: 220 }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '000000' } } }));
   return out;
 }
 
 // ── TOS table (mirrors StepTOS.jsx's shape) ───────────────────────────────────
-function tosTable(tos, itemCeiling) {
+function tosTable(tos, itemCeiling, lang) {
+  const T = STRINGS[lang];
   const labelW = Math.floor(PAGE_W * 0.4);
   const cellW  = Math.floor((PAGE_W - labelW) / 7);
-  const headers = ['Competency', ...COGNITIVE_LEVELS.map((l) => l.short), 'Total'];
+  const headers = [T.competency, ...COGNITIVE_LEVELS.map((l) => l.short), T.totalColumn];
 
   function headerCell(text, i) {
     return new TableCell({
@@ -93,33 +152,25 @@ function tosTable(tos, itemCeiling) {
 
   const rows = [new TableRow({ children: headers.map((h, i) => headerCell(h, i)) })];
   tos.rows.forEach((r) => {
-    rows.push(new TableRow({ children: [r.label || 'Untitled competency', ...r.cells, r.total].map((v, i) => dataCell(v, i)) }));
+    rows.push(new TableRow({ children: [r.label || T.untitledCompetency, ...r.cells, r.total].map((v, i) => dataCell(v, i)) }));
   });
   const grandTotal = tos.columnTotals.reduce((a, b) => a + b, 0);
-  rows.push(new TableRow({ children: ['TOTAL', ...tos.columnTotals, grandTotal].map((v, i) => dataCell(v, i, true)) }));
+  rows.push(new TableRow({ children: [T.total, ...tos.columnTotals, grandTotal].map((v, i) => dataCell(v, i, true)) }));
 
   return [
     new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows }),
-    para([run(`Total items: ${grandTotal} of ${itemCeiling}`, { italic: true, size: 18 })], { spacing: { before: 60, after: 220 } }),
+    para([run(T.totalItems(grandTotal, itemCeiling), { italic: true, size: 18 })], { spacing: { before: 60, after: 220 } }),
   ];
 }
 
-// ── Per-format directions ─────────────────────────────────────────────────────
-const DIRECTIONS = {
-  'Multiple Choice': 'Read each question carefully and write the letter of the correct answer.',
-  'True or False':   'Write TRUE if the statement is correct and FALSE if it is not.',
-  'Matching Type':   'Match Column A with Column B. Write the letter of the correct answer on the blank.',
-  'Identification':  'Identify what is being described or asked in each item.',
-  'Enumeration':      'List/enumerate what is being asked in each item.',
-  'Essay':            'Answer the following completely and clearly.',
-};
 const FORMAT_ORDER = ['Multiple Choice', 'True or False', 'Matching Type', 'Identification', 'Enumeration', 'Essay'];
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
-function partHeading(romanNum, format) {
+function partHeading(romanNum, format, lang) {
+  const T = STRINGS[lang];
   return [
-    para([run(`PART ${romanNum}. ${format.toUpperCase()}`, { bold: true, size: 24 })], { spacing: { before: 220, after: 40 } }),
-    para([run(`Directions: ${DIRECTIONS[format] || ''}`, { italic: true, size: 20 })], { spacing: { after: 140 } }),
+    para([run(`${T.partWord} ${romanNum}. ${(T.formatLabel[format] || format).toUpperCase()}`, { bold: true, size: 24 })], { spacing: { before: 220, after: 40 } }),
+    para([run(T.directions[format] || '', { italic: true, size: 20 })], { spacing: { after: 140 } }),
   ];
 }
 
@@ -148,15 +199,16 @@ function freeTextBlock(items, startNum, format) {
 
 // Combines every "Matching Type" item across the whole test into one block —
 // Column A keeps the running item numbers, Column B is shuffled ONCE here.
-function matchingBlock(items, startNum) {
+function matchingBlock(items, startNum, lang) {
+  const T = STRINGS[lang];
   const half = Math.floor(PAGE_W / 2);
   const tagged = items.map((it, i) => ({ ...it, __idx: i }));
   const shuffled = gShuffle(tagged);
 
   const rows = [
     new TableRow({ children: [
-      new TableCell({ children: [para([run('Column A', { bold: true, size: 22 })])], width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BMed, right: BThin } }),
-      new TableCell({ children: [para([run('Column B', { bold: true, size: 22 })])], width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BMed, left: BThin } }),
+      new TableCell({ children: [para([run(T.columnA, { bold: true, size: 22 })])], width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BMed, right: BThin } }),
+      new TableCell({ children: [para([run(T.columnB, { bold: true, size: 22 })])], width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BMed, left: BThin } }),
     ] }),
     ...tagged.map((it, i) => new TableRow({ children: [
       new TableCell({
@@ -204,8 +256,11 @@ function answerGrid(answers) {
  * blocks. Call this ONCE per generation and reuse the result for both
  * downloads — matchingBlock() shuffles randomly, so calling this twice would
  * make the Answer Key's letters disagree with the Test Questions document.
+ * `lang` is 'en' | 'fil' — derive it once via deriveLanguage(subject) and
+ * pass it in, so the static test-paper text matches the AI-generated content.
  */
-export function buildTestPaperParts(items) {
+export function buildTestPaperParts(items, lang = 'en') {
+  const T = STRINGS[lang];
   const byFormat = FORMAT_ORDER
     .map((fmt) => ({ format: fmt, items: items.filter((it) => it.format === fmt) }))
     .filter((g) => g.items.length > 0);
@@ -216,7 +271,7 @@ export function buildTestPaperParts(items) {
   let num = 1;
 
   byFormat.forEach((group, gi) => {
-    testBlocks.push(...partHeading(ROMAN[gi] || String(gi + 1), group.format));
+    testBlocks.push(...partHeading(ROMAN[gi] || String(gi + 1), group.format, lang));
 
     if (group.format === 'Multiple Choice') {
       testBlocks.push(...mcBlock(group.items, num));
@@ -224,10 +279,13 @@ export function buildTestPaperParts(items) {
       num += group.items.length;
     } else if (group.format === 'True or False') {
       testBlocks.push(...tfBlock(group.items, num));
-      group.items.forEach((it, i) => shortAnswers.push(`${num + i}. ${String(it.answer).toUpperCase()}`));
+      group.items.forEach((it, i) => {
+        const isTrue = String(it.answer).toUpperCase() === 'TRUE';
+        shortAnswers.push(`${num + i}. ${isTrue ? T.trueLabel : T.falseLabel}`);
+      });
       num += group.items.length;
     } else if (group.format === 'Matching Type') {
-      const { block, answers } = matchingBlock(group.items, num);
+      const { block, answers } = matchingBlock(group.items, num, lang);
       testBlocks.push(...block);
       shortAnswers.push(...answers);
       num += group.items.length;
@@ -240,11 +298,11 @@ export function buildTestPaperParts(items) {
 
   const keyBlocks = [];
   if (shortAnswers.length) {
-    keyBlocks.push(para([run('Answer Key', { bold: true, size: 22 })], { spacing: { after: 120 } }));
+    keyBlocks.push(para([run(T.answerKeyLabel, { bold: true, size: 22 })], { spacing: { after: 120 } }));
     keyBlocks.push(answerGrid(shortAnswers));
   }
   if (longAnswers.length) {
-    keyBlocks.push(para([run('Suggested Answers', { bold: true, size: 22 })], { spacing: { before: 220, after: 100 } }));
+    keyBlocks.push(para([run(T.suggestedAnswersLabel, { bold: true, size: 22 })], { spacing: { before: 220, after: 100 } }));
     longAnswers.forEach((a) => keyBlocks.push(para([run(a, { size: 20 })], { spacing: { after: 80 } })));
   }
 
@@ -271,7 +329,7 @@ function slugify(meta) {
 export async function downloadTestQuestionsDocx({ testBlocks, meta, profile }) {
   const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
   const doc = new Document({
-    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'TEST QUESTIONS'), ...testBlocks] }],
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'testQuestions'), ...testBlocks] }],
   });
   await download(doc, `${slugify(meta)}_TestQuestions.docx`);
 }
@@ -279,15 +337,16 @@ export async function downloadTestQuestionsDocx({ testBlocks, meta, profile }) {
 export async function downloadAnswerKeyDocx({ keyBlocks, meta, profile }) {
   const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
   const doc = new Document({
-    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'ANSWER KEY'), ...keyBlocks] }],
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'answerKey'), ...keyBlocks] }],
   });
   await download(doc, `${slugify(meta)}_AnswerKey.docx`);
 }
 
 export async function downloadTosDocx({ tos, itemCeiling, meta, profile }) {
   const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
+  const lang = deriveLanguage(meta.subject);
   const doc = new Document({
-    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'TABLE OF SPECIFICATIONS'), ...tosTable(tos, itemCeiling)] }],
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'tos'), ...tosTable(tos, itemCeiling, lang)] }],
   });
   await download(doc, `${slugify(meta)}_TOS.docx`);
 }

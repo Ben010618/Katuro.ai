@@ -22,6 +22,15 @@ export function testTypeLabel(testType) {
   return TEST_TYPES.find((t) => t.value === testType)?.label || testType || '';
 }
 
+// Subjects whose medium of instruction is Filipino (Tagalog) — drives both the
+// AI item-generation language and the static document text (directions,
+// headers, answer-key labels). Everything else defaults to English.
+export const FILIPINO_MEDIUM_SUBJECTS = new Set(['Filipino', 'ESP', 'Araling Panlipunan']);
+
+export function deriveLanguage(subject) {
+  return FILIPINO_MEDIUM_SUBJECTS.has(subject) ? 'fil' : 'en';
+}
+
 // Item formats the AI can draw from when generating the actual test paper.
 // 'Matching Type' and 'True or False' spellings match the existing worksheet
 // generator's labels (src/services/gamificationDocx.js) for consistency.

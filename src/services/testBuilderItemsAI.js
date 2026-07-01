@@ -7,8 +7,20 @@
 
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 import { buildItemSlots } from '../utils/testBuilderCalc';
+import { deriveLanguage } from '../config/testBuilderConfig';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Filipino, ESP, and Araling Panlipunan are taught in Filipino — every other
+// subject defaults to English. Structural/protocol values (TRUE/FALSE, MC
+// letters A-D) stay literal regardless of language so parsing stays reliable;
+// only natural-language content (questions, choices, definitions, free-text
+// answers) follows this rule.
+function langInstruction(subject) {
+  return deriveLanguage(subject) === 'fil'
+    ? 'LANGUAGE: Write ALL natural-language content — questions, choices, matchDefinition text, and free-text answers — in Filipino (Tagalog). Filipino is the medium of instruction for this subject. (Exception: for True or False items, still return "answer" as the literal word "TRUE" or "FALSE"; for Multiple Choice, still return "answer" as the literal letter A/B/C/D — these are structural values, not sentence content.)'
+    : 'LANGUAGE: Write ALL content in English. English is the medium of instruction for this subject.';
+}
 
 const LEVEL_LABELS = {
   remembering: 'Remembering', understanding: 'Understanding', applying: 'Applying',
@@ -67,6 +79,7 @@ export async function generateItemsForCompetency({ competencyText, cells, subjec
 Subject: ${subject || ''}
 Grade Level: ${gradeLevel || ''}
 Competency (MELC): ${competencyText}
+${langInstruction(subject)}
 
 Ground every item strictly in this Most Essential Learning Competency (MELC) — do not test anything outside it. Match the depth, phrasing, and rigor of DepEd's own instructional materials for this competency:
 - DepEd PIVOT 4A learning modules (their Explore/Firm Up/Deepen/Transfer question style and how they scaffold from simple recall toward application)

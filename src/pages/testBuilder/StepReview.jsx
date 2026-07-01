@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { getTeacherProfile, deductTokens } from '../../services/db';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
-import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor, KEY_STAGE_LABELS } from '../../config/testBuilderConfig';
+import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
@@ -80,7 +80,7 @@ export default function StepReview() {
         cursor = nextIndex;
       }
 
-      setGeneratedParts(buildTestPaperParts(allItems));
+      setGeneratedParts(buildTestPaperParts(allItems, deriveLanguage(store.subject)));
       addToast(`Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`, 'success');
     } catch (err) {
       setGenError(err.message || 'Item generation failed. Please try again.');
