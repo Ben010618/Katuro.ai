@@ -18,7 +18,7 @@ const cardStyle = (active) => ({
 
 export default function ActionResearchPhase2() {
   const { docId }  = useParams();
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,          setDocData]          = useState(null);
@@ -135,7 +135,7 @@ export default function ActionResearchPhase2() {
           }}>
             {generating
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating…</>
-              : <><Sparkles size={13} /> {questions.length ? 'Regenerate' : 'Generate'} research questions (5 tokens)</>}
+              : <><Sparkles size={13} /> {questions.length ? 'Regenerate' : 'Generate'} research questions{!freeMode && ' (5 tokens)'}</>}
           </button>
 
           {questions.length > 0 && (

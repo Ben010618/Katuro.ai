@@ -299,7 +299,7 @@ function InstrumentDisplay({ type, data }) {
 
 export default function ActionResearchPhase5() {
   const { docId }  = useParams();
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,             setDocData]             = useState(null);
@@ -449,7 +449,7 @@ export default function ActionResearchPhase5() {
           }}>
             {generating
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating methodology…</>
-              : <><Sparkles size={13} /> {dc ? 'Regenerate' : 'Generate'} data collection plan (5 tokens)</>}
+              : <><Sparkles size={13} /> {dc ? 'Regenerate' : 'Generate'} data collection plan{!freeMode && ' (5 tokens)'}</>}
           </button>
         </div>
 
@@ -612,7 +612,7 @@ export default function ActionResearchPhase5() {
           >
             {generatingInstrument
               ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }} /> Generating instrument…</>
-              : <><Sparkles size={13} /> {instrument ? 'Regenerate' : 'Generate'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label} (5 tokens)</>}
+              : <><Sparkles size={13} /> {instrument ? 'Regenerate' : 'Generate'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}{!freeMode && ' (5 tokens)'}</>}
           </button>
           {generatingInstrument && (
             <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>Building your complete instrument — this takes about 10–20 seconds…</p>

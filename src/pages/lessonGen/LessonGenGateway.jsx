@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
+import { useAuth } from '../../hooks/useAuth';
 import { Sparkles, BookOpen, CalendarDays, ArrowRight, RotateCcw, ShieldCheck } from 'lucide-react';
 
 // ── Colors extracted from the Filipino education mural ─────────────────────
@@ -14,6 +15,7 @@ const COT_COLOR   = '#d97706';   // Sunburst Amber-Gold
 export default function LessonGenGateway() {
   const navigate = useNavigate();
   const store    = useLessonGenStore();
+  const { freeMode } = useAuth();
 
   const hasDraft = !!(store.subject || store.selectedDays?.length > 0);
 
@@ -93,7 +95,7 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: ILAW_COLOR }}>3 tokens per generation</span>
+            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: ILAW_COLOR }}>3 tokens per generation</span>}
             <ArrowRight size={14} color={ILAW_COLOR} />
           </div>
         </button>
@@ -135,7 +137,7 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: DLL_COLOR }}>3 tokens per generation</span>
+            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: DLL_COLOR }}>3 tokens per generation</span>}
             <ArrowRight size={14} color={DLL_COLOR} />
           </div>
         </button>
@@ -180,7 +182,7 @@ export default function LessonGenGateway() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: COT_COLOR }}>3 tokens per generation</span>
+            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: COT_COLOR }}>3 tokens per generation</span>}
             <ArrowRight size={14} color={COT_COLOR} />
           </div>
         </button>

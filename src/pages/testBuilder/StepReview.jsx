@@ -21,7 +21,7 @@ const GENERATE_ITEMS_COST = 5;
 
 export default function StepReview() {
   const store = useTestBuilderStore();
-  const { user } = useAuth();
+  const { user, freeMode } = useAuth();
   const { addToast } = useToast();
 
   const keyStage = deriveKeyStage(store.gradeLevel);
@@ -59,7 +59,7 @@ export default function StepReview() {
     setGenError('');
     setGeneratedParts(null);
     try {
-      setGenPhase('Checking tokens…');
+      setGenPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
       await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST);
 
       const allItems = [];
@@ -81,7 +81,10 @@ export default function StepReview() {
       }
 
       setGeneratedParts(buildTestPaperParts(allItems, deriveLanguage(store.subject)));
-      addToast(`Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`, 'success');
+      addToast(
+        freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
+        'success'
+      );
     } catch (err) {
       setGenError(err.message || 'Item generation failed. Please try again.');
     } finally {
@@ -232,7 +235,7 @@ export default function StepReview() {
             <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Items with AI</p>
             <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
               {store.status === 'tos_generated'
-                ? `AI writes items for exactly the counts in your TOS, using only your selected Question Format(s). (${GENERATE_ITEMS_COST} tokens)`
+                ? `AI writes items for exactly the counts in your TOS, using only your selected Question Format(s).${freeMode ? '' : ` (${GENERATE_ITEMS_COST} tokens)`}`
                 : 'Confirm and Save first to unlock item generation.'}
             </p>
           </div>

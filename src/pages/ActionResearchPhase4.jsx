@@ -14,7 +14,7 @@ const iconBox = { width:26, height:26, borderRadius:7, background:'#d8f3dc', dis
 
 export default function ActionResearchPhase4() {
   const { docId }  = useParams();
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,     setDocData]     = useState(null);
@@ -115,7 +115,7 @@ export default function ActionResearchPhase4() {
           }}>
             {generating
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating action plan…</>
-              : <><Sparkles size={13} /> {actionPlan ? 'Regenerate' : 'Generate'} action plan (5 tokens)</>}
+              : <><Sparkles size={13} /> {actionPlan ? 'Regenerate' : 'Generate'} action plan{!freeMode && ' (5 tokens)'}</>}
           </button>
         </div>
 

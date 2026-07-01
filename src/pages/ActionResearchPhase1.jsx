@@ -76,7 +76,7 @@ const blur  = e => { e.target.style.borderColor='rgba(45,106,79,0.2)'; e.target.
 /* ── Component ───────────────────────────────────────────────────────────── */
 
 export default function ActionResearchPhase1() {
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
   const { docId: urlDocId } = useParams(); // present when resuming an existing project
 
@@ -376,7 +376,7 @@ export default function ActionResearchPhase1() {
               disabled={titlesLoading}
               style={{ display:'flex', alignItems:'center', gap:7, background:titlesLoading?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff', border:'none', borderRadius:8, padding:'10px 18px', fontSize:13, fontWeight:600, cursor:titlesLoading?'not-allowed':'pointer', fontFamily:'inherit', marginBottom: researchTitles.length?16:0 }}
             >
-              {titlesLoading ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating titles…</> : <><Sparkles size={13} /> Generate research titles (5 tokens)</>}
+              {titlesLoading ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating titles…</> : <><Sparkles size={13} /> Generate research titles{!freeMode && ' (5 tokens)'}</>}
             </button>
           )}
 

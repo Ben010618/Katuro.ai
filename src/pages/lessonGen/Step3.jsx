@@ -47,7 +47,7 @@ export default function Step3() {
   const navigate     = useNavigate();
   const store        = useLessonGenStore();
   const { addToast } = useToast();
-  const { user }     = useAuth();
+  const { user, freeMode } = useAuth();
 
   const [decl,       setDecl]       = useState(store.declarationOfAIUse);
   const [generating, setGenerating] = useState(false);
@@ -72,7 +72,7 @@ export default function Step3() {
     setGenerating(true);
     setGenError(null);
     setProgress(5);
-    setStatusMsg('Checking tokens…');
+    setStatusMsg(freeMode ? 'Preparing…' : 'Checking tokens…');
     try {
       await deductTokens(user.uid, 'lesson');
     } catch (err) {

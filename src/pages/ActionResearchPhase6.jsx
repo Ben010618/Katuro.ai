@@ -20,7 +20,7 @@ const fieldStyle = {
 
 export default function ActionResearchPhase6() {
   const { docId }  = useParams();
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,     setDocData]     = useState(null);
@@ -156,7 +156,7 @@ export default function ActionResearchPhase6() {
           >
             {generating
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Interpreting findings…</>
-              : <><Sparkles size={13} /> {findings ? 'Regenerate' : 'Generate'} findings & report (30 tokens)</>}
+              : <><Sparkles size={13} /> {findings ? 'Regenerate' : 'Generate'} findings & report{!freeMode && ' (30 tokens)'}</>}
           </button>
           {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>Writing your complete Chapter V — this may take 20–40 seconds…</p>}
         </div>

@@ -20,7 +20,7 @@ export default function CotStep3() {
   const navigate     = useNavigate();
   const store        = useCotStore();
   const { addToast } = useToast();
-  const { user }     = useAuth();
+  const { user, freeMode } = useAuth();
 
   const [generating, setGenerating] = useState(false);
   const [progress,   setProgress]   = useState(0);
@@ -38,7 +38,7 @@ export default function CotStep3() {
     setGenerating(true);
     setGenError(null);
     setProgress(5);
-    setStatusMsg('Checking tokens…');
+    setStatusMsg(freeMode ? 'Preparing…' : 'Checking tokens…');
 
     try {
       await deductTokens(user.uid, 'cot-lesson');
@@ -257,7 +257,7 @@ export default function CotStep3() {
               Generate Now <ArrowRight size={18} />
             </button>
             <p style={{ margin: '12px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Costs 3 tokens · Generation takes 15–30 seconds
+              {freeMode ? 'Generation takes 15–30 seconds' : 'Costs 3 tokens · Generation takes 15–30 seconds'}
             </p>
           </>
         ) : (

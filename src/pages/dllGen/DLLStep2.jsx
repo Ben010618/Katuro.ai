@@ -230,7 +230,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
 export default function DLLStep2() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
-  const { user, tokenBalance } = useAuth();
+  const { user, tokenBalance, freeMode } = useAuth();
   const { addToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
@@ -245,7 +245,7 @@ export default function DLLStep2() {
     store.contentStandards.trim() &&
     store.performanceStandards.trim() &&
     melcFilled && contentFilled &&
-    tokenBalance >= 3;
+    (freeMode || tokenBalance >= 3);
 
   async function handleGenerate() {
     if (!canGenerate || generating) return;
@@ -369,7 +369,7 @@ export default function DLLStep2() {
       />
 
       {/* Token warning */}
-      {tokenBalance < 3 && (
+      {!freeMode && tokenBalance < 3 && (
         <div style={{
           background: '#fff7ed', border: '1px solid #fed7aa',
           borderRadius: 10, padding: '12px 16px', marginBottom: 16,
@@ -418,7 +418,7 @@ export default function DLLStep2() {
           ) : (
             <>
               <Sparkles size={15} />
-              Generate Daily Lesson Log (3 tokens)
+              Generate Daily Lesson Log{!freeMode && ' (3 tokens)'}
               <ArrowRight size={15} />
             </>
           )}

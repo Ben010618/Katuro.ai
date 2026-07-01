@@ -85,7 +85,7 @@ export default function DLLOutputPage() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
   const cotStore     = useCotStore();
-  const { profile, user } = useAuth();
+  const { profile, user, freeMode } = useAuth();
   const { addToast } = useToast();
 
   const [downloading,  setDownloading]  = useState(false);
@@ -182,7 +182,7 @@ export default function DLLOutputPage() {
     setPptLoading(true);
     setGenError('');
     try {
-      setPptPhase('Checking tokens…');
+      setPptPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
       await deductTokens(user.uid, 'presentation_gen', 3);
 
       setPptPhase('Generating slide outline…');
@@ -215,7 +215,7 @@ export default function DLLOutputPage() {
         includeNotes: true,
       });
 
-      addToast('Presentation downloaded! (3 tokens used)', 'success');
+      addToast(freeMode ? 'Presentation downloaded!' : 'Presentation downloaded! (3 tokens used)', 'success');
       setSelectedDay(null);
     } catch (err) {
       if (err.message?.includes('Insufficient tokens') || err.message?.includes('tokens')) {
@@ -265,7 +265,7 @@ export default function DLLOutputPage() {
       }
       setGameResult(data);
       setGameModal('result');
-      addToast('Game generated! (0.5 tokens used)', 'success');
+      addToast(freeMode ? 'Game generated!' : 'Game generated! (0.5 tokens used)', 'success');
     } catch (err) {
       addToast(err.message || 'Game generation failed.', 'error');
       setGameModal('pick');
@@ -760,7 +760,7 @@ export default function DLLOutputPage() {
                 <Projector size={16} />
                 {pptLoading ? pptPhase || 'Generating…' : 'Generate Presentation'}
               </button>
-              {!pptLoading && (
+              {!pptLoading && !freeMode && (
                 <span style={{
                   position: 'absolute', top: -9, right: 14,
                   background: '#2d6a4f', color: '#fff',
@@ -787,7 +787,7 @@ export default function DLLOutputPage() {
             >
               <Gamepad2 size={16} />
               Generate Games
-              <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 7px', fontWeight: 800 }}>0.5 token</span>
+              {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 7px', fontWeight: 800 }}>0.5 token</span>}
             </button>
           </div>
         </div>
@@ -819,7 +819,7 @@ export default function DLLOutputPage() {
 
             {gameModal === 'pick' && (
               <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate. Costs 0.5 token.</p>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate.{!freeMode && ' Costs 0.5 token.'}</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
                   {GAME_TYPES.map(gt => (
                     <button
@@ -845,7 +845,7 @@ export default function DLLOutputPage() {
                   disabled={gameLoading}
                   style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
-                  <Gamepad2 size={15} /> Generate Game <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                  <Gamepad2 size={15} /> Generate Game {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
                 </button>
               </div>
             )}

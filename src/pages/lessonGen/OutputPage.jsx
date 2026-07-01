@@ -154,7 +154,7 @@ function InfoRow({ label, value }) {
 export default function OutputPage() {
   const navigate      = useNavigate();
   const { addToast }  = useToast();
-  const { user }      = useAuth();
+  const { user, freeMode } = useAuth();
   const store         = useLessonGenStore();
   const cotStore      = useCotStore();
 
@@ -213,7 +213,7 @@ export default function OutputPage() {
 
     setPptLoading(true);
     try {
-      setPptPhase('Checking tokens…');
+      setPptPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
       await deductTokens(user.uid, 'presentation_gen', 3);
 
       setPptPhase('Generating slide outline…');
@@ -246,7 +246,7 @@ export default function OutputPage() {
         includeNotes: true,
       });
 
-      addToast('Presentation downloaded! (3 tokens used)', 'success');
+      addToast(freeMode ? 'Presentation downloaded!' : 'Presentation downloaded! (3 tokens used)', 'success');
       setSelectedSession(null);
     } catch (err) {
       addToast(err.message || 'Presentation generation failed.', 'error');
@@ -294,7 +294,7 @@ export default function OutputPage() {
       }
       setGameResult(data);
       setGameModal('result');
-      addToast('Game generated! (0.5 tokens used)', 'success');
+      addToast(freeMode ? 'Game generated!' : 'Game generated! (0.5 tokens used)', 'success');
     } catch (err) {
       addToast(err.message || 'Game generation failed.', 'error');
       setGameModal('pick');
@@ -701,7 +701,7 @@ export default function OutputPage() {
                 >
                   {pptLoading
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Generating…'}</>
-                    : <><Presentation size={14} /> Generate Presentation <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>3 tokens</span></>
+                    : <><Presentation size={14} /> Generate Presentation {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>3 tokens</span>}</>
                   }
                 </button>
 
@@ -720,7 +720,7 @@ export default function OutputPage() {
                   onMouseEnter={e => e.currentTarget.style.background = '#1e40af'}
                   onMouseLeave={e => e.currentTarget.style.background = '#1d4ed8'}
                 >
-                  <Gamepad2 size={14} /> Generate Games <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                  <Gamepad2 size={14} /> Generate Games {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
                 </button>
               </div>
             </div>
@@ -759,7 +759,7 @@ export default function OutputPage() {
               {/* Pick step */}
               {gameModal === 'pick' && (
                 <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                  <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate. Costs 0.5 token.</p>
+                  <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate.{!freeMode && ' Costs 0.5 token.'}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
                     {GAME_TYPES.map(gt => (
                       <button
@@ -789,7 +789,7 @@ export default function OutputPage() {
                     disabled={gameLoading}
                     style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                   >
-                    <Gamepad2 size={15} /> Generate Game <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                    <Gamepad2 size={15} /> Generate Game {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
                   </button>
                 </div>
               )}

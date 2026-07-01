@@ -19,7 +19,7 @@ const SECTIONS = [
 
 export default function ActionResearchPhase3() {
   const { docId }  = useParams();
-  const { user }   = useAuth();
+  const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,     setDocData]     = useState(null);
@@ -132,7 +132,7 @@ export default function ActionResearchPhase3() {
           }}>
             {generating
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating literature review…</>
-              : <><Sparkles size={13} /> {litReview ? 'Regenerate' : 'Generate'} literature review (5 tokens)</>}
+              : <><Sparkles size={13} /> {litReview ? 'Regenerate' : 'Generate'} literature review{!freeMode && ' (5 tokens)'}</>}
           </button>
           {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>This may take 15–30 seconds. Researching global, national, local, and classroom literature…</p>}
         </div>
