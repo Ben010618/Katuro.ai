@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Images, Compass, PlusSquare, Bell, User, ArrowLeft,
+  Images, Compass, PlusSquare, Bell, User, Home,
 } from 'lucide-react';
 // Images kept for mobile feed nav; Compass used for renamed "Explore" (main feed)
 import { useAuth } from '../../hooks/useAuth';
@@ -67,19 +67,14 @@ export default function SharesModule() {
         <nav className="sh-nav">
           <NavItem to="/shares"              icon={Compass} label="Explore" />
           <NavItem to="/shares/notifications" icon={Bell}   label="Notifications" badge={unreadCount} />
-          <NavItem to={`/shares/profile/${uid}`} icon={User} label="My Profile" />
+          <button className="sh-nav-link" onClick={() => navigate('/dashboard')} type="button" style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Home size={18} />
+            Home / Dashboard
+          </button>
         </nav>
 
         <button className="sh-nav-post-btn" onClick={() => setComposer(true)} type="button">
           <PlusSquare size={16} /> New Post
-        </button>
-
-        <button
-          onClick={() => navigate('/dashboard')}
-          style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--sh-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', padding: '8px 12px' }}
-          type="button"
-        >
-          <ArrowLeft size={13} /> Back to kaTuro
         </button>
       </aside>
 

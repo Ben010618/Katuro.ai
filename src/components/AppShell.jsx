@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { subscribeToCollabUnread, uploadProfilePhoto, getTeacherProfile } from '../services/collabService';
+import { uploadProfilePhoto, getTeacherProfile } from '../services/collabService';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
@@ -17,7 +17,7 @@ import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, ChevronDown,
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
-  School, GraduationCap, Moon, Sun, MessageSquare,
+  School, GraduationCap, Moon, Sun,
   Settings, Camera, Loader2, Images,
 } from 'lucide-react';
 
@@ -28,7 +28,6 @@ const MAIN_NAV = [
   { to: '/quiz-builder',            label: 'Quiz Builder',         Icon: ClipboardList   },
   { to: '/test-builder',            label: 'Test Builder',         Icon: ClipboardCheck, isNew: true },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
-  { to: '/collab',                   label: 'KaTuro Collab',        Icon: MessageSquare   },
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, isNew: true },
 ];
 
@@ -50,7 +49,7 @@ const TITLES = {
 };
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
-function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, collabUnread, onProfileOpen }) {
+function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, onProfileOpen }) {
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -154,9 +153,6 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
                 fontWeight: 800, letterSpacing: '0.04em', lineHeight: '15px',
                 textTransform: 'uppercase',
               }}>NEW</span>
-            )}
-            {to === '/collab' && collabUnread > 0 && (
-              <span style={{ background: '#ed4245', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700, lineHeight: '16px' }}>{collabUnread}</span>
             )}
           </NavLink>
         ))}
@@ -267,16 +263,10 @@ export default function AppShell() {
   const [mobileOpen,     setMobileOpen]     = useState(false);
   const [slideIdx,       setSlideIdx]       = useState(0);
   const [showBundle,     setShowBundle]     = useState(false);
-  const [collabUnread,   setCollabUnread]   = useState(0);
   const [profileData,    setProfileData]    = useState(null); // lifted out of sidebar
   const [photoUploading, setPhotoUploading] = useState(false);
   const shownOnLogin = useRef(false);
   const photoRef     = useRef(null);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    return subscribeToCollabUnread(user.uid, setCollabUnread);
-  }, [user?.uid]);
 
   useEffect(() => {
     const id = setInterval(() => setSlideIdx(i => (i + 1) % 4), 10000);
@@ -333,7 +323,7 @@ export default function AppShell() {
           <SidebarContent
             user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
             freeMode={freeMode} dark={dark} toggle={toggle}
-            collabUnread={collabUnread} onProfileOpen={setProfileData}
+            onProfileOpen={setProfileData}
           />
         </div>
 
@@ -345,7 +335,7 @@ export default function AppShell() {
               <SidebarContent
                 user={user} tokenBalance={tokenBalance} isAdmin={isAdmin}
                 freeMode={freeMode} dark={dark} toggle={toggle}
-                collabUnread={collabUnread} onProfileOpen={setProfileData}
+                onProfileOpen={setProfileData}
                 onClose={() => setMobileOpen(false)}
               />
             </div>
