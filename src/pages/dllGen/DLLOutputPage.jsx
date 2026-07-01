@@ -5,8 +5,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
-import { createSharedPlan } from '../../services/db';
-import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Loader2, Share2 } from 'lucide-react';
+import { deductTokens, createSharedPlan } from '../../services/db';
+import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
+import { exportToPptx } from '../../services/pptxExport';
+import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2, Share2 } from 'lucide-react';
+import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
+import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
+import { downloadGameDocx } from '../../services/gamificationDocx';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
 
@@ -87,6 +92,15 @@ export default function DLLOutputPage() {
   const [sharing,      setSharing]      = useState(false);
   const [shareUrl,     setShareUrl]     = useState(null);
   const [selectedDay,  setSelectedDay]  = useState(null); // null or 0–4
+  const [pptLoading,   setPptLoading]   = useState(false);
+  const [pptPhase,     setPptPhase]     = useState('');
+  const [genError,     setGenError]     = useState('');
+  const [gameModal,    setGameModal]    = useState(null);
+  const [selGameType,  setSelGameType]  = useState('matching');
+  const [gameCount,    setGameCount]    = useState(10);
+  const [gameLoading,      setGameLoading]      = useState(false);
+  const [gameResult,       setGameResult]       = useState(null);
+  const [gameDownloading,  setGameDownloading]  = useState(false);
 
   if (!store.procedure) {
     return (
@@ -156,9 +170,140 @@ export default function DLLOutputPage() {
     navigate('/cot-gen/step-2');
   }
 
-  // Pre-compute day data (used by modal preview)
+  // Pre-compute day data (used by modal preview AND handleGeneratePresentation)
   const melcMap    = buildDayMap(store.melcList);
   const contentMap = buildDayMap(store.contentList);
+
+  async function handleGeneratePresentation() {
+    if (!user?.uid) return;
+    const topic    = contentMap[selectedDay] || store.subject || '';
+    const melcCode = melcMap[selectedDay]    || store.melc    || '';
+
+    setPptLoading(true);
+    setGenError('');
+    try {
+      setPptPhase('Checking tokens…');
+      await deductTokens(user.uid, 'presentation_gen', 3);
+
+      setPptPhase('Generating slide outline…');
+      const { outline: outlineSlides } = await generateOutline({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode,
+        topic,
+        slideCount: 14,
+      });
+
+      setPptPhase('Writing content with AI…');
+      const { slides: expanded } = await expandSlides({
+        subject:    store.subject,
+        gradeLevel: store.gradeLevel,
+        melcCode,
+        topic,
+        slides:     outlineSlides,
+        style:      'Academic',
+      });
+
+      setPptPhase('Building your PPTX…');
+      await exportToPptx({
+        title:        topic || store.subject,
+        subject:      store.subject,
+        gradeLevel:   store.gradeLevel,
+        schoolName:   profile?.school,
+        schoolEmail:  profile?.email || user?.email,
+        slides:       toExportSlides(expanded),
+        includeNotes: true,
+      });
+
+      addToast('Presentation downloaded! (3 tokens used)', 'success');
+      setSelectedDay(null);
+    } catch (err) {
+      if (err.message?.includes('Insufficient tokens') || err.message?.includes('tokens')) {
+        setGenError('Not enough tokens. You need 3 tokens to generate a presentation.');
+      } else {
+        setGenError(err.message || 'Generation failed. Please try again.');
+      }
+    } finally {
+      setPptLoading(false);
+      setPptPhase('');
+    }
+  }
+
+  async function handleGenerateGame() {
+    if (selectedDay === null) return;
+    const lesson = {
+      type: 'dll',
+      subject: store.subject || '',
+      gradeLevel: store.gradeLevel || '',
+      lessonName: contentMap[selectedDay] || store.subject || '',
+      objectives: Object.values(store.objectives || {}),
+      contentList: Object.values(store.contentList || {}),
+      melc: melcMap[selectedDay] || store.melc || '',
+    };
+    setGameLoading(true);
+    setGameModal('loading');
+    try {
+      await deductTokens(user.uid, 'game_gen', 0.5);
+      let data;
+      if (selGameType === 'matching') {
+        const pairs = await genMatching(lesson, gameCount);
+        data = { type: 'matching', pairs, shuffledDefs: gShuffle(pairs.map(p => ({ definition: p.definition }))) };
+      } else if (selGameType === 'jumbled') {
+        const raw = await genJumbled(lesson, gameCount);
+        data = { type: 'jumbled', items: raw.map(r => ({ ...r, jumbled: gScramble(r.word) })) };
+      } else if (selGameType === 'truefalse') {
+        data = { type: 'truefalse', items: await genTrueFalse(lesson, gameCount) };
+      } else if (selGameType === 'crossword') {
+        const pairs = await genCrossword(lesson, gameCount);
+        data = { type: 'crossword', pairs, layout: buildCrossword(pairs) };
+      } else if (selGameType === 'wordhunt') {
+        const words = await genWordHunt(lesson, gameCount);
+        data = { type: 'wordhunt', words, wsGrid: buildWordSearch(words) };
+      } else if (selGameType === 'fillblanks') {
+        const raw = await genFillBlanks(lesson, gameCount);
+        data = { type: 'fillblanks', items: raw.map(r => ({ ...r, shuffledChoices: gShuffle(r.choices) })) };
+      }
+      setGameResult(data);
+      setGameModal('result');
+      addToast('Game generated! (0.5 tokens used)', 'success');
+    } catch (err) {
+      addToast(err.message || 'Game generation failed.', 'error');
+      setGameModal('pick');
+    } finally {
+      setGameLoading(false);
+    }
+  }
+
+  function handlePrintGame() {
+    const el = document.getElementById('dll-game-worksheet-content');
+    if (!el) return;
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Game Worksheet</title><style>body{font-family:Arial,sans-serif;padding:16px;color:#111;font-size:12px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:4px 7px;}h2{margin:5px 0 2px;}ol{padding-left:16px;}@page{size:A4;margin:12.7mm;}@media print{body{margin:0;padding:0;}}</style></head><body>${el.innerHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  }
+
+  async function handleDownloadGame() {
+    if (!gameResult) return;
+    const dayContent = selectedDay !== null ? (contentMap[selectedDay] || '') : '';
+    const lesson = {
+      type: 'dll',
+      subject: store.subject || '',
+      gradeLevel: store.gradeLevel || '',
+      lessonName: dayContent || store.subject || '',
+      topic: dayContent || '',
+    };
+    setGameDownloading(true);
+    try {
+      await downloadGameDocx({ gameData: gameResult, lesson, inclKey: true, profile });
+      addToast('Game worksheet downloaded!', 'success');
+    } catch (err) {
+      addToast('Download failed: ' + err.message, 'error');
+    } finally {
+      setGameDownloading(false);
+    }
+  }
 
   const melcList    = (store.melcList    || []).filter(m => m.text?.trim());
   const contentList = (store.contentList || []).filter(c => c.text?.trim());
@@ -588,6 +733,155 @@ export default function DLLOutputPage() {
             <p style={{ margin: '11px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
               Free · DLL data pre-filled · you choose indicators next → then generate
             </p>
+
+            {/* Generate Presentation */}
+            {genError && (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', textAlign: 'center' }}>
+                {genError}
+              </p>
+            )}
+            <div style={{ position: 'relative', marginTop: 10 }}>
+              <button
+                onClick={handleGeneratePresentation}
+                disabled={pptLoading}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: pptLoading ? '#f9fafb' : 'linear-gradient(135deg, #1a3d2b 0%, #2d6a4f 100%)',
+                  color: pptLoading ? '#9ca3af' : '#fff',
+                  border: pptLoading ? '1.5px dashed #e5e7eb' : 'none',
+                  borderRadius: 12,
+                  padding: '13px 20px', fontSize: 14, fontWeight: 700,
+                  cursor: pptLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.opacity = '0.88'; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+              >
+                <Projector size={16} />
+                {pptLoading ? pptPhase || 'Generating…' : 'Generate Presentation'}
+              </button>
+              {!pptLoading && (
+                <span style={{
+                  position: 'absolute', top: -9, right: 14,
+                  background: '#2d6a4f', color: '#fff',
+                  fontSize: 9, fontWeight: 800, borderRadius: 20,
+                  padding: '2px 9px', letterSpacing: '0.06em', pointerEvents: 'none',
+                }}>
+                  3 tokens
+                </span>
+              )}
+            </div>
+
+            {/* Generate Games */}
+            <button
+              onClick={() => { setSelGameType('matching'); setGameCount(10); setGameModal('pick'); }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 12,
+                padding: '13px 20px', fontSize: 14, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit', marginTop: 10,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+            >
+              <Gamepad2 size={16} />
+              Generate Games
+              <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 7px', fontWeight: 800 }}>0.5 token</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Game picker / result modal */}
+      {gameModal && (
+        <div
+          onClick={() => { if (gameModal !== 'loading') setGameModal(null); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.28)', width: '100%', maxWidth: gameModal === 'result' ? 720 : 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+          >
+            <div style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)', padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Gamepad2 size={16} color="#93c5fd" />
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                  {gameModal === 'pick' ? 'Choose Game Type' : gameModal === 'loading' ? 'Generating Game…' : 'Game Worksheet'}
+                </span>
+              </div>
+              {gameModal !== 'loading' && (
+                <button onClick={() => setGameModal(null)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            {gameModal === 'pick' && (
+              <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate. Costs 0.5 token.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
+                  {GAME_TYPES.map(gt => (
+                    <button
+                      key={gt.id}
+                      onClick={() => { setSelGameType(gt.id); setGameCount(gt.defaultCount); }}
+                      style={{ background: selGameType === gt.id ? gt.bg : '#f9fafb', border: `2px solid ${selGameType === gt.id ? gt.color : '#e5e7eb'}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.12s' }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selGameType === gt.id ? gt.color : '#1f2937' }}>{gt.label}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{gt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Number of items:</label>
+                  <input
+                    type="number" min={5} max={30} value={gameCount}
+                    onChange={e => setGameCount(Math.max(5, Math.min(30, +e.target.value)))}
+                    style={{ width: 68, border: '1.5px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit', textAlign: 'center', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  onClick={handleGenerateGame}
+                  disabled={gameLoading}
+                  style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  <Gamepad2 size={15} /> Generate Game <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>
+                </button>
+              </div>
+            )}
+
+            {gameModal === 'loading' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 20px', gap: 14 }}>
+                <Loader2 size={38} color="#1d4ed8" style={{ animation: 'spin 1s linear infinite' }} />
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>AI is generating your game…</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>This may take a few seconds</p>
+              </div>
+            )}
+
+            {gameModal === 'result' && gameResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 20px', display: 'flex', gap: 8, borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+                  <button onClick={() => setGameModal('pick')} style={{ background: '#f3f4f6', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}>← New Game</button>
+                  <button onClick={handlePrintGame} style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Printer size={13} /> Print / Save
+                  </button>
+                  <button
+                    onClick={handleDownloadGame}
+                    disabled={gameDownloading}
+                    style={{ background: gameDownloading ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: gameDownloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <FileDown size={13} /> {gameDownloading ? 'Downloading…' : 'Download DOCX'}
+                  </button>
+                </div>
+                <div id="dll-game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
+                  <GameWorksheetDisplay
+                    data={gameResult}
+                    lesson={{ subject: store.subject || '', gradeLevel: store.gradeLevel || '', lessonName: contentMap[selectedDay] || store.subject || '' }}
+                    session={{ keyContentFocus: contentMap[selectedDay] || '' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
