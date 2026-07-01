@@ -1,10 +1,23 @@
+import { useState } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor } from '../../config/testBuilderConfig';
-import { normalizeWeights, computeHotsPct } from '../../utils/testBuilderCalc';
-import { Brain, TrendingUp, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { normalizeWeights, computeHotsPct, coerceWeightsTo100 } from '../../utils/testBuilderCalc';
+import { suggestCognitiveWeights } from '../../services/testBuilderAI';
+import { deductTokens } from '../../services/db';
+import { AI_ENABLED } from '../../services/ai';
+import {
+  Brain, TrendingUp, CheckCircle2, AlertTriangle,
+  Sparkles, Loader2, AlertCircle, X, Check,
+} from 'lucide-react';
+
+const SUGGEST_COST = 0.5;
 
 export default function StepBlooms() {
   const store = useTestBuilderStore();
+  const { user } = useAuth();
+  const { addToast } = useToast();
   const keyStage = deriveKeyStage(store.gradeLevel);
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
 
@@ -13,11 +26,53 @@ export default function StepBlooms() {
   const hotsPct = computeHotsPct(store.cognitiveWeights);
   const hotsOk = hotsPct >= hotsFloor;
 
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [aiError,      setAiError]      = useState('');
+  const [aiSuggestion, setAiSuggestion] = useState(null); // { ...weights, rationale }
+
+  const hasCompetencyText = store.competencies.some((c) => c.text?.trim());
+  const canSuggest = AI_ENABLED && hasCompetencyText && !aiLoading;
+
   function handleSlider(index, value) {
     const next = normalizeWeights(weightArray, index, Number(value));
     const obj = {};
     COGNITIVE_LEVELS.forEach((l, i) => { obj[l.key] = next[i]; });
     store.setCognitiveWeights(obj);
+  }
+
+  async function handleSuggest() {
+    if (!canSuggest || !user?.uid) return;
+    setAiLoading(true);
+    setAiError('');
+    try {
+      await deductTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST);
+      const result = await suggestCognitiveWeights({
+        gradeLevel: store.gradeLevel,
+        subject: store.subject,
+        keyStage,
+        hotsFloorPct: hotsFloor,
+        competencies: store.competencies,
+      });
+      setAiSuggestion(result);
+    } catch (err) {
+      setAiError(err.message || 'AI suggestion failed. Please try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleApply() {
+    if (!aiSuggestion) return;
+    const coerced = coerceWeightsTo100(COGNITIVE_LEVELS.map((l) => aiSuggestion[l.key]));
+    const obj = {};
+    COGNITIVE_LEVELS.forEach((l, i) => { obj[l.key] = coerced[i]; });
+    store.setCognitiveWeights(obj);
+    setAiSuggestion(null);
+    addToast('AI suggestion applied — feel free to fine-tune the sliders.', 'success');
+  }
+
+  function handleDismiss() {
+    setAiSuggestion(null);
   }
 
   return (
@@ -67,6 +122,107 @@ export default function StepBlooms() {
           </div>
         </div>
       </div>
+
+      {/* AI Assist */}
+      {!aiSuggestion && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.06), rgba(45,106,79,0.05))',
+          border: '1px solid rgba(124,58,237,0.18)', borderRadius: 12, padding: '12px 16px',
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center',
+            background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+          }}>
+            <Sparkles size={15} color="#fff" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Let AI suggest a starting distribution</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+              {hasCompetencyText
+                ? 'Based on your competencies — you always have the final say on the sliders.'
+                : 'Add competency text in Setup first so the AI has something to analyze.'}
+            </p>
+          </div>
+          <button
+            onClick={handleSuggest}
+            disabled={!canSuggest}
+            className="btn-outline"
+            style={{ fontSize: 12, padding: '8px 14px', flexShrink: 0, opacity: canSuggest ? 1 : 0.5, borderColor: '#7c3aed', color: '#7c3aed' }}
+          >
+            {aiLoading
+              ? <><Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Analyzing…</>
+              : <><Sparkles size={13} /> Suggest with AI</>}
+          </button>
+        </div>
+      )}
+
+      {aiError && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, background: '#fde8e8',
+          borderRadius: 10, padding: '10px 14px',
+        }}>
+          <AlertCircle size={15} color="var(--kt-danger)" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--kt-danger)', fontWeight: 600 }}>{aiError}</span>
+          <button onClick={() => setAiError('')} aria-label="Dismiss error" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-danger)', padding: 2 }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {aiSuggestion && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.07), rgba(167,139,250,0.05))',
+          border: '1px solid rgba(124,58,237,0.3)', borderRadius: 14, padding: '16px 18px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center',
+              background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+            }}>
+              <Sparkles size={13} color="#fff" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.8px' }}>AI Suggestion</p>
+              {aiSuggestion.rationale && (
+                <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.5 }}>{aiSuggestion.rationale}</p>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+            {COGNITIVE_LEVELS.map((l) => (
+              <div key={l.key} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'var(--kt-card)', borderRadius: 9, padding: '6px 10px',
+                border: l.hots ? '1px solid rgba(124,58,237,0.25)' : '1px solid var(--kt-border)',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)' }}>{l.short}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, fontFamily: '"DM Mono", monospace', color: l.hots ? '#6d28d9' : 'var(--kt-green-primary)' }}>
+                  {aiSuggestion[l.key]}%
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleApply}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff',
+                border: 'none', borderRadius: 9, padding: '9px 16px', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Check size={13} /> Apply suggestion
+            </button>
+            <button onClick={handleDismiss} className="btn-outline" style={{ fontSize: 12, padding: '9px 16px' }}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sliders */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

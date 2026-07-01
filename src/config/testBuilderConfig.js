@@ -18,6 +18,22 @@ export const TEST_TYPES = [
   { value: 'TE',  label: 'Term Examination (TE)' },
 ];
 
+export function testTypeLabel(testType) {
+  return TEST_TYPES.find((t) => t.value === testType)?.label || testType || '';
+}
+
+// Item formats the AI can draw from when generating the actual test paper.
+// 'Matching Type' and 'True or False' spellings match the existing worksheet
+// generator's labels (src/services/gamificationDocx.js) for consistency.
+export const QUESTION_FORMATS = [
+  'Multiple Choice',
+  'True or False',
+  'Matching Type',
+  'Identification',
+  'Enumeration',
+  'Essay',
+];
+
 // Item ceiling table only defines KS2–KS4 (Grades 4–12) — DO 015 examinations
 // (ST1/ST2/TE) apply from Grade 4 onward.
 export const GRADE_LEVELS = [

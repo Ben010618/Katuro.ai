@@ -21,6 +21,7 @@ const STEPS = [
     id: 'setup', label: 'Setup', component: StepSetup,
     isValid: (s) => !!(
       s.gradeLevel && s.subject?.trim() && s.testType && s.terms?.length > 0 &&
+      s.questionFormats?.length > 0 &&
       s.competencies?.length > 0 && s.competencies.every((c) => c.text?.trim())
     ),
     primaryLabel: () => "Continue to Bloom's Levels →",
@@ -64,6 +65,7 @@ function pickSessionFields(store) {
     testType:     store.testType,
     itemCeiling:  keyStage ? deriveItemCeiling(keyStage, store.testType) : 0,
     terms:        store.terms,
+    questionFormats: store.questionFormats,
     competencies: store.competencies,
     dayLimit:     DAY_LIMIT,
     cognitiveWeights: store.cognitiveWeights,
@@ -114,7 +116,7 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
       .then(() => setSaveState('saved'))
       .catch(() => setSaveState('idle'));
   }, [
-    ready, store.gradeLevel, store.subject, store.testType, store.terms,
+    ready, store.gradeLevel, store.subject, store.testType, store.terms, store.questionFormats,
     JSON.stringify(store.competencies), JSON.stringify(store.cognitiveWeights), JSON.stringify(store.tos),
   ], 500);
 

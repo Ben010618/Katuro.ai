@@ -5,6 +5,7 @@ import {
   clampCompetencyDays,
   totalDays,
   computeTOS,
+  coerceWeightsTo100,
 } from './testBuilderCalc';
 
 describe('largestRemainder', () => {
@@ -141,5 +142,28 @@ describe('computeTOS', () => {
     const { rows, hotsPct } = computeTOS(zeroDay, weights, 50);
     expect(rows[0].total).toBe(0);
     expect(hotsPct).toBe(0);
+  });
+});
+
+describe('coerceWeightsTo100', () => {
+  it('leaves an already-valid 100-sum distribution untouched', () => {
+    expect(coerceWeightsTo100([20, 20, 20, 16, 14, 10])).toEqual([20, 20, 20, 16, 14, 10]);
+  });
+
+  it('nudges the largest entry to absorb a rounding shortfall', () => {
+    // AI-ish output summing to 98 (rounding drift)
+    const result = coerceWeightsTo100([19, 19, 19, 16, 14, 11]);
+    expect(result.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it('nudges the largest entry to absorb an overage', () => {
+    const result = coerceWeightsTo100([25, 25, 25, 16, 14, 10]); // sums to 115
+    expect(result.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it('never produces a negative weight', () => {
+    const result = coerceWeightsTo100([0, 0, 0, 0, 0, 5]); // sums to 5, needs +95
+    expect(result.every((v) => v >= 0)).toBe(true);
+    expect(result.reduce((a, b) => a + b, 0)).toBe(100);
   });
 });

@@ -1,10 +1,10 @@
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import {
-  GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT,
+  GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT, QUESTION_FORMATS,
   KEY_STAGE_LABELS, deriveKeyStage, deriveItemCeiling, makeEmptyCompetency,
 } from '../../config/testBuilderConfig';
 import { clampCompetencyDays, totalDays } from '../../utils/testBuilderCalc';
-import { Trash2, Plus, LayoutGrid } from 'lucide-react';
+import { Trash2, Plus, LayoutGrid, FileQuestion } from 'lucide-react';
 
 const labelStyle = {
   display: 'block', marginBottom: 6,
@@ -129,6 +129,42 @@ export default function StepSetup() {
                 }}
               >
                 {t}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Question Format(s) */}
+      <div className="card">
+        <label style={labelStyle}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <FileQuestion size={12} /> Question Format(s) <span style={{ color: 'var(--kt-danger)' }}>*</span>
+          </span>
+        </label>
+        <p style={{ margin: '2px 0 10px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+          Select the item types this test will use — the AI will draw from this mix when generating the test paper.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {QUESTION_FORMATS.map((fmt) => {
+            const selected = store.questionFormats.includes(fmt);
+            return (
+              <button
+                key={fmt}
+                onClick={() => store.setField(
+                  'questionFormats',
+                  selected ? store.questionFormats.filter((x) => x !== fmt) : [...store.questionFormats, fmt]
+                )}
+                style={{
+                  padding: '8px 14px', borderRadius: 20, border: '1.5px solid',
+                  borderColor: selected ? 'var(--kt-green-dark)' : 'rgba(45,106,79,0.2)',
+                  background: selected ? 'linear-gradient(135deg, #1a3d2b, #2d6a4f)' : 'var(--kt-card)',
+                  color: selected ? '#fff' : 'var(--kt-text-secondary)',
+                  fontSize: 13, fontWeight: selected ? 700 : 500,
+                  cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                }}
+              >
+                {fmt}
               </button>
             );
           })}

@@ -42,6 +42,7 @@ export async function createTestSession(uid, { gradeLevel = '', subject = '', te
     testType,
     itemCeiling: keyStage ? deriveItemCeiling(keyStage, testType) : 0,
     terms: [],
+    questionFormats: [],
     competencies: [makeEmptyCompetency(), makeEmptyCompetency(), makeEmptyCompetency()],
     dayLimit: DAY_LIMIT,
     cognitiveWeights: derivePreset(keyStage || 'KS2'),

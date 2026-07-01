@@ -1,20 +1,92 @@
+import { useEffect, useState } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
+import { getTeacherProfile, deductTokens } from '../../services/db';
+import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
+import { downloadTestPaperDocx } from '../../services/testBuilderDocx';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor, KEY_STAGE_LABELS } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
-import { ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck } from 'lucide-react';
+import {
+  ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
+  FileDown, Loader2, AlertCircle, X, Lock,
+} from 'lucide-react';
 
 const sectionLabel = {
   margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '1.2px',
 };
 
+const GENERATE_DOC_COST = 5;
+
 export default function StepReview() {
   const store = useTestBuilderStore();
+  const { user } = useAuth();
+  const { addToast } = useToast();
+
   const keyStage = deriveKeyStage(store.gradeLevel);
   const itemCeiling = keyStage ? deriveItemCeiling(keyStage, store.testType) : 0;
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
   const hotsOk = store.tos.hotsPct >= hotsFloor;
   const grandTotal = store.tos.columnTotals.reduce((a, b) => a + b, 0);
+
+  const [teacherProfile, setTeacherProfile] = useState(null);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genPhase,   setGenPhase]   = useState('');
+  const [genError,   setGenError]   = useState('');
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    getTeacherProfile(user.uid).then(setTeacherProfile).catch(() => {});
+  }, [user?.uid]);
+
+  const canGenerate = store.status === 'tos_generated' && grandTotal > 0 && !genLoading;
+
+  async function handleGenerateDoc() {
+    if (!canGenerate || !user?.uid) return;
+    setGenLoading(true);
+    setGenError('');
+    try {
+      setGenPhase('Checking tokens…');
+      await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_DOC_COST);
+
+      const allItems = [];
+      for (let i = 0; i < store.tos.rows.length; i++) {
+        const row = store.tos.rows[i];
+        if (row.total === 0) continue;
+        setGenPhase(`Writing items for competency ${i + 1} of ${store.tos.rows.length}…`);
+        const items = await generateItemsForCompetency({
+          competencyText: row.label,
+          cells: row.cells,
+          subject: store.subject,
+          gradeLevel: store.gradeLevel,
+          questionFormats: store.questionFormats,
+        });
+        allItems.push(...items);
+      }
+
+      setGenPhase('Building your test document…');
+      await downloadTestPaperDocx({
+        items: allItems,
+        tos: store.tos,
+        meta: {
+          subject: store.subject,
+          gradeLevel: store.gradeLevel,
+          testType: store.testType,
+          terms: store.terms.join(', '),
+          itemCeiling,
+        },
+        profile: teacherProfile,
+      });
+
+      addToast(`Test document downloaded! (${GENERATE_DOC_COST} tokens used)`, 'success');
+    } catch (err) {
+      setGenError(err.message || 'Document generation failed. Please try again.');
+    } finally {
+      setGenLoading(false);
+      setGenPhase('');
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingBottom: 32 }}>
@@ -45,8 +117,9 @@ export default function StepReview() {
           <ReviewField label="Test Type" value={store.testType} />
           <ReviewField label="Key Stage" value={keyStage ? KEY_STAGE_LABELS[keyStage] : '—'} />
         </div>
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <ReviewField label="Terms" value={store.terms.length ? store.terms.join(', ') : '—'} />
+          <ReviewField label="Question Formats" value={store.questionFormats.length ? store.questionFormats.join(', ') : '—'} />
         </div>
       </div>
 
@@ -121,6 +194,55 @@ export default function StepReview() {
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-green-dark)' }}>
             This TOS has been saved. You can confirm again to re-save any later edits.
           </span>
+        </div>
+      )}
+
+      {/* Generate Test Document */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 55%, #2d6a4f 100%)',
+        borderRadius: 14, padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16,
+      }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: 'grid', placeItems: 'center',
+          background: 'linear-gradient(135deg, #52b788, #2d6a4f)',
+        }}>
+          <FileDown size={20} color="#fff" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Document</p>
+          <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
+            {store.status === 'tos_generated'
+              ? `AI writes the actual items from your TOS above, into one A4 Word document with the test paper, answer key, and TOS. (${GENERATE_DOC_COST} tokens)`
+              : 'Confirm and Save first to unlock document generation.'}
+          </p>
+        </div>
+        <button
+          onClick={handleGenerateDoc}
+          disabled={!canGenerate}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0,
+            background: canGenerate ? '#fff' : 'rgba(255,255,255,0.12)',
+            color: canGenerate ? '#1a3d2b' : 'rgba(255,255,255,0.5)',
+            border: 'none', borderRadius: 10, padding: '11px 18px',
+            fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+            cursor: canGenerate ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {genLoading
+            ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> {genPhase || 'Generating…'}</>
+            : canGenerate
+              ? <><FileDown size={14} /> Generate DOC</>
+              : <><Lock size={14} /> Locked</>}
+        </button>
+      </div>
+
+      {genError && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fde8e8', borderRadius: 10, padding: '10px 14px' }}>
+          <AlertCircle size={15} color="var(--kt-danger)" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--kt-danger)', fontWeight: 600 }}>{genError}</span>
+          <button onClick={() => setGenError('')} aria-label="Dismiss error" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-danger)', padding: 2 }}>
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>

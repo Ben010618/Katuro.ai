@@ -120,3 +120,20 @@ export function computeTOS(competencies, cognitiveWeights, itemCeiling) {
 export function computeHotsPct(weights) {
   return HOTS_KEYS.reduce((sum, k) => sum + (weights[k] || 0), 0);
 }
+
+/**
+ * Safety net for externally-sourced weights (e.g. an AI suggestion) that may
+ * not sum to exactly 100 — rounds each to an integer, then nudges whichever
+ * entry is largest to absorb the rounding diff, same correction rule as
+ * normalizeWeights.
+ */
+export function coerceWeightsTo100(values) {
+  const ints = values.map((v) => Math.max(0, Math.round(Number(v) || 0)));
+  const diff = 100 - ints.reduce((sum, v) => sum + v, 0);
+  if (diff !== 0) {
+    let maxIdx = 0;
+    ints.forEach((v, i) => { if (v > ints[maxIdx]) maxIdx = i; });
+    ints[maxIdx] = Math.max(0, ints[maxIdx] + diff);
+  }
+  return ints;
+}
