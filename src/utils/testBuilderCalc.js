@@ -122,6 +122,27 @@ export function computeHotsPct(weights) {
 }
 
 /**
+ * Deterministically assigns a question format to every item a TOS row needs —
+ * the AI is never asked to choose, so "only Multiple Choice selected" always
+ * means every item really is Multiple Choice, and "N formats selected" always
+ * means all N actually appear (round-robin across the flattened cell list,
+ * continuing from `startIndex` so distribution stays fair across competencies).
+ * `cells` is the [R,U,Ap,An,Ev,Cr] count array computeTOS produces.
+ */
+export function buildItemSlots(cells, formats, startIndex = 0) {
+  if (!formats?.length) return [];
+  const slots = [];
+  let idx = startIndex;
+  cells.forEach((count, li) => {
+    for (let i = 0; i < count; i++) {
+      slots.push({ cognitiveLevel: LEVEL_KEYS[li], format: formats[idx % formats.length] });
+      idx++;
+    }
+  });
+  return slots;
+}
+
+/**
  * Safety net for externally-sourced weights (e.g. an AI suggestion) that may
  * not sum to exactly 100 — rounds each to an integer, then nudges whichever
  * entry is largest to absorb the rounding diff, same correction rule as

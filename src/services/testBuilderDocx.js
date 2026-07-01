@@ -1,6 +1,11 @@
-// kaTuro Test Builder — DOCX export: test paper + TOS + answer key.
-// A4 portrait, narrow margins — mirrors src/services/gamificationDocx.js's
-// layout constants/patterns (the current, non-buggy A4 portrait reference).
+// kaTuro Test Builder — DOCX export: three separate downloads (test questions,
+// answer key, TOS) instead of one bundled file. A4 portrait, narrow margins —
+// mirrors src/services/gamificationDocx.js's layout (the current, non-buggy
+// A4 portrait reference; avoids the ILAW/DLL landscape width/height-swap quirk).
+//
+// Matching Type uses a random shuffle for its Column B — buildTestPaperParts()
+// must be called ONCE and its result reused for both the Test Questions and
+// Answer Key downloads, or the two documents' letters would disagree.
 
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType,
@@ -32,20 +37,27 @@ const BThin = { style: BorderStyle.SINGLE, size: 4, color: '999999' };
 const BMed  = { style: BorderStyle.SINGLE, size: 10, color: '000000' };
 const BNoneAll = { top: BNone, bottom: BNone, left: BNone, right: BNone };
 
+const pageProps = {
+  page: {
+    size:   { width: A4_W, height: A4_H },
+    margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+  },
+};
+
 // ── Page header ───────────────────────────────────────────────────────────────
-function makeHeader(profile, meta, answerKey) {
+function makeHeader(profile, meta, docLabel) {
   const out = [];
   if (profile?.school) out.push(centered([run(profile.school, { bold: true, size: 26 })]));
   const nameDesig = [profile?.name, profile?.designation].filter(Boolean).join(' · ');
   if (nameDesig) out.push(centered([run(nameDesig, { size: 20 })]));
 
-  const title = `${meta.subject || 'Test'} — ${meta.testTypeLabel}`.toUpperCase() + (answerKey ? ' (ANSWER KEY)' : '');
+  const title = `${meta.subject || 'Test'} — ${meta.testTypeLabel}`.toUpperCase() + (docLabel ? ` (${docLabel})` : '');
   out.push(centered([run(title, { bold: true, size: 28 })], { spacing: { before: 80, after: 40 } }));
 
   const sub = [meta.gradeLevel, meta.terms].filter(Boolean).join(' | ');
   if (sub) out.push(centered([run(sub, { size: 20 })], { spacing: { after: 80 } }));
 
-  if (!answerKey) {
+  if (docLabel === 'TEST QUESTIONS' || !docLabel) {
     out.push(para(
       [run('Name: _______________________________   Section: _______________   Date: _______________   Score: ______', { size: 20 })],
       { spacing: { before: 120, after: 120 } },
@@ -87,7 +99,6 @@ function tosTable(tos, itemCeiling) {
   rows.push(new TableRow({ children: ['TOTAL', ...tos.columnTotals, grandTotal].map((v, i) => dataCell(v, i, true)) }));
 
   return [
-    para([run('Table of Specifications', { bold: true, size: 24 })], { spacing: { before: 40, after: 80 } }),
     new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows }),
     para([run(`Total items: ${grandTotal} of ${itemCeiling}`, { italic: true, size: 18 })], { spacing: { before: 60, after: 220 } }),
   ];
@@ -136,7 +147,7 @@ function freeTextBlock(items, startNum, format) {
 }
 
 // Combines every "Matching Type" item across the whole test into one block —
-// Column A keeps the running item numbers, Column B is shuffled.
+// Column A keeps the running item numbers, Column B is shuffled ONCE here.
 function matchingBlock(items, startNum) {
   const half = Math.floor(PAGE_W / 2);
   const tagged = items.map((it, i) => ({ ...it, __idx: i }));
@@ -187,8 +198,14 @@ function answerGrid(answers) {
   return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows });
 }
 
-// ── Assembles the test proper + answer key from a flat, unnumbered items array
-function buildTestAndKey(items) {
+/**
+ * Groups/numbers a flat items array (each already tagged with `format` by
+ * buildItemSlots) into the test-proper blocks and the matching answer-key
+ * blocks. Call this ONCE per generation and reuse the result for both
+ * downloads — matchingBlock() shuffles randomly, so calling this twice would
+ * make the Answer Key's letters disagree with the Test Questions document.
+ */
+export function buildTestPaperParts(items) {
   const byFormat = FORMAT_ORDER
     .map((fmt) => ({ format: fmt, items: items.filter((it) => it.format === fmt) }))
     .filter((g) => g.items.length > 0);
@@ -234,30 +251,43 @@ function buildTestAndKey(items) {
   return { testBlocks, keyBlocks };
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-export async function downloadTestPaperDocx({ items, tos, meta, profile }) {
+function download(doc, filename) {
+  return Packer.toBlob(doc).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function slugify(meta) {
+  return [meta.subject, meta.gradeLevel, meta.testType].filter(Boolean).join('_').replace(/[^a-zA-Z0-9_]/g, '_') || 'test';
+}
+
+// ── Public API — three independent downloads ──────────────────────────────────
+
+export async function downloadTestQuestionsDocx({ testBlocks, meta, profile }) {
   const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
-  const { testBlocks, keyBlocks } = buildTestAndKey(items);
+  const doc = new Document({
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'TEST QUESTIONS'), ...testBlocks] }],
+  });
+  await download(doc, `${slugify(meta)}_TestQuestions.docx`);
+}
 
-  const pageProps = {
-    page: {
-      size:   { width: A4_W, height: A4_H },
-      margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
-    },
-  };
+export async function downloadAnswerKeyDocx({ keyBlocks, meta, profile }) {
+  const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
+  const doc = new Document({
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'ANSWER KEY'), ...keyBlocks] }],
+  });
+  await download(doc, `${slugify(meta)}_AnswerKey.docx`);
+}
 
-  const sections = [
-    { properties: pageProps, children: [...makeHeader(profile, fullMeta, false), ...tosTable(tos, meta.itemCeiling), ...testBlocks] },
-    { properties: pageProps, children: [...makeHeader(profile, fullMeta, true), ...keyBlocks] },
-  ];
-
-  const doc  = new Document({ sections });
-  const blob = await Packer.toBlob(doc);
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  const slug = [meta.subject, meta.gradeLevel, meta.testType].filter(Boolean).join('_').replace(/[^a-zA-Z0-9_]/g, '_') || 'test';
-  a.href     = url;
-  a.download = `${slug}_TestPaper.docx`;
-  a.click();
-  URL.revokeObjectURL(url);
+export async function downloadTosDocx({ tos, itemCeiling, meta, profile }) {
+  const fullMeta = { ...meta, testTypeLabel: testTypeLabel(meta.testType) };
+  const doc = new Document({
+    sections: [{ properties: pageProps, children: [...makeHeader(profile, fullMeta, 'TABLE OF SPECIFICATIONS'), ...tosTable(tos, itemCeiling)] }],
+  });
+  await download(doc, `${slugify(meta)}_TOS.docx`);
 }

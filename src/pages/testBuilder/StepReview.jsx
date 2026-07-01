@@ -4,12 +4,12 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTeacherProfile, deductTokens } from '../../services/db';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
-import { downloadTestPaperDocx } from '../../services/testBuilderDocx';
+import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor, KEY_STAGE_LABELS } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
-  FileDown, Loader2, AlertCircle, X, Lock,
+  FileText, KeyRound, Table2, Sparkles, Loader2, AlertCircle, X, Lock,
 } from 'lucide-react';
 
 const sectionLabel = {
@@ -17,7 +17,7 @@ const sectionLabel = {
   textTransform: 'uppercase', letterSpacing: '1.2px',
 };
 
-const GENERATE_DOC_COST = 5;
+const GENERATE_ITEMS_COST = 5;
 
 export default function StepReview() {
   const store = useTestBuilderStore();
@@ -30,61 +30,80 @@ export default function StepReview() {
   const hotsOk = store.tos.hotsPct >= hotsFloor;
   const grandTotal = store.tos.columnTotals.reduce((a, b) => a + b, 0);
 
-  const [teacherProfile, setTeacherProfile] = useState(null);
-  const [genLoading, setGenLoading] = useState(false);
-  const [genPhase,   setGenPhase]   = useState('');
-  const [genError,   setGenError]   = useState('');
+  const [teacherProfile,  setTeacherProfile]  = useState(null);
+  const [genLoading,      setGenLoading]      = useState(false);
+  const [genPhase,        setGenPhase]        = useState('');
+  const [genError,        setGenError]        = useState('');
+  const [generatedParts,  setGeneratedParts]  = useState(null); // { testBlocks, keyBlocks } — cached so both downloads agree
+  const [downloadingKind, setDownloadingKind] = useState(null); // 'tos' | 'questions' | 'key' | null
 
   useEffect(() => {
     if (!user?.uid) return;
     getTeacherProfile(user.uid).then(setTeacherProfile).catch(() => {});
   }, [user?.uid]);
 
-  const canGenerate = store.status === 'tos_generated' && grandTotal > 0 && !genLoading;
+  const docMeta = {
+    subject: store.subject,
+    gradeLevel: store.gradeLevel,
+    testType: store.testType,
+    terms: store.terms.join(', '),
+    itemCeiling,
+  };
 
-  async function handleGenerateDoc() {
-    if (!canGenerate || !user?.uid) return;
+  const canGenerateItems = store.status === 'tos_generated' && grandTotal > 0 && !genLoading;
+  const canDownloadTos   = store.status === 'tos_generated' && grandTotal > 0;
+
+  async function handleGenerateItems() {
+    if (!canGenerateItems || !user?.uid) return;
     setGenLoading(true);
     setGenError('');
+    setGeneratedParts(null);
     try {
       setGenPhase('Checking tokens…');
-      await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_DOC_COST);
+      await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST);
 
       const allItems = [];
+      let cursor = 0;
       for (let i = 0; i < store.tos.rows.length; i++) {
         const row = store.tos.rows[i];
         if (row.total === 0) continue;
         setGenPhase(`Writing items for competency ${i + 1} of ${store.tos.rows.length}…`);
-        const items = await generateItemsForCompetency({
+        const { items, nextIndex } = await generateItemsForCompetency({
           competencyText: row.label,
           cells: row.cells,
           subject: store.subject,
           gradeLevel: store.gradeLevel,
           questionFormats: store.questionFormats,
+          startIndex: cursor,
         });
         allItems.push(...items);
+        cursor = nextIndex;
       }
 
-      setGenPhase('Building your test document…');
-      await downloadTestPaperDocx({
-        items: allItems,
-        tos: store.tos,
-        meta: {
-          subject: store.subject,
-          gradeLevel: store.gradeLevel,
-          testType: store.testType,
-          terms: store.terms.join(', '),
-          itemCeiling,
-        },
-        profile: teacherProfile,
-      });
-
-      addToast(`Test document downloaded! (${GENERATE_DOC_COST} tokens used)`, 'success');
+      setGeneratedParts(buildTestPaperParts(allItems));
+      addToast(`Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`, 'success');
     } catch (err) {
-      setGenError(err.message || 'Document generation failed. Please try again.');
+      setGenError(err.message || 'Item generation failed. Please try again.');
     } finally {
       setGenLoading(false);
       setGenPhase('');
+    }
+  }
+
+  async function handleDownload(kind) {
+    setDownloadingKind(kind);
+    try {
+      if (kind === 'tos') {
+        await downloadTosDocx({ tos: store.tos, itemCeiling, meta: docMeta, profile: teacherProfile });
+      } else if (kind === 'questions') {
+        await downloadTestQuestionsDocx({ testBlocks: generatedParts.testBlocks, meta: docMeta, profile: teacherProfile });
+      } else if (kind === 'key') {
+        await downloadAnswerKeyDocx({ keyBlocks: generatedParts.keyBlocks, meta: docMeta, profile: teacherProfile });
+      }
+    } catch (err) {
+      setGenError(err.message || 'Download failed. Please try again.');
+    } finally {
+      setDownloadingKind(null);
     }
   }
 
@@ -197,43 +216,64 @@ export default function StepReview() {
         </div>
       )}
 
-      {/* Generate Test Document */}
+      {/* Generate + download outputs */}
       <div style={{
         background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 55%, #2d6a4f 100%)',
-        borderRadius: 14, padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16,
+        borderRadius: 14, padding: '20px 22px',
       }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: 'grid', placeItems: 'center',
-          background: 'linear-gradient(135deg, #52b788, #2d6a4f)',
-        }}>
-          <FileDown size={20} color="#fff" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: generatedParts ? 18 : 0 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: 'grid', placeItems: 'center',
+            background: 'linear-gradient(135deg, #52b788, #2d6a4f)',
+          }}>
+            <Sparkles size={20} color="#fff" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Items with AI</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
+              {store.status === 'tos_generated'
+                ? `AI writes items for exactly the counts in your TOS, using only your selected Question Format(s). (${GENERATE_ITEMS_COST} tokens)`
+                : 'Confirm and Save first to unlock item generation.'}
+            </p>
+          </div>
+          <button
+            onClick={handleGenerateItems}
+            disabled={!canGenerateItems}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0,
+              background: canGenerateItems ? '#fff' : 'rgba(255,255,255,0.12)',
+              color: canGenerateItems ? '#1a3d2b' : 'rgba(255,255,255,0.5)',
+              border: 'none', borderRadius: 10, padding: '11px 18px',
+              fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              cursor: canGenerateItems ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {genLoading
+              ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> {genPhase || 'Generating…'}</>
+              : canGenerateItems
+                ? <><Sparkles size={14} /> {generatedParts ? 'Regenerate' : 'Generate Items'}</>
+                : <><Lock size={14} /> Locked</>}
+          </button>
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Document</p>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
-            {store.status === 'tos_generated'
-              ? `AI writes the actual items from your TOS above, into one A4 Word document with the test paper, answer key, and TOS. (${GENERATE_DOC_COST} tokens)`
-              : 'Confirm and Save first to unlock document generation.'}
-          </p>
+
+        {/* Three independent downloads */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <DownloadButton
+            icon={Table2} label="TOS" sub="Table of Specifications"
+            enabled={canDownloadTos} loading={downloadingKind === 'tos'}
+            onClick={() => handleDownload('tos')}
+          />
+          <DownloadButton
+            icon={FileText} label="Test Questions" sub="The actual test"
+            enabled={!!generatedParts} loading={downloadingKind === 'questions'}
+            onClick={() => handleDownload('questions')}
+          />
+          <DownloadButton
+            icon={KeyRound} label="Answer Key" sub="Matches the test"
+            enabled={!!generatedParts} loading={downloadingKind === 'key'}
+            onClick={() => handleDownload('key')}
+          />
         </div>
-        <button
-          onClick={handleGenerateDoc}
-          disabled={!canGenerate}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0,
-            background: canGenerate ? '#fff' : 'rgba(255,255,255,0.12)',
-            color: canGenerate ? '#1a3d2b' : 'rgba(255,255,255,0.5)',
-            border: 'none', borderRadius: 10, padding: '11px 18px',
-            fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            cursor: canGenerate ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {genLoading
-            ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> {genPhase || 'Generating…'}</>
-            : canGenerate
-              ? <><FileDown size={14} /> Generate DOC</>
-              : <><Lock size={14} /> Locked</>}
-        </button>
       </div>
 
       {genError && (
@@ -255,5 +295,30 @@ function ReviewField({ label, value }) {
       <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</p>
       <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--kt-text-primary)' }}>{value}</p>
     </div>
+  );
+}
+
+function DownloadButton({ icon: Icon, label, sub, enabled, loading, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={!enabled || loading}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        background: enabled ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${enabled ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`,
+        borderRadius: 11, padding: '14px 10px',
+        cursor: enabled && !loading ? 'pointer' : 'not-allowed',
+        fontFamily: 'inherit', transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => { if (enabled && !loading) e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; }}
+      onMouseLeave={(e) => { if (enabled && !loading) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+    >
+      {loading
+        ? <Loader2 size={17} color="#fff" style={{ animation: 'spin 0.8s linear infinite' }} />
+        : <Icon size={17} color={enabled ? '#fff' : 'rgba(255,255,255,0.4)'} />}
+      <span style={{ fontSize: 12, fontWeight: 700, color: enabled ? '#fff' : 'rgba(255,255,255,0.4)' }}>{label}</span>
+      <span style={{ fontSize: 10, color: enabled ? 'rgba(216,243,220,0.7)' : 'rgba(255,255,255,0.3)' }}>{sub}</span>
+    </button>
   );
 }

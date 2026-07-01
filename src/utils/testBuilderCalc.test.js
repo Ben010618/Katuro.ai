@@ -6,6 +6,7 @@ import {
   totalDays,
   computeTOS,
   coerceWeightsTo100,
+  buildItemSlots,
 } from './testBuilderCalc';
 
 describe('largestRemainder', () => {
@@ -165,5 +166,51 @@ describe('coerceWeightsTo100', () => {
     const result = coerceWeightsTo100([0, 0, 0, 0, 0, 5]); // sums to 5, needs +95
     expect(result.every((v) => v >= 0)).toBe(true);
     expect(result.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+});
+
+describe('buildItemSlots', () => {
+  it('uses ONLY the single selected format for every item — the must-have guarantee', () => {
+    const cells = [3, 2, 1, 1, 0, 0]; // 7 items total
+    const slots = buildItemSlots(cells, ['Multiple Choice']);
+    expect(slots).toHaveLength(7);
+    expect(slots.every((s) => s.format === 'Multiple Choice')).toBe(true);
+  });
+
+  it('produces exactly one slot per item across all cognitive levels', () => {
+    const cells = [3, 2, 1, 1, 0, 2];
+    const slots = buildItemSlots(cells, ['Multiple Choice', 'True or False']);
+    expect(slots).toHaveLength(cells.reduce((a, b) => a + b, 0));
+  });
+
+  it('tags each slot with the cognitive level its count came from, in order', () => {
+    const cells = [2, 0, 0, 0, 0, 1]; // 2 remembering, 1 creating
+    const slots = buildItemSlots(cells, ['Multiple Choice']);
+    expect(slots.map((s) => s.cognitiveLevel)).toEqual(['remembering', 'remembering', 'creating']);
+  });
+
+  it('uses every selected format when more than one is chosen (round-robin)', () => {
+    const cells = [6, 0, 0, 0, 0, 0];
+    const slots = buildItemSlots(cells, ['Multiple Choice', 'True or False', 'Identification']);
+    const usedFormats = new Set(slots.map((s) => s.format));
+    expect(usedFormats).toEqual(new Set(['Multiple Choice', 'True or False', 'Identification']));
+  });
+
+  it('never assigns a format outside the selected list', () => {
+    const cells = [10, 0, 0, 0, 0, 0];
+    const slots = buildItemSlots(cells, ['Essay', 'Matching Type']);
+    expect(slots.every((s) => ['Essay', 'Matching Type'].includes(s.format))).toBe(true);
+  });
+
+  it('continues the round-robin from startIndex so distribution stays fair across competencies', () => {
+    const formats = ['Multiple Choice', 'True or False'];
+    const first = buildItemSlots([3, 0, 0, 0, 0, 0], formats, 0);
+    const second = buildItemSlots([3, 0, 0, 0, 0, 0], formats, first.length);
+    // first: MC,TF,MC (idx 0,1,2) — second continues at idx 3,4,5: TF,MC,TF
+    expect(second.map((s) => s.format)).toEqual(['True or False', 'Multiple Choice', 'True or False']);
+  });
+
+  it('returns an empty array when no formats are selected', () => {
+    expect(buildItemSlots([1, 1, 1, 1, 1, 1], [])).toEqual([]);
   });
 });
