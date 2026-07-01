@@ -16,7 +16,7 @@ const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
   LayoutDashboard, Sparkles, BookOpen, ClipboardList,
   LogOut, Menu, X, ChevronRight, ChevronDown,
-  ShieldCheck, Coins, FlaskConical, Zap,
+  ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun, MessageSquare,
   Settings, Camera, Loader2, Images,
 } from 'lucide-react';
@@ -26,6 +26,7 @@ const MAIN_NAV = [
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
   { to: '/quiz-builder',            label: 'Quiz Builder',         Icon: ClipboardList   },
+  { to: '/test-builder',            label: 'Test Builder',         Icon: ClipboardCheck, isNew: true },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
   { to: '/collab',                   label: 'KaTuro Collab',        Icon: MessageSquare   },
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, isNew: true },
@@ -42,6 +43,7 @@ const TITLES = {
   '/dll-gen':                 'Daily Lesson Log',
   '/my-lessons':              'My Lessons',
   '/quiz-builder':            'Quiz Builder',
+  '/test-builder':            'Test Builder',
   '/action-research/phase-1': 'Action Research',
   '/classroom-management':    'Classroom Management',
   '/classes-i-teach':         'Classes I Teach',

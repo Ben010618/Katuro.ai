@@ -1,0 +1,96 @@
+// kaTuro Test Builder — config constants (DepEd Order No. 015, s. 2026)
+// Product convention values (HOTS floors, cognitive presets) are marked as such —
+// not hard DepEd numbers — kept here as named constants rather than magic numbers.
+
+export const DAY_LIMIT = 50;
+
+export const TERMS = ['Term 1', 'Term 2', 'Term 3'];
+
+export const SUBJECTS = [
+  'Science', 'Mathematics', 'English', 'Filipino',
+  'Araling Panlipunan', 'MAPEH', 'GMRC', 'Makabansa',
+  'Reading & Literacy', 'Language', 'TLE', 'EPP', 'ESP',
+];
+
+export const TEST_TYPES = [
+  { value: 'ST1', label: 'Summative Test 1 (ST1)' },
+  { value: 'ST2', label: 'Summative Test 2 (ST2)' },
+  { value: 'TE',  label: 'Term Examination (TE)' },
+];
+
+// Item ceiling table only defines KS2–KS4 (Grades 4–12) — DO 015 examinations
+// (ST1/ST2/TE) apply from Grade 4 onward.
+export const GRADE_LEVELS = [
+  'Grade 4', 'Grade 5', 'Grade 6',
+  'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
+  'Grade 11', 'Grade 12',
+];
+
+const GRADE_KEY_STAGE = {
+  'Grade 4': 'KS2', 'Grade 5': 'KS2', 'Grade 6': 'KS2',
+  'Grade 7': 'KS3', 'Grade 8': 'KS3', 'Grade 9': 'KS3', 'Grade 10': 'KS3',
+  'Grade 11': 'KS4', 'Grade 12': 'KS4',
+};
+
+export function deriveKeyStage(gradeLevel) {
+  return GRADE_KEY_STAGE[gradeLevel] || null;
+}
+
+export const KEY_STAGE_LABELS = {
+  KS2: 'Key Stage 2 · Grades 4–6',
+  KS3: 'Key Stage 3 · Grades 7–10',
+  KS4: 'Key Stage 4 · Grades 11–12',
+};
+
+// TE items, ST1/ST2 max each (per Key Stage)
+export const ITEM_CEILINGS = {
+  KS2: { TE: 40, ST1: 20, ST2: 20 },
+  KS3: { TE: 50, ST1: 25, ST2: 25 },
+  KS4: { TE: 60, ST1: 30, ST2: 30 },
+};
+
+export function deriveItemCeiling(keyStage, testType) {
+  return ITEM_CEILINGS[keyStage]?.[testType] ?? 0;
+}
+
+// HOTS floor by Key Stage — product convention, not a hard DepEd number.
+export const HOTS_FLOOR = { KS2: 0, KS3: 30, KS4: 40 };
+
+export function deriveHotsFloor(keyStage) {
+  return HOTS_FLOOR[keyStage] ?? 0;
+}
+
+export const COGNITIVE_LEVELS = [
+  { key: 'remembering',   label: 'Remembering',   short: 'R',  hots: false },
+  { key: 'understanding', label: 'Understanding', short: 'U',  hots: false },
+  { key: 'applying',      label: 'Applying',      short: 'Ap', hots: false },
+  { key: 'analyzing',     label: 'Analyzing',     short: 'An', hots: true  },
+  { key: 'evaluating',    label: 'Evaluating',    short: 'E',  hots: true  },
+  { key: 'creating',      label: 'Creating',      short: 'C',  hots: true  },
+];
+
+// Default cognitive preset (R/U/Ap/An/E/C) by Key Stage — product convention.
+export const COGNITIVE_PRESETS = {
+  KS2: { remembering: 30, understanding: 25, applying: 25, analyzing: 10, evaluating: 5,  creating: 5  },
+  KS3: { remembering: 20, understanding: 20, applying: 20, analyzing: 16, evaluating: 14, creating: 10 },
+  KS4: { remembering: 15, understanding: 15, applying: 20, analyzing: 20, evaluating: 15, creating: 15 },
+};
+
+export function derivePreset(keyStage) {
+  return { ...(COGNITIVE_PRESETS[keyStage] || COGNITIVE_PRESETS.KS2) };
+}
+
+export function genCompetencyId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+export function makeEmptyCompetency() {
+  return { id: genCompetencyId(), text: '', days: 1 };
+}
+
+export const EMPTY_TOS = {
+  rows: [],
+  columnTotals: [0, 0, 0, 0, 0, 0],
+  hotsCount: 0,
+  hotsPct: 0,
+};

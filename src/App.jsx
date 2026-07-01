@@ -43,6 +43,9 @@ import CotStep2      from './pages/cotGen/CotStep2';
 import CotStep3      from './pages/cotGen/CotStep3';
 import CotOutputPage from './pages/cotGen/CotOutputPage';
 
+// Test Builder
+import TestBuilderWizard from './pages/testBuilder/TestBuilderWizard';
+
 // Classroom Management Module
 import ClassroomManagementPage from './pages/classroomMgmt/ClassroomManagementPage';
 import SectionDetailPage       from './pages/classroomMgmt/SectionDetailPage';
@@ -208,6 +211,9 @@ export default function App() {
               </Route>
               <Route path="output" element={<CotOutputPage />} />
             </Route>
+
+            {/* Test Builder — DepEd-compliant Table of Specifications wizard */}
+            <Route path="test-builder" element={<TestBuilderWizard />} />
 
             {/* Classroom Management Module */}
             <Route path="classroom-management" element={<ClassroomManagementPage />} />
