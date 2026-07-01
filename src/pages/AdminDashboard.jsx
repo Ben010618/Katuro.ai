@@ -118,7 +118,7 @@ function AddUserModal({ adminUid, onClose, onSuccess }) {
         <div>
           <label style={labelStyle}>Initial Tokens</label>
           <input style={inputStyle} type="number" min={0} value={tokens} onChange={e => setTokens(e.target.value)} placeholder="0" />
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 Lesson Plan, 1 Quiz, or 1 Presentation</p>
+          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 Lesson Plan or 1 Quiz</p>
         </div>
         {err && (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
@@ -396,8 +396,6 @@ const FEATURE_LABELS = {
   dll_generated:         'Daily Lesson Log',
   cot_generated:         'COT Plan',
   quiz_generated:        'Quiz',
-  presentation_built:    'Presentation',
-  gamification_used:     'Game Worksheet',
   bubble_sheet_generated:'Bubble Sheet',
   lesson_exported_docx:  'DOCX Export',
   lesson_shared:         'Share Link',
