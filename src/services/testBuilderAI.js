@@ -3,6 +3,7 @@
 // module never touches the wizard's store directly.
 
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { parseAIJson } from './aiJsonParse';
 import { KEY_STAGE_LABELS } from '../config/testBuilderConfig';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
@@ -30,7 +31,7 @@ async function callGemini(prompt) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: 'application/json' },
     }),
   });
   if (!res.ok) {
@@ -39,9 +40,7 @@ async function callGemini(prompt) {
   }
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error('AI returned no valid JSON');
-  return JSON.parse(m[1] ?? m[0]);
+  return parseAIJson(text);
 }
 
 /**

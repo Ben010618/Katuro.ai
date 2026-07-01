@@ -6,6 +6,7 @@
 // it to the model's judgment.
 
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { parseAIJson } from './aiJsonParse';
 import { buildItemSlots } from '../utils/testBuilderCalc';
 import { deriveLanguage } from '../config/testBuilderConfig';
 
@@ -36,7 +37,7 @@ const FORMAT_SPEC = {
   'Essay':           'An open-ended prompt as "question". Return "answer" as a brief model-answer / key points summary.',
 };
 
-async function callGemini(prompt, maxOutputTokens = 3072) {
+async function callGemini(prompt, maxOutputTokens = 4096) {
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
   const res = await geminiWithRetry(url, {
@@ -44,7 +45,10 @@ async function callGemini(prompt, maxOutputTokens = 3072) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens, thinkingConfig: { thinkingBudget: 0 } },
+      // responseMimeType constrains Gemini to emit syntactically valid JSON
+      // (no markdown fences, no trailing commas) — parseAIJson's repair
+      // chain is the fallback for whatever still slips through.
+      generationConfig: { temperature: 0.6, maxOutputTokens, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: 'application/json' },
     }),
   });
   if (!res.ok) {
@@ -53,9 +57,7 @@ async function callGemini(prompt, maxOutputTokens = 3072) {
   }
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error('AI returned no valid JSON');
-  return JSON.parse(m[1] ?? m[0]);
+  return parseAIJson(text);
 }
 
 /**
