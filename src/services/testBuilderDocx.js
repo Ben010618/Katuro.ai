@@ -13,7 +13,7 @@
 // Tagalog questions next to English "Directions:".
 
 import {
-  Document, Packer, Paragraph, TextRun, AlignmentType,
+  Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType,
   Table, TableRow, TableCell, WidthType, BorderStyle,
 } from 'docx';
 import { COGNITIVE_LEVELS, testTypeLabel, deriveLanguage } from '../config/testBuilderConfig';
@@ -35,6 +35,29 @@ function para(children, opts = {}) {
 }
 function centered(children, opts = {}) {
   return para(children, { alignment: AlignmentType.CENTER, ...opts });
+}
+
+// ── Hanging-indent list items — the actual fix for "questions/choices must
+// be properly indented". A real tab stop + hanging indent (not manual spaces)
+// so "1." / "A." prefixes align consistently regardless of digit width, AND
+// wrapped continuation lines land under the text instead of back at the
+// margin. Two nesting levels: numbered items at Q_INDENT, lettered choices
+// nested one level deeper at CHOICE_INDENT.
+const Q_INDENT = 400;       // ~0.28in — question/prompt numbering
+const CHOICE_INDENT = 760;  // ~0.53in — MC lettered choices, nested under the question
+
+// `indentPos` is where the marker's TEXT starts (and where wrapped continuation
+// lines land). `firstLineIndent` is where the marker itself starts — for a
+// top-level question that's 0 (flush left); for a nested MC choice it's
+// Q_INDENT, so "A." visually nests under the question instead of sitting at
+// the same margin as "1.".
+function hangingPara(marker, contentRuns, indentPos, firstLineIndent, markerOpts = {}, paraOpts = {}) {
+  return new Paragraph({
+    tabStops: [{ type: TabStopType.LEFT, position: indentPos }],
+    indent: { left: indentPos, hanging: indentPos - firstLineIndent },
+    children: [run(`${marker}\t`, markerOpts), ...contentRuns],
+    ...paraOpts,
+  });
 }
 
 const BNone = { style: BorderStyle.NIL, size: 0, color: 'FFFFFF' };
@@ -177,24 +200,35 @@ function partHeading(romanNum, format, lang) {
 function mcBlock(items, startNum) {
   const out = [];
   items.forEach((it, i) => {
-    out.push(para([run(`${startNum + i}.  ${it.question}`, { size: 22 })], { spacing: { before: 120, after: 50 } }));
+    out.push(hangingPara(
+      `${startNum + i}.`, [run(it.question, { size: 22 })], Q_INDENT, 0,
+      { size: 22 }, { spacing: { before: 140, after: 60 } },
+    ));
     const choices = it.choices || {};
-    const choiceText = ['A', 'B', 'C', 'D'].map((k) => `${k}. ${choices[k] || ''}`).join('     ');
-    out.push(para([run(choiceText, { size: 20, color: '374151' })], { spacing: { after: 40 } }));
+    ['A', 'B', 'C', 'D'].forEach((k, ci) => {
+      out.push(hangingPara(
+        `${k}.`, [run(choices[k] || '', { size: 20, color: '374151' })], CHOICE_INDENT, Q_INDENT,
+        { size: 20, color: '374151' }, { spacing: { after: ci === 3 ? 160 : 40 } },
+      ));
+    });
   });
   return out;
 }
 
 function tfBlock(items, startNum) {
-  return items.map((it, i) => para(
-    [run(`${startNum + i}. _______________  `, { size: 22 }), run(it.question, { size: 22 })],
-    { spacing: { after: 140 } },
+  return items.map((it, i) => hangingPara(
+    `${startNum + i}.`,
+    [run('_______________  ', { size: 22 }), run(it.question, { size: 22 })],
+    Q_INDENT, 0, { size: 22 }, { spacing: { after: 140 } },
   ));
 }
 
 function freeTextBlock(items, startNum, format) {
   const gap = format === 'Essay' ? 280 : 160;
-  return items.map((it, i) => para([run(`${startNum + i}.  ${it.question}`, { size: 22 })], { spacing: { before: 120, after: gap } }));
+  return items.map((it, i) => hangingPara(
+    `${startNum + i}.`, [run(it.question, { size: 22 })], Q_INDENT, 0,
+    { size: 22 }, { spacing: { before: 120, after: gap } },
+  ));
 }
 
 // Combines every "Matching Type" item across the whole test into one block —
@@ -212,11 +246,11 @@ function matchingBlock(items, startNum, lang) {
     ] }),
     ...tagged.map((it, i) => new TableRow({ children: [
       new TableCell({
-        children: [para([run(`___ ${startNum + i}.  ${it.question}`, { size: 22 })], { spacing: { before: DXA(1.5), after: DXA(1.5) } })],
+        children: [hangingPara(`___ ${startNum + i}.`, [run(it.question, { size: 22 })], 460, 0, { size: 22 }, { spacing: { before: DXA(1.5), after: DXA(1.5) } })],
         width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BThin, right: BThin }, margins: { left: DXA(3), right: DXA(3) },
       }),
       new TableCell({
-        children: [para([run(`${String.fromCharCode(65 + i)}.  ${shuffled[i].matchDefinition || ''}`, { size: 22 })], { spacing: { before: DXA(1.5), after: DXA(1.5) } })],
+        children: [hangingPara(`${String.fromCharCode(65 + i)}.`, [run(shuffled[i].matchDefinition || '', { size: 22 })], 260, 0, { size: 22 }, { spacing: { before: DXA(1.5), after: DXA(1.5) } })],
         width: { size: half, type: WidthType.DXA }, borders: { ...BNoneAll, bottom: BThin, left: BThin }, margins: { left: DXA(3), right: DXA(3) },
       }),
     ] })),
@@ -291,7 +325,7 @@ export function buildTestPaperParts(items, lang = 'en') {
       num += group.items.length;
     } else {
       testBlocks.push(...freeTextBlock(group.items, num, group.format));
-      group.items.forEach((it, i) => longAnswers.push(`${num + i}. ${it.answer}`));
+      group.items.forEach((it, i) => longAnswers.push({ num: num + i, text: it.answer }));
       num += group.items.length;
     }
   });
@@ -303,7 +337,9 @@ export function buildTestPaperParts(items, lang = 'en') {
   }
   if (longAnswers.length) {
     keyBlocks.push(para([run(T.suggestedAnswersLabel, { bold: true, size: 22 })], { spacing: { before: 220, after: 100 } }));
-    longAnswers.forEach((a) => keyBlocks.push(para([run(a, { size: 20 })], { spacing: { after: 80 } })));
+    longAnswers.forEach(({ num: n, text }) => keyBlocks.push(
+      hangingPara(`${n}.`, [run(text, { size: 20 })], Q_INDENT, 0, { size: 20 }, { spacing: { after: 80 } }),
+    ));
   }
 
   return { testBlocks, keyBlocks };
