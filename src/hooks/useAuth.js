@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { teacherRef, applyPendingPassword } from '../services/db';
+import { trackEvent } from '../services/usageTracker';
 
 export function useAuth() {
   const [user,     setUser]     = useState(null);
@@ -17,6 +18,7 @@ export function useAuth() {
       setUser(currentUser);
       if (!currentUser) { setLoading(false); return; }
       applyPendingPassword(currentUser).catch(() => {});
+      trackEvent(currentUser.uid, 'login');
     });
     return () => { unsubAuth(); clearTimeout(timeout); };
   }, []);

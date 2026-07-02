@@ -50,6 +50,12 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // ── Usage analytics — any auth user logs their own events; admin reads all ──
+    match /usageEvents/{docId} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin();
+    }
+
     // ── Shared plan snapshots — public read (no auth), Cloud Function writes ──
     match /sharedPlans/{shareId} {
       allow read:  if true;

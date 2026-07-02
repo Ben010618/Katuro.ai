@@ -14,7 +14,7 @@ import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Time
 import { db } from '../firebase';
 import {
   BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts';
 import ktLogo from '../assets/KT Favicon.png';
 import {
@@ -399,6 +399,7 @@ const FEATURE_LABELS = {
   bubble_sheet_generated:'Bubble Sheet',
   lesson_exported_docx:  'DOCX Export',
   lesson_shared:         'Share Link',
+  login:                 'Site Visit',
 };
 
 const FEATURE_COLORS = [
@@ -407,22 +408,44 @@ const FEATURE_COLORS = [
 ];
 
 function buildDailyData(events, days = 30) {
-  const counts = {};
+  const buckets = {};
   const now = Date.now();
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(now - i * 86400000);
     const key = d.toISOString().slice(0, 10);
-    counts[key] = 0;
+    buckets[key] = { count: 0, uids: new Set() };
   }
   events.forEach(e => {
     const d = e.ts?.toDate ? e.ts.toDate() : new Date(e.ts);
     const key = d.toISOString().slice(0, 10);
-    if (key in counts) counts[key]++;
+    if (key in buckets) {
+      buckets[key].count++;
+      buckets[key].uids.add(e.uid);
+    }
   });
-  return Object.entries(counts).map(([date, count]) => ({
+  return Object.entries(buckets).map(([date, { count, uids }]) => ({
     date: date.slice(5), // MM-DD
     count,
+    users: uids.size,
   }));
+}
+
+function buildTopVisitors(events, teachers, top = 5) {
+  const counts = {};
+  events.forEach(e => {
+    if (e.feature !== 'login') return;
+    counts[e.uid] = (counts[e.uid] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, top)
+    .map(([uid, visits]) => {
+      const t = teachers.find(t => t.id === uid);
+      const label = t
+        ? (t.givenName && t.surname ? `${t.givenName} ${t.surname}` : t.email || uid)
+        : uid;
+      return { uid, label, visits };
+    });
 }
 
 function buildHourData(events) {
@@ -458,7 +481,7 @@ function StatChip({ label, value, color }) {
   );
 }
 
-function AnalyticsSection() {
+function AnalyticsSection({ teachers = [] }) {
   const [events,   setEvents]   = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [range,    setRange]    = useState(30);
@@ -481,12 +504,15 @@ function AnalyticsSection() {
 
   useEffect(() => { load(range); }, [range]);
 
-  const featureData = buildFeatureData(events);
+  const featureEvents = events.filter(e => e.feature !== 'login');
+  const featureData = buildFeatureData(featureEvents);
   const dailyData   = buildDailyData(events, range);
   const hourData    = buildHourData(events);
+  const topVisitors = buildTopVisitors(events, teachers);
 
   const totalEvents  = events.length;
   const uniqueUsers  = new Set(events.map(e => e.uid)).size;
+  const siteVisits   = events.filter(e => e.feature === 'login').length;
   const topFeature   = featureData[0]?.name || '—';
   const peakHour     = hourData.reduce((best, h) => h.count > best.count ? h : best, { hour: '—', count: 0 }).hour;
 
@@ -533,9 +559,10 @@ function AnalyticsSection() {
       ) : (
         <>
           {/* KPI chips */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 24 }}>
             <StatChip label="Total Events"   value={totalEvents}  color="#2d6a4f" />
             <StatChip label="Unique Users"   value={uniqueUsers}  color="#0284c7" />
+            <StatChip label="Site Visits"    value={siteVisits}   color="#16a34a" />
             <StatChip label="Top Feature"    value={topFeature}   color="#e8a320" />
             <StatChip label="Peak Hour"      value={peakHour}     color="#6d28d9" />
           </div>
@@ -563,16 +590,19 @@ function AnalyticsSection() {
 
           {/* Chart 2 — Daily Usage Trend */}
           <div style={{ ...card, marginBottom: 20 }}>
-            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Daily Usage — Last {range} Days</p>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Daily Usage &amp; Active Users — Last {range} Days</p>
             <ResponsiveContainer width="100%" height={chartHeight}>
-              <LineChart data={dailyData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+              <LineChart data={dailyData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#4a6357' }} tickLine={false} axisLine={false} interval={Math.floor(dailyData.length / 8)} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fontSize: 11, fill: '#0284c7' }} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }}
                 />
-                <Line type="monotone" dataKey="count" name="Events" stroke="#2d6a4f" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#2d6a4f' }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line yAxisId="left" type="monotone" dataKey="count" name="Events" stroke="#2d6a4f" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#2d6a4f' }} />
+                <Line yAxisId="right" type="monotone" dataKey="users" name="Active Users" stroke="#0284c7" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#0284c7' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -592,6 +622,28 @@ function AnalyticsSection() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Most Frequent Visitors */}
+          {topVisitors.length > 0 && (
+            <div style={{ ...card, marginTop: 20 }}>
+              <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Most Frequent Visitors</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {topVisitors.map((u, i) => (
+                  <div key={u.uid} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', background: 'var(--kt-surface)', borderRadius: 8,
+                    border: '1px solid var(--kt-border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.label}</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', fontFamily: '"DM Mono", monospace', flexShrink: 0 }}>{u.visits} visits</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1260,7 +1312,7 @@ export default function AdminDashboard() {
 
         {activeTab === 'analytics' && (
           <div style={card}>
-            <AnalyticsSection />
+            <AnalyticsSection teachers={teachers} />
           </div>
         )}
 
@@ -1429,28 +1481,6 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
-        </div>
-
-        {/* Firestore rules reminder */}
-        <div style={{ marginTop: 18, background: 'rgba(232,163,32,0.08)', border: '1px solid rgba(232,163,32,0.25)', borderRadius: 12, padding: '14px 18px' }}>
-          <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#b47a10' }}>Firestore Security Rules</p>
-          {/* also allow admin to read usageEvents */}
-          <p style={{ margin: 0, fontSize: 12, color: '#7a5a10', lineHeight: 1.65 }}>
-            Add this to your Firestore rules so admins can read/write all teacher docs:
-          </p>
-          <pre style={{ margin: '8px 0 0', fontSize: 11, background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '10px 14px', overflowX: 'auto', color: 'var(--kt-text-primary)', lineHeight: 1.7 }}>{`function isAdmin() {
-  return get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.isAdmin == true;
-}
-match /teachers/{uid} {
-  allow read, write: if request.auth.uid == uid || isAdmin();
-  match /{col}/{docId} {
-    allow read, write: if request.auth.uid == uid || isAdmin();
-  }
-}
-match /usageEvents/{docId} {
-  allow create: if request.auth != null;
-  allow read: if isAdmin();
-}`}</pre>
         </div>
 
         </> }
