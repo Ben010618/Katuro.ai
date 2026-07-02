@@ -74,6 +74,7 @@ export default function StepReview() {
           subject: store.subject,
           gradeLevel: store.gradeLevel,
           questionFormats: store.questionFormats,
+          proficiencyLevel: store.proficiencyLevel,
           startIndex: cursor,
         });
         allItems.push(...items);

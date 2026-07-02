@@ -66,6 +66,7 @@ function pickSessionFields(store) {
     itemCeiling:  keyStage ? deriveItemCeiling(keyStage, store.testType) : 0,
     terms:        store.terms,
     questionFormats: store.questionFormats,
+    proficiencyLevel: store.proficiencyLevel,
     competencies: store.competencies,
     dayLimit:     DAY_LIMIT,
     cognitiveWeights: store.cognitiveWeights,

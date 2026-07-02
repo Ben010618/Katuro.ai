@@ -22,6 +22,21 @@ export function testTypeLabel(testType) {
   return TEST_TYPES.find((t) => t.value === testType)?.label || testType || '';
 }
 
+// Optional class-average calibration for AI item difficulty — a rough sense
+// of where students are starting from, not a DepEd grading band. Values are
+// the class's current average score (%); the AI leans easier/harder and
+// adjusts distractor plausibility accordingly (see testBuilderItemsAI.js).
+export const PROFICIENCY_LEVELS = [
+  { value: 75, label: '75% — Developing' },
+  { value: 80, label: '80% — Approaching Proficiency' },
+  { value: 90, label: '90% — Proficient' },
+  { value: 95, label: '95% — Advanced' },
+];
+
+export function proficiencyLevelLabel(value) {
+  return PROFICIENCY_LEVELS.find((p) => p.value === Number(value))?.label || '';
+}
+
 // Subjects whose medium of instruction is Filipino (Tagalog) — drives both the
 // AI item-generation language and the static document text (directions,
 // headers, answer-key labels). Everything else defaults to English.

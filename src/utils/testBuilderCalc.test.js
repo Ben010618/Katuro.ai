@@ -7,7 +7,20 @@ import {
   computeTOS,
   coerceWeightsTo100,
   buildItemSlots,
+  equalDistributionWeights,
 } from './testBuilderCalc';
+
+describe('equalDistributionWeights', () => {
+  it('splits 100 into 6 equal-ish shares via Hamilton\'s Method, summing to exactly 100', () => {
+    const result = equalDistributionWeights(6);
+    expect(result).toEqual([17, 17, 17, 17, 16, 16]);
+    expect(result.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it('handles a count that divides evenly', () => {
+    expect(equalDistributionWeights(4)).toEqual([25, 25, 25, 25]);
+  });
+});
 
 describe('largestRemainder', () => {
   it('sums exactly to the target total', () => {

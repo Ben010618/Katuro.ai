@@ -3,13 +3,13 @@ import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor } from '../../config/testBuilderConfig';
-import { normalizeWeights, computeHotsPct, coerceWeightsTo100 } from '../../utils/testBuilderCalc';
+import { normalizeWeights, computeHotsPct, coerceWeightsTo100, equalDistributionWeights } from '../../utils/testBuilderCalc';
 import { suggestCognitiveWeights } from '../../services/testBuilderAI';
 import { deductTokens } from '../../services/db';
 import { AI_ENABLED } from '../../services/ai';
 import {
   Brain, TrendingUp, CheckCircle2, AlertTriangle,
-  Sparkles, Loader2, AlertCircle, X, Check,
+  Sparkles, Loader2, AlertCircle, X, Check, Scale,
 } from 'lucide-react';
 
 const SUGGEST_COST = 0.5;
@@ -73,6 +73,13 @@ export default function StepBlooms() {
 
   function handleDismiss() {
     setAiSuggestion(null);
+  }
+
+  function handleEqualDistribution() {
+    const equal = equalDistributionWeights(COGNITIVE_LEVELS.length);
+    const obj = {};
+    COGNITIVE_LEVELS.forEach((l, i) => { obj[l.key] = equal[i]; });
+    store.setCognitiveWeights(obj);
   }
 
   return (
@@ -226,6 +233,21 @@ export default function StepBlooms() {
 
       {/* Sliders */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Adjust levels</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+              Or split all six levels evenly with Hamilton's Method (largest-remainder rounding).
+            </p>
+          </div>
+          <button
+            onClick={handleEqualDistribution}
+            className="btn-outline"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '8px 14px', flexShrink: 0 }}
+          >
+            <Scale size={13} /> Equal Distribution
+          </button>
+        </div>
         {COGNITIVE_LEVELS.map((level, i) => (
           <div key={level.key}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>

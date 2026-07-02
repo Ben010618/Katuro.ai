@@ -59,6 +59,16 @@ export function normalizeWeights(weights, changedIndex, newValue) {
   return result;
 }
 
+/**
+ * Equal Distribution preset: splits 100% into `count` equal shares using
+ * Hamilton's Method (the same largest-remainder rounding as computeTOS), so
+ * e.g. 6 levels come out [17,17,17,17,16,16] rather than a naive 16.67%
+ * that wouldn't sum to 100.
+ */
+export function equalDistributionWeights(count) {
+  return largestRemainder(Array(count).fill(100 / count), 100);
+}
+
 export function totalDays(daysArray) {
   return daysArray.reduce((sum, d) => sum + (d || 0), 0);
 }

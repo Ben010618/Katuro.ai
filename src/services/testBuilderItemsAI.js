@@ -8,7 +8,7 @@
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
 import { buildItemSlots } from '../utils/testBuilderCalc';
-import { deriveLanguage } from '../config/testBuilderConfig';
+import { deriveLanguage, proficiencyLevelLabel } from '../config/testBuilderConfig';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -21,6 +21,14 @@ function langInstruction(subject) {
   return deriveLanguage(subject) === 'fil'
     ? 'LANGUAGE: Write ALL natural-language content — questions, choices, matchDefinition text, and free-text answers — in Filipino (Tagalog). Filipino is the medium of instruction for this subject. (Exception: for True or False items, still return "answer" as the literal word "TRUE" or "FALSE"; for Multiple Choice, still return "answer" as the literal letter A/B/C/D — these are structural values, not sentence content.)'
     : 'LANGUAGE: Write ALL content in English. English is the medium of instruction for this subject.';
+}
+
+// Optional class-average calibration — nudges phrasing/distractor difficulty
+// without changing the cognitive level or format a slot already fixes.
+function proficiencyInstruction(proficiencyLevel) {
+  const label = proficiencyLevelLabel(proficiencyLevel);
+  if (!label) return '';
+  return `\nCLASS PROFICIENCY: This class's current average score is around ${label}. Calibrate item difficulty to match — for lower averages, favor clearer wording and less subtle distractors; for higher averages, favor more nuanced phrasing and more plausible distractors. Do not change the required cognitive level or format of any slot.`;
 }
 
 const LEVEL_LABELS = {
@@ -68,7 +76,7 @@ async function callGemini(prompt, maxOutputTokens = 4096) {
  * format assignment across competencies (pass the running total item count).
  * Returns { items, nextIndex }.
  */
-export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, startIndex = 0 }) {
+export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, proficiencyLevel, startIndex = 0 }) {
   const slots = buildItemSlots(cells, questionFormats, startIndex);
   if (slots.length === 0) return { items: [], nextIndex: startIndex };
 
@@ -81,7 +89,7 @@ export async function generateItemsForCompetency({ competencyText, cells, subjec
 Subject: ${subject || ''}
 Grade Level: ${gradeLevel || ''}
 Competency (MELC): ${competencyText}
-${langInstruction(subject)}
+${langInstruction(subject)}${proficiencyInstruction(proficiencyLevel)}
 
 Ground every item strictly in this Most Essential Learning Competency (MELC) — do not test anything outside it. Match the depth, phrasing, and rigor of DepEd's own instructional materials for this competency:
 - DepEd PIVOT 4A learning modules (their Explore/Firm Up/Deepen/Transfer question style and how they scaffold from simple recall toward application)

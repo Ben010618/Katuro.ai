@@ -1,6 +1,6 @@
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import {
-  GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT, QUESTION_FORMATS,
+  GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT, QUESTION_FORMATS, PROFICIENCY_LEVELS,
   KEY_STAGE_LABELS, deriveKeyStage, deriveItemCeiling, makeEmptyCompetency,
 } from '../../config/testBuilderConfig';
 import { clampCompetencyDays, totalDays } from '../../utils/testBuilderCalc';
@@ -169,6 +169,22 @@ export default function StepSetup() {
             );
           })}
         </div>
+      </div>
+
+      {/* Student Proficiency Level */}
+      <div className="card">
+        <label style={labelStyle}>Student Proficiency Level (optional)</label>
+        <p style={{ margin: '2px 0 10px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+          Your class's current average score — the AI calibrates item difficulty and distractor plausibility to match.
+        </p>
+        <select
+          className="select"
+          value={store.proficiencyLevel}
+          onChange={(e) => store.setField('proficiencyLevel', e.target.value ? Number(e.target.value) : '')}
+        >
+          <option value="">Not specified</option>
+          {PROFICIENCY_LEVELS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
       </div>
 
       {/* Competencies */}
