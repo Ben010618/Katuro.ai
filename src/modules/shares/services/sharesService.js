@@ -80,11 +80,12 @@ export async function setCoverPhoto(uid, url) {
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
 /** Create a new photo post. Returns the new document ID. */
-export async function createPost(uid, { photoUrls, caption, school, gradeLevel, subject }) {
+export async function createPost(uid, { photoUrls, title, caption, school, gradeLevel, subject }) {
   const hashtags = extractHashtags(caption);
   const ref = await addDoc(collection(db, 'shares_posts'), {
     authorUid: uid,
     photoUrls,
+    title: title || '',
     caption,
     hashtags,
     school, gradeLevel, subject,
@@ -101,6 +102,22 @@ export async function createPost(uid, { photoUrls, caption, school, gradeLevel, 
 export async function deletePost(postId, uid) {
   await deleteDoc(doc(db, 'shares_posts', postId));
   await updateDoc(doc(db, 'shares_profiles', uid), { postCount: increment(-1) });
+}
+
+/** Edit a post's title/caption (author only — enforced by firestore.rules). */
+export async function editPost(postId, { title, caption }) {
+  const hashtags = extractHashtags(caption);
+  await updateDoc(doc(db, 'shares_posts', postId), {
+    title: title || '', caption, hashtags,
+    editedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Fetch a single post by ID (used by the shareable single-post view). */
+export async function getPost(postId) {
+  const snap = await getDoc(doc(db, 'shares_posts', postId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 /** Fetch paginated global feed (all teachers). Returns { posts, lastDoc }. */

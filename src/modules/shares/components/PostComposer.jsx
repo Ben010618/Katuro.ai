@@ -21,6 +21,7 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
 
   const [files,       setFiles]       = useState([]);
   const [previews,    setPreviews]    = useState([]);
+  const [title,       setTitle]       = useState('');
   const [caption,     setCaption]     = useState('');
   const [school,      setSchool]      = useState(defaultSchool   || '');
   const [gradeLevel,  setGradeLevel]  = useState(defaultGrade    || '');
@@ -58,7 +59,7 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
 
   async function handlePost() {
     if (!files.length) { setFileError('Please add at least one photo.'); return; }
-    const postId = await publish({ files, caption, school, gradeLevel, subject });
+    const postId = await publish({ files, title, caption, school, gradeLevel, subject });
     if (postId) {
       previews.forEach(URL.revokeObjectURL);
       onSuccess?.(postId);
@@ -129,6 +130,18 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
               {fileError || postError}
             </p>
           )}
+
+          {/* Title (optional) */}
+          <div className="sh-composer-field">
+            <input
+              className="sh-composer-title-input"
+              type="text"
+              placeholder="Add a title (optional)…"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              maxLength={120}
+            />
+          </div>
 
           {/* Rich text editor */}
           <div className="sh-composer-field">

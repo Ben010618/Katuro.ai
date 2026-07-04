@@ -13,7 +13,7 @@ export function usePost(uid) {
   const [progress,  setProgress]  = useState({ uploaded: 0, total: 0 });
   const [error,     setError]     = useState(null);
 
-  const publish = useCallback(async ({ files, caption, school, gradeLevel, subject }) => {
+  const publish = useCallback(async ({ files, title, caption, school, gradeLevel, subject }) => {
     if (!files.length || uploading) return null;
     setUploading(true);
     setError(null);
@@ -24,7 +24,7 @@ export function usePost(uid) {
       const photoUrls = await uploadPostPhotos(uid, postId, files, (uploaded, total) => {
         setProgress({ uploaded, total });
       });
-      await createPost(uid, { photoUrls, caption, school, gradeLevel, subject });
+      await createPost(uid, { photoUrls, title, caption, school, gradeLevel, subject });
       return postId;
     } catch (e) {
       setError(e.message);

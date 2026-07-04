@@ -95,10 +95,10 @@ const Icons = {
   ),
 };
 
-export default function ShareModal({ url, title, subject, onClose }) {
+export default function ShareModal({ url, title, subject, onClose, modalTitle = 'Share Lesson Plan', shareText: shareTextProp }) {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Check out this lesson plan: ${title}`;
+  const shareText = shareTextProp || `Check out this lesson plan: ${title}`;
 
   async function handleCopy() {
     try {
@@ -149,7 +149,7 @@ export default function ShareModal({ url, title, subject, onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>Share Lesson Plan</p>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>{modalTitle}</p>
             {title && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>{title}</p>}
           </div>
           <button

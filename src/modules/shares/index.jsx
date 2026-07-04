@@ -13,6 +13,7 @@ import SharesFeed           from './SharesFeed';
 import SharesExplore        from './SharesExplore';
 import SharesProfile        from './SharesProfile';
 import SharesNotifications  from './SharesNotifications';
+import SharePostPage        from './SharePostPage';
 import './shares.css';
 
 function NavItem({ to, icon: Icon, label, badge }) {
@@ -100,6 +101,7 @@ export default function SharesModule() {
           <Routes>
             <Route index element={<SharesFeed {...pageProps} />} />
             <Route path="explore" element={<SharesExplore uid={uid} displayName={displayName} initials={initials} />} />
+            <Route path="post/:postId" element={<SharePostPage uid={uid} displayName={displayName} initials={initials} />} />
             <Route path="notifications" element={<SharesNotifications uid={uid} />} />
             <Route path="profile/:uid" element={<SharesProfile myUid={uid} myDisplayName={displayName} myInitials={initials} />} />
             <Route path="profile" element={<SharesProfile myUid={uid} myDisplayName={displayName} myInitials={initials} />} />
