@@ -2,6 +2,7 @@ import { useTestBuilderStore } from '../../store/testBuilderStore';
 import {
   GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT, QUESTION_FORMATS, PROFICIENCY_LEVELS,
   KEY_STAGE_LABELS, deriveKeyStage, deriveItemCeiling, makeEmptyCompetency,
+  isManualCeilingType, manualCeilingOptions,
 } from '../../config/testBuilderConfig';
 import { clampCompetencyDays, totalDays } from '../../utils/testBuilderCalc';
 import { Trash2, Plus, LayoutGrid, FileQuestion } from 'lucide-react';
@@ -15,7 +16,10 @@ const labelStyle = {
 export default function StepSetup() {
   const store = useTestBuilderStore();
   const keyStage = deriveKeyStage(store.gradeLevel);
-  const itemCeiling = keyStage ? deriveItemCeiling(keyStage, store.testType) : null;
+  const manualCeiling = isManualCeilingType(store.testType);
+  const itemCeiling = manualCeiling
+    ? store.itemCeilingOverride
+    : (keyStage ? deriveItemCeiling(keyStage, store.testType) : null);
 
   const days = store.competencies.map((c) => c.days);
   const used = totalDays(days);
@@ -64,7 +68,8 @@ export default function StepSetup() {
           Set up your test
         </h2>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
-          Grade level and test type determine your DepEd item ceiling automatically — no manual entry.
+          Term Exams get a DepEd item ceiling automatically from grade level. Summative Tests (ST1/ST2) let you
+          choose the item count — 10 to 25 per the DepEd memo cap.
         </p>
       </div>
 
@@ -94,18 +99,36 @@ export default function StepSetup() {
         </div>
 
         <div>
-          <label style={labelStyle}>Item Ceiling</label>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, height: 40, borderRadius: 10,
-            background: 'var(--kt-green-tint)', padding: '0 14px',
-          }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--kt-green-dark)', fontFamily: '"DM Mono", monospace' }}>
-              {itemCeiling ?? '—'}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--kt-green-dark)', fontWeight: 600 }}>
-              {keyStage ? KEY_STAGE_LABELS[keyStage] : 'Select a grade level'}
-            </span>
-          </div>
+          <label style={labelStyle}>
+            Item Ceiling {manualCeiling && <span style={{ color: 'var(--kt-danger)' }}>*</span>}
+          </label>
+          {manualCeiling ? (
+            <select
+              className="select"
+              value={store.itemCeilingOverride ?? ''}
+              onChange={(e) => store.setField('itemCeilingOverride', e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Select item count (10–25)...</option>
+              {manualCeilingOptions().map((n) => (
+                <option key={n} value={n}>{n} items</option>
+              ))}
+            </select>
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, height: 40, borderRadius: 10,
+              background: 'var(--kt-green-tint)', padding: '0 14px', overflow: 'hidden',
+            }}>
+              <span style={{ flexShrink: 0, fontSize: 18, fontWeight: 800, color: 'var(--kt-green-dark)', fontFamily: '"DM Mono", monospace' }}>
+                {itemCeiling ?? '—'}
+              </span>
+              <span style={{
+                flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontSize: 11, color: 'var(--kt-green-dark)', fontWeight: 600,
+              }}>
+                {keyStage ? KEY_STAGE_LABELS[keyStage] : 'Select a grade level'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -185,6 +208,27 @@ export default function StepSetup() {
           <option value="">Not specified</option>
           {PROFICIENCY_LEVELS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
+      </div>
+
+      {/* Context Box */}
+      <div className="card">
+        <label style={labelStyle}>Context Box (optional)</label>
+        <p style={{ margin: '2px 0 10px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+          Anything about your class the AI should factor in — recent struggles, local/community examples,
+          learners who need differentiation, topics to emphasize or avoid. The AI reads this for every item it writes.
+        </p>
+        <textarea
+          className="input"
+          rows={4}
+          maxLength={1000}
+          placeholder="e.g. Several students still confuse mean/median — go easy on wording there. Use local barangay examples for word problems…"
+          value={store.contextNotes}
+          onChange={(e) => store.setField('contextNotes', e.target.value)}
+          style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+        />
+        <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--kt-muted)', textAlign: 'right' }}>
+          {store.contextNotes.length} / 1000
+        </p>
       </div>
 
       {/* Competencies */}

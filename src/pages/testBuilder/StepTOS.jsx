@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { computeTOS } from '../../utils/testBuilderCalc';
-import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor } from '../../config/testBuilderConfig';
+import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, resolveItemCeiling } from '../../config/testBuilderConfig';
 import { Table2, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const cellStyle = {
@@ -13,7 +13,7 @@ const cellStyle = {
 export default function StepTOS() {
   const store = useTestBuilderStore();
   const keyStage = deriveKeyStage(store.gradeLevel);
-  const itemCeiling = keyStage ? deriveItemCeiling(keyStage, store.testType) : 0;
+  const itemCeiling = resolveItemCeiling(keyStage, store.testType, store.itemCeilingOverride);
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
 
   const competenciesKey = JSON.stringify(store.competencies);

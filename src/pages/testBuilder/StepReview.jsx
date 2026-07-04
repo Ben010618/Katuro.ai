@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { getTeacherProfile, deductTokens } from '../../services/db';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
-import { COGNITIVE_LEVELS, deriveKeyStage, deriveItemCeiling, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS } from '../../config/testBuilderConfig';
+import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
@@ -25,7 +25,7 @@ export default function StepReview() {
   const { addToast } = useToast();
 
   const keyStage = deriveKeyStage(store.gradeLevel);
-  const itemCeiling = keyStage ? deriveItemCeiling(keyStage, store.testType) : 0;
+  const itemCeiling = resolveItemCeiling(keyStage, store.testType, store.itemCeilingOverride);
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
   const hotsOk = store.tos.hotsPct >= hotsFloor;
   const grandTotal = store.tos.columnTotals.reduce((a, b) => a + b, 0);
@@ -75,6 +75,7 @@ export default function StepReview() {
           gradeLevel: store.gradeLevel,
           questionFormats: store.questionFormats,
           proficiencyLevel: store.proficiencyLevel,
+          contextNotes: store.contextNotes,
           startIndex: cursor,
         });
         allItems.push(...items);
@@ -144,6 +145,11 @@ export default function StepReview() {
           <ReviewField label="Terms" value={store.terms.length ? store.terms.join(', ') : '—'} />
           <ReviewField label="Question Formats" value={store.questionFormats.length ? store.questionFormats.join(', ') : '—'} />
         </div>
+        {store.contextNotes?.trim() && (
+          <div style={{ marginTop: 14 }}>
+            <ReviewField label="Context Box" value={store.contextNotes} />
+          </div>
+        )}
       </div>
 
       {/* Competencies card */}

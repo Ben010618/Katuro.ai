@@ -31,6 +31,15 @@ function proficiencyInstruction(proficiencyLevel) {
   return `\nCLASS PROFICIENCY: This class's current average score is around ${label}. Calibrate item difficulty to match — for lower averages, favor clearer wording and less subtle distractors; for higher averages, favor more nuanced phrasing and more plausible distractors. Do not change the required cognitive level or format of any slot.`;
 }
 
+// Free-text classroom context from the teacher's Setup-step Context Box —
+// student-specific notes to ground phrasing/examples/emphasis in, without
+// overriding the fixed cognitive level or format of any slot.
+function contextInstruction(contextNotes) {
+  const trimmed = contextNotes?.trim();
+  if (!trimmed) return '';
+  return `\nCLASSROOM CONTEXT (from the teacher): ${trimmed}\nFactor this into phrasing, examples, and emphasis wherever relevant. Do not change the required cognitive level or format of any slot.`;
+}
+
 const LEVEL_LABELS = {
   remembering: 'Remembering', understanding: 'Understanding', applying: 'Applying',
   analyzing: 'Analyzing', evaluating: 'Evaluating', creating: 'Creating',
@@ -76,7 +85,7 @@ async function callGemini(prompt, maxOutputTokens = 4096) {
  * format assignment across competencies (pass the running total item count).
  * Returns { items, nextIndex }.
  */
-export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, proficiencyLevel, startIndex = 0 }) {
+export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, proficiencyLevel, contextNotes, startIndex = 0 }) {
   const slots = buildItemSlots(cells, questionFormats, startIndex);
   if (slots.length === 0) return { items: [], nextIndex: startIndex };
 
@@ -89,7 +98,7 @@ export async function generateItemsForCompetency({ competencyText, cells, subjec
 Subject: ${subject || ''}
 Grade Level: ${gradeLevel || ''}
 Competency (MELC): ${competencyText}
-${langInstruction(subject)}${proficiencyInstruction(proficiencyLevel)}
+${langInstruction(subject)}${proficiencyInstruction(proficiencyLevel)}${contextInstruction(contextNotes)}
 
 Ground every item strictly in this Most Essential Learning Competency (MELC) — do not test anything outside it. Match the depth, phrasing, and rigor of DepEd's own instructional materials for this competency:
 - DepEd PIVOT 4A learning modules (their Explore/Firm Up/Deepen/Transfer question style and how they scaffold from simple recall toward application)

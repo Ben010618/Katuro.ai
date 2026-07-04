@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useDebouncedEffect } from '../../hooks/useDebouncedEffect';
 import { createTestSession, getTestSession, updateTestSession } from '../../services/testBuilderDb';
-import { deriveKeyStage, deriveItemCeiling, deriveHotsFloor, DAY_LIMIT } from '../../config/testBuilderConfig';
+import { deriveKeyStage, deriveHotsFloor, DAY_LIMIT, isManualCeilingType, resolveItemCeiling } from '../../config/testBuilderConfig';
 import { Check, Lock, Loader2, Save, ClipboardList } from 'lucide-react';
 
 import StepSetup from './StepSetup';
@@ -22,7 +22,8 @@ const STEPS = [
     isValid: (s) => !!(
       s.gradeLevel && s.subject?.trim() && s.testType && s.terms?.length > 0 &&
       s.questionFormats?.length > 0 &&
-      s.competencies?.length > 0 && s.competencies.every((c) => c.text?.trim())
+      s.competencies?.length > 0 && s.competencies.every((c) => c.text?.trim()) &&
+      (!isManualCeilingType(s.testType) || (s.itemCeilingOverride >= 10 && s.itemCeilingOverride <= 25))
     ),
     primaryLabel: () => "Continue to Bloom's Levels →",
     onPrimary: ({ goNext }) => goNext(),
@@ -63,10 +64,12 @@ function pickSessionFields(store) {
     keyStage,
     subject:      store.subject,
     testType:     store.testType,
-    itemCeiling:  keyStage ? deriveItemCeiling(keyStage, store.testType) : 0,
+    itemCeilingOverride: store.itemCeilingOverride,
+    itemCeiling:  resolveItemCeiling(keyStage, store.testType, store.itemCeilingOverride),
     terms:        store.terms,
     questionFormats: store.questionFormats,
     proficiencyLevel: store.proficiencyLevel,
+    contextNotes: store.contextNotes,
     competencies: store.competencies,
     dayLimit:     DAY_LIMIT,
     cognitiveWeights: store.cognitiveWeights,
@@ -117,8 +120,8 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
       .then(() => setSaveState('saved'))
       .catch(() => setSaveState('idle'));
   }, [
-    ready, store.gradeLevel, store.subject, store.testType, store.terms, store.questionFormats,
-    JSON.stringify(store.competencies), JSON.stringify(store.cognitiveWeights), JSON.stringify(store.tos),
+    ready, store.gradeLevel, store.subject, store.testType, store.itemCeilingOverride, store.terms, store.questionFormats,
+    store.contextNotes, JSON.stringify(store.competencies), JSON.stringify(store.cognitiveWeights), JSON.stringify(store.tos),
   ], 500);
 
   const step = STEPS[activeStep];

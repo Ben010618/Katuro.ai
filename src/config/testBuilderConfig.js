@@ -93,6 +93,30 @@ export function deriveItemCeiling(keyStage, testType) {
   return ITEM_CEILINGS[keyStage]?.[testType] ?? 0;
 }
 
+// Summative Tests (ST1/ST2): DepEd memo caps these at 25 items regardless of
+// Key Stage, and lets the teacher pick the count (min 10) rather than a fixed
+// auto value. Term Examination keeps the auto-derived ceiling above.
+export const MANUAL_CEILING_TYPES = new Set(['ST1', 'ST2']);
+export const MANUAL_CEILING_MIN = 10;
+export const MANUAL_CEILING_MAX = 25;
+
+export function isManualCeilingType(testType) {
+  return MANUAL_CEILING_TYPES.has(testType);
+}
+
+export function manualCeilingOptions() {
+  const opts = [];
+  for (let n = MANUAL_CEILING_MIN; n <= MANUAL_CEILING_MAX; n++) opts.push(n);
+  return opts;
+}
+
+// Single source of truth for the effective item ceiling — manual pick for
+// ST1/ST2, DepEd auto-derived value for everything else.
+export function resolveItemCeiling(keyStage, testType, manualCeiling) {
+  if (isManualCeilingType(testType)) return manualCeiling || 0;
+  return keyStage ? deriveItemCeiling(keyStage, testType) : 0;
+}
+
 // HOTS floor by Key Stage — product convention, not a hard DepEd number.
 export const HOTS_FLOOR = { KS2: 0, KS3: 30, KS4: 40 };
 
