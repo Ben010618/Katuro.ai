@@ -71,21 +71,6 @@ export async function deletePostPhotos(uid, postId, count) {
 }
 
 /**
- * Upload a profile cover photo to Firebase Storage and return the download URL.
- */
-export async function uploadCoverPhoto(uid, file) {
-  const compressed = await imageCompression(file, {
-    maxSizeMB: 2,
-    maxWidthOrHeight: 1920,
-    useWebWorker: true,
-    fileType: 'image/jpeg',
-  });
-  const storageRef = ref(storage, `shares/${uid}/cover.jpg`);
-  const snap = await uploadBytes(storageRef, compressed, { contentType: 'image/jpeg' });
-  return getDownloadURL(snap.ref);
-}
-
-/**
  * Create a local preview URL for a File object.
  * Caller is responsible for revoking via URL.revokeObjectURL.
  */

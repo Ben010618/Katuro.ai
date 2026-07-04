@@ -16,7 +16,7 @@ function countWords(text) {
   return plain === '' ? 0 : plain.split(/\s+/).length;
 }
 
-export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGrade, subject: defaultSubject, onSuccess, onClose }) {
+export function PostComposer({ uid, displayName, initials, photoURL, school: defaultSchool, gradeLevel: defaultGrade, subject: defaultSubject, onSuccess, onClose }) {
   const { uploading, progress, error: postError, publish } = usePost(uid);
 
   const [files,       setFiles]       = useState([]);
@@ -59,7 +59,10 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
 
   async function handlePost() {
     if (!files.length) { setFileError('Please add at least one photo.'); return; }
-    const postId = await publish({ files, title, caption, school, gradeLevel, subject });
+    const postId = await publish({
+      files, title, caption, school, gradeLevel, subject,
+      authorName: displayName, authorInitials: initials, authorPhotoURL: photoURL,
+    });
     if (postId) {
       previews.forEach(URL.revokeObjectURL);
       onSuccess?.(postId);
@@ -179,6 +182,9 @@ export function PostComposer({ uid, school: defaultSchool, gradeLevel: defaultGr
 
 PostComposer.propTypes = {
   uid:             PropTypes.string.isRequired,
+  displayName:     PropTypes.string,
+  initials:        PropTypes.string,
+  photoURL:        PropTypes.string,
   school:          PropTypes.string,
   gradeLevel:      PropTypes.string,
   subject:         PropTypes.string,

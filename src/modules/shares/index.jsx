@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Images, Compass, PlusSquare, Bell, User, Home,
-} from 'lucide-react';
-// Images kept for mobile feed nav; Compass used for renamed "Explore" (main feed)
+import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { Compass, PlusSquare, Bell, Home } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ensureSharesProfile, getInitials } from './services/sharesService';
 import { useNotifications } from './hooks/useNotifications';
@@ -11,7 +8,6 @@ import { PostComposer }     from './components/PostComposer';
 import { SharesLogoFull }   from './assets/SharesLogo';
 import SharesFeed           from './SharesFeed';
 import SharesExplore        from './SharesExplore';
-import SharesProfile        from './SharesProfile';
 import SharesNotifications  from './SharesNotifications';
 import SharePostPage        from './SharePostPage';
 import './shares.css';
@@ -33,7 +29,6 @@ function NavItem({ to, icon: Icon, label, badge }) {
 export default function SharesModule() {
   const { user, photoURL } = useAuth();
   const navigate           = useNavigate();
-  const location           = useLocation();
   const [profile,  setProfile]  = useState(null);
   const [composer, setComposer] = useState(false);
 
@@ -51,8 +46,9 @@ export default function SharesModule() {
     ensureSharesProfile(user.uid, {
       displayName: user.displayName || '',
       email:       user.email || '',
+      photoURL,
     }).then(setProfile).catch(() => {});
-  }, [user?.uid]);
+  }, [user?.uid, photoURL]);
 
   const pageProps = { uid, displayName, initials, photoURL, school, gradeLevel, subject };
 
@@ -100,11 +96,9 @@ export default function SharesModule() {
         <div className="sh-main" style={{ maxWidth: '100%', padding: 0 }}>
           <Routes>
             <Route index element={<SharesFeed {...pageProps} />} />
-            <Route path="explore" element={<SharesExplore uid={uid} displayName={displayName} initials={initials} />} />
-            <Route path="post/:postId" element={<SharePostPage uid={uid} displayName={displayName} initials={initials} />} />
+            <Route path="explore" element={<SharesExplore uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} />} />
+            <Route path="post/:postId" element={<SharePostPage uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} />} />
             <Route path="notifications" element={<SharesNotifications uid={uid} />} />
-            <Route path="profile/:uid" element={<SharesProfile myUid={uid} myDisplayName={displayName} myInitials={initials} />} />
-            <Route path="profile" element={<SharesProfile myUid={uid} myDisplayName={displayName} myInitials={initials} />} />
           </Routes>
         </div>
       </main>
@@ -127,9 +121,6 @@ export default function SharesModule() {
             )}
             <span>Notifs</span>
           </NavLink>
-          <NavLink to={`/shares/profile/${uid}`} className={({ isActive }) => `sh-mobile-nav-btn ${isActive ? 'active' : ''}`}>
-            <User size={22} /><span>Me</span>
-          </NavLink>
         </div>
       </nav>
 
@@ -137,6 +128,9 @@ export default function SharesModule() {
       {composer && (
         <PostComposer
           uid={uid}
+          displayName={displayName}
+          initials={initials}
+          photoURL={photoURL}
           school={school}
           gradeLevel={gradeLevel}
           subject={subject}

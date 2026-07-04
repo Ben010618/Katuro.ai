@@ -752,68 +752,6 @@
 
 .sh-load-more-btn:hover { background: var(--sh-primary-light); }
 
-/* ── Profile ─────────────────────────────────────────────────────── */
-/* Profile page wrapper — max-width centered, padded */
-.sh-profile-page {
-  max-width: 780px;
-  margin: 0 auto;
-  padding: 20px 16px 40px;
-}
-
-.sh-profile-header {
-  background: var(--sh-surface);
-  border: 1px solid var(--sh-border-neutral);
-  border-radius: var(--sh-radius-md);
-  overflow: hidden; margin-bottom: 16px;
-  box-shadow: var(--sh-shadow-sm);
-}
-
-.sh-profile-banner {
-  height: 160px;
-  background: linear-gradient(135deg, #0d2218 0%, #2d6a4f 50%, #22c55e 100%);
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-}
-
-.sh-cover-btn {
-  position: absolute;
-  bottom: 14px;
-  right: 16px;
-  background: rgba(0,0,0,0.52);
-  color: white;
-  border: none;
-  border-radius: 20px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  backdrop-filter: blur(6px);
-  transition: background 0.15s;
-}
-.sh-cover-btn:hover   { background: rgba(0,0,0,0.72); }
-.sh-cover-btn:disabled { opacity: 0.6; cursor: default; }
-
-.sh-profile-info { padding: 0 20px 20px; margin-top: -44px; position: relative; z-index: 2; }
-
-.sh-profile-avatar-wrap {
-  display: flex; align-items: flex-end;
-  justify-content: space-between; margin-bottom: 12px;
-}
-
-.sh-profile-name { font-size: 20px; font-weight: 800; color: var(--sh-text-primary); margin: 0 0 4px; }
-.sh-profile-meta { font-size: 13px; color: var(--sh-text-muted); margin: 0 0 8px; }
-.sh-profile-bio  { font-size: 14px; color: var(--sh-text-secondary); line-height: 1.5; margin: 0 0 14px; }
-
-.sh-profile-stats { display: flex; gap: 24px; }
-.sh-stat { text-align: center; }
-.sh-stat-value { font-size: 18px; font-weight: 800; color: var(--sh-text-primary); font-family: var(--sh-mono); }
-.sh-stat-label { font-size: 11px; color: var(--sh-text-muted); font-weight: 600; }
-
 .sh-post-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
 
 .sh-post-thumb { aspect-ratio: 1; overflow: hidden; cursor: pointer; background: var(--sh-bg); position: relative; }
@@ -877,22 +815,6 @@
   gap: 12px;
   margin-bottom: 12px;
 }
-
-.sh-my-card-btn {
-  width: 100%;
-  background: var(--sh-primary-light);
-  color: var(--sh-primary);
-  border: 1px solid rgba(45,106,79,0.22);
-  border-radius: 8px;
-  padding: 7px 0;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.14s;
-}
-
-.sh-my-card-btn:hover { background: #bbf7d0; }
 
 /* Announcement card */
 .sh-announcement-card {

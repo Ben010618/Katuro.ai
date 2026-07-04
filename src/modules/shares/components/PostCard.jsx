@@ -33,7 +33,7 @@ function renderPlainCaption(caption) {
   );
 }
 
-export function PostCard({ post, uid, displayName, initials, onDelete }) {
+export function PostCard({ post, uid, displayName, initials, photoURL, onDelete }) {
   const [lightbox,      setLightbox]      = useState(null);
   const [showMenu,      setShowMenu]      = useState(false);
   const [showComments,  setShowComments]  = useState(false);
@@ -97,17 +97,15 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
 
       {/* Header */}
       <div className="sh-card-header">
-        <Link to={`/shares/profile/${post.authorUid}`} style={{ textDecoration: 'none' }}>
-          <div className="sh-avatar sh-avatar--md" style={{ background: bg, color: '#fff' }}>
-            {post.authorPhotoURL
-              ? <img src={post.authorPhotoURL} alt={post.authorName || 'Teacher'} />
-              : post.authorInitials || getInitials(post.authorName)}
-          </div>
-        </Link>
+        <div className="sh-avatar sh-avatar--md" style={{ background: bg, color: '#fff' }}>
+          {post.authorPhotoURL
+            ? <img src={post.authorPhotoURL} alt={post.authorName || 'Teacher'} />
+            : post.authorInitials || getInitials(post.authorName)}
+        </div>
         <div className="sh-card-header-info">
-          <Link to={`/shares/profile/${post.authorUid}`} className="sh-author-name">
+          <span className="sh-author-name">
             {post.authorName || 'Teacher'}
-          </Link>
+          </span>
           <div className="sh-author-meta">
             {post.school    && <span>{post.school}</span>}
             {post.school && post.gradeLevel && <span className="sh-author-meta-dot">·</span>}
@@ -247,6 +245,7 @@ export function PostCard({ post, uid, displayName, initials, onDelete }) {
           postAuthorUid={post.authorUid}
           displayName={displayName}
           initials={initials}
+          photoURL={photoURL}
           commentCount={post.commentCount}
         />
       )}
@@ -280,5 +279,6 @@ PostCard.propTypes = {
   uid:         PropTypes.string.isRequired,
   displayName: PropTypes.string.isRequired,
   initials:    PropTypes.string.isRequired,
+  photoURL:    PropTypes.string,
   onDelete:    PropTypes.func,
 };

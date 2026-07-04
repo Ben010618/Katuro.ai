@@ -22,7 +22,7 @@ function ReplyRow({ r, uid, onDelete }) {
   const isOwn = r.authorUid === uid;
   return (
     <div className="sh-comment" style={{ marginBottom: 6 }}>
-      <Avatar uid={r.authorUid} initials={r.authorInitials || getInitials(r.authorName)} size="sm" />
+      <Avatar uid={r.authorUid} photoURL={r.authorPhotoURL} initials={r.authorInitials || getInitials(r.authorName)} size="sm" />
       <div className="sh-comment-body">
         <div className="sh-comment-bubble">
           <div className="sh-comment-author">{r.authorName || 'Teacher'}</div>
@@ -46,7 +46,7 @@ function ReplyRow({ r, uid, onDelete }) {
   );
 }
 
-function CommentRow({ c, uid, postId, myDisplayName, myInitials, addReply, deleteComment, editComment }) {
+function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, addReply, deleteComment, editComment }) {
   const [editing,     setEditing]     = useState(false);
   const [editText,    setEditText]    = useState(c.text);
   const [replyOpen,   setReplyOpen]   = useState(false);
@@ -72,7 +72,7 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, addReply, delet
 
   async function submitReply() {
     if (!replyText.trim()) return;
-    await addReply(c.id, c.authorUid, myDisplayName, myInitials, replyText);
+    await addReply(c.id, c.authorUid, myDisplayName, myInitials, myPhotoURL, replyText);
     setReplyText('');
     setReplyOpen(false);
     setShowReplies(true);
@@ -80,7 +80,7 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, addReply, delet
 
   return (
     <div className="sh-comment">
-      <Avatar uid={c.authorUid} initials={c.authorInitials || getInitials(c.authorName)} size="sm" />
+      <Avatar uid={c.authorUid} photoURL={c.authorPhotoURL} initials={c.authorInitials || getInitials(c.authorName)} size="sm" />
       <div className="sh-comment-body">
         <div className="sh-comment-bubble">
           <div className="sh-comment-author">{c.authorName || 'Teacher'}</div>
@@ -172,7 +172,7 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, addReply, delet
   );
 }
 
-export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, commentCount }) {
+export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, photoURL, commentCount }) {
   const { comments, loading, addComment, addReply, deleteComment, editComment } = useComments(postId, uid, postAuthorUid);
   const [expanded, setExpanded] = useState(false);
   const [text,     setText]     = useState('');
@@ -183,7 +183,7 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
   async function submitComment() {
     if (!text.trim() || sending) return;
     setSending(true);
-    await addComment(displayName, initials, text);
+    await addComment(displayName, initials, photoURL, text);
     setText('');
     setSending(false);
   }
@@ -209,6 +209,7 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
           postId={postId}
           myDisplayName={displayName}
           myInitials={initials}
+          myPhotoURL={photoURL}
           addReply={addReply}
           deleteComment={deleteComment}
           editComment={editComment}
@@ -217,7 +218,7 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
 
       {/* New comment input */}
       <div className="sh-comment-input-row">
-        <Avatar uid={uid} initials={initials} size="sm" />
+        <Avatar uid={uid} photoURL={photoURL} initials={initials} size="sm" />
         <textarea
           className="sh-comment-input"
           placeholder="Add a comment…"
@@ -246,5 +247,6 @@ CommentThread.propTypes = {
   postAuthorUid: PropTypes.string.isRequired,
   displayName:   PropTypes.string.isRequired,
   initials:      PropTypes.string.isRequired,
+  photoURL:      PropTypes.string,
   commentCount:  PropTypes.number,
 };

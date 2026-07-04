@@ -44,9 +44,6 @@ export function NotificationItem({ notif, onRead }) {
   if (notif.postId) {
     return <Link to={`/shares`} style={{ textDecoration: 'none' }}>{inner}</Link>;
   }
-  if (notif.type === 'follow') {
-    return <Link to={`/shares/profile/${notif.fromUid}`} style={{ textDecoration: 'none' }}>{inner}</Link>;
-  }
   return inner;
 }
 

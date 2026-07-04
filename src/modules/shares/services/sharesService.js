@@ -42,15 +42,28 @@ export function avatarColor(uid = '') {
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 
-/** Ensure a shares_profile document exists for the user, creating if absent. */
-export async function ensureSharesProfile(uid, { displayName, email, school = '', gradeLevel = '', subject = '' }) {
+/**
+ * Ensure a shares_profile document exists for the user, creating it on first
+ * visit. Identity fields (name/initials/photo) are re-synced from the source
+ * of truth — the teacher's main account profile — on every call, so kaTuro
+ * Shares always reflects the photo uploaded at registration/AppShell without
+ * needing its own separate profile-editing UI.
+ */
+export async function ensureSharesProfile(uid, { displayName, email, photoURL = null, school = '', gradeLevel = '', subject = '' }) {
   const ref = doc(db, 'shares_profiles', uid);
   const snap = await getDoc(ref);
-  if (snap.exists()) return { id: uid, ...snap.data() };
-  const profile = {
+  const identity = {
     displayName: displayName || email?.split('@')[0] || 'Teacher',
     initials: getInitials(displayName),
-    school, gradeLevel, subject, bio: '',
+    photoURL,
+  };
+  if (snap.exists()) {
+    await setDoc(ref, identity, { merge: true });
+    return { id: uid, ...snap.data(), ...identity };
+  }
+  const profile = {
+    ...identity,
+    school, gradeLevel, subject,
     followerCount: 0, followingCount: 0, postCount: 0,
     createdAt: serverTimestamp(),
   };
@@ -64,26 +77,16 @@ export async function getSharesProfile(uid) {
   return snap.exists() ? { id: uid, ...snap.data() } : null;
 }
 
-/** Update editable profile fields. */
-export async function updateSharesProfile(uid, { displayName, school, gradeLevel, subject, bio }) {
-  await updateDoc(doc(db, 'shares_profiles', uid), {
-    displayName, school, gradeLevel, subject, bio,
-    initials: getInitials(displayName),
-  });
-}
-
-/** Save a cover photo URL to the shares_profile document. */
-export async function setCoverPhoto(uid, url) {
-  await updateDoc(doc(db, 'shares_profiles', uid), { coverPhotoURL: url });
-}
-
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
 /** Create a new photo post. Returns the new document ID. */
-export async function createPost(uid, { photoUrls, title, caption, school, gradeLevel, subject }) {
+export async function createPost(uid, { photoUrls, title, caption, school, gradeLevel, subject, authorName, authorInitials, authorPhotoURL }) {
   const hashtags = extractHashtags(caption);
   const ref = await addDoc(collection(db, 'shares_posts'), {
     authorUid: uid,
+    authorName: authorName || '',
+    authorInitials: authorInitials || '',
+    authorPhotoURL: authorPhotoURL || null,
     photoUrls,
     title: title || '',
     caption,
@@ -300,20 +303,20 @@ export function subscribeToReplies(postId, commentId, cb) {
 }
 
 /** Post a top-level comment. */
-export async function addComment(postId, uid, { displayName, initials, text }) {
+export async function addComment(postId, uid, { displayName, initials, photoURL, text }) {
   const ref = await addDoc(
     collection(db, 'shares_posts', postId, 'comments'),
-    { authorUid: uid, authorName: displayName, authorInitials: initials, text, likes: 0, replyCount: 0, createdAt: serverTimestamp() }
+    { authorUid: uid, authorName: displayName, authorInitials: initials, authorPhotoURL: photoURL || null, text, likes: 0, replyCount: 0, createdAt: serverTimestamp() }
   );
   await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(1) });
   return ref.id;
 }
 
 /** Post a reply to a comment. */
-export async function addReply(postId, commentId, uid, { displayName, initials, text }) {
+export async function addReply(postId, commentId, uid, { displayName, initials, photoURL, text }) {
   await addDoc(
     collection(db, 'shares_posts', postId, 'comments', commentId, 'replies'),
-    { authorUid: uid, authorName: displayName, authorInitials: initials, text, createdAt: serverTimestamp() }
+    { authorUid: uid, authorName: displayName, authorInitials: initials, authorPhotoURL: photoURL || null, text, createdAt: serverTimestamp() }
   );
   await updateDoc(doc(db, 'shares_posts', postId, 'comments', commentId), { replyCount: increment(1) });
   await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(1) });

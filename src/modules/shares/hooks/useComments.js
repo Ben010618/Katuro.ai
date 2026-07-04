@@ -29,10 +29,10 @@ export function useComments(postId, uid, postAuthorUid) {
     return unsub;
   }, [postId]);
 
-  const addComment = useCallback(async (displayName, initials, text) => {
+  const addComment = useCallback(async (displayName, initials, photoURL, text) => {
     if (!text.trim()) return;
     try {
-      const commentId = await svcAddComment(postId, uid, { displayName, initials, text: text.trim() });
+      const commentId = await svcAddComment(postId, uid, { displayName, initials, photoURL, text: text.trim() });
       await notifyComment(uid, displayName, postId, postAuthorUid).catch(() => {});
       return commentId;
     } catch (e) {
@@ -40,10 +40,10 @@ export function useComments(postId, uid, postAuthorUid) {
     }
   }, [postId, uid, postAuthorUid]);
 
-  const addReply = useCallback(async (commentId, commentAuthorUid, displayName, initials, text) => {
+  const addReply = useCallback(async (commentId, commentAuthorUid, displayName, initials, photoURL, text) => {
     if (!text.trim()) return;
     try {
-      await svcAddReply(postId, commentId, uid, { displayName, initials, text: text.trim() });
+      await svcAddReply(postId, commentId, uid, { displayName, initials, photoURL, text: text.trim() });
       await notifyReply(uid, displayName, postId, commentAuthorUid).catch(() => {});
     } catch (e) {
       setError(e.message);

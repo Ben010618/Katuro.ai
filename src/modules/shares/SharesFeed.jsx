@@ -77,6 +77,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
                   uid={uid}
                   displayName={displayName}
                   initials={initials}
+                  photoURL={photoURL}
                   onDelete={async (id) => { removePost(id); }}
                 />
               ))
@@ -98,8 +99,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
           <div className="sh-my-card-inner">
             <div
               className="sh-avatar sh-avatar--md"
-              style={{ background: myBg, color: '#fff', cursor: 'pointer', flexShrink: 0 }}
-              onClick={() => navigate(`/shares/profile/${uid}`)}
+              style={{ background: myBg, color: '#fff', flexShrink: 0 }}
             >
               {photoURL ? <img src={photoURL} alt={displayName} /> : initials}
             </div>
@@ -119,13 +119,6 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
               )}
             </div>
           </div>
-          <button
-            onClick={() => navigate(`/shares/profile/${uid}`)}
-            className="sh-my-card-btn"
-            type="button"
-          >
-            View My Profile
-          </button>
         </div>
 
         {/* kaTuro Announcement */}
@@ -148,12 +141,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
           <div className="sh-widget">
             <div className="sh-widget-title">🟢 Online Now</div>
             {onlineTeachers.slice(0, 6).map(t => (
-              <div
-                key={t.id}
-                className="sh-teacher-card"
-                onClick={() => navigate(`/shares/profile/${t.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
+              <div key={t.id} className="sh-teacher-card">
                 <div className="sh-avatar sh-avatar--sm" style={{ background: avatarColor(t.id), color: '#fff' }}>
                   {t.photoURL
                     ? <img src={t.photoURL} alt={t.displayName || 'T'} />
