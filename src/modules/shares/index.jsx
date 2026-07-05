@@ -30,7 +30,16 @@ export default function SharesModule() {
   const { user, photoURL } = useAuth();
   const navigate           = useNavigate();
   const [profile,  setProfile]  = useState(null);
-  const [composer, setComposer] = useState(false);
+  // Deep link from the daily reminder popup (/shares?compose=1) opens the
+  // composer immediately on mount.
+  const [composer, setComposer] = useState(() => new URLSearchParams(window.location.search).get('compose') === '1');
+
+  // Strip the ?compose=1 param from the address bar so back/refresh doesn't reopen it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('compose') === '1') {
+      window.history.replaceState(null, '', '/shares');
+    }
+  }, []);
 
   const uid         = user?.uid || '';
   const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Teacher';
