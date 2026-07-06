@@ -22,6 +22,31 @@
   --kt-border:         rgba(45,106,79,0.15);
   --kt-sidebar-bg:     #ffffff;
   --kt-topbar-bg:      #ffffff;
+
+  /* Semantic colors — distinct from brand green, so "success" doesn't have
+     to double as "brand" and both lose their meaning. */
+  --kt-success:      #16a34a;
+  --kt-success-tint: #dcfce7;
+  --kt-info:         #0284c7;
+  --kt-info-tint:    #e0f2fe;
+  --kt-warning:      #e8a320;
+  --kt-warning-tint: #fef3c7;
+  --kt-danger-tint:  #fde8e8;
+
+  /* Radius scale */
+  --kt-radius-sm:   8px;
+  --kt-radius-md:   14px;
+  --kt-radius-lg:   20px;
+  --kt-radius-pill: 999px;
+
+  /* Elevation — soft, tactile shadows (light mode). */
+  --kt-shadow-sm: 0 1px 2px rgba(13,34,24,0.06);
+  --kt-shadow-md: 0 8px 24px rgba(13,34,24,0.10);
+  --kt-shadow-lg: 0 24px 64px rgba(13,34,24,0.18);
+
+  /* Motion */
+  --kt-ease:     cubic-bezier(0.4, 0, 0.2, 1);
+  --kt-duration: 0.18s;
 }
 
 [data-dark="true"] {
@@ -38,6 +63,20 @@
   --kt-sidebar-bg:     #0a1710;
   --kt-topbar-bg:      #0e1f17;
   color-scheme: dark;
+
+  --kt-success:      #4ade80;
+  --kt-success-tint: rgba(74,222,128,0.12);
+  --kt-info:         #38bdf8;
+  --kt-info-tint:    rgba(56,189,248,0.12);
+  --kt-warning:      #fbbf24;
+  --kt-warning-tint: rgba(251,191,36,0.12);
+  --kt-danger-tint:  rgba(224,92,92,0.14);
+
+  /* Dark-mode elevation — drop shadows disappear on dark backgrounds, so
+     depth comes from a faint light border/inset highlight instead. */
+  --kt-shadow-sm: 0 0 0 1px rgba(255,255,255,0.04);
+  --kt-shadow-md: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.32);
+  --kt-shadow-lg: 0 0 0 1px rgba(255,255,255,0.08), 0 24px 64px rgba(0,0,0,0.42);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -92,14 +131,16 @@ body {
 ═══════════════════════════════════════════════════════════ */
 .card {
   background: var(--kt-card);
-  border-radius: 14px;
+  border-radius: var(--kt-radius-md);
   border: 1px solid var(--kt-border);
   padding: 20px 24px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: var(--kt-shadow-sm);
+  transition: border-color var(--kt-duration) var(--kt-ease), transform var(--kt-duration) var(--kt-ease), box-shadow var(--kt-duration) var(--kt-ease);
 }
 .card:hover {
   border-color: rgba(45,106,79,0.3);
   transform: translateY(-1px);
+  box-shadow: var(--kt-shadow-md);
 }
 
 .card-accent {
@@ -285,6 +326,37 @@ body {
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Responsive Grid Utilities
+   Many pages set gridTemplateColumns as an inline style, which
+   can't respond to a media query on its own. These classes own
+   the column count instead — apply as className alongside the
+   inline style (leave gap/marginBottom/etc. inline; just drop
+   `display` and `gridTemplateColumns` from the style object).
+═══════════════════════════════════════════════════════════ */
+.kt-grid-2         { display: grid; grid-template-columns: 1fr 1fr; }
+.kt-grid-3         { display: grid; grid-template-columns: repeat(3, 1fr); }
+.kt-grid-4         { display: grid; grid-template-columns: repeat(4, 1fr); }
+.kt-split-sidebar  { display: grid; grid-template-columns: 1fr 296px; }
+
+@media (max-width: 860px) {
+  .kt-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .kt-grid-2,
+  .kt-grid-3,
+  .kt-split-sidebar { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .kt-grid-4 { grid-template-columns: 1fr; }
+}
+
+/* Wraps wide tables/dense rows so they scroll instead of squeezing/breaking. */
+.kt-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { getPost }     from './services/sharesService';
@@ -39,7 +39,7 @@ export default function SharePostPage({ uid, displayName, initials, photoURL }) 
 
       {!loading && notFound && (
         <div className="sh-empty">
-          <div className="sh-empty-icon" style={{ fontSize: 48 }}>🔍</div>
+          <div className="sh-empty-icon" style={{ display: 'flex', justifyContent: 'center', opacity: 0.35 }}><Search size={40} /></div>
           <div className="sh-empty-title">Post not found</div>
           <p className="sh-empty-text">This post may have been deleted or the link is incorrect.</p>
         </div>

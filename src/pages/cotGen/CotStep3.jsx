@@ -156,7 +156,7 @@ export default function CotStep3() {
       </div>
 
       {/* Review cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+      <div className="kt-grid-2" style={{ gap: 14, marginBottom: 16 }}>
 
         {/* Lesson info card */}
         <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid rgba(124,58,237,0.12)', padding: '16px 18px' }}>

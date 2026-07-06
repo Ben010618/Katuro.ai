@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { useFeed } from './hooks/useFeed';
+import { ImageOff } from 'lucide-react';
 import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { TeacherCard }  from './components/TeacherCard';
@@ -61,7 +62,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
             : posts.length === 0
               ? (
                 <div className="sh-empty">
-                  <div className="sh-empty-icon" style={{ fontSize: 48 }}>📷</div>
+                  <div className="sh-empty-icon" style={{ display: 'flex', justifyContent: 'center', opacity: 0.35 }}><ImageOff size={40} /></div>
                   <div className="sh-empty-title">No posts yet</div>
                   <p className="sh-empty-text">
                     {mode === 'following'
@@ -123,7 +124,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
 
         {/* kaTuro Announcement */}
         <div className="sh-widget sh-announcement-card">
-          <div className="sh-widget-title">📢 kaTuro Update</div>
+          <div className="sh-widget-title">kaTuro Update</div>
           <p style={{ fontSize: 13, color: 'var(--sh-text-secondary)', lineHeight: 1.55, margin: '0 0 10px' }}>
             Welcome to <strong>kaTuro Shares</strong> — share classroom moments, creative lessons, and student activities with fellow Filipino teachers. 🇵🇭
           </p>
@@ -139,7 +140,10 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
         {/* Online teachers */}
         {onlineTeachers.length > 0 && (
           <div className="sh-widget">
-            <div className="sh-widget-title">🟢 Online Now</div>
+            <div className="sh-widget-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
+              Online Now
+            </div>
             {onlineTeachers.slice(0, 6).map(t => (
               <div key={t.id} className="sh-teacher-card">
                 <div className="sh-avatar sh-avatar--sm" style={{ background: avatarColor(t.id), color: '#fff' }}>

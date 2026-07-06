@@ -213,7 +213,7 @@ export default function Step3() {
       </div>
 
       {/* Review Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+      <div className="kt-grid-2" style={{ gap: 14, marginBottom: 16 }}>
 
         <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>

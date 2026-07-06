@@ -257,7 +257,7 @@ export default function QuizBuilderPage() {
       </div>
 
       {/* ── Two-column layout: wizard left, bubble preview right ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 296px', gap: 20, alignItems: 'start' }}>
+      <div className="kt-split-sidebar" style={{ gap: 20, alignItems: 'start' }}>
 
       {/* ── LEFT: wizard card ── */}
       <div style={{

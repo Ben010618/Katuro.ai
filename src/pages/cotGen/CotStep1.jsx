@@ -71,7 +71,7 @@ export default function CotStep1() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
         {/* Row: Teacher + School */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="kt-grid-2" style={{ gap: 16 }}>
           <Field label="Teacher Name" required>
             <input
               {...inp}
@@ -91,7 +91,7 @@ export default function CotStep1() {
         </div>
 
         {/* Row: Subject + Grade */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="kt-grid-2" style={{ gap: 16 }}>
           <Field label="Subject / Learning Area" required>
             <input
               {...inp}
@@ -109,7 +109,7 @@ export default function CotStep1() {
         </div>
 
         {/* Row: Quarter + Teaching Date */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="kt-grid-2" style={{ gap: 16 }}>
           <Field label="Quarter" required>
             <select {...selectStyle} value={store.quarter} onChange={set('quarter')}>
               <option value="">Select quarter</option>

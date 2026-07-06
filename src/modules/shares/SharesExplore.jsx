@@ -101,7 +101,7 @@ export default function SharesExplore({ uid, displayName, initials, photoURL }) 
             : posts.length === 0
               ? (
                 <div className="sh-empty">
-                  <div className="sh-empty-icon" style={{ fontSize: 40 }}>🔍</div>
+                  <div className="sh-empty-icon" style={{ display: 'flex', justifyContent: 'center', opacity: 0.35 }}><Search size={36} /></div>
                   <div className="sh-empty-title">
                     {activeTag ? `No posts tagged #${activeTag} yet` : 'Nothing here yet'}
                   </div>

@@ -143,13 +143,13 @@ export default function StepReview() {
       {/* Overview card */}
       <div className="card card-accent">
         <p style={sectionLabel}>Overview</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <div className="kt-grid-4" style={{ gap: 14 }}>
           <ReviewField label="Grade Level" value={store.gradeLevel || '—'} />
           <ReviewField label="Subject" value={store.subject || '—'} />
           <ReviewField label="Test Type" value={store.testType} />
           <ReviewField label="Key Stage" value={keyStage ? KEY_STAGE_LABELS[keyStage] : '—'} />
         </div>
-        <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div className="kt-grid-2" style={{ marginTop: 14, gap: 14 }}>
           <ReviewField label="Terms" value={store.terms.length ? store.terms.join(', ') : '—'} />
           <ReviewField label="Question Formats" value={store.questionFormats.length ? store.questionFormats.join(', ') : '—'} />
         </div>
@@ -275,7 +275,7 @@ export default function StepReview() {
         </div>
 
         {/* Three independent downloads */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <div className="kt-grid-3" style={{ gap: 10 }}>
           <DownloadButton
             icon={Table2} label="TOS" sub="Table of Specifications"
             enabled={canDownloadTos} loading={downloadingKind === 'tos'}

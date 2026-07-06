@@ -158,17 +158,17 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
         ))}
 
         {/* Classroom box */}
-        <div style={{ marginTop: 10, borderRadius: 13, background: 'linear-gradient(160deg, #0f172a 0%, #1a2236 55%, #1e293b 100%)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 8px 8px', boxShadow: '0 4px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-          <p style={{ margin: '0 0 7px 7px', fontSize: 9, fontWeight: 800, color: 'rgba(148,163,184,0.65)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>Classroom</p>
+        <div style={{ marginTop: 10, borderRadius: 'var(--kt-radius-md)', background: 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 8px 8px', boxShadow: 'var(--kt-shadow-md), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+          <p style={{ margin: '0 0 7px 7px', fontSize: 9, fontWeight: 800, color: 'rgba(216,243,220,0.55)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>Classroom</p>
           {CLASSROOM_NAV.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} onClick={onClose}
               style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 10px', borderRadius: 9, textDecoration: 'none', marginBottom: 2,
+                padding: '9px 10px', borderRadius: 'var(--kt-radius-sm)', textDecoration: 'none', marginBottom: 2,
                 background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
                 color: '#ffffff', fontWeight: isActive ? 700 : 500, fontSize: 13,
-                transition: 'background 0.14s',
-                borderLeft: isActive ? '3px solid #4ade80' : '3px solid transparent',
+                transition: 'background var(--kt-duration) var(--kt-ease)',
+                borderLeft: isActive ? '3px solid var(--kt-green-bright)' : '3px solid transparent',
               })}
               onMouseEnter={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.09)' }); }}
               onMouseLeave={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'transparent' }); }}
@@ -348,7 +348,7 @@ export default function AppShell() {
             <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.07 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
           ))}
 
-          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
+          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: 'var(--kt-shadow-sm)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
             <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#1a3d2b', alignItems: 'center' }}>
               <Menu size={20} />
             </button>

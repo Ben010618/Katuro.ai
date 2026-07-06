@@ -981,7 +981,8 @@ function AnalyticsSection({ teachers = [] }) {
             <div style={{ ...card, marginTop: 20 }}>
               <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Weekly Retention Cohorts</p>
               <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>% of each signup-week cohort still active on Day 1 / 7 / 30 — a cell reads "—" until that cohort has actually reached that many days since signup</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="kt-scroll-x">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 420 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 70px 70px', gap: 8, padding: '0 12px 6px', borderBottom: '1px solid var(--kt-border)' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cohort (week of)</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center' }}>Size</span>
@@ -1003,6 +1004,7 @@ function AnalyticsSection({ teachers = [] }) {
                   </div>
                 ))}
               </div>
+              </div>
             </div>
           )}
 
@@ -1010,7 +1012,7 @@ function AnalyticsSection({ teachers = [] }) {
           {(lessonGenFunnel[0]?.count > 0 || dllGenFunnel[0]?.count > 0 || cotGenFunnel[0]?.count > 0 || testBuilderFunnel[0]?.count > 0) && (
             <div style={{ marginTop: 20 }}>
               <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Wizard Funnels</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="kt-grid-2" style={{ gap: 20 }}>
                 <FunnelCard title="Lesson Gen (ILAW)" stepLabels={LESSONGEN_STEPS} funnel={lessonGenFunnel} />
                 <FunnelCard title="DLL Gen" stepLabels={DLLGEN_STEPS} funnel={dllGenFunnel} />
                 <FunnelCard title="COT Gen" stepLabels={COTGEN_STEPS} funnel={cotGenFunnel} />
@@ -1021,7 +1023,7 @@ function AnalyticsSection({ teachers = [] }) {
 
           {/* Chart 6 & 7 — Subject / Grade Demand */}
           {(bySubject.length > 0 || byGrade.length > 0) && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            <div className="kt-grid-2" style={{ gap: 20, marginTop: 20 }}>
               {bySubject.length > 0 && (
                 <div style={card}>
                   <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Generations by Subject</p>
@@ -1654,7 +1656,7 @@ export default function AdminDashboard() {
           {showNotifs && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              width: 340, background: 'var(--kt-card)', borderRadius: 14,
+              width: 340, maxWidth: 'calc(100vw - 24px)', background: 'var(--kt-card)', borderRadius: 14,
               border: '1px solid var(--kt-border)',
               boxShadow: '0 12px 40px rgba(13,34,24,0.16)',
               zIndex: 100, overflow: 'hidden',
@@ -1775,7 +1777,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+        <div className="kt-grid-4" style={{ gap: 14, marginBottom: 24 }}>
           {[
             { label: 'Total Users',      value: teachers.length, Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
             { label: 'Active Users',     value: activeCount,     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },

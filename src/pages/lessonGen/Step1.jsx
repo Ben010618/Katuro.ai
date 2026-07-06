@@ -156,7 +156,7 @@ export default function Step1() {
       </div>
 
       {/* Two-column layout */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,alignItems:'start'}}>
+      <div className="kt-grid-2" style={{gap:20,alignItems:'start'}}>
 
         {/* LEFT: Form */}
         <div style={{background:'var(--kt-card)',border:'1px solid var(--kt-border)',borderRadius:14,padding:24,display:'flex',flexDirection:'column',gap:20}}>

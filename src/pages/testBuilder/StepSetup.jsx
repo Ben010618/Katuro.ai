@@ -74,7 +74,7 @@ export default function StepSetup() {
       </div>
 
       {/* Grade / Subject / Test type */}
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+      <div className="card kt-grid-2" style={{ gap: 18 }}>
         <div>
           <label style={labelStyle}>Grade Level <span style={{ color: 'var(--kt-danger)' }}>*</span></label>
           <select className="select" value={store.gradeLevel} onChange={(e) => store.setField('gradeLevel', e.target.value)}>

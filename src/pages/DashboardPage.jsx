@@ -244,9 +244,9 @@ export default function DashboardPage() {
       {/* Welcome banner */}
       <div style={{
         background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 50%, #2d6a4f 100%)',
-        borderRadius: 16, padding: '28px 32px',
+        borderRadius: 'var(--kt-radius-lg)', padding: '28px 32px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        overflow: 'hidden', position: 'relative',
+        overflow: 'hidden', position: 'relative', boxShadow: 'var(--kt-shadow-md)',
       }}>
         {SLIDE_IMGS.map((src, i) => (
           <div key={i} style={{
@@ -256,7 +256,7 @@ export default function DashboardPage() {
             backgroundPosition: 'center',
             opacity: i === slideIdx ? 0.09 : 0,
             transition: 'opacity 1.8s ease-in-out',
-            borderRadius: 16,
+            borderRadius: 'var(--kt-radius-lg)',
             pointerEvents: 'none',
           }} />
         ))}
@@ -378,12 +378,12 @@ export default function DashboardPage() {
             <button key={to} onClick={() => navigate(to)} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
-              borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-              transition: 'all 0.18s',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+              borderRadius: 'var(--kt-radius-md)', padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
+              transition: 'all var(--kt-duration) var(--kt-ease)',
+              boxShadow: 'var(--kt-shadow-sm)',
             }}
               onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: color, transform: 'translateY(-2px)', boxShadow: `0 6px 20px ${color}22` })}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(45,106,79,0.12)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(45,106,79,0.12)', transform: 'none', boxShadow: 'var(--kt-shadow-sm)' })}
             >
               <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: `${color}14`, border: `1px solid ${color}28`, display: 'grid', placeItems: 'center' }}>
                 <Icon size={19} color={color} />

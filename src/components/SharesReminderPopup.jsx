@@ -46,17 +46,17 @@ export default function SharesReminderPopup() {
     <>
       <style>{`
         @keyframes kt-shares-fade-in {
-          from { opacity: 0; transform: scale(0.94) translateY(8px); }
+          from { opacity: 0; transform: scale(0.96) translateY(6px); }
           to   { opacity: 1; transform: scale(1)    translateY(0);   }
         }
-        .kt-shares-popup-card { animation: kt-shares-fade-in 0.28s cubic-bezier(0.34,1.3,0.64,1) forwards; }
+        .kt-shares-popup-card { animation: kt-shares-fade-in 0.22s var(--kt-ease, ease) forwards; }
       `}</style>
 
       <div
         onClick={close}
         style={{
           position: 'fixed', inset: 0, zIndex: 9000,
-          background: 'rgba(13,34,24,0.55)',
+          background: 'rgba(13,34,24,0.5)',
           backdropFilter: 'blur(3px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '20px',
@@ -66,36 +66,42 @@ export default function SharesReminderPopup() {
           className="kt-shares-popup-card"
           onClick={e => e.stopPropagation()}
           style={{
-            background: '#f0fdf4',
-            border: '1.5px solid #bbf7d0',
-            borderRadius: 22,
-            padding: '32px 30px 28px',
-            width: '100%', maxWidth: 420,
-            boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
+            background: 'var(--kt-card)',
+            border: '1px solid var(--kt-border)',
+            borderRadius: 'var(--kt-radius-lg)',
+            padding: '28px',
+            width: '100%', maxWidth: 400,
+            boxShadow: 'var(--kt-shadow-lg)',
             position: 'relative',
           }}
         >
           <button
             onClick={close}
+            aria-label="Close"
             style={{
               position: 'absolute', top: 14, right: 14,
-              background: 'rgba(0,0,0,0.07)', border: 'none',
-              borderRadius: 8, padding: 6, cursor: 'pointer',
+              background: 'var(--kt-surface)', border: 'none',
+              borderRadius: 'var(--kt-radius-sm)', padding: 6, cursor: 'pointer',
               display: 'flex', alignItems: 'center',
-              color: '#6b7280', lineHeight: 0,
+              color: 'var(--kt-text-secondary)', lineHeight: 0,
             }}
           >
             <X size={16} />
           </button>
 
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: '#d8f3dc', color: '#1a3d2b',
-            borderRadius: 20, padding: '4px 12px',
-            fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
-            textTransform: 'uppercase', marginBottom: 18,
-          }}>
-            <PenLine size={12} /> kaTuro Shares · Teacher Community
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 'var(--kt-radius-sm)', flexShrink: 0,
+              display: 'grid', placeItems: 'center', background: 'var(--kt-success-tint)', color: 'var(--kt-success)',
+            }}>
+              <PenLine size={16} />
+            </div>
+            <span style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+              color: 'var(--kt-text-secondary)',
+            }}>
+              kaTuro Shares · Teacher Community
+            </span>
           </div>
 
           <p style={{
@@ -108,28 +114,28 @@ export default function SharesReminderPopup() {
           <p style={{
             margin: '0 0 20px',
             fontSize: 15, fontWeight: 700, fontStyle: 'italic',
-            color: '#2d6a4f', lineHeight: 1.5,
+            color: 'var(--kt-green-primary)', lineHeight: 1.5,
           }}>
             {prompt}
           </p>
 
-          <p style={{ margin: '0 0 22px', fontSize: 13, color: '#374151', lineHeight: 1.65 }}>
+          <p style={{ margin: '0 0 22px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
             Isang tagumpay, isang aral, o simpleng kwento mula sa iyong klase — makakaabot ito sa kapwa mo guro sa kaTuro Shares.
           </p>
 
           <button
             onClick={writeNow}
             style={{
-              width: '100%', padding: '13px 20px',
-              background: 'linear-gradient(135deg, #2d6a4f, #52b788)',
-              color: '#fff', border: 'none', borderRadius: 12,
-              fontSize: 14, fontWeight: 800, cursor: 'pointer',
-              fontFamily: 'inherit', letterSpacing: '0.02em',
-              transition: 'opacity 0.15s, transform 0.1s',
-              boxShadow: '0 4px 14px rgba(45,106,79,0.35)',
+              width: '100%', padding: '12px 20px',
+              background: 'linear-gradient(135deg, var(--kt-green-primary), var(--kt-green-bright))',
+              color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-md)',
+              fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit', letterSpacing: '0.01em',
+              transition: 'opacity var(--kt-duration) var(--kt-ease), transform var(--kt-duration) var(--kt-ease)',
+              boxShadow: 'var(--kt-shadow-sm)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             }}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
           >
             <PenLine size={15} /> Isulat Ngayon →

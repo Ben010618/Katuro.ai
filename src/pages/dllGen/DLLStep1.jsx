@@ -62,7 +62,7 @@ export default function DLLStep1() {
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="kt-grid-2" style={{ gap: 20, alignItems: 'start' }}>
 
         {/* LEFT — form */}
         <div style={{
