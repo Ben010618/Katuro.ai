@@ -4,6 +4,7 @@ import { X, ImagePlus, Loader2, Plus } from 'lucide-react';
 import { usePost } from '../hooks/usePost';
 import { validateImageFile, createPreviewUrl } from '../services/storageService';
 import { RichTextEditor } from './RichTextEditor';
+import { trackEvent } from '../../../services/usageTracker';
 
 const WORD_LIMIT = 250;
 
@@ -65,6 +66,7 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
     });
     if (postId) {
       previews.forEach(URL.revokeObjectURL);
+      trackEvent(uid, 'shares_post_created', { hasTitle: !!title.trim() });
       onSuccess?.(postId);
       onClose();
     }

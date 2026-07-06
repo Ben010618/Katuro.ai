@@ -6,6 +6,7 @@ import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { deductTokens }     from '../services/db';
 import { interpretFindings, THEME_LABELS } from '../services/actionResearchAI';
+import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx } from '../services/actionResearchDocx';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
@@ -49,8 +50,10 @@ export default function ActionResearchPhase6() {
   async function handleGenerate() {
     if (!user?.uid || !docData || rawData.trim().length < 30) return;
     setGenerating(true); setError('');
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-findings', 30);
+      elapsedMs = startTimer();
       const result = await interpretFindings({
         title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
         problemText: docData.problemText, beraTheme: docData.beraTheme,
@@ -62,8 +65,14 @@ export default function ActionResearchPhase6() {
         rawData, findings: result, phase: 6, status:'complete', updatedAt: serverTimestamp(),
       });
       setCompleted(true);
+      trackEvent(user.uid, 'action_research_phase6_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
+      trackEvent(user.uid, 'action_research_completed', { subject: docData.subjectArea, grade: docData.gradeLevel });
+      trackGeneration(user.uid, 'ar_phase6', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(err.message || 'Failed to generate. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'ar_phase6', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally { setGenerating(false); }
   }
 

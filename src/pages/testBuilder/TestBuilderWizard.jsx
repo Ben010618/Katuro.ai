@@ -6,6 +6,7 @@ import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useDebouncedEffect } from '../../hooks/useDebouncedEffect';
 import { createTestSession, getTestSession, updateTestSession } from '../../services/testBuilderDb';
 import { deriveKeyStage, deriveHotsFloor, DAY_LIMIT, isManualCeilingType, resolveItemCeiling } from '../../config/testBuilderConfig';
+import { trackEvent } from '../../services/usageTracker';
 import { Check, Lock, Loader2, Save, ClipboardList } from 'lucide-react';
 
 import StepSetup from './StepSetup';
@@ -51,6 +52,7 @@ const STEPS = [
       });
       store.setField('status', 'tos_generated');
       addToast('Table of Specifications saved!', 'success');
+      trackEvent(uid, 'test_builder_tos_generated', { subject: store.subject, grade: store.gradeLevel, testType: store.testType });
       // Phase 2 hook point — AI item generation against this TOS attaches here.
       onSessionFinalized?.(sessionId);
     },
@@ -127,6 +129,13 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
   const step = STEPS[activeStep];
   const ActiveComponent = step.component;
   const isValid = step.isValid(store);
+
+  // Funnel tracking — which step teachers actually reach vs. where they drop off.
+  useEffect(() => {
+    if (!ready || !user?.uid) return;
+    trackEvent(user.uid, 'test_builder_step_viewed', { step: step.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, activeStep, user?.uid]);
 
   function goNext() {
     const next = Math.min(activeStep + 1, STEPS.length - 1);

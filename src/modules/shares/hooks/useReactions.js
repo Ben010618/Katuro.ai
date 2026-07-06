@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getMyReaction, toggleReaction } from '../services/sharesService';
 import { notifyReaction } from '../services/notificationService';
+import { trackEvent } from '../../../services/usageTracker';
 
 /**
  * Reaction state and toggle for a single post.
@@ -48,9 +49,10 @@ export function useReactions(postId, uid, initialReactions = {}, postAuthorUid =
 
     try {
       await toggleReaction(postId, uid, type);
-      // Only send notification when adding (not removing)
+      // Only send notification/track when adding (not removing)
       if (prevReaction !== type) {
         await notifyReaction(uid, '', postId, postAuthorUid, type).catch(() => {});
+        trackEvent(uid, 'shares_reaction_added', { type });
       }
     } catch (_) {
       // Rollback on failure

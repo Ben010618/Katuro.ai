@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useCotStore } from '../../store/cotStore';
+import { useAuth } from '../../hooks/useAuth';
+import { trackEvent } from '../../services/usageTracker';
 import { Check, Lock } from 'lucide-react';
 
 const STEPS = [
@@ -17,9 +20,17 @@ export default function CotLayout() {
   const navigate = useNavigate();
   const loc      = useLocation();
   const store    = useCotStore();
+  const { user } = useAuth();
 
   const currentIdx = STEPS.findIndex(s => loc.pathname === s.path);
   const stepNum    = currentIdx + 1;
+
+  // Funnel tracking — which step teachers actually reach vs. where they drop off.
+  useEffect(() => {
+    if (!user?.uid || currentIdx < 0) return;
+    trackEvent(user.uid, 'cotgen_step_viewed', { step: `step${stepNum}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, currentIdx]);
 
   const step1Valid = !!(
     store.subject?.trim() &&

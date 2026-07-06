@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateIlawSession } from '../../services/ai';
 import { saveIlawPlan, deductTokens } from '../../services/db';
-import { trackEvent } from '../../services/usageTracker';
+import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 
 function formatDayShort(iso) {
@@ -82,6 +82,7 @@ export default function Step3() {
     }
 
     const genId = ++activeGenRef.current;
+    const elapsedMs = startTimer();
     setStatusMsg(`Generating ${n} session${n !== 1 ? 's' : ''}…`);
 
     const context = {
@@ -143,6 +144,11 @@ export default function Step3() {
           ? failed[0].reason.message
           : `${failed.length} sessions could not be generated. Check your connection and try again.`
       );
+      trackGeneration(user.uid, 'ilaw', {
+        success: false,
+        durationMs: elapsedMs(),
+        error: failed[0]?.reason?.message,
+      });
       return;
     }
 
@@ -161,6 +167,7 @@ export default function Step3() {
 
     navigate('/lesson-gen/output/new');
     trackEvent(user.uid, 'ilaw_generated', { subject: store.subject, grade: store.gradeLevel });
+    trackGeneration(user.uid, 'ilaw', { success: true, durationMs: elapsedMs() });
 
     if (user?.uid) {
       const planData = {

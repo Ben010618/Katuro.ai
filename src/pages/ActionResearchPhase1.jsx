@@ -8,6 +8,7 @@ import { useAuth }    from '../hooks/useAuth';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getGeminiKey }          from '../services/geminiConfig';
 import { generateResearchTitles, THEME_LABELS } from '../services/actionResearchAI';
+import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import {
   actionResearchColRef,
   getActionResearch,
@@ -184,16 +185,23 @@ export default function ActionResearchPhase1() {
   async function handleGenerateTitles() {
     if (!user?.uid || problemText.trim().length < 20) return;
     setTitlesLoading(true); setError('');
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-titles', 5);
+      elapsedMs = startTimer();
       const result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel });
       const titles = result.titles ?? [];
       setResearchTitles(titles);
       setSelectedTitle('');
       // Save intermediate state so the project appears in the dashboard
       await saveToFirestore(buildPayload({ researchTitles: titles, selectedTitle: '' }));
+      trackEvent(user.uid, 'action_research_phase1_generated', { subject: subjectArea, grade: gradeLevel });
+      trackGeneration(user.uid, 'ar_phase1', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(err.message || 'Failed to generate titles. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'ar_phase1', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally {
       setTitlesLoading(false);
     }

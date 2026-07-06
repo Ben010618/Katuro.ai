@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { generateQuizAI } from '../services/ai';
 import { createQuiz, deductTokens } from '../services/db';
-import { trackEvent } from '../services/usageTracker';
+import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
 import {
   Search, ChevronRight, Loader2, RefreshCw,
@@ -125,9 +125,11 @@ export default function QuizBuilderPage() {
     setGenerating(true);
     setGenError(null);
 
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'quiz');
       trackEvent(user.uid, 'quiz_generated', { subject: selectedLesson?.subject });
+      elapsedMs = startTimer();
     } catch (err) {
       setGenError(err.message);
       setGenerating(false);
@@ -175,6 +177,7 @@ export default function QuizBuilderPage() {
       setQuestions(result.questions);
       setStep(2);
       setGenerating(false);
+      trackGeneration(user.uid, 'quiz', { success: true, durationMs: elapsedMs() });
       await saveQuizToFirebase(result.questions);
       return;
     } catch (err1) {
@@ -189,9 +192,11 @@ export default function QuizBuilderPage() {
       setQuestions(result.questions);
       setStep(2);
       setGenerating(false);
+      trackGeneration(user.uid, 'quiz', { success: true, durationMs: elapsedMs() });
       await saveQuizToFirebase(result.questions);
     } catch (err2) {
       setGenError(err2.message || 'Generation failed. Check your connection and try again.');
+      trackGeneration(user.uid, 'quiz', { success: false, durationMs: elapsedMs(), error: err2.message });
     } finally {
       setGenerating(false);
     }

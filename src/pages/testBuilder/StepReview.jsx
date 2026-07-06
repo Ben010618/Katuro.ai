@@ -7,6 +7,7 @@ import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
+import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
   FileText, KeyRound, Table2, Sparkles, Loader2, AlertCircle, X, Lock,
@@ -58,9 +59,11 @@ export default function StepReview() {
     setGenLoading(true);
     setGenError('');
     setGeneratedParts(null);
+    let elapsedMs;
     try {
       setGenPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
       await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST);
+      elapsedMs = startTimer();
 
       const allItems = [];
       let cursor = 0;
@@ -87,8 +90,13 @@ export default function StepReview() {
         freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
         'success'
       );
+      trackEvent(user.uid, 'test_builder_items_generated', { subject: store.subject, grade: store.gradeLevel });
+      trackGeneration(user.uid, 'test_builder_items', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setGenError(err.message || 'Item generation failed. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'test_builder_items', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally {
       setGenLoading(false);
       setGenPhase('');

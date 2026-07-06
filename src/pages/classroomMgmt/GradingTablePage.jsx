@@ -8,6 +8,7 @@ import {
   subscribeStudents, subscribeSectionComments,
 } from '../../services/classroomDb';
 import { thumbUrl } from '../../services/cloudinaryUpload';
+import { trackEvent } from '../../services/usageTracker';
 import StudentCardModal from '../../components/StudentCardModal';
 import { ArrowLeft, Save, Plus, Minus, AlertTriangle, CheckCircle2, Send, RefreshCw, Download, Bell, Upload } from 'lucide-react';
 
@@ -223,6 +224,7 @@ export default function GradingTablePage() {
       });
       setDirty(false);
       addToast('Draft saved!', 'success');
+      trackEvent(user.uid, 'classroom_grades_saved', { subject: decodedSubject, term: activeTerm });
     } catch (err) {
       addToast('Save failed: ' + err.message, 'error');
     } finally {
@@ -254,6 +256,7 @@ export default function GradingTablePage() {
       setLocalGrades(updatedGrades);
       setDirty(false);
       addToast(`${TERMS.find(t => t.key === activeTerm)?.label} grades submitted to adviser!`, 'success');
+      trackEvent(user.uid, 'classroom_grades_submitted', { subject: decodedSubject, term: activeTerm });
     } catch (err) {
       addToast('Submit failed: ' + err.message, 'error');
     } finally {

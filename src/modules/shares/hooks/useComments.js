@@ -7,6 +7,7 @@ import {
   editComment   as svcEditComment,
 } from '../services/sharesService';
 import { notifyComment, notifyReply } from '../services/notificationService';
+import { trackEvent } from '../../../services/usageTracker';
 
 /**
  * Real-time comments and replies for a post.
@@ -34,6 +35,7 @@ export function useComments(postId, uid, postAuthorUid) {
     try {
       const commentId = await svcAddComment(postId, uid, { displayName, initials, photoURL, text: text.trim() });
       await notifyComment(uid, displayName, postId, postAuthorUid).catch(() => {});
+      trackEvent(uid, 'shares_comment_added', { isReply: false });
       return commentId;
     } catch (e) {
       setError(e.message);
@@ -45,6 +47,7 @@ export function useComments(postId, uid, postAuthorUid) {
     try {
       await svcAddReply(postId, commentId, uid, { displayName, initials, photoURL, text: text.trim() });
       await notifyReply(uid, displayName, postId, commentAuthorUid).catch(() => {});
+      trackEvent(uid, 'shares_comment_added', { isReply: true });
     } catch (e) {
       setError(e.message);
     }

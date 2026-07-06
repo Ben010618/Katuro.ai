@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
+import { useAuth } from '../../hooks/useAuth';
+import { trackEvent } from '../../services/usageTracker';
 import { ArrowRight, CalendarDays } from 'lucide-react';
 
 const SUBJECTS = [
@@ -30,6 +33,11 @@ const inputStyle = {
 export default function DLLStep1() {
   const navigate = useNavigate();
   const store    = useDLLStore();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step1' });
+  }, [user?.uid]);
 
   const canNext = store.subject.trim() && store.gradeLevel.trim() && store.term.trim();
 

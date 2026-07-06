@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { isFollowing, followTeacher, unfollowTeacher } from '../services/sharesService';
 import { notifyFollow } from '../services/notificationService';
+import { trackEvent } from '../../../services/usageTracker';
 
 /**
  * Follow/unfollow state with optimistic UI.
@@ -35,6 +36,7 @@ export function useFollow(myUid, targetUid, myName = '') {
       } else {
         await followTeacher(myUid, targetUid);
         await notifyFollow(myUid, myName, targetUid).catch(() => {});
+        trackEvent(myUid, 'shares_follow_added');
       }
     } catch (_) {
       setFollowing(wasFollowing);

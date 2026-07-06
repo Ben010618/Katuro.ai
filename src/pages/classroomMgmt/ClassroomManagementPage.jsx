@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import {
   createSection, subscribeAdviserSections, deleteSection, GRADE_LEVELS,
 } from '../../services/classroomDb';
+import { trackEvent } from '../../services/usageTracker';
 import { Plus, School, ChevronRight, Users, BookOpen, Trash2, AlertTriangle } from 'lucide-react';
 
 const INPUT = {
@@ -33,6 +34,7 @@ function CreateClassModal({ onClose, onCreated }) {
     try {
       const id = await createSection(user.uid, form);
       addToast('Class created!', 'success');
+      trackEvent(user.uid, 'classroom_section_created', { gradeLevel: form.gradeLevel });
       onCreated(id);
     } catch (err) {
       addToast('Failed to create class: ' + err.message, 'error');

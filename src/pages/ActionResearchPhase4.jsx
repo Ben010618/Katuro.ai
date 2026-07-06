@@ -6,6 +6,7 @@ import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { deductTokens }     from '../services/db';
 import { generateActionPlan, THEME_LABELS } from '../services/actionResearchAI';
+import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx } from '../services/actionResearchDocx';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
@@ -40,8 +41,10 @@ export default function ActionResearchPhase4() {
   async function handleGenerate() {
     if (!user?.uid || !docData) return;
     setGenerating(true); setError('');
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-plan', 5);
+      elapsedMs = startTimer();
       const result = await generateActionPlan({
         title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
         problemText: docData.problemText, beraTheme: docData.beraTheme,
@@ -49,8 +52,13 @@ export default function ActionResearchPhase4() {
         schoolName: docData.schoolName, schoolYear: docData.schoolYear,
       });
       setActionPlan(result);
+      trackEvent(user.uid, 'action_research_phase4_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
+      trackGeneration(user.uid, 'ar_phase4', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(err.message || 'Failed to generate. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'ar_phase4', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally { setGenerating(false); }
   }
 

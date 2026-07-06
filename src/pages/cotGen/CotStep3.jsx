@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateCotLesson } from '../../services/cotAI';
 import { deductTokens, saveCotPlan } from '../../services/db';
-import { trackEvent } from '../../services/usageTracker';
+import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const KRA_COLOR = {
@@ -49,6 +49,7 @@ export default function CotStep3() {
     }
 
     const genId = ++activeRef.current;
+    const elapsedMs = startTimer();
     setProgress(15);
     setStatusMsg('Building your COT-optimized lesson plan…');
 
@@ -93,6 +94,7 @@ export default function CotStep3() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (lastErr?.message || 'Generation failed. Check your connection and try again.')
       );
+      trackGeneration(user.uid, 'cot', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
       return;
     }
 
@@ -108,6 +110,7 @@ export default function CotStep3() {
 
     navigate('/cot-gen/output');
     trackEvent(user.uid, 'cot_generated', { subject: store.subject, grade: store.grade });
+    trackGeneration(user.uid, 'cot', { success: true, durationMs: elapsedMs() });
 
     if (user?.uid) {
       const planData = {

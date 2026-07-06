@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
+import { useAuth } from '../../hooks/useAuth';
+import { trackEvent } from '../../services/usageTracker';
 import { Check, Lock, Pencil } from 'lucide-react';
 
 const STEPS = [
@@ -18,11 +20,19 @@ export default function LessonGenLayout() {
   const navigate  = useNavigate();
   const loc       = useLocation();
   const store     = useLessonGenStore();
+  const { user }  = useAuth();
 
   const [saveState, setSaveState] = useState('idle');
 
   const currentIdx = STEPS.findIndex(s => loc.pathname === s.path);
   const stepNum    = currentIdx + 1;
+
+  // Funnel tracking — which step teachers actually reach vs. where they drop off.
+  useEffect(() => {
+    if (!user?.uid || currentIdx < 0) return;
+    trackEvent(user.uid, 'lessongen_step_viewed', { step: `step${stepNum}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, currentIdx]);
 
   const step1Valid = !!(store.subject && store.gradeLevel && store.term && store.weekNumber && store.selectedDays.length > 0);
   const step2Valid = !!(store.unpackedSessions?.length > 0 && store.lessonName?.trim());

@@ -9,6 +9,7 @@ import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { deductTokens }     from '../services/db';
 import { generateDataCollection, generateResearchInstrument, THEME_LABELS } from '../services/actionResearchAI';
+import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx } from '../services/actionResearchDocx';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
@@ -342,8 +343,10 @@ export default function ActionResearchPhase5() {
   async function handleGenerate() {
     if (!user?.uid || !docData) return;
     setGenerating(true); setError('');
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-datacollection', 5);
+      elapsedMs = startTimer();
       const result = await generateDataCollection({
         title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
         beraTheme: docData.beraTheme, subjectArea: docData.subjectArea,
@@ -355,16 +358,23 @@ export default function ActionResearchPhase5() {
         setAiRecommended(rec);
         setInstrumentType(rec);
       }
+      trackEvent(user.uid, 'action_research_phase5_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
+      trackGeneration(user.uid, 'ar_phase5_data', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(err.message || 'Failed to generate. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'ar_phase5_data', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally { setGenerating(false); }
   }
 
   async function handleGenerateInstrument() {
     if (!user?.uid || !docData) return;
     setGeneratingInstrument(true); setError('');
+    let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-instrument', 5);
+      elapsedMs = startTimer();
       const result = await generateResearchInstrument({
         instrumentType,
         title:             docData.selectedTitle,
@@ -377,8 +387,12 @@ export default function ActionResearchPhase5() {
       await updateDoc(doc(db, 'teachers', user.uid, 'actionResearch', docId), {
         instrument: result, instrumentType, updatedAt: serverTimestamp(),
       });
+      trackGeneration(user.uid, 'ar_phase5_instrument', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(err.message || 'Failed to generate instrument. Please try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'ar_phase5_instrument', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally { setGeneratingInstrument(false); }
   }
 

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { deductTokens, saveDLLPlan } from '../../services/db';
-import { trackEvent } from '../../services/usageTracker';
+import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
 import { useToast } from '../../context/ToastContext';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
@@ -235,6 +235,10 @@ export default function DLLStep2() {
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
 
+  useEffect(() => {
+    if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step2' });
+  }, [user?.uid]);
+
   const melcList    = store.melcList;
   const contentList = store.contentList;
 
@@ -251,8 +255,10 @@ export default function DLLStep2() {
     if (!canGenerate || generating) return;
     setGenerating(true);
     setGenError('');
+    let elapsedMs = null;
     try {
       await deductTokens(user.uid, 'dll', 3);
+      elapsedMs = startTimer();
 
       const { objectives, procedure, resources } = await generateDLLProcedure({
         subject:              store.subject,
@@ -295,8 +301,12 @@ export default function DLLStep2() {
 
       navigate('/dll-gen/output');
       trackEvent(user.uid, 'dll_generated', { subject: store.subject, grade: store.gradeLevel });
+      trackGeneration(user.uid, 'dll', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setGenError(err.message || 'Generation failed. Try again.');
+      if (elapsedMs) {
+        trackGeneration(user.uid, 'dll', { success: false, durationMs: elapsedMs(), error: err.message });
+      }
     } finally {
       setGenerating(false);
     }

@@ -400,7 +400,31 @@ const FEATURE_LABELS = {
   lesson_exported_docx:  'DOCX Export',
   lesson_shared:         'Share Link',
   login:                 'Site Visit',
+  shares_post_created:   'Shares Post',
+  shares_comment_added:  'Shares Comment',
+  shares_reaction_added: 'Shares Reaction',
+  shares_follow_added:   'Shares Follow',
+  test_builder_tos_generated:   'Test Builder TOS',
+  test_builder_items_generated: 'Test Builder Items',
+  classroom_section_created:    'Class Created',
+  classroom_grades_saved:       'Grades Saved',
+  classroom_grades_submitted:   'Grades Submitted',
+  action_research_phase1_generated: 'Action Research P1',
+  action_research_phase2_generated: 'Action Research P2',
+  action_research_phase3_generated: 'Action Research P3',
+  action_research_phase4_generated: 'Action Research P4',
+  action_research_phase5_generated: 'Action Research P5',
+  action_research_phase6_generated: 'Action Research P6',
+  action_research_completed:        'Action Research Completed',
 };
+
+// Diagnostic event types — power specific charts (reliability, funnels) but
+// don't represent a teacher "using a feature," so they're excluded from
+// feature-popularity and adoption-depth aggregates.
+const NON_FEATURE_EVENTS = new Set([
+  'login', 'ai_generation',
+  'lessongen_step_viewed', 'dllgen_step_viewed', 'cotgen_step_viewed', 'test_builder_step_viewed',
+]);
 
 const FEATURE_COLORS = [
   '#2d6a4f','#40916c','#52b788','#74c69d',
@@ -468,6 +492,272 @@ function buildFeatureData(events) {
     .map(([name, count]) => ({ name, count }));
 }
 
+const TOOL_LABELS = {
+  ilaw: 'ILAW Lesson',
+  dll:  'Daily Lesson Log',
+  cot:  'COT Plan',
+  quiz: 'Quiz',
+  test_builder_items: 'Test Builder Items',
+  ar_phase1: 'Action Research P1',
+  ar_phase2: 'Action Research P2',
+  ar_phase3: 'Action Research P3',
+  ar_phase4: 'Action Research P4',
+  ar_phase5_data: 'Action Research P5 (Data)',
+  ar_phase5_instrument: 'Action Research P5 (Instrument)',
+  ar_phase6: 'Action Research P6',
+};
+
+function formatDuration(ms) {
+  if (ms == null) return '—';
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * Reliability of AI generation calls — separate from feature-popularity
+ * counts, since a failed attempt still logs an 'ai_generation' event but
+ * must never be confused with a successful '*_generated' feature use.
+ */
+function buildGenerationStats(events) {
+  const genEvents = events.filter(e => e.feature === 'ai_generation');
+  const total     = genEvents.length;
+  const successes = genEvents.filter(e => e.success).length;
+  const successRate = total > 0 ? Math.round((successes / total) * 100) : null;
+
+  const durations = genEvents
+    .filter(e => e.success && typeof e.durationMs === 'number')
+    .map(e => e.durationMs);
+  const avgDurationMs = durations.length > 0
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : null;
+
+  const recentErrors = genEvents
+    .filter(e => !e.success)
+    .sort((a, b) => (b.ts?.toMillis?.() || 0) - (a.ts?.toMillis?.() || 0))
+    .slice(0, 5);
+
+  return { total, successes, failures: total - successes, successRate, avgDurationMs, recentErrors };
+}
+
+function teacherCreatedMs(t) {
+  return t?.createdAt?.toMillis ? t.createdAt.toMillis() : null;
+}
+
+/** New signups per day, from teachers.createdAt — no new instrumentation needed. */
+function buildSignupData(teachers, days = 30) {
+  const buckets = {};
+  const now = Date.now();
+  for (let i = days - 1; i >= 0; i--) {
+    const key = new Date(now - i * 86400000).toISOString().slice(0, 10);
+    buckets[key] = 0;
+  }
+  teachers.forEach(t => {
+    const ms = teacherCreatedMs(t);
+    if (!ms) return;
+    const key = new Date(ms).toISOString().slice(0, 10);
+    if (key in buckets) buckets[key]++;
+  });
+  return Object.entries(buckets).map(([date, count]) => ({ date: date.slice(5), count }));
+}
+
+/** Top schools by teacher count — reuses the school field already collected at signup. */
+function buildTopSchools(teachers, top = 8) {
+  const counts = {};
+  teachers.forEach(t => {
+    const school = (t.school || '').trim();
+    if (school) counts[school] = (counts[school] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, top)
+    .map(([school, count]) => ({ school, count }));
+}
+
+/** How many distinct features each active teacher touched — depth, not just volume. */
+function buildAdoptionDepth(featureEvents) {
+  const perUser = {};
+  featureEvents.forEach(e => {
+    (perUser[e.uid] ||= new Set()).add(e.feature);
+  });
+  const buckets = { '1 feature': 0, '2 features': 0, '3+ features': 0 };
+  Object.values(perUser).forEach(set => {
+    if (set.size === 1) buckets['1 feature']++;
+    else if (set.size === 2) buckets['2 features']++;
+    else if (set.size >= 3) buckets['3+ features']++;
+  });
+  return Object.entries(buckets).map(([name, count]) => ({ name, count }));
+}
+
+/** New vs. returning active users in the selected window, by signup date. */
+function buildNewVsReturning(events, teachers, days) {
+  const cutoff = Date.now() - days * 86400000;
+  const activeUids = new Set(events.map(e => e.uid));
+  let newCount = 0;
+  let returningCount = 0;
+  activeUids.forEach(uid => {
+    const ms = teacherCreatedMs(teachers.find(t => t.id === uid));
+    if (ms && ms >= cutoff) newCount++;
+    else returningCount++;
+  });
+  return { newCount, returningCount };
+}
+
+/** Teachers who existed before the window but logged zero activity inside it. */
+function buildInactiveCount(events, teachers, days) {
+  const cutoff = Date.now() - days * 86400000;
+  const activeUids = new Set(events.map(e => e.uid));
+  return teachers.filter(t => {
+    const ms = teacherCreatedMs(t);
+    return ms && ms < cutoff && !activeUids.has(t.id);
+  }).length;
+}
+
+/**
+ * Weekly signup cohorts × Day-1/7/30 retention. A checkpoint only counts
+ * toward the denominator once the cohort has actually reached that many
+ * days since signup — a teacher who joined 3 days ago is excluded from the
+ * Day-7 calculation entirely rather than counted as churned.
+ */
+function buildRetentionCohorts(events, teachers, days) {
+  const now = Date.now();
+  const weeksBack = Math.max(1, Math.min(8, Math.ceil(days / 7)));
+  const eventsByUid = {};
+  events.forEach(e => {
+    const ms = e.ts?.toMillis ? e.ts.toMillis() : null;
+    if (ms) (eventsByUid[e.uid] ||= []).push(ms);
+  });
+
+  const cohorts = [];
+  for (let w = weeksBack - 1; w >= 0; w--) {
+    const weekStart = now - (w + 1) * 7 * 86400000;
+    const weekEnd   = now - w * 7 * 86400000;
+    const cohortTeachers = teachers.filter(t => {
+      const ms = teacherCreatedMs(t);
+      return ms && ms >= weekStart && ms < weekEnd;
+    });
+    if (cohortTeachers.length === 0) continue;
+
+    const checkpoint = (dayN) => {
+      let retained = 0;
+      let eligible = 0;
+      cohortTeachers.forEach(t => {
+        const signupMs = teacherCreatedMs(t);
+        const checkMs = signupMs + dayN * 86400000;
+        if (checkMs > now) return;
+        eligible++;
+        const hits = eventsByUid[t.id] || [];
+        if (hits.some(ms => ms >= signupMs && ms <= checkMs)) retained++;
+      });
+      return eligible > 0 ? Math.round((retained / eligible) * 100) : null;
+    };
+
+    cohorts.push({
+      label: new Date(weekStart).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+      size: cohortTeachers.length,
+      day1:  checkpoint(1),
+      day7:  checkpoint(7),
+      day30: checkpoint(30),
+    });
+  }
+  return cohorts;
+}
+
+/** Sessions per active user (30-minute inactivity gap closes a session) and average length. */
+function buildSessionStats(events) {
+  const byUser = {};
+  events.forEach(e => {
+    const ms = e.ts?.toMillis ? e.ts.toMillis() : null;
+    if (ms) (byUser[e.uid] ||= []).push(ms);
+  });
+
+  const GAP_MS = 30 * 60 * 1000;
+  let totalSessions = 0;
+  const durations = [];
+
+  Object.values(byUser).forEach(timestamps => {
+    timestamps.sort((a, b) => a - b);
+    let sessionStart = timestamps[0];
+    let lastTs = timestamps[0];
+    totalSessions++;
+    for (let i = 1; i < timestamps.length; i++) {
+      if (timestamps[i] - lastTs > GAP_MS) {
+        durations.push(lastTs - sessionStart);
+        totalSessions++;
+        sessionStart = timestamps[i];
+      }
+      lastTs = timestamps[i];
+    }
+    durations.push(lastTs - sessionStart);
+  });
+
+  const avgSessionMs = durations.length > 0
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : null;
+
+  return { totalSessions, avgSessionMs };
+}
+
+/** Generation demand by subject and grade level — already logged in event metadata. */
+function buildSubjectGradeData(featureEvents) {
+  const subjectCounts = {};
+  const gradeCounts   = {};
+  featureEvents.forEach(e => {
+    if (e.subject) subjectCounts[e.subject] = (subjectCounts[e.subject] || 0) + 1;
+    if (e.grade)   gradeCounts[e.grade]     = (gradeCounts[e.grade]     || 0) + 1;
+  });
+  const toSorted = counts => Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+  return { bySubject: toSorted(subjectCounts), byGrade: toSorted(gradeCounts) };
+}
+
+/** Unique teachers reaching each named step of a wizard, in declared order. */
+function buildFunnel(events, eventName, stepOrder) {
+  const stepUsers = {};
+  stepOrder.forEach(s => { stepUsers[s] = new Set(); });
+  events.forEach(e => {
+    if (e.feature === eventName && stepUsers[e.step]) stepUsers[e.step].add(e.uid);
+  });
+  let prevCount = null;
+  return stepOrder.map(step => {
+    const count = stepUsers[step].size;
+    const pctOfPrev = prevCount != null && prevCount > 0 ? Math.round((count / prevCount) * 100) : null;
+    prevCount = count;
+    return { step, count, pctOfPrev };
+  });
+}
+
+const LESSONGEN_STEPS     = { step1: 'Session Setup', step2: 'Competency', step3: 'Generate' };
+const DLLGEN_STEPS        = { step1: 'Setup', step2: 'Generate' };
+const COTGEN_STEPS        = { step1: 'Lesson Info', step2: 'COT Indicators', step3: 'Generate' };
+const TEST_BUILDER_STEPS  = { setup: 'Setup', blooms: "Bloom's Levels", tos: 'TOS', review: 'Review' };
+
+function FunnelCard({ title, stepLabels, funnel }) {
+  const maxCount = funnel[0]?.count || 0;
+  if (maxCount === 0) return null;
+  return (
+    <div style={card}>
+      <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{title}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {funnel.map((f, i) => (
+          <div key={f.step}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>{stepLabels[f.step] || f.step}</span>
+              <span style={{ fontSize: 12, fontFamily: '"DM Mono", monospace', color: 'var(--kt-text-secondary)' }}>
+                {f.count}{i > 0 && f.pctOfPrev != null ? ` (${f.pctOfPrev}% of prev step)` : ''}
+              </span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: 'var(--kt-surface)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 4,
+                width: `${maxCount > 0 ? (f.count / maxCount) * 100 : 0}%`,
+                background: FEATURE_COLORS[i % FEATURE_COLORS.length],
+              }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StatChip({ label, value, color }) {
   return (
     <div style={{
@@ -504,17 +794,39 @@ function AnalyticsSection({ teachers = [] }) {
 
   useEffect(() => { load(range); }, [range]);
 
-  const featureEvents = events.filter(e => e.feature !== 'login');
+  const featureEvents = events.filter(e => !NON_FEATURE_EVENTS.has(e.feature));
   const featureData = buildFeatureData(featureEvents);
   const dailyData   = buildDailyData(events, range);
   const hourData    = buildHourData(events);
   const topVisitors = buildTopVisitors(events, teachers);
+  const genStats    = buildGenerationStats(events);
+  const signupData  = buildSignupData(teachers, range);
+  const topSchools  = buildTopSchools(teachers);
+  const adoptionData = buildAdoptionDepth(featureEvents);
+  const { newCount, returningCount } = buildNewVsReturning(events, teachers, range);
+  const inactiveCount = buildInactiveCount(events, teachers, range);
+  const { bySubject, byGrade } = buildSubjectGradeData(featureEvents);
+  const retentionCohorts = buildRetentionCohorts(events, teachers, range);
+  const sessionStats = buildSessionStats(events);
+  const lessonGenFunnel    = buildFunnel(events, 'lessongen_step_viewed', ['step1', 'step2', 'step3']);
+  const dllGenFunnel       = buildFunnel(events, 'dllgen_step_viewed', ['step1', 'step2']);
+  const cotGenFunnel       = buildFunnel(events, 'cotgen_step_viewed', ['step1', 'step2', 'step3']);
+  const testBuilderFunnel  = buildFunnel(events, 'test_builder_step_viewed', ['setup', 'blooms', 'tos', 'review']);
 
   const totalEvents  = events.length;
   const uniqueUsers  = new Set(events.map(e => e.uid)).size;
+  const dailyUsersAvg = dailyData.length > 0
+    ? dailyData.reduce((sum, d) => sum + d.users, 0) / dailyData.length
+    : 0;
+  const stickiness = uniqueUsers > 0 ? Math.round((dailyUsersAvg / uniqueUsers) * 100) : null;
   const siteVisits   = events.filter(e => e.feature === 'login').length;
   const topFeature   = featureData[0]?.name || '—';
   const peakHour     = hourData.reduce((best, h) => h.count > best.count ? h : best, { hour: '—', count: 0 }).hour;
+
+  const successRateColor = genStats.successRate == null ? undefined
+    : genStats.successRate >= 90 ? '#16a34a'
+    : genStats.successRate >= 70 ? '#e8a320'
+    : '#e05c5c';
 
   const chartHeight = 220;
 
@@ -565,6 +877,18 @@ function AnalyticsSection({ teachers = [] }) {
             <StatChip label="Site Visits"    value={siteVisits}   color="#16a34a" />
             <StatChip label="Top Feature"    value={topFeature}   color="#e8a320" />
             <StatChip label="Peak Hour"      value={peakHour}     color="#6d28d9" />
+            <StatChip
+              label="Generation Success"
+              value={genStats.successRate == null ? '—' : `${genStats.successRate}%`}
+              color={successRateColor}
+            />
+            <StatChip label="Avg Generation Time" value={formatDuration(genStats.avgDurationMs)} color="#0284c7" />
+            <StatChip label="Stickiness" value={stickiness == null ? '—' : `${stickiness}%`} color="#6d28d9" />
+            <StatChip label="New Users" value={newCount} color="#16a34a" />
+            <StatChip label="Returning Users" value={returningCount} color="#0284c7" />
+            <StatChip label="Inactive Users" value={inactiveCount} color="#e05c5c" />
+            <StatChip label="Sessions" value={sessionStats.totalSessions} color="#2d6a4f" />
+            <StatChip label="Avg Session Length" value={formatDuration(sessionStats.avgSessionMs)} color="#e8a320" />
           </div>
 
           {/* Chart 1 — Most Used Features */}
@@ -623,6 +947,138 @@ function AnalyticsSection({ teachers = [] }) {
             </ResponsiveContainer>
           </div>
 
+          {/* Chart 4 — New Signups */}
+          <div style={{ ...card, marginTop: 20 }}>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>New Signups — Last {range} Days</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart data={signupData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#4a6357' }} tickLine={false} axisLine={false} interval={Math.floor(signupData.length / 8)} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }} />
+                <Bar dataKey="count" name="Signups" fill="#16a34a" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Chart 5 — Feature Adoption Depth */}
+          <div style={{ ...card, marginTop: 20 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Feature Adoption Depth</p>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>How many distinct features each active teacher touched this period</p>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart data={adoptionData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }} />
+                <Bar dataKey="count" name="Teachers" fill="#6d28d9" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Weekly Retention Cohorts */}
+          {retentionCohorts.length > 0 && (
+            <div style={{ ...card, marginTop: 20 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Weekly Retention Cohorts</p>
+              <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>% of each signup-week cohort still active on Day 1 / 7 / 30 — a cell reads "—" until that cohort has actually reached that many days since signup</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 70px 70px', gap: 8, padding: '0 12px 6px', borderBottom: '1px solid var(--kt-border)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cohort (week of)</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center' }}>Size</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center' }}>Day 1</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center' }}>Day 7</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center' }}>Day 30</span>
+                </div>
+                {retentionCohorts.map(c => (
+                  <div key={c.label} style={{
+                    display: 'grid', gridTemplateColumns: '1fr 70px 70px 70px 70px', gap: 8,
+                    padding: '8px 12px', background: 'var(--kt-surface)', borderRadius: 8,
+                    border: '1px solid var(--kt-border)', alignItems: 'center',
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>{c.label}</span>
+                    <span style={{ fontSize: 12, fontFamily: '"DM Mono", monospace', color: 'var(--kt-text-secondary)', textAlign: 'center' }}>{c.size}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: '"DM Mono", monospace', color: c.day1 == null ? 'var(--kt-text-secondary)' : '#16a34a', textAlign: 'center' }}>{c.day1 == null ? '—' : `${c.day1}%`}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: '"DM Mono", monospace', color: c.day7 == null ? 'var(--kt-text-secondary)' : '#0284c7', textAlign: 'center' }}>{c.day7 == null ? '—' : `${c.day7}%`}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: '"DM Mono", monospace', color: c.day30 == null ? 'var(--kt-text-secondary)' : '#6d28d9', textAlign: 'center' }}>{c.day30 == null ? '—' : `${c.day30}%`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Wizard Funnels — where teachers drop off mid-flow */}
+          {(lessonGenFunnel[0]?.count > 0 || dllGenFunnel[0]?.count > 0 || cotGenFunnel[0]?.count > 0 || testBuilderFunnel[0]?.count > 0) && (
+            <div style={{ marginTop: 20 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Wizard Funnels</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <FunnelCard title="Lesson Gen (ILAW)" stepLabels={LESSONGEN_STEPS} funnel={lessonGenFunnel} />
+                <FunnelCard title="DLL Gen" stepLabels={DLLGEN_STEPS} funnel={dllGenFunnel} />
+                <FunnelCard title="COT Gen" stepLabels={COTGEN_STEPS} funnel={cotGenFunnel} />
+                <FunnelCard title="Test Builder" stepLabels={TEST_BUILDER_STEPS} funnel={testBuilderFunnel} />
+              </div>
+            </div>
+          )}
+
+          {/* Chart 6 & 7 — Subject / Grade Demand */}
+          {(bySubject.length > 0 || byGrade.length > 0) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+              {bySubject.length > 0 && (
+                <div style={card}>
+                  <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Generations by Subject</p>
+                  <ResponsiveContainer width="100%" height={chartHeight}>
+                    <BarChart data={bySubject} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }} cursor={{ fill: 'rgba(45,106,79,0.05)' }} />
+                      <Bar dataKey="count" name="Generations" radius={[0, 4, 4, 0]}>
+                        {bySubject.map((_, i) => <Cell key={i} fill={FEATURE_COLORS[i % FEATURE_COLORS.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {byGrade.length > 0 && (
+                <div style={card}>
+                  <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Generations by Grade Level</p>
+                  <ResponsiveContainer width="100%" height={chartHeight}>
+                    <BarChart data={byGrade} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#4a6357' }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }} cursor={{ fill: 'rgba(45,106,79,0.05)' }} />
+                      <Bar dataKey="count" name="Generations" radius={[0, 4, 4, 0]}>
+                        {byGrade.map((_, i) => <Cell key={i} fill={FEATURE_COLORS[i % FEATURE_COLORS.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Top Schools */}
+          {topSchools.length > 0 && (
+            <div style={{ ...card, marginTop: 20 }}>
+              <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Top Schools</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {topSchools.map((s, i) => (
+                  <div key={s.school} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', background: 'var(--kt-surface)', borderRadius: 8,
+                    border: '1px solid var(--kt-border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.school}</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', fontFamily: '"DM Mono", monospace', flexShrink: 0 }}>{s.count} teacher{s.count !== 1 ? 's' : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Most Frequent Visitors */}
           {topVisitors.length > 0 && (
             <div style={{ ...card, marginTop: 20 }}>
@@ -639,6 +1095,34 @@ function AnalyticsSection({ teachers = [] }) {
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.label}</span>
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', fontFamily: '"DM Mono", monospace', flexShrink: 0 }}>{u.visits} visits</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent Generation Errors */}
+          {genStats.recentErrors.length > 0 && (
+            <div style={{ ...card, marginTop: 20 }}>
+              <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={14} color="#e05c5c" /> Recent Generation Errors
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {genStats.recentErrors.map(e => (
+                  <div key={e.id} style={{
+                    padding: '8px 12px', background: '#fdf2f2', borderRadius: 8,
+                    border: '1px solid rgba(224,92,92,0.25)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{TOOL_LABELS[e.tool] || e.tool}</span>
+                      <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                        {e.ts?.toDate ? e.ts.toDate().toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                        {typeof e.durationMs === 'number' ? ` · ${formatDuration(e.durationMs)}` : ''}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: '#a13327', fontFamily: '"DM Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e.error || 'Unknown error'}
+                    </p>
                   </div>
                 ))}
               </div>
