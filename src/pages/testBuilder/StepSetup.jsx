@@ -69,7 +69,7 @@ export default function StepSetup() {
         </h2>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
           Term Exams get a DepEd item ceiling automatically from grade level. Summative Tests (ST1/ST2) let you
-          choose the item count — 10 to 25 per the DepEd memo cap.
+          choose the item count — <mark className="kt-highlight">10 to 25</mark> per the DepEd memo cap.
         </p>
       </div>
 
