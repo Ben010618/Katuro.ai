@@ -15,7 +15,7 @@ const TYPES = [
     iconBg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
     Icon: BookOpen,
     title: 'Build your ILAW Lesson Plan',
-    description: <>AI-generated detailed lesson plans per session. 3 steps, <mark className="kt-highlight">~5 minutes</mark>. Pre-lesson, flow, assessment, extended learning.</>,
+    description: 'AI-generated detailed lesson plans per session. 3 steps, ~5 minutes. Pre-lesson, flow, assessment, extended learning.',
   },
   {
     key: 'dll',
@@ -23,7 +23,7 @@ const TYPES = [
     iconBg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
     Icon: CalendarDays,
     title: 'Build your Daily Lesson Log',
-    description: <>DepEd standard DLL format. AI fills in <mark className="kt-highlight">all 10 procedure steps</mark> for each day. Exports as landscape A4 Word document.</>,
+    description: 'DepEd standard DLL format. AI fills in all 10 procedure steps for each day. Exports as landscape A4 Word document.',
   },
   {
     key: 'cot',
@@ -32,7 +32,7 @@ const TYPES = [
     Icon: ShieldCheck,
     title: 'Build your COT Lesson Plan',
     badge: 'COT-optimized · 4As Framework',
-    description: <>Full PIVOT 4A / IDEA lesson plan with a built-in <mark className="kt-highlight">COT Indicator Evidence Map</mark> for your IPCRF defense.</>,
+    description: 'Full PIVOT 4A / IDEA lesson plan with a built-in COT Indicator Evidence Map for your IPCRF defense.',
   },
 ];
 

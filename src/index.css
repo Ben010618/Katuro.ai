@@ -47,19 +47,6 @@
   /* Motion */
   --kt-ease:     cubic-bezier(0.4, 0, 0.2, 1);
   --kt-duration: 0.18s;
-
-  /* Type scale — reference sizes for consistent hierarchy across pages.
-     Roles: eyebrow (uppercase labels/badges), sm (secondary/meta text),
-     body (default paragraph), title (card/subsection heading), heading
-     (page h1), display (rare hero moment). Adopt gradually — existing
-     inline sizes don't need a forced rewrite, but new components and
-     any hierarchy work should draw from this scale, not a new number. */
-  --kt-text-eyebrow: 11px;
-  --kt-text-sm:      13px;
-  --kt-text-body:    15px;
-  --kt-text-title:   17px;
-  --kt-text-heading: 22px;
-  --kt-text-display: 28px;
 }
 
 [data-dark="true"] {
@@ -137,22 +124,6 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-/* Inline keyword emphasis — a soft brand-tinted highlight stroke behind
-   the text (not a literal marker yellow). Use sparingly: one highlighted
-   phrase per block, reserved for the single most important takeaway —
-   stacking several in one sentence cancels the effect entirely. */
-.kt-highlight {
-  font-weight: 700;
-  color: var(--kt-green-dark);
-  background-image: linear-gradient(180deg, transparent 58%, var(--kt-green-tint) 58%);
-  padding: 0 1px;
-  border-radius: 3px;
-}
-[data-dark="true"] .kt-highlight {
-  color: var(--kt-green-bright);
-  background-image: linear-gradient(180deg, transparent 58%, rgba(82,183,136,0.22) 58%);
 }
 
 /* ═══════════════════════════════════════════════════════════
