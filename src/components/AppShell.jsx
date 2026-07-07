@@ -345,7 +345,7 @@ export default function AppShell() {
         {/* Right: topbar + content */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
           {SLIDE_IMGS.map((src, i) => (
-            <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.07 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
+            <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.5 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
           ))}
 
           <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: 'var(--kt-shadow-sm)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>

@@ -254,7 +254,7 @@ export default function DashboardPage() {
             backgroundImage: `url(${src})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: i === slideIdx ? 0.09 : 0,
+            opacity: i === slideIdx ? 0.5 : 0,
             transition: 'opacity 1.8s ease-in-out',
             borderRadius: 'var(--kt-radius-lg)',
             pointerEvents: 'none',
