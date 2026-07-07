@@ -253,6 +253,14 @@ export async function getMyReaction(postId, uid) {
   return snap.exists() ? snap.data().type : null;
 }
 
+/** Everyone who reacted to a post — so the author (or anyone) can see who reacted, and with what. */
+export async function getReactors(postId) {
+  const snap = await getDocs(collection(db, 'shares_reactions', postId, 'userReactions'));
+  return snap.docs
+    .map(d => ({ uid: d.id, type: d.data().type, createdAt: d.data().createdAt }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+}
+
 /**
  * Toggle reaction. If same type → remove. If different → switch. If none → add.
  * Uses a transaction to keep reaction counts consistent.
