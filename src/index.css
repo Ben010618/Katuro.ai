@@ -360,6 +360,55 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   3D Tactile Cards — clickable "choose one" cards with real
+   depth: ambient shadow, inset top-edge highlight, a lift +
+   zoom on hover, and a tactile press-down on click. Set
+   --card-accent to an "R,G,B" triplet to tint the hover glow.
+═══════════════════════════════════════════════════════════ */
+.kt-3d-card {
+  --card-accent: 45,106,79;
+  position: relative;
+  text-align: left;
+  background: linear-gradient(180deg, var(--kt-card) 0%, var(--kt-surface) 100%);
+  border: 1.5px solid rgba(var(--card-accent), 0.18);
+  border-radius: var(--kt-radius-lg);
+  padding: 26px 24px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(13,34,24,0.04), 0 6px 16px rgba(13,34,24,0.05), inset 0 1px 0 rgba(255,255,255,0.7);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease;
+}
+.kt-3d-card:hover {
+  transform: translateY(-5px) scale(1.025);
+  border-color: rgba(var(--card-accent), 0.55);
+  box-shadow: 0 1px 2px rgba(13,34,24,0.05), 0 22px 44px rgba(var(--card-accent), 0.18), inset 0 1px 0 rgba(255,255,255,0.85);
+}
+.kt-3d-card:active {
+  transform: translateY(-2px) scale(1.01);
+  transition-duration: 0.08s;
+  box-shadow: 0 1px 2px rgba(13,34,24,0.05), 0 10px 20px rgba(var(--card-accent), 0.2), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.kt-3d-card-icon {
+  width: 48px; height: 48px; border-radius: var(--kt-radius-md);
+  display: grid; place-items: center; flex-shrink: 0;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.kt-3d-card:hover .kt-3d-card-icon { transform: scale(1.08) rotate(-3deg); }
+
+[data-dark="true"] .kt-3d-card {
+  background: linear-gradient(180deg, var(--kt-card) 0%, var(--kt-card-2) 100%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 6px 16px rgba(0,0,0,0.3);
+}
+[data-dark="true"] .kt-3d-card:hover {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 22px 44px rgba(var(--card-accent), 0.24), 0 6px 16px rgba(0,0,0,0.35);
+}
+[data-dark="true"] .kt-3d-card:active {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 10px 20px rgba(var(--card-accent), 0.26), 0 6px 16px rgba(0,0,0,0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════
    Print
 ═══════════════════════════════════════════════════════════ */
 @media print {

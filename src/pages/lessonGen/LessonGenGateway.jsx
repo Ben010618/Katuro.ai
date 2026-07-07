@@ -8,9 +8,67 @@ import { Sparkles, BookOpen, CalendarDays, ArrowRight, RotateCcw, ShieldCheck } 
 // 2. Rice Terrace Green    — lush mountains & terraces #14532d → #16a34a
 // 3. Sunburst Amber-Gold   — radiating sun & flag gold #92400e → #d97706
 
-const ILAW_COLOR  = '#1d4ed8';   // Philippine Blue
-const DLL_COLOR   = '#16a34a';   // Rice Terrace Green
-const COT_COLOR   = '#d97706';   // Sunburst Amber-Gold
+const TYPES = [
+  {
+    key: 'ilaw',
+    color: '#1d4ed8', accentRgb: '29,78,216',
+    iconBg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
+    Icon: BookOpen,
+    title: 'Build your ILAW Lesson Plan',
+    description: 'AI-generated detailed lesson plans per session. 3 steps, ~5 minutes. Pre-lesson, flow, assessment, extended learning.',
+  },
+  {
+    key: 'dll',
+    color: '#16a34a', accentRgb: '22,163,74',
+    iconBg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+    Icon: CalendarDays,
+    title: 'Build your Daily Lesson Log',
+    description: 'DepEd standard DLL format. AI fills in all 10 procedure steps for each day. Exports as landscape A4 Word document.',
+  },
+  {
+    key: 'cot',
+    color: '#d97706', accentRgb: '217,119,6',
+    iconBg: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+    Icon: ShieldCheck,
+    title: 'Build your COT Lesson Plan',
+    badge: 'COT-optimized · 4As Framework',
+    description: 'Full PIVOT 4A / IDEA lesson plan with a built-in COT Indicator Evidence Map for your IPCRF defense.',
+  },
+];
+
+function TypeCard({ type, freeMode, onClick }) {
+  const { color, accentRgb, iconBg, Icon, title, badge, description } = type;
+  return (
+    <button
+      onClick={onClick}
+      className="kt-3d-card"
+      style={{ '--card-accent': accentRgb }}
+    >
+      <div className="kt-3d-card-icon" style={{ background: iconBg }}>
+        <Icon size={22} color={color} />
+      </div>
+
+      <div>
+        <p style={{ margin: badge ? '0 0 4px' : '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+          {title}
+        </p>
+        {badge && (
+          <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {badge}
+          </p>
+        )}
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
+          {description}
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
+        {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color }}>3 tokens per generation</span>}
+        <ArrowRight size={14} color={color} />
+      </div>
+    </button>
+  );
+}
 
 export default function LessonGenGateway() {
   const navigate = useNavigate();
@@ -29,6 +87,12 @@ export default function LessonGenGateway() {
     else if (store.competencyText)            navigate('/lesson-gen/step-2');
     else                                      navigate('/lesson-gen/step-1');
   }
+
+  const HANDLERS = {
+    ilaw: handleILAW,
+    dll:  () => navigate('/dll-gen/step-1'),
+    cot:  () => navigate('/cot-gen/step-1'),
+  };
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto' }}>
@@ -56,137 +120,10 @@ export default function LessonGenGateway() {
       </div>
 
       {/* Type cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 18, marginBottom: 28 }}>
-
-        {/* ILAW card — Philippine Blue */}
-        <button
-          onClick={handleILAW}
-          style={{
-            textAlign: 'left', background: 'var(--kt-card)',
-            border: `2px solid rgba(29,78,216,0.15)`,
-            borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-            display: 'flex', flexDirection: 'column', gap: 14,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = ILAW_COLOR;
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(29,78,216,0.14)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(29,78,216,0.15)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
-            display: 'grid', placeItems: 'center',
-          }}>
-            <BookOpen size={22} color={ILAW_COLOR} />
-          </div>
-
-          <div>
-            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-              Build your ILAW Lesson Plan
-            </p>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
-              AI-generated detailed lesson plans per session. 3 steps, ~5 minutes. Pre-lesson, flow, assessment, extended learning.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: ILAW_COLOR }}>3 tokens per generation</span>}
-            <ArrowRight size={14} color={ILAW_COLOR} />
-          </div>
-        </button>
-
-        {/* DLL card — Rice Terrace Green */}
-        <button
-          onClick={() => navigate('/dll-gen/step-1')}
-          style={{
-            textAlign: 'left', background: 'var(--kt-card)',
-            border: `2px solid rgba(22,163,74,0.15)`,
-            borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-            display: 'flex', flexDirection: 'column', gap: 14,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = DLL_COLOR;
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(22,163,74,0.14)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(22,163,74,0.15)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
-            display: 'grid', placeItems: 'center',
-          }}>
-            <CalendarDays size={22} color={DLL_COLOR} />
-          </div>
-
-          <div>
-            <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-              Build your Daily Lesson Log
-            </p>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
-              DepEd standard DLL format. AI fills in all 10 procedure steps for each day. Exports as landscape A4 Word document.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: DLL_COLOR }}>3 tokens per generation</span>}
-            <ArrowRight size={14} color={DLL_COLOR} />
-          </div>
-        </button>
-
-        {/* COT card — Sunburst Amber-Gold */}
-        <button
-          onClick={() => navigate('/cot-gen/step-1')}
-          style={{
-            textAlign: 'left', background: 'var(--kt-card)',
-            border: `2px solid rgba(217,119,6,0.15)`,
-            borderRadius: 16, padding: '26px 24px', cursor: 'pointer',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-            display: 'flex', flexDirection: 'column', gap: 14,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = COT_COLOR;
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(217,119,6,0.14)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(217,119,6,0.15)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
-            display: 'grid', placeItems: 'center',
-          }}>
-            <ShieldCheck size={22} color={COT_COLOR} />
-          </div>
-
-          <div>
-            <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-              Build your COT Lesson Plan
-            </p>
-            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: COT_COLOR, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              COT-optimized · 4As Framework
-            </p>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
-              Full PIVOT 4A / IDEA lesson plan with a built-in COT Indicator Evidence Map for your IPCRF defense.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-            {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color: COT_COLOR }}>3 tokens per generation</span>}
-            <ArrowRight size={14} color={COT_COLOR} />
-          </div>
-        </button>
-
+      <div className="kt-grid-3" style={{ gap: 18, marginBottom: 28, paddingTop: 4 }}>
+        {TYPES.map(type => (
+          <TypeCard key={type.key} type={type} freeMode={freeMode} onClick={HANDLERS[type.key]} />
+        ))}
       </div>
 
       {/* Resume draft */}
