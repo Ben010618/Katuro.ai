@@ -559,7 +559,7 @@
 .sh-composer {
   background: var(--sh-surface);
   border-radius: var(--sh-radius-lg);
-  width: 100%; max-width: 580px;
+  width: 100%; max-width: 680px;
   max-height: 90vh; overflow-y: auto;
   box-shadow: var(--sh-shadow-md);
 }
@@ -991,43 +991,82 @@
 .sh-rte-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px;
   border-bottom: 1px solid var(--sh-border-neutral);
   background: var(--sh-bg);
   flex-wrap: wrap;
 }
 
+/* Tactile, raised "key" buttons — soft shadow + inset highlight so each
+   control looks pressable, with a real press-down state on click. */
 .sh-rte-btn {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
+  border: 1px solid rgba(15,23,20,0.10);
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
-  font-family: var(--sh-font);
-  color: var(--sh-text-primary);
-  padding: 4px 8px;
-  line-height: 1;
-  transition: background 0.12s, border-color 0.12s;
-  min-width: 28px;
+  color: var(--sh-text-secondary);
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(15,23,20,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, color 0.1s ease, background 0.1s ease;
 }
 .sh-rte-btn:hover {
-  background: var(--sh-primary-light);
-  border-color: var(--sh-border);
+  color: var(--sh-primary-dark);
+  background: linear-gradient(180deg, #ffffff 0%, #eaf6ee 100%);
+  box-shadow: 0 2px 5px rgba(15,23,20,0.10), inset 0 1px 0 rgba(255,255,255,0.9);
+  transform: translateY(-1px);
+}
+.sh-rte-btn:active {
+  transform: translateY(0);
+  background: linear-gradient(180deg, #eef2f0 0%, #e2e8e5 100%);
+  box-shadow: inset 0 1px 3px rgba(15,23,20,0.16);
 }
 .sh-rte-btn--sm {
-  font-size: 11px;
-  padding: 3px 6px;
-  color: var(--sh-text-muted);
+  width: 26px; height: 26px;
 }
 
 .sh-rte-divider {
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--sh-border-neutral);
-  margin: 0 4px;
+  margin: 0 2px;
   flex-shrink: 0;
 }
+
+/* Inline "insert link" popover row */
+.sh-rte-link-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--sh-border-neutral);
+  background: var(--sh-primary-xlight);
+}
+.sh-rte-link-row-icon { color: var(--sh-primary); flex-shrink: 0; }
+.sh-rte-link-input {
+  flex: 1; min-width: 0;
+  border: 1.5px solid var(--sh-border-neutral);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: var(--sh-font);
+  color: var(--sh-text-primary);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sh-rte-link-input:focus { border-color: var(--sh-primary); }
+.sh-rte-link-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: none; border-radius: 7px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15,23,20,0.1);
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+.sh-rte-link-btn:hover { transform: translateY(-1px); }
+.sh-rte-link-btn:active { transform: translateY(0); opacity: 0.85; }
+.sh-rte-link-btn--confirm { background: var(--sh-primary); color: #fff; }
+.sh-rte-link-btn--cancel  { background: #fff; color: var(--sh-text-muted); border: 1px solid var(--sh-border-neutral); }
 
 .sh-rte-editor {
   min-height: 240px;
@@ -1050,6 +1089,20 @@
   padding-left: 20px;
 }
 .sh-rte-editor li { margin-bottom: 2px; }
+.sh-rte-editor a,
+.sh-caption--rich a,
+.sh-caption-link {
+  color: var(--sh-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--sh-primary-light);
+  text-underline-offset: 2px;
+}
+.sh-rte-editor a:hover,
+.sh-caption--rich a:hover,
+.sh-caption-link:hover {
+  text-decoration-color: var(--sh-primary);
+}
 
 /* Rich HTML captions in the feed */
 .sh-caption--rich {
