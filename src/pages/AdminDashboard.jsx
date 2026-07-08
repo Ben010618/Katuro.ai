@@ -794,32 +794,39 @@ function AnalyticsSection({ teachers = [] }) {
 
   useEffect(() => { load(range); }, [range]);
 
-  const featureEvents = events.filter(e => !NON_FEATURE_EVENTS.has(e.feature));
-  const featureData = buildFeatureData(featureEvents);
-  const dailyData   = buildDailyData(events, range);
-  const hourData    = buildHourData(events);
-  const topVisitors = buildTopVisitors(events, teachers);
-  const genStats    = buildGenerationStats(events);
-  const signupData  = buildSignupData(teachers, range);
-  const topSchools  = buildTopSchools(teachers);
-  const adoptionData = buildAdoptionDepth(featureEvents);
-  const { newCount, returningCount } = buildNewVsReturning(events, teachers, range);
-  const inactiveCount = buildInactiveCount(events, teachers, range);
-  const { bySubject, byGrade } = buildSubjectGradeData(featureEvents);
-  const retentionCohorts = buildRetentionCohorts(events, teachers, range);
-  const sessionStats = buildSessionStats(events);
-  const lessonGenFunnel    = buildFunnel(events, 'lessongen_step_viewed', ['step1', 'step2', 'step3']);
-  const dllGenFunnel       = buildFunnel(events, 'dllgen_step_viewed', ['step1', 'step2']);
-  const cotGenFunnel       = buildFunnel(events, 'cotgen_step_viewed', ['step1', 'step2', 'step3']);
-  const testBuilderFunnel  = buildFunnel(events, 'test_builder_step_viewed', ['setup', 'blooms', 'tos', 'review']);
+  // Admin accounts are excluded from analytics entirely — their logins,
+  // visits, and feature usage shouldn't skew what's meant to measure
+  // teacher behavior.
+  const adminUids       = new Set(teachers.filter(t => t.isAdmin).map(t => t.id));
+  const visibleTeachers = teachers.filter(t => !t.isAdmin);
+  const visibleEvents   = events.filter(e => !adminUids.has(e.uid));
 
-  const totalEvents  = events.length;
-  const uniqueUsers  = new Set(events.map(e => e.uid)).size;
+  const featureEvents = visibleEvents.filter(e => !NON_FEATURE_EVENTS.has(e.feature));
+  const featureData = buildFeatureData(featureEvents);
+  const dailyData   = buildDailyData(visibleEvents, range);
+  const hourData    = buildHourData(visibleEvents);
+  const topVisitors = buildTopVisitors(visibleEvents, visibleTeachers);
+  const genStats    = buildGenerationStats(visibleEvents);
+  const signupData  = buildSignupData(visibleTeachers, range);
+  const topSchools  = buildTopSchools(visibleTeachers);
+  const adoptionData = buildAdoptionDepth(featureEvents);
+  const { newCount, returningCount } = buildNewVsReturning(visibleEvents, visibleTeachers, range);
+  const inactiveCount = buildInactiveCount(visibleEvents, visibleTeachers, range);
+  const { bySubject, byGrade } = buildSubjectGradeData(featureEvents);
+  const retentionCohorts = buildRetentionCohorts(visibleEvents, visibleTeachers, range);
+  const sessionStats = buildSessionStats(visibleEvents);
+  const lessonGenFunnel    = buildFunnel(visibleEvents, 'lessongen_step_viewed', ['step1', 'step2', 'step3']);
+  const dllGenFunnel       = buildFunnel(visibleEvents, 'dllgen_step_viewed', ['step1', 'step2']);
+  const cotGenFunnel       = buildFunnel(visibleEvents, 'cotgen_step_viewed', ['step1', 'step2', 'step3']);
+  const testBuilderFunnel  = buildFunnel(visibleEvents, 'test_builder_step_viewed', ['setup', 'blooms', 'tos', 'review']);
+
+  const totalEvents  = visibleEvents.length;
+  const uniqueUsers  = new Set(visibleEvents.map(e => e.uid)).size;
   const dailyUsersAvg = dailyData.length > 0
     ? dailyData.reduce((sum, d) => sum + d.users, 0) / dailyData.length
     : 0;
   const stickiness = uniqueUsers > 0 ? Math.round((dailyUsersAvg / uniqueUsers) * 100) : null;
-  const siteVisits   = events.filter(e => e.feature === 'login').length;
+  const siteVisits   = visibleEvents.filter(e => e.feature === 'login').length;
   const topFeature   = featureData[0]?.name || '—';
   const peakHour     = hourData.reduce((best, h) => h.count > best.count ? h : best, { hour: '—', count: 0 }).hour;
 
@@ -862,7 +869,7 @@ function AnalyticsSection({ teachers = [] }) {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
           <Loader2 size={24} color="#2d6a4f" style={{ animation: 'spin 1s linear infinite' }} />
         </div>
-      ) : events.length === 0 ? (
+      ) : visibleEvents.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--kt-text-secondary)' }}>
           <BarChart2 size={36} style={{ opacity: 0.25, marginBottom: 12 }} />
           <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No usage data yet</p>
