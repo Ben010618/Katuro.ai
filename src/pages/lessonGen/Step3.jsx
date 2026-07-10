@@ -126,11 +126,17 @@ export default function Step3() {
           }
         }
       }
+      const REASON_MESSAGES = {
+        429:            'Rate limit reached — wait a moment and try again.',
+        truncated:      'The AI response was cut off. Try again — it usually succeeds on retry.',
+        invalid_json:   'The AI returned an unexpected format for this session. Try again.',
+        empty_response: 'The AI returned no content for this session. Try again.',
+        safety_block:   'This session was blocked by the AI\'s content filter. Try rephrasing the competency or context.',
+      };
+      const reasonKey = lastErr?.status === 429 ? 429 : lastErr?.reason;
       throw new Error(
         `Session ${s.day} (${bloomsBaseOf(s.bloomsLevel)}) could not be generated. ` +
-        (lastErr?.status === 429
-          ? 'Rate limit reached — wait a moment and try again.'
-          : 'Check your connection and try again.')
+        (REASON_MESSAGES[reasonKey] || 'Check your connection and try again.')
       );
     });
 

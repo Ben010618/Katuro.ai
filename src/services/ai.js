@@ -64,6 +64,14 @@ function closeOpenJSON(raw) {
 
   if (!stack.length) return s;
 
+  // Truncation mid-string (e.g. output cut off by the token limit while
+  // writing a field's value) leaves inStr === true with no safeEnd past
+  // it — the bracket-closing pass below can't fix an unterminated quote,
+  // so close it first or the repair silently fails on every truncation.
+  if (inStr && safeEnd < 0) {
+    s = s + '"';
+  }
+
   let t = (safeEnd >= 0 ? s.slice(0, safeEnd + 1) : s).replace(/,\s*$/, "");
   const open = [];
   inStr = false; esc = false;
@@ -75,6 +83,7 @@ function closeOpenJSON(raw) {
     if (c === "{" || c === "[") open.push(c === "{" ? "}" : "]");
     else if ((c === "}" || c === "]") && open.length) open.pop();
   }
+  if (inStr) t += '"';
   return t + open.reverse().join("");
 }
 
@@ -414,7 +423,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, ...NO_THINKING },
+      generationConfig: { temperature: 0.6, maxOutputTokens: 3072, ...NO_THINKING },
     }),
   });
 
@@ -423,25 +432,32 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
     console.error(`generateIlawSession (session ${session.day}) API error:`, errData);
     const err = new Error(`Gemini error: ${res.status} — ${errData?.error?.message || res.statusText}`);
     err.status = res.status;
+    err.reason = 'api_error';
     if (res.status === 429) {
       err.retryAfter = parseInt(res.headers.get('retry-after') || '30', 10);
     }
     throw err;
   }
 
-  const data    = await res.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const data        = await res.json();
+  const candidate   = data.candidates?.[0];
+  const finishReason = candidate?.finishReason;
+  const rawText     = candidate?.content?.parts?.[0]?.text?.trim();
   if (!rawText) {
     console.error(`generateIlawSession (session ${session.day}) empty response:`, data);
-    throw new Error(`Session ${session.day} — empty response from AI`);
+    const err = new Error(`Session ${session.day} — empty response from AI`);
+    err.reason = finishReason === 'SAFETY' ? 'safety_block' : 'empty_response';
+    throw err;
   }
 
   let parsed;
   try {
     parsed = parseJSON(rawText);
   } catch (e) {
-    console.error(`generateIlawSession (session ${session.day}) parse failed:`, rawText);
-    throw new Error(`Session ${session.day} — AI returned invalid JSON`);
+    console.error(`generateIlawSession (session ${session.day}) parse failed (finishReason: ${finishReason}):`, rawText);
+    const err = new Error(`Session ${session.day} — AI returned invalid JSON`, { cause: e });
+    err.reason = finishReason === 'MAX_TOKENS' ? 'truncated' : 'invalid_json';
+    throw err;
   }
 
   return {
