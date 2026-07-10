@@ -38,7 +38,6 @@
 
 /* ── App Layout ──────────────────────────────────────────────────── */
 .sh-root {
-  display: flex;
   min-height: 100vh;
   /* 4.png decorative background at 7% opacity blended with the page green */
   background:
@@ -48,97 +47,65 @@
   color: var(--sh-text-primary);
 }
 
-/* ── Left Sidebar ────────────────────────────────────────────────── */
-.sh-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  background: #0d2218;
-  border-right: 1px solid rgba(255,255,255,0.06);
+.sh-page {
   display: flex;
   flex-direction: column;
-  padding: 20px 12px;
-  overflow-y: auto;
-  z-index: 30;
+  min-height: 100vh;
 }
 
-.sh-logo-row {
-  padding: 8px 10px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-  margin-bottom: 14px;
-}
-
-/* ── Sidebar Nav ─────────────────────────────────────────────────── */
-.sh-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-
-.sh-nav-link {
+/* ── Brand strip + Explore/Notifications shortcuts ──────────────────
+   Replaces the old standalone left sidebar now that Shares lives
+   inside AppShell — page-level nav comes from AppShell's own sidebar,
+   this strip only carries feed-specific shortcuts. ─────────────────── */
+.sh-subheader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--sh-radius-sm);
-  text-decoration: none;
-  color: rgba(255,255,255,0.55);
-  font-weight: 600;
-  font-size: 13px;
-  transition: background 0.14s, color 0.14s;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  position: relative;
-  border-left: 3px solid transparent;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #0d2218 0%, #143c2a 60%, #0d2218 100%);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 
-.sh-nav-link:hover {
-  background: rgba(82,183,136,0.12);
-  color: #4ade80;
-  border-left-color: rgba(82,183,136,0.4);
-}
+.sh-subheader-logo { display: flex; align-items: center; text-decoration: none; }
 
-.sh-nav-link.active {
-  background: rgba(34,197,94,0.18);
-  color: #4ade80;
-  font-weight: 700;
-  border-left-color: #22c55e;
-}
+.sh-subheader-actions { display: flex; align-items: center; gap: 6px; }
 
-.sh-nav-post-btn {
-  margin-top: 14px;
-  width: 100%;
-  background: linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%);
-  color: white;
-  border: none;
-  border-radius: var(--sh-radius-sm);
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
+.sh-subheader-link {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: opacity 0.15s, transform 0.1s;
-  box-shadow: 0 4px 14px rgba(34,197,94,0.35);
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.14s, color 0.14s, box-shadow 0.14s;
+  position: relative;
 }
 
-.sh-nav-post-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-.sh-nav-post-btn:active { transform: translateY(0); }
+.sh-subheader-link:hover { background: rgba(82,183,136,0.16); color: #fff; }
 
-.sh-nav-badge {
+.sh-subheader-link.active {
+  background: linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(34,197,94,0.35);
+}
+
+.sh-subheader-badge {
+  position: absolute;
+  top: -3px; right: -3px;
   background: var(--sh-red);
-  color: white;
+  color: #fff;
   border-radius: 10px;
-  font-size: 10px;
-  padding: 1px 6px;
+  font-size: 9px;
+  padding: 1px 5px;
   font-weight: 700;
-  line-height: 16px;
-  margin-left: auto;
+  line-height: 14px;
 }
 
 /* ── Feed Layout ─────────────────────────────────────────────────── */
@@ -147,6 +114,54 @@
   min-width: 0;
   padding: 0;
 }
+
+/* ── Composer trigger — inline "what's on your mind" entry point ──── */
+.sh-composer-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 28px);
+  margin: 14px 14px 12px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--sh-primary-xlight) 100%);
+  border: 1.5px solid var(--sh-border);
+  border-radius: var(--sh-radius-lg);
+  padding: 13px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: var(--sh-shadow-sm);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.24s ease;
+}
+
+.sh-composer-trigger:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sh-shadow-md);
+  border-color: var(--sh-primary-mid);
+}
+
+.sh-composer-trigger:active { transform: translateY(-1px); }
+
+.sh-composer-trigger-text {
+  flex: 1;
+  text-align: left;
+  color: var(--sh-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sh-composer-trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(34,197,94,0.35);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-composer-trigger:hover .sh-composer-trigger-icon { transform: scale(1.08) rotate(-4deg); }
 
 /* Feed + right panel wrapper in SharesFeed */
 .sh-feed-layout {
@@ -986,42 +1001,6 @@
 .sh-empty-title { font-size: 16px; font-weight: 700; color: var(--sh-text-secondary); margin: 0 0 6px; }
 .sh-empty-text { font-size: 14px; margin: 0; }
 
-/* ── Mobile Bottom Nav ───────────────────────────────────────────── */
-.sh-mobile-nav {
-  display: none;
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-  background: #0d2218; border-top: 1px solid rgba(255,255,255,0.06);
-  padding: 8px 0 env(safe-area-inset-bottom, 0);
-}
-
-.sh-mobile-nav-inner {
-  display: flex; align-items: center; justify-content: space-around;
-  max-width: 480px; margin: 0 auto;
-}
-
-.sh-mobile-nav-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: none; border: none; cursor: pointer;
-  color: rgba(255,255,255,0.45); font-size: 10px;
-  font-family: inherit; font-weight: 600;
-  padding: 4px 12px; border-radius: 10px;
-  transition: color 0.14s; position: relative;
-}
-
-.sh-mobile-nav-btn.active { color: #4ade80; }
-.sh-mobile-nav-btn:hover  { color: #4ade80; }
-
-.sh-mobile-fab {
-  width: 50px; height: 50px; border-radius: 50%;
-  background: linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%);
-  color: white; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 16px rgba(34,197,94,0.4);
-  transition: transform 0.15s; margin-top: -10px;
-}
-
-.sh-mobile-fab:hover { transform: scale(1.06); }
-
 /* ── Animations ──────────────────────────────────────────────────── */
 @keyframes sh-fade-in {
   from { opacity: 0; }
@@ -1039,9 +1018,9 @@
 }
 
 @media (max-width: 768px) {
-  .sh-sidebar    { display: none; }
-  .sh-mobile-nav { display: block; }
-  .sh-feed { padding-bottom: 80px; }
+  .sh-subheader { padding: 10px 14px; }
+  .sh-subheader-link span { display: none; }
+  .sh-subheader-link { padding: 8px 10px; }
   .sh-post-grid { grid-template-columns: repeat(3, 1fr); }
   .sh-tag-fields { grid-template-columns: 1fr; }
   .sh-card-header { padding: 12px 12px 8px; }

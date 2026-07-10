@@ -55,7 +55,7 @@ import ClassesITeachPage       from './pages/classroomMgmt/ClassesITeachPage';
 import GradingTablePage        from './pages/classroomMgmt/GradingTablePage';
 import InvitePage              from './pages/classroomMgmt/InvitePage';
 import SharedPlanPage          from './pages/SharedPlanPage';
-import SharesModule            from './modules/shares/index';
+import SharesLayout             from './modules/shares/index';
 
 function LoadingScreen() {
   return (
@@ -152,7 +152,7 @@ function AdminRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to="/shares" replace />;
   return children;
 }
 
@@ -170,7 +170,10 @@ export default function App() {
 
           {/* Protected shell */}
           <Route path="/" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<Navigate to="/shares" replace />} />
+
+            {/* kaTuro Shares — teacher community feed, the app's new landing page */}
+            <Route path="shares/*" element={<SharesLayout />} />
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
@@ -233,9 +236,6 @@ export default function App() {
 
           {/* Public shared plan preview — no auth required */}
           <Route path="/shared/:shareId" element={<SharedPlanPage />} />
-
-          {/* kaTuro Shares — standalone social feed module */}
-          <Route path="/shares/*" element={<ProtectedRoute><SharesModule /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

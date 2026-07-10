@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { useFeed } from './hooks/useFeed';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, ImagePlus } from 'lucide-react';
 import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { TeacherCard }  from './components/TeacherCard';
@@ -19,7 +19,7 @@ const FEED_MODES = [
   { key: 'following', label: 'Following' },
 ];
 
-export default function SharesFeed({ uid, displayName, initials, photoURL, school, gradeLevel, subject }) {
+export default function SharesFeed({ uid, displayName, initials, photoURL, school, gradeLevel, subject, onOpenComposer }) {
   const [mode,           setMode]           = useState('global');
   const [suggestions,    setSuggestions]    = useState([]);
   const [trending,       setTrending]       = useState([]);
@@ -44,6 +44,20 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
       {/* Feed column */}
       <div className="sh-feed-col">
         <div className="sh-feed">
+
+          {/* Composer trigger — opens the full post composer */}
+          <button type="button" className="sh-composer-trigger" onClick={onOpenComposer}>
+            <div className="sh-avatar sh-avatar--md" style={{ background: myBg, color: '#fff', flexShrink: 0 }}>
+              {photoURL ? <img src={photoURL} alt={displayName} /> : initials}
+            </div>
+            <span className="sh-composer-trigger-text">
+              What&rsquo;s on your mind, {displayName.split(' ')[0]}?
+            </span>
+            <span className="sh-composer-trigger-icon">
+              <ImagePlus size={17} />
+            </span>
+          </button>
+
           <div className="sh-filter-tabs">
             {FEED_MODES.map(m => (
               <button
@@ -189,11 +203,12 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
 }
 
 SharesFeed.propTypes = {
-  uid:         PropTypes.string.isRequired,
-  displayName: PropTypes.string.isRequired,
-  initials:    PropTypes.string.isRequired,
-  photoURL:    PropTypes.string,
-  school:      PropTypes.string,
-  gradeLevel:  PropTypes.string,
-  subject:     PropTypes.string,
+  uid:            PropTypes.string.isRequired,
+  displayName:    PropTypes.string.isRequired,
+  initials:       PropTypes.string.isRequired,
+  photoURL:       PropTypes.string,
+  school:         PropTypes.string,
+  gradeLevel:     PropTypes.string,
+  subject:        PropTypes.string,
+  onOpenComposer: PropTypes.func,
 };

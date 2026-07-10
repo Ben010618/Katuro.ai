@@ -18,7 +18,7 @@ import {
   LogOut, Menu, X, ChevronRight, ChevronDown,
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
-  Settings, Camera, Loader2, Images,
+  Settings, Camera, Loader2,
 } from 'lucide-react';
 
 const MAIN_NAV = [
@@ -27,7 +27,6 @@ const MAIN_NAV = [
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
   { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck, isNew: true },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
-  { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, isNew: true },
 ];
 
 const CLASSROOM_NAV = [
@@ -36,6 +35,7 @@ const CLASSROOM_NAV = [
 ];
 
 const TITLES = {
+  '/shares':                  'kaTuro Shares',
   '/dashboard':               'Dashboard',
   '/lesson-gen':              'Lesson Gen',
   '/dll-gen':                 'Daily Lesson Log',
@@ -306,6 +306,10 @@ export default function AppShell() {
     ? TITLES[Object.keys(TITLES).find(k => location.pathname.startsWith(k))]
     : 'kaTuro AI';
 
+  // kaTuro Shares manages its own edge-to-edge feed layout — skip the
+  // standard page padding so its feed/right-panel columns sit flush.
+  const isShares = location.pathname.startsWith('/shares');
+
   return (
     <>
       <style>{`
@@ -373,7 +377,7 @@ export default function AppShell() {
             )}
           </header>
 
-          <main style={{ flex: 1, overflow: 'auto', padding: 24, position: 'relative', zIndex: 1 }}>
+          <main style={{ flex: 1, overflow: 'auto', padding: isShares ? 0 : 24, position: 'relative', zIndex: 1 }}>
             <Outlet />
           </main>
         </div>
