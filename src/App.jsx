@@ -16,6 +16,7 @@ import DashboardPage    from './pages/DashboardPage';
 import MyLessonsPage    from './pages/MyLessonsPage';
 import QuizBuilderPage         from './pages/QuizBuilderPage';
 import ScanAnswerSheetsPage    from './pages/ScanAnswerSheetsPage';
+import AssessmentGateway       from './pages/assessment/AssessmentGateway';
 import AdminDashboard          from './pages/AdminDashboard';
 import ActionResearchPhase1    from './pages/ActionResearchPhase1';
 import ActionResearchPhase2    from './pages/ActionResearchPhase2';
@@ -173,6 +174,10 @@ export default function App() {
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
+
+            {/* Assessment — gateway card page for Quiz Builder & Test Builder */}
+            <Route path="assessment"     element={<AssessmentGateway />} />
+
             <Route path="quiz-builder"   element={<QuizBuilderPage />} />
             <Route path="quiz-builder/:quizId/scan" element={<ScanAnswerSheetsPage />} />
             <Route path="action-research">

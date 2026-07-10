@@ -14,7 +14,7 @@ import TokenBundleModal from './TokenBundleModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
-  LayoutDashboard, Sparkles, BookOpen, ClipboardList,
+  LayoutDashboard, Sparkles, BookOpen,
   LogOut, Menu, X, ChevronRight, ChevronDown,
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
@@ -25,8 +25,7 @@ const MAIN_NAV = [
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
-  { to: '/quiz-builder',            label: 'Quiz Builder',         Icon: ClipboardList   },
-  { to: '/test-builder',            label: 'Test Builder',         Icon: ClipboardCheck, isNew: true },
+  { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck, isNew: true },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, isNew: true },
 ];
@@ -41,6 +40,7 @@ const TITLES = {
   '/lesson-gen':              'Lesson Gen',
   '/dll-gen':                 'Daily Lesson Log',
   '/my-lessons':              'My Lessons',
+  '/assessment':              'Assessment',
   '/quiz-builder':            'Quiz Builder',
   '/test-builder':            'Test Builder',
   '/action-research/phase-1': 'Action Research',
