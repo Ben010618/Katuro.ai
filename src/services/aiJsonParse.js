@@ -26,6 +26,13 @@ function closeOpenJSON(raw) {
 
   if (!stack.length) return s;
 
+  // Truncation mid-string leaves inStr === true with no safeEnd past it —
+  // close the dangling quote first or the bracket-closing pass below can't
+  // fix it and every mid-string truncation falls through to a hard failure.
+  if (inStr && safeEnd < 0) {
+    s = s + '"';
+  }
+
   let t = (safeEnd >= 0 ? s.slice(0, safeEnd + 1) : s).replace(/,\s*$/, '');
   const open = [];
   inStr = false; esc = false;
@@ -37,6 +44,7 @@ function closeOpenJSON(raw) {
     if (c === '{' || c === '[') open.push(c === '{' ? '}' : ']');
     else if ((c === '}' || c === ']') && open.length) open.pop();
   }
+  if (inStr) t += '"';
   return t + open.reverse().join('');
 }
 

@@ -15,6 +15,7 @@ import LoginPage        from './pages/LoginPage';
 import DashboardPage    from './pages/DashboardPage';
 import MyLessonsPage    from './pages/MyLessonsPage';
 import QuizBuilderPage         from './pages/QuizBuilderPage';
+import ScanAnswerSheetsPage    from './pages/ScanAnswerSheetsPage';
 import AdminDashboard          from './pages/AdminDashboard';
 import ActionResearchPhase1    from './pages/ActionResearchPhase1';
 import ActionResearchPhase2    from './pages/ActionResearchPhase2';
@@ -173,6 +174,7 @@ export default function App() {
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
             <Route path="quiz-builder"   element={<QuizBuilderPage />} />
+            <Route path="quiz-builder/:quizId/scan" element={<ScanAnswerSheetsPage />} />
             <Route path="action-research">
               <Route path="phase-1"              element={<ActionResearchPhase1 />} />
               <Route path="phase-1/:docId"       element={<ActionResearchPhase1 />} />

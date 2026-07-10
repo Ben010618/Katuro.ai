@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext';
 import {
   Search, ChevronRight, Loader2, RefreshCw,
   Printer, CheckCircle, Eye, EyeOff, AlertCircle,
-  BookOpen, Plus, ArrowRight, Scissors, FileDown,
+  BookOpen, Plus, ArrowRight, Scissors, FileDown, Camera,
 } from 'lucide-react';
 import BubbleSheetPrint, { BubbleSheetPreview, A4_PX_W } from '../components/BubbleSheetPrint';
 
@@ -744,6 +744,24 @@ export default function QuizBuilderPage() {
         >
           <FileDown size={15} /> Download PDF
         </button>
+
+        {savedQuizId && (
+          <button
+            onClick={() => navigate(`/quiz-builder/${savedQuizId}/scan`)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: '#fff', color: '#1a3d2b', border: '1.5px solid rgba(45,106,79,0.25)',
+              borderRadius: 12, padding: '11px 0', cursor: 'pointer',
+              fontFamily: '"Plus Jakarta Sans", sans-serif',
+              fontSize: 13, fontWeight: 700, width: '100%',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-surface)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+          >
+            <Camera size={15} /> Scan Answer Sheets
+          </button>
+        )}
 
         {/* Hint */}
         <div style={{

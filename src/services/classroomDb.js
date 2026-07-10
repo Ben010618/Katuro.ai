@@ -20,6 +20,12 @@ export const DEFAULT_SUBJECTS = [
 
 export const GRADE_LEVELS = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 
+export const TERMS = [
+  { key: 'term1', label: 'Term 1' },
+  { key: 'term2', label: 'Term 2' },
+  { key: 'term3', label: 'Term 3' },
+];
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 export function slugify(str) {

@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import {
   subscribeGradeSheet, saveGradeSheet, submitGradeSheet, computeFinalGrade,
-  subscribeStudents, subscribeSectionComments,
+  subscribeStudents, subscribeSectionComments, TERMS,
 } from '../../services/classroomDb';
 import { thumbUrl } from '../../services/cloudinaryUpload';
 import { trackEvent } from '../../services/usageTracker';
@@ -29,12 +29,6 @@ const DEFAULT_WEIGHTS = {
   ptMax: [100, 100],
   stMax: [100, 100],
 };
-const TERMS = [
-  { key: 'term1', label: 'Term 1' },
-  { key: 'term2', label: 'Term 2' },
-  { key: 'term3', label: 'Term 3' },
-];
-
 export default function GradingTablePage() {
   const { sectionId, subject } = useParams();
   const decodedSubject = decodeURIComponent(subject);
