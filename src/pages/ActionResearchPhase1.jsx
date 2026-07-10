@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth }    from '../hooks/useAuth';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
-import { getGeminiKey }          from '../services/geminiConfig';
+import { getGeminiKey, geminiWithRetry } from '../services/geminiConfig';
 import { generateResearchTitles, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import {
@@ -41,7 +41,7 @@ const BERF_THEMES  = new Set(['teaching-learning','governance']);
 
 async function fetchAISuggestion(problemText, themeName) {
   const key = await getGeminiKey();
-  const res = await fetch(
+  const res = await geminiWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
     { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ contents:[{parts:[{text:

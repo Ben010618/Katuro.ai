@@ -60,7 +60,23 @@ export function invalidateKeyCache() {
  * Usage: replace `await fetch(url, opts)` with `await geminiWithRetry(url, opts)`
  */
 export async function geminiWithRetry(url, opts, attempt = 0) {
-  const res = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch {
+    // fetch() itself throws (TypeError: Failed to fetch) on network failures —
+    // offline, DNS hiccup, dropped connection, CORS — rather than resolving
+    // with a bad status. These are almost always transient, so retry them
+    // the same way as a 503 instead of letting the raw browser error surface.
+    if (attempt < 4) {
+      const delay = (2 ** attempt) * 1000 + Math.random() * 600;
+      await new Promise(r => setTimeout(r, delay));
+      return geminiWithRetry(url, opts, attempt + 1);
+    }
+    const err = new Error('Could not reach the AI service. Check your internet connection and try again.');
+    err.reason = 'network_error';
+    throw err;
+  }
 
   if ((res.status === 429 || res.status === 503) && attempt < 4) {
     const delay = (2 ** attempt) * 1000 + Math.random() * 600;
@@ -69,7 +85,10 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
   }
 
   if (!res.ok && res.status === 429) {
-    throw new Error('The AI service is busy right now. Please try again in a moment.');
+    const err = new Error('The AI service is busy right now. Please try again in a moment.');
+    err.status = 429;
+    err.reason = 'rate_limited';
+    throw err;
   }
 
   return res;

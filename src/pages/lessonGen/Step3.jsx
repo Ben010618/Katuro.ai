@@ -132,6 +132,7 @@ export default function Step3() {
         invalid_json:   'The AI returned an unexpected format for this session. Try again.',
         empty_response: 'The AI returned no content for this session. Try again.',
         safety_block:   'This session was blocked by the AI\'s content filter. Try rephrasing the competency or context.',
+        network_error:  'Could not reach the AI service. Check your internet connection and try again.',
       };
       const reasonKey = lastErr?.status === 429 ? 429 : lastErr?.reason;
       throw new Error(

@@ -1,5 +1,5 @@
 // ── Gemini configuration ─────────────────────────────────────────────────────
-import { getGeminiKey } from './geminiConfig';
+import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 function geminiUrl(key) {
@@ -24,7 +24,7 @@ function langInstruction(subject) {
 
 async function call(prompt, opts = {}) {
   const key = await getGeminiKey();
-  const res = await fetch(geminiUrl(key), {
+  const res = await geminiWithRetry(geminiUrl(key), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -295,7 +295,7 @@ Just the raw JSON object:
 }`;
 
   const key = await getGeminiKey();
-  const res = await fetch(geminiUrl(key), {
+  const res = await geminiWithRetry(geminiUrl(key), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -322,7 +322,7 @@ Just the raw JSON object:
     parsed = parseJSON(rawText);
   } catch (e) {
     console.error('unpackCompetency parse failed. Raw response:', rawText);
-    throw new Error('AI returned invalid format. Retrying…');
+    throw new Error('AI returned invalid format. Retrying…', { cause: e });
   }
 
   if (!parsed.sessions || !Array.isArray(parsed.sessions)) {
@@ -418,7 +418,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
 }`;
 
   const key2 = await getGeminiKey();
-  const res = await fetch(geminiUrl(key2), {
+  const res = await geminiWithRetry(geminiUrl(key2), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

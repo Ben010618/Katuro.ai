@@ -1,4 +1,4 @@
-import { getGeminiKey } from './geminiConfig';
+import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 
 function parseJSON(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -270,7 +270,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
 }
 `.trim();
 
-  const res = await fetch(url, {
+  const res = await geminiWithRetry(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

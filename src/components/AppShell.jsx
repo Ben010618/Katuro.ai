@@ -18,10 +18,11 @@ import {
   LogOut, Menu, X, ChevronRight, ChevronDown,
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
-  Settings, Camera, Loader2,
+  Settings, Camera, Loader2, Images,
 } from 'lucide-react';
 
 const MAIN_NAV = [
+  { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
@@ -108,9 +109,18 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
-        {MAIN_NAV.map(({ to, label, Icon, isNew }) => (
+        {MAIN_NAV.map(({ to, label, Icon, isNew, highlight }) => (
           <NavLink key={to} to={to} onClick={onClose}
-            style={({ isActive }) => ({
+            style={({ isActive }) => highlight ? {
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 10px', borderRadius: 9, textDecoration: 'none',
+              background: 'linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%)',
+              color: '#fff', fontWeight: 700, fontSize: 13,
+              marginBottom: 6,
+              boxShadow: isActive ? '0 3px 14px rgba(34,197,94,0.45)' : '0 2px 8px rgba(34,197,94,0.28)',
+              transition: 'box-shadow 0.14s, transform 0.14s',
+              transform: isActive ? 'scale(1.01)' : 'none',
+            } : {
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
               background: isActive
@@ -128,8 +138,9 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
               borderLeft: isActive
                 ? `3px solid ${isNew ? '#534AB7' : '#22c55e'}`
                 : isNew ? '3px solid rgba(83,74,183,0.3)' : '3px solid transparent',
-            })}
+            }}
             onMouseEnter={e => {
+              if (highlight) { e.currentTarget.style.boxShadow = '0 4px 18px rgba(34,197,94,0.55)'; return; }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
                 Object.assign(e.currentTarget.style, isNew
                   ? { background: dark ? 'rgba(83,74,183,0.18)' : '#ede9ff', color: '#534AB7' }
@@ -137,6 +148,11 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
               }
             }}
             onMouseLeave={e => {
+              if (highlight) {
+                const isActive = e.currentTarget.getAttribute('aria-current') === 'page';
+                e.currentTarget.style.boxShadow = isActive ? '0 3px 14px rgba(34,197,94,0.45)' : '0 2px 8px rgba(34,197,94,0.28)';
+                return;
+              }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
                 Object.assign(e.currentTarget.style, isNew
                   ? { background: dark ? 'rgba(83,74,183,0.10)' : 'rgba(83,74,183,0.06)', color: '#534AB7' }
