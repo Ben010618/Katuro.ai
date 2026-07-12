@@ -3,14 +3,19 @@ import { useEffect, useRef } from 'react';
 const SPEED_PX_PER_SEC = 26;             // slow, readable pace
 const PAUSE_AFTER_INTERACTION_MS = 3000; // resume this long after the user last touched/scrolled manually
 
-/** Walk up from `el` to find the nearest ancestor that actually scrolls. */
+/**
+ * Walk up from `el` to find the nearest ancestor set up to scroll (overflow-y
+ * auto/scroll). Matches purely on the CSS rule rather than the *current*
+ * scrollHeight/clientHeight — at mount time layout (avatars, images) can
+ * still be settling, so a live-content check here can false-negative and
+ * fall back to an ancestor that never actually scrolls in this app's
+ * fixed-viewport shell.
+ */
 function findScrollParent(el) {
   let node = el?.parentElement;
   while (node && node !== document.body) {
     const { overflowY } = window.getComputedStyle(node);
-    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-      return node;
-    }
+    if (overflowY === 'auto' || overflowY === 'scroll') return node;
     node = node.parentElement;
   }
   return document.scrollingElement || document.documentElement;
