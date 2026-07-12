@@ -22,7 +22,7 @@ import {
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
-  ToggleLeft, ToggleRight, Bug, Gift, BarChart2,
+  ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 
@@ -772,9 +772,46 @@ function StatChip({ label, value, color }) {
 }
 
 function AnalyticsSection({ teachers = [] }) {
-  const [events,   setEvents]   = useState([]);
-  const [loading,  setLoading]  = useState(false);
-  const [range,    setRange]    = useState(30);
+  const [events,     setEvents]     = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [range,      setRange]      = useState(30);
+  const [exporting,  setExporting]  = useState(false);
+  const reportRef = useRef(null);
+
+  async function handleExportPDF() {
+    const el = reportRef.current;
+    if (!el || exporting) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(el, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL('image/png');
+
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error('Analytics PDF export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function load(days) {
     setLoading(true);
@@ -862,6 +899,17 @@ function AnalyticsSection({ teachers = [] }) {
           <button onClick={() => load(range)} style={{ ...btnSecondary, fontSize: 11, padding: '5px 10px' }} title="Refresh">
             <RefreshCw size={12} />
           </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading || visibleEvents.length === 0}
+            style={{ ...btnPrimary, fontSize: 11, padding: '5px 12px', opacity: (exporting || loading || visibleEvents.length === 0) ? 0.6 : 1 }}
+            title="Export analytics as PDF"
+          >
+            {exporting
+              ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Exporting…</>
+              : <><Download size={12} /> Export PDF</>
+            }
+          </button>
         </div>
       </div>
 
@@ -876,7 +924,7 @@ function AnalyticsSection({ teachers = [] }) {
           <p style={{ margin: '6px 0 0', fontSize: 12, opacity: 0.7 }}>Events will appear here once teachers start using the app.</p>
         </div>
       ) : (
-        <>
+        <div ref={reportRef}>
           {/* KPI chips */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 24 }}>
             <StatChip label="Total Events"   value={totalEvents}  color="#2d6a4f" />
@@ -1137,7 +1185,7 @@ function AnalyticsSection({ teachers = [] }) {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
