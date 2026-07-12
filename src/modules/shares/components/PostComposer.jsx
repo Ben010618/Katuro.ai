@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { X, ImagePlus, Loader2, Plus } from 'lucide-react';
+import { X, ImagePlus, Loader2, Plus, Sparkles } from 'lucide-react';
 import { usePost } from '../hooks/usePost';
 import { validateImageFile, createPreviewUrl } from '../services/storageService';
 import { RichTextEditor } from './RichTextEditor';
 import { trackEvent } from '../../../services/usageTracker';
+import { getWeeklyPrompt } from '../services/weeklyPrompt';
 
 const WORD_LIMIT = 250;
 
@@ -30,7 +31,20 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
   const [dragover,    setDragover]    = useState(false);
   const [fileError,   setFileError]   = useState('');
 
+  const prompt = useMemo(() => getWeeklyPrompt(), []);
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  const [editorKey,   setEditorKey]   = useState(0);
+  const [editorSeed,  setEditorSeed]  = useState('');
+
   const inputRef = useRef(null);
+
+  function useWeeklyPrompt() {
+    const html = `<p>${prompt} </p>`;
+    setEditorSeed(html);
+    setCaption(html);
+    setEditorKey(k => k + 1);
+    setPromptDismissed(true);
+  }
 
   const addFiles = useCallback((incoming) => {
     const remaining = 4 - files.length;
@@ -59,7 +73,10 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
   }
 
   async function handlePost() {
-    if (!files.length) { setFileError('Please add at least one photo.'); return; }
+    if (!files.length && countWords(caption) === 0) {
+      setFileError('Add a photo or write something to post.');
+      return;
+    }
     const postId = await publish({
       files, title, caption, school, gradeLevel, subject,
       authorName: displayName, authorInitials: initials, authorPhotoURL: photoURL,
@@ -75,7 +92,7 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
   const wordCount  = countWords(caption);
   const wordsLeft  = WORD_LIMIT - wordCount;
   const isOverLimit = wordCount > WORD_LIMIT;
-  const canPost    = files.length > 0 && !uploading && !isOverLimit;
+  const canPost    = (files.length > 0 || wordCount > 0) && !uploading && !isOverLimit;
 
   return (
     <div className="sh-composer-overlay" onClick={onClose}>
@@ -90,7 +107,24 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
 
         <div className="sh-composer-body">
 
-          {/* Photo area */}
+          {/* Weekly prompt — reduces blank-page friction */}
+          {!promptDismissed && (
+            <div className="sh-prompt-banner">
+              <div className="sh-prompt-banner-icon"><Sparkles size={16} /></div>
+              <div className="sh-prompt-banner-text">
+                <span className="sh-prompt-banner-label">Prompt of the week</span>
+                {prompt}
+              </div>
+              <div className="sh-prompt-banner-actions">
+                <button type="button" className="sh-prompt-use-btn" onClick={useWeeklyPrompt}>Use this</button>
+                <button type="button" className="sh-prompt-dismiss-btn" onClick={() => setPromptDismissed(true)} aria-label="Dismiss prompt">
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Photo area (optional — text-only posts are allowed) */}
           {files.length === 0 ? (
             <div
               className={`sh-drop-zone ${dragover ? 'dragover' : ''}`}
@@ -100,8 +134,8 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
               onClick={() => inputRef.current?.click()}
             >
               <div className="sh-drop-zone-icon"><ImagePlus size={40} /></div>
-              <div className="sh-drop-zone-text">Drop photos here or click to browse</div>
-              <div className="sh-drop-zone-hint">JPEG, PNG, WebP · Max 4 photos · 1 MB each after compression</div>
+              <div className="sh-drop-zone-text">Drop photos here or click to browse (optional)</div>
+              <div className="sh-drop-zone-hint">JPEG, PNG, WebP · Max 4 photos · 1 MB each after compression · or skip photos and just write</div>
             </div>
           ) : (
             <div className="sh-preview-grid" style={{ marginBottom: 14 }}>
@@ -152,6 +186,7 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
           <div className="sh-composer-field">
             <label className="sh-composer-label">Share Your Thoughts!</label>
             <RichTextEditor
+              key={editorKey}
               onChange={html => {
                 if (countWords(html) <= WORD_LIMIT) {
                   setCaption(html);
@@ -160,7 +195,7 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
                 }
               }}
               placeholder="What's happening in your classroom? #DLL #MELC"
-              initialValue=""
+              initialValue={editorSeed}
             />
           </div>
 

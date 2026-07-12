@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { useFeed } from './hooks/useFeed';
+import { useAutoScroll } from './hooks/useAutoScroll';
 import { ImageOff, ImagePlus } from 'lucide-react';
 import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { TeacherCard }  from './components/TeacherCard';
+import { AutoScrollToggle } from './components/AutoScrollToggle';
 import {
   fetchSuggestions,
   fetchTrendingHashtags,
@@ -24,9 +26,21 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
   const [suggestions,    setSuggestions]    = useState([]);
   const [trending,       setTrending]       = useState([]);
   const [onlineTeachers, setOnlineTeachers] = useState([]);
+  const [autoScroll,     setAutoScroll]     = useState(() => {
+    const saved = localStorage.getItem('sh_autoscroll');
+    return saved === null ? true : saved === '1'; // defaults ON
+  });
   const navigate = useNavigate();
+  const feedRef  = useRef(null);
 
   const { posts, loading, loadingMore, hasMore, load, loadMore, removePost } = useFeed(mode, uid);
+
+  useAutoScroll(feedRef, autoScroll && !loading && posts.length > 0);
+
+  function toggleAutoScroll(next) {
+    setAutoScroll(next);
+    localStorage.setItem('sh_autoscroll', next ? '1' : '0');
+  }
 
   useEffect(() => { load(); }, [mode]);
 
@@ -42,7 +56,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
     <div className="sh-feed-layout">
 
       {/* Feed column */}
-      <div className="sh-feed-col">
+      <div className="sh-feed-col" ref={feedRef}>
         <div className="sh-feed">
 
           {/* Composer trigger — opens the full post composer */}
@@ -58,17 +72,20 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
             </span>
           </button>
 
-          <div className="sh-filter-tabs">
-            {FEED_MODES.map(m => (
-              <button
-                key={m.key}
-                className={`sh-filter-tab ${mode === m.key ? 'active' : ''}`}
-                onClick={() => setMode(m.key)}
-                type="button"
-              >
-                {m.label}
-              </button>
-            ))}
+          <div className="sh-filter-row">
+            <div className="sh-filter-tabs">
+              {FEED_MODES.map(m => (
+                <button
+                  key={m.key}
+                  className={`sh-filter-tab ${mode === m.key ? 'active' : ''}`}
+                  onClick={() => setMode(m.key)}
+                  type="button"
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <AutoScrollToggle checked={autoScroll} onChange={toggleAutoScroll} label="Auto-scroll" />
           </div>
 
           {loading

@@ -14,16 +14,18 @@ export function usePost(uid) {
   const [error,     setError]     = useState(null);
 
   const publish = useCallback(async ({ files, title, caption, school, gradeLevel, subject, authorName, authorInitials, authorPhotoURL }) => {
-    if (!files.length || uploading) return null;
+    if (uploading) return null;
     setUploading(true);
     setError(null);
     setProgress({ uploaded: 0, total: files.length });
     try {
       // Pre-generate a postId so Storage paths align with the Firestore doc
       const postId = doc(collection(db, 'shares_posts')).id;
-      const photoUrls = await uploadPostPhotos(uid, postId, files, (uploaded, total) => {
-        setProgress({ uploaded, total });
-      });
+      const photoUrls = files.length
+        ? await uploadPostPhotos(uid, postId, files, (uploaded, total) => {
+            setProgress({ uploaded, total });
+          })
+        : [];
       await createPost(uid, { photoUrls, title, caption, school, gradeLevel, subject, authorName, authorInitials, authorPhotoURL });
       return postId;
     } catch (e) {

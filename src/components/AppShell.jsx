@@ -114,10 +114,10 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
             style={({ isActive }) => highlight ? {
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '9px 10px', borderRadius: 9, textDecoration: 'none',
-              background: 'linear-gradient(135deg, #2d6a4f 0%, #22c55e 100%)',
+              background: 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)',
               color: '#fff', fontWeight: 700, fontSize: 13,
               marginBottom: 6,
-              boxShadow: isActive ? '0 3px 14px rgba(34,197,94,0.45)' : '0 2px 8px rgba(34,197,94,0.28)',
+              boxShadow: isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)',
               transition: 'box-shadow 0.14s, transform 0.14s',
               transform: isActive ? 'scale(1.01)' : 'none',
             } : {
@@ -140,7 +140,7 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
                 : isNew ? '3px solid rgba(83,74,183,0.3)' : '3px solid transparent',
             }}
             onMouseEnter={e => {
-              if (highlight) { e.currentTarget.style.boxShadow = '0 4px 18px rgba(34,197,94,0.55)'; return; }
+              if (highlight) { e.currentTarget.style.boxShadow = '0 4px 18px rgba(13,34,24,0.65)'; return; }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
                 Object.assign(e.currentTarget.style, isNew
                   ? { background: dark ? 'rgba(83,74,183,0.18)' : '#ede9ff', color: '#534AB7' }
@@ -150,7 +150,7 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
             onMouseLeave={e => {
               if (highlight) {
                 const isActive = e.currentTarget.getAttribute('aria-current') === 'page';
-                e.currentTarget.style.boxShadow = isActive ? '0 3px 14px rgba(34,197,94,0.45)' : '0 2px 8px rgba(34,197,94,0.28)';
+                e.currentTarget.style.boxShadow = isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)';
                 return;
               }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
