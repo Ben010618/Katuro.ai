@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSharedPlan } from '../services/db';
-import ktLogo from '../assets/KT Favicon.png';
+import ktLogo from '../assets/KT-Favicon.webp';
 import { BookOpen, GraduationCap, Calendar, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 
 const PLAN_LABELS = { dll: 'Daily Lesson Log', ilaw: 'ILAW Lesson Plan', cot: 'COT Lesson Plan' };

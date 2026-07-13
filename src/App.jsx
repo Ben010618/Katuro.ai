@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import ktLogo from './assets/KT Favicon.png';
+import { useEffect, lazy, Suspense } from 'react';
+import ktLogo from './assets/KT-Favicon.webp';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { useAuth } from './hooks/useAuth';
@@ -10,52 +10,53 @@ import { auth } from './firebase';
 import AppShell from './components/AppShell';
 import { Clock, LogOut as LogOutIcon } from 'lucide-react';
 
-// Pages
-import LoginPage        from './pages/LoginPage';
-import DashboardPage    from './pages/DashboardPage';
-import MyLessonsPage    from './pages/MyLessonsPage';
-import QuizBuilderPage         from './pages/QuizBuilderPage';
-import ScanAnswerSheetsPage    from './pages/ScanAnswerSheetsPage';
-import AssessmentGateway       from './pages/assessment/AssessmentGateway';
-import AdminDashboard          from './pages/AdminDashboard';
-import ActionResearchPhase1    from './pages/ActionResearchPhase1';
-import ActionResearchPhase2    from './pages/ActionResearchPhase2';
-import ActionResearchPhase3    from './pages/ActionResearchPhase3';
-import ActionResearchPhase4    from './pages/ActionResearchPhase4';
-import ActionResearchPhase5    from './pages/ActionResearchPhase5';
-import ActionResearchPhase6    from './pages/ActionResearchPhase6';
+// Pages — LoginPage stays eager (near-universal first paint); everything
+// behind auth is lazy so a teacher only downloads the module(s) they visit.
+import LoginPage from './pages/LoginPage';
+const DashboardPage    = lazy(() => import('./pages/DashboardPage'));
+const MyLessonsPage    = lazy(() => import('./pages/MyLessonsPage'));
+const QuizBuilderPage         = lazy(() => import('./pages/QuizBuilderPage'));
+const ScanAnswerSheetsPage    = lazy(() => import('./pages/ScanAnswerSheetsPage'));
+const AssessmentGateway       = lazy(() => import('./pages/assessment/AssessmentGateway'));
+const AdminDashboard          = lazy(() => import('./pages/AdminDashboard'));
+const ActionResearchPhase1    = lazy(() => import('./pages/ActionResearchPhase1'));
+const ActionResearchPhase2    = lazy(() => import('./pages/ActionResearchPhase2'));
+const ActionResearchPhase3    = lazy(() => import('./pages/ActionResearchPhase3'));
+const ActionResearchPhase4    = lazy(() => import('./pages/ActionResearchPhase4'));
+const ActionResearchPhase5    = lazy(() => import('./pages/ActionResearchPhase5'));
+const ActionResearchPhase6    = lazy(() => import('./pages/ActionResearchPhase6'));
 
 // Lesson Gen
-import LessonGenGateway from './pages/lessonGen/LessonGenGateway';
-import LessonGenLayout  from './pages/lessonGen/LessonGenLayout';
-import Step1            from './pages/lessonGen/Step1';
-import Step2            from './pages/lessonGen/Step2';
-import Step3            from './pages/lessonGen/Step3';
-import OutputPage       from './pages/lessonGen/OutputPage';
+const LessonGenGateway = lazy(() => import('./pages/lessonGen/LessonGenGateway'));
+const LessonGenLayout  = lazy(() => import('./pages/lessonGen/LessonGenLayout'));
+const Step1            = lazy(() => import('./pages/lessonGen/Step1'));
+const Step2            = lazy(() => import('./pages/lessonGen/Step2'));
+const Step3            = lazy(() => import('./pages/lessonGen/Step3'));
+const OutputPage       = lazy(() => import('./pages/lessonGen/OutputPage'));
 
 // DLL Gen
-import DLLStep1      from './pages/dllGen/DLLStep1';
-import DLLStep2      from './pages/dllGen/DLLStep2';
-import DLLOutputPage from './pages/dllGen/DLLOutputPage';
+const DLLStep1      = lazy(() => import('./pages/dllGen/DLLStep1'));
+const DLLStep2      = lazy(() => import('./pages/dllGen/DLLStep2'));
+const DLLOutputPage = lazy(() => import('./pages/dllGen/DLLOutputPage'));
 
 // COT Gen
-import CotLayout     from './pages/cotGen/CotLayout';
-import CotStep1      from './pages/cotGen/CotStep1';
-import CotStep2      from './pages/cotGen/CotStep2';
-import CotStep3      from './pages/cotGen/CotStep3';
-import CotOutputPage from './pages/cotGen/CotOutputPage';
+const CotLayout     = lazy(() => import('./pages/cotGen/CotLayout'));
+const CotStep1      = lazy(() => import('./pages/cotGen/CotStep1'));
+const CotStep2      = lazy(() => import('./pages/cotGen/CotStep2'));
+const CotStep3      = lazy(() => import('./pages/cotGen/CotStep3'));
+const CotOutputPage = lazy(() => import('./pages/cotGen/CotOutputPage'));
 
 // Test Builder
-import TestBuilderWizard from './pages/testBuilder/TestBuilderWizard';
+const TestBuilderWizard = lazy(() => import('./pages/testBuilder/TestBuilderWizard'));
 
 // Classroom Management Module
-import ClassroomManagementPage from './pages/classroomMgmt/ClassroomManagementPage';
-import SectionDetailPage       from './pages/classroomMgmt/SectionDetailPage';
-import ClassesITeachPage       from './pages/classroomMgmt/ClassesITeachPage';
-import GradingTablePage        from './pages/classroomMgmt/GradingTablePage';
-import InvitePage              from './pages/classroomMgmt/InvitePage';
-import SharedPlanPage          from './pages/SharedPlanPage';
-import SharesLayout             from './modules/shares/index';
+const ClassroomManagementPage = lazy(() => import('./pages/classroomMgmt/ClassroomManagementPage'));
+const SectionDetailPage       = lazy(() => import('./pages/classroomMgmt/SectionDetailPage'));
+const ClassesITeachPage       = lazy(() => import('./pages/classroomMgmt/ClassesITeachPage'));
+const GradingTablePage        = lazy(() => import('./pages/classroomMgmt/GradingTablePage'));
+const InvitePage              = lazy(() => import('./pages/classroomMgmt/InvitePage'));
+const SharedPlanPage          = lazy(() => import('./pages/SharedPlanPage'));
+const SharesLayout            = lazy(() => import('./modules/shares/index'));
 
 function LoadingScreen() {
   return (
@@ -161,6 +162,7 @@ export default function App() {
     <ThemeProvider>
     <ToastProvider>
       <BrowserRouter>
+        <Suspense fallback={<LoadingScreen />}>
         <Routes>
           {/* Public */}
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -239,6 +241,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </ToastProvider>
     </ThemeProvider>

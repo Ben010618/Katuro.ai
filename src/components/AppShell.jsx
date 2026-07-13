@@ -5,11 +5,11 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
-import img1 from '../assets/1.png';
-import img2 from '../assets/2.png';
-import img3 from '../assets/3.png';
-import img4 from '../assets/4.png';
-import ktLogo from '../assets/KT Favicon.png';
+import img1 from '../assets/1.webp';
+import img2 from '../assets/2.webp';
+import img3 from '../assets/3.webp';
+import img4 from '../assets/4.webp';
+import ktLogo from '../assets/KT-Favicon.webp';
 import TokenBundleModal from './TokenBundleModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];

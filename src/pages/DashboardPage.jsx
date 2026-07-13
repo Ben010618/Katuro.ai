@@ -4,10 +4,10 @@ import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { updateTeacherProfile, listActionResearch, deleteActionResearch } from '../services/db';
 import { useToast } from '../context/ToastContext';
-import img1 from '../assets/1.png';
-import img2 from '../assets/2.png';
-import img3 from '../assets/3.png';
-import img4 from '../assets/4.png';
+import img1 from '../assets/1.webp';
+import img2 from '../assets/2.webp';
+import img3 from '../assets/3.webp';
+import img4 from '../assets/4.webp';
 import DailyMotivationalPopup from '../components/DailyMotivationalPopup';
 import SharesReminderPopup from '../components/SharesReminderPopup';
 

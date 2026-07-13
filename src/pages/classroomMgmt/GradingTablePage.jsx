@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import {
   subscribeGradeSheet, saveGradeSheet, submitGradeSheet, computeFinalGrade,
   subscribeStudents, subscribeSectionComments, TERMS,
+  sumComponentWeights, reshapeItemCount, updateMaxScore,
 } from '../../services/classroomDb';
 import { thumbUrl } from '../../services/cloudinaryUpload';
 import { trackEvent } from '../../services/usageTracker';
@@ -265,28 +266,15 @@ export default function GradingTablePage() {
 
   function changeCount(key, delta) {
     setDirty(true);
-    setLocalWeights(w => {
-      const newCount = Math.max(1, (w[key] || 1) + delta);
-      const updated = { ...w, [key]: newCount };
-      if (key === 'wwCount') {
-        updated.wwMax = Array.from({ length: newCount }, (_, i) => w.wwMax?.[i] ?? 100);
-      } else if (key === 'ptCount') {
-        updated.ptMax = Array.from({ length: newCount }, (_, i) => w.ptMax?.[i] ?? 100);
-      }
-      return updated;
-    });
+    setLocalWeights(w => reshapeItemCount(w, key, delta));
   }
 
   function setMaxScore(field, idx, value) {
     setDirty(true);
-    setLocalWeights(w => {
-      const arr = [...(w[field] || [])];
-      arr[idx] = Math.max(1, Number(value) || 100);
-      return { ...w, [field]: arr };
-    });
+    setLocalWeights(w => updateMaxScore(w, field, idx, value));
   }
 
-  const weightSum    = (localWeights.writtenWorksWeight || 0) + (localWeights.performanceTaskWeight || 0) + (localWeights.summativeTestWeight || 0);
+  const weightSum    = sumComponentWeights(localWeights);
   const validWeights = weightSum === 100;
   const isSubmitted  = sheet?.status === 'submitted';
 

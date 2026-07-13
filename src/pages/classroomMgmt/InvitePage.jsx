@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getInvitationByCode, acceptInvitation } from '../../services/classroomDb';
-import ktLogo from '../../assets/KT Favicon.png';
+import ktLogo from '../../assets/KT-Favicon.webp';
 import { CheckCircle2, AlertCircle, Loader2, GraduationCap, X } from 'lucide-react';
 
 const SUBJECT_COLORS = {

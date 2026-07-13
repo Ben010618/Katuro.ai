@@ -1,5 +1,5 @@
 import { ChevronRight, ArrowLeft, Download, Loader2 } from 'lucide-react';
-import ktLogo from '../assets/KT Favicon.png';
+import ktLogo from '../assets/KT-Favicon.webp';
 
 const STEPS = [
   'BERA theme & problem',

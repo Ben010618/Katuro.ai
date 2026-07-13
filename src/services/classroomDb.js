@@ -77,6 +77,27 @@ export function computeFinalGrade({
   return Math.round(Math.min(100, TG) * 100) / 100;
 }
 
+export function sumComponentWeights({ writtenWorksWeight = 0, performanceTaskWeight = 0, summativeTestWeight = 0 } = {}) {
+  return (writtenWorksWeight || 0) + (performanceTaskWeight || 0) + (summativeTestWeight || 0);
+}
+
+export function reshapeItemCount(weights, key, delta) {
+  const newCount = Math.max(1, (weights[key] || 1) + delta);
+  const updated = { ...weights, [key]: newCount };
+  if (key === 'wwCount') {
+    updated.wwMax = Array.from({ length: newCount }, (_, i) => weights.wwMax?.[i] ?? 100);
+  } else if (key === 'ptCount') {
+    updated.ptMax = Array.from({ length: newCount }, (_, i) => weights.ptMax?.[i] ?? 100);
+  }
+  return updated;
+}
+
+export function updateMaxScore(weights, field, idx, value) {
+  const arr = [...(weights[field] || [])];
+  arr[idx] = Math.max(1, Number(value) || 100);
+  return { ...weights, [field]: arr };
+}
+
 // ── Collection helpers ────────────────────────────────────────────────────────
 
 const secCol  = ()              => collection(db, 'sections');

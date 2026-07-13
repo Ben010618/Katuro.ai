@@ -16,7 +16,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts';
-import ktLogo from '../assets/KT Favicon.png';
+import ktLogo from '../assets/KT-Favicon.webp';
 import {
   Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,

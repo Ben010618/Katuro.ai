@@ -180,7 +180,7 @@ const PHASE_INDICATOR_MAP = {
   application:  ['ppst-3-3-2', 'ppst-3-4-2', 'ppst-5-1-2'],
 };
 
-function phaseIndicators(phase, selectedIndicators) {
+export function phaseIndicators(phase, selectedIndicators) {
   const phaseIds = PHASE_INDICATOR_MAP[phase] || [];
   return selectedIndicators.filter(ind => phaseIds.includes(ind.id));
 }

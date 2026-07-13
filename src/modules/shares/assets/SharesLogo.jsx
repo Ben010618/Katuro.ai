@@ -1,4 +1,4 @@
-import ktLogo from '../../../assets/KT Favicon.png';
+import ktLogo from '../../../assets/KT-Favicon.webp';
 
 export function SharesLogo({ size = 40, className = '' }) {
   return (

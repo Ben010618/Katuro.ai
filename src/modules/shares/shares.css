@@ -42,7 +42,7 @@
   /* 4.png decorative background at 7% opacity blended with the page green */
   background:
     linear-gradient(rgba(240,250,245,0.93), rgba(240,250,245,0.93)),
-    url('../../../assets/4.png') center / cover fixed;
+    url('../../assets/4.webp') center / cover fixed;
   font-family: var(--sh-font);
   color: var(--sh-text-primary);
 }

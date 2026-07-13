@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { X, Zap } from 'lucide-react';
-import ktLogo from '../assets/KT Favicon.png';
+import ktLogo from '../assets/KT-Favicon.webp';
 
 const BUNDLES = [
   {
