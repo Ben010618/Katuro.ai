@@ -23,8 +23,10 @@ import {
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
+import { saveAs } from 'file-saver';
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
@@ -771,46 +773,285 @@ function StatChip({ label, value, color }) {
   );
 }
 
+/** Rasterizes one chart DOM node to a small compressed JPEG (data URL) for PDF embedding. */
+async function captureChartJPEG(el, html2canvas, maxWidth = 800, quality = 0.7) {
+  if (!el) return null;
+  const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false });
+  let out = canvas;
+  if (canvas.width > maxWidth) {
+    const scale = maxWidth / canvas.width;
+    const resized = document.createElement('canvas');
+    resized.width = maxWidth;
+    resized.height = Math.round(canvas.height * scale);
+    resized.getContext('2d').drawImage(canvas, 0, 0, resized.width, resized.height);
+    out = resized;
+  }
+  return { dataUrl: out.toDataURL('image/jpeg', quality), width: out.width, height: out.height };
+}
+
+function csvRow(cells) {
+  return cells.map(c => {
+    const s = String(c ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',');
+}
+
 function AnalyticsSection({ teachers = [] }) {
   const [events,     setEvents]     = useState([]);
   const [loading,    setLoading]    = useState(false);
   const [range,      setRange]      = useState(30);
   const [exporting,  setExporting]  = useState(false);
-  const reportRef = useRef(null);
+  const featureChartRef = useRef(null);
+  const dailyChartRef   = useRef(null);
+  const signupChartRef  = useRef(null);
+  const subjectChartRef = useRef(null);
+  const gradeChartRef   = useRef(null);
 
   async function handleExportPDF() {
-    const el = reportRef.current;
-    if (!el || exporting) return;
+    if (exporting) return;
     setExporting(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
-      const canvas = await html2canvas(el, {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-      });
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      const imgData = canvas.toDataURL('image/png');
+      const autoTable = (await import('jspdf-autotable')).default;
+      const html2canvas = (await import('html2canvas')).default;
 
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position -= pageH;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-        heightLeft -= pageH;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const marginX = 14;
+      const marginTop = 20;
+      const marginBottom = 16;
+      const contentW = pageW - marginX * 2;
+
+      const now = new Date();
+      const rangeStart = new Date(now.getTime() - (range - 1) * 86400000);
+      const fmtDate = d => d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+      const exportedAt = now.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+
+      let y = marginTop;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(26, 61, 43);
+      doc.text('kaTuro AI — Usage Analytics Report', marginX, y);
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(90, 90, 90);
+      doc.text(`Date range: ${fmtDate(rangeStart)} – ${fmtDate(now)} (last ${range} days)`, marginX, y);
+      y += 5;
+      doc.text(`Exported ${exportedAt}`, marginX, y);
+      y += 9;
+
+      const sectionTitle = (text) => {
+        if (y > pageH - marginBottom - 20) { doc.addPage(); y = marginTop; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(26, 61, 43);
+        doc.text(text, marginX, y);
+        y += 6;
+      };
+
+      const table = (opts) => {
+        autoTable(doc, {
+          startY: y,
+          margin: { left: marginX, right: marginX, bottom: marginBottom },
+          styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: [40, 40, 40], overflow: 'linebreak' },
+          headStyles: { fillColor: [45, 106, 79], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [244, 249, 246] },
+          ...opts,
+        });
+        y = doc.lastAutoTable.finalY + 8;
+      };
+
+      const addChartImage = async (ref) => {
+        const captured = await captureChartJPEG(ref.current, html2canvas);
+        if (!captured) return;
+        const imgW = contentW;
+        const imgH = (captured.height / captured.width) * imgW;
+        if (y + imgH > pageH - marginBottom) { doc.addPage(); y = marginTop; }
+        doc.addImage(captured.dataUrl, 'JPEG', marginX, y, imgW, imgH);
+        y += imgH + 9;
+      };
+
+      // KPI summary
+      sectionTitle('KPI Summary');
+      table({
+        head: [['Metric', 'Value']],
+        body: [
+          ['Total Events', String(totalEvents)],
+          ['Unique Users', String(uniqueUsers)],
+          ['Site Visits', String(siteVisits)],
+          ['Sessions', String(sessionStats.totalSessions)],
+          ['Stickiness', stickiness == null ? '—' : `${stickiness}%`],
+          ['Generation Success Rate', genStats.successRate == null ? '—' : `${genStats.successRate}%`],
+          ['Avg Generation Time', formatDuration(genStats.avgDurationMs)],
+          ['Avg Session Length', formatDuration(sessionStats.avgSessionMs)],
+          ['New Users', String(newCount)],
+          ['Returning Users', String(returningCount)],
+          ['Inactive Users', String(inactiveCount)],
+          ['Top Feature', topFeature],
+          ['Peak Hour', peakHour],
+        ],
+        columnStyles: { 0: { cellWidth: 70 } },
+      });
+
+      // Most Used Features
+      sectionTitle('Most Used Features');
+      table({ head: [['Feature', 'Uses']], body: featureData.map(f => [f.name, String(f.count)]) });
+      await addChartImage(featureChartRef);
+
+      // Daily Usage
+      sectionTitle(`Daily Usage — Last ${range} Days`);
+      table({ head: [['Date', 'Events', 'Active Users']], body: dailyData.map(d => [d.date, String(d.count), String(d.users)]) });
+      await addChartImage(dailyChartRef);
+
+      // New Signups
+      sectionTitle(`New Signups — Last ${range} Days`);
+      table({ head: [['Date', 'Signups']], body: signupData.map(d => [d.date, String(d.count)]) });
+      await addChartImage(signupChartRef);
+
+      // Retention Cohorts
+      if (retentionCohorts.length > 0) {
+        sectionTitle('Weekly Retention Cohorts');
+        table({
+          head: [['Cohort (week of)', 'Size', 'Day 1', 'Day 7', 'Day 30']],
+          body: retentionCohorts.map(c => [
+            c.label, String(c.size),
+            c.day1 == null ? '—' : `${c.day1}%`,
+            c.day7 == null ? '—' : `${c.day7}%`,
+            c.day30 == null ? '—' : `${c.day30}%`,
+          ]),
+        });
       }
-      pdf.save(`katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.pdf`);
+
+      // Wizard Funnels
+      const funnelSection = (title, stepLabels, funnel) => {
+        if (!(funnel[0]?.count > 0)) return;
+        sectionTitle(title);
+        table({
+          head: [['Step', 'Users', '% of Prev Step']],
+          body: funnel.map(f => [stepLabels[f.step] || f.step, String(f.count), f.pctOfPrev == null ? '—' : `${f.pctOfPrev}%`]),
+        });
+      };
+      funnelSection('Wizard Funnel — Lesson Gen (ILAW)', LESSONGEN_STEPS, lessonGenFunnel);
+      funnelSection('Wizard Funnel — DLL Gen', DLLGEN_STEPS, dllGenFunnel);
+      funnelSection('Wizard Funnel — COT Gen', COTGEN_STEPS, cotGenFunnel);
+      funnelSection('Wizard Funnel — Test Builder', TEST_BUILDER_STEPS, testBuilderFunnel);
+
+      // Generations by Subject / Grade
+      if (bySubject.length > 0) {
+        sectionTitle('Generations by Subject');
+        table({ head: [['Subject', 'Generations']], body: bySubject.map(s => [s.name, String(s.count)]) });
+        await addChartImage(subjectChartRef);
+      }
+      if (byGrade.length > 0) {
+        sectionTitle('Generations by Grade Level');
+        table({ head: [['Grade', 'Generations']], body: byGrade.map(g => [g.name, String(g.count)]) });
+        await addChartImage(gradeChartRef);
+      }
+
+      // Top Schools
+      if (topSchools.length > 0) {
+        sectionTitle('Top Schools');
+        table({ head: [['#', 'School', 'Teachers']], body: topSchools.map((s, i) => [String(i + 1), s.school, String(s.count)]) });
+      }
+
+      // Most Frequent Visitors
+      if (topVisitors.length > 0) {
+        sectionTitle('Most Frequent Visitors');
+        table({ head: [['#', 'Teacher', 'Visits']], body: topVisitors.map((v, i) => [String(i + 1), v.label, String(v.visits)]) });
+      }
+
+      // Recent Generation Errors
+      if (genStats.recentErrors.length > 0) {
+        sectionTitle('Recent Generation Errors');
+        table({
+          head: [['Tool', 'When', 'Duration', 'Error']],
+          body: genStats.recentErrors.map(e => [
+            TOOL_LABELS[e.tool] || e.tool || '—',
+            e.ts?.toDate ? e.ts.toDate().toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
+            typeof e.durationMs === 'number' ? formatDuration(e.durationMs) : '—',
+            e.error || 'Unknown error',
+          ]),
+          columnStyles: { 3: { cellWidth: 70 } },
+        });
+      }
+
+      // Footer on every page
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`kaTuro AI Analytics — Exported ${exportedAt}`, marginX, pageH - 8);
+        doc.text(`Page ${i} of ${pageCount}`, pageW - marginX, pageH - 8, { align: 'right' });
+      }
+
+      doc.save(`katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err) {
       console.error('Analytics PDF export failed:', err);
     } finally {
       setExporting(false);
     }
+  }
+
+  function handleExportCSV() {
+    const lines = [];
+    const section = (title, head, body) => {
+      lines.push(csvRow([title]));
+      if (head) lines.push(csvRow(head));
+      body.forEach(r => lines.push(csvRow(r)));
+      lines.push('');
+    };
+
+    section('KPI Summary', ['Metric', 'Value'], [
+      ['Total Events', totalEvents],
+      ['Unique Users', uniqueUsers],
+      ['Site Visits', siteVisits],
+      ['Sessions', sessionStats.totalSessions],
+      ['Stickiness %', stickiness ?? ''],
+      ['Generation Success Rate %', genStats.successRate ?? ''],
+      ['Avg Generation Time', formatDuration(genStats.avgDurationMs)],
+      ['Avg Session Length', formatDuration(sessionStats.avgSessionMs)],
+      ['New Users', newCount],
+      ['Returning Users', returningCount],
+      ['Inactive Users', inactiveCount],
+      ['Top Feature', topFeature],
+      ['Peak Hour', peakHour],
+    ]);
+
+    section('Most Used Features', ['Feature', 'Uses'], featureData.map(f => [f.name, f.count]));
+    section(`Daily Usage (Last ${range} Days)`, ['Date', 'Events', 'Active Users'], dailyData.map(d => [d.date, d.count, d.users]));
+    section(`New Signups (Last ${range} Days)`, ['Date', 'Signups'], signupData.map(d => [d.date, d.count]));
+
+    if (retentionCohorts.length > 0) {
+      section('Retention Cohorts', ['Cohort (week of)', 'Size', 'Day 1 %', 'Day 7 %', 'Day 30 %'],
+        retentionCohorts.map(c => [c.label, c.size, c.day1 ?? '', c.day7 ?? '', c.day30 ?? '']));
+    }
+
+    const funnelRows = (funnel, stepLabels) => funnel.map(f => [stepLabels[f.step] || f.step, f.count, f.pctOfPrev ?? '']);
+    if (lessonGenFunnel[0]?.count > 0) section('Wizard Funnel - Lesson Gen (ILAW)', ['Step', 'Users', '% of Prev Step'], funnelRows(lessonGenFunnel, LESSONGEN_STEPS));
+    if (dllGenFunnel[0]?.count > 0) section('Wizard Funnel - DLL Gen', ['Step', 'Users', '% of Prev Step'], funnelRows(dllGenFunnel, DLLGEN_STEPS));
+    if (cotGenFunnel[0]?.count > 0) section('Wizard Funnel - COT Gen', ['Step', 'Users', '% of Prev Step'], funnelRows(cotGenFunnel, COTGEN_STEPS));
+    if (testBuilderFunnel[0]?.count > 0) section('Wizard Funnel - Test Builder', ['Step', 'Users', '% of Prev Step'], funnelRows(testBuilderFunnel, TEST_BUILDER_STEPS));
+
+    if (bySubject.length > 0) section('Generations by Subject', ['Subject', 'Generations'], bySubject.map(s => [s.name, s.count]));
+    if (byGrade.length > 0) section('Generations by Grade Level', ['Grade', 'Generations'], byGrade.map(g => [g.name, g.count]));
+    if (topSchools.length > 0) section('Top Schools', ['#', 'School', 'Teachers'], topSchools.map((s, i) => [i + 1, s.school, s.count]));
+    if (topVisitors.length > 0) section('Most Frequent Visitors', ['#', 'Teacher', 'Visits'], topVisitors.map((v, i) => [i + 1, v.label, v.visits]));
+    if (genStats.recentErrors.length > 0) {
+      section('Recent Generation Errors', ['Tool', 'When', 'Duration', 'Error'], genStats.recentErrors.map(e => [
+        TOOL_LABELS[e.tool] || e.tool || '',
+        e.ts?.toDate ? e.ts.toDate().toISOString() : '',
+        typeof e.durationMs === 'number' ? formatDuration(e.durationMs) : '',
+        e.error || 'Unknown error',
+      ]));
+    }
+
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function load(days) {
@@ -900,6 +1141,14 @@ function AnalyticsSection({ teachers = [] }) {
             <RefreshCw size={12} />
           </button>
           <button
+            onClick={handleExportCSV}
+            disabled={loading || visibleEvents.length === 0}
+            style={{ ...btnSecondary, fontSize: 11, padding: '5px 12px', opacity: (loading || visibleEvents.length === 0) ? 0.6 : 1 }}
+            title="Export raw metrics as CSV"
+          >
+            <FileSpreadsheet size={12} /> Export CSV
+          </button>
+          <button
             onClick={handleExportPDF}
             disabled={exporting || loading || visibleEvents.length === 0}
             style={{ ...btnPrimary, fontSize: 11, padding: '5px 12px', opacity: (exporting || loading || visibleEvents.length === 0) ? 0.6 : 1 }}
@@ -924,7 +1173,7 @@ function AnalyticsSection({ teachers = [] }) {
           <p style={{ margin: '6px 0 0', fontSize: 12, opacity: 0.7 }}>Events will appear here once teachers start using the app.</p>
         </div>
       ) : (
-        <div ref={reportRef}>
+        <div>
           {/* KPI chips */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 24 }}>
             <StatChip label="Total Events"   value={totalEvents}  color="#2d6a4f" />
@@ -949,6 +1198,7 @@ function AnalyticsSection({ teachers = [] }) {
           {/* Chart 1 — Most Used Features */}
           <div style={{ ...card, marginBottom: 20 }}>
             <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Most Used Features</p>
+            <div ref={featureChartRef}>
             <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={featureData} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
@@ -965,11 +1215,13 @@ function AnalyticsSection({ teachers = [] }) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Chart 2 — Daily Usage Trend */}
           <div style={{ ...card, marginBottom: 20 }}>
             <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Daily Usage &amp; Active Users — Last {range} Days</p>
+            <div ref={dailyChartRef}>
             <ResponsiveContainer width="100%" height={chartHeight}>
               <LineChart data={dailyData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" />
@@ -984,6 +1236,7 @@ function AnalyticsSection({ teachers = [] }) {
                 <Line yAxisId="right" type="monotone" dataKey="users" name="Active Users" stroke="#0284c7" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#0284c7' }} />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Chart 3 — Hour of Day Distribution */}
@@ -1005,6 +1258,7 @@ function AnalyticsSection({ teachers = [] }) {
           {/* Chart 4 — New Signups */}
           <div style={{ ...card, marginTop: 20 }}>
             <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>New Signups — Last {range} Days</p>
+            <div ref={signupChartRef}>
             <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={signupData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(45,106,79,0.08)" vertical={false} />
@@ -1014,6 +1268,7 @@ function AnalyticsSection({ teachers = [] }) {
                 <Bar dataKey="count" name="Signups" fill="#16a34a" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Chart 5 — Feature Adoption Depth */}
@@ -1082,6 +1337,7 @@ function AnalyticsSection({ teachers = [] }) {
               {bySubject.length > 0 && (
                 <div style={card}>
                   <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Generations by Subject</p>
+                  <div ref={subjectChartRef}>
                   <ResponsiveContainer width="100%" height={chartHeight}>
                     <BarChart data={bySubject} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
@@ -1093,11 +1349,13 @@ function AnalyticsSection({ teachers = [] }) {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
               )}
               {byGrade.length > 0 && (
                 <div style={card}>
                   <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Generations by Grade Level</p>
+                  <div ref={gradeChartRef}>
                   <ResponsiveContainer width="100%" height={chartHeight}>
                     <BarChart data={byGrade} layout="vertical" margin={{ left: 8, right: 24, top: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(45,106,79,0.08)" />
@@ -1109,6 +1367,7 @@ function AnalyticsSection({ teachers = [] }) {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
               )}
             </div>
