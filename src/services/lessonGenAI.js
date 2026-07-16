@@ -7,6 +7,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import PDFWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import mammoth from "mammoth";
 import { getGeminiKey } from "./geminiConfig";
+import { parseAIJson } from "./aiJsonParse";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = PDFWorkerUrl;
 
@@ -21,7 +22,7 @@ export const OR_ENABLED = true; // always enabled — key fetched from Firestore
  * onToken(chunk, fullText) is called for each delta.
  * Returns the full text when complete.
  */
-async function streamGemini(parts, { onToken, maxTokens = 4096, temperature = 0.5 } = {}) {
+async function streamGemini(parts, { onToken, maxTokens = 4096, temperature = 0.5, json = true } = {}) {
   const key = await getGeminiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${key}`;
 
@@ -34,6 +35,7 @@ async function streamGemini(parts, { onToken, maxTokens = 4096, temperature = 0.
         temperature,
         maxOutputTokens: maxTokens,
         thinkingConfig: { thinkingBudget: 0 },
+        ...(json ? { responseMimeType: 'application/json' } : {}),
       },
     }),
   });
@@ -142,16 +144,6 @@ export async function prepareFileContent(file, onProgress) {
   throw new Error(`Unsupported file type: "${type}". Use PDF, Word (.docx), PNG, or JPG.`);
 }
 
-// ── JSON parser ───────────────────────────────────────────────────────────────
-
-function parseJSON(text) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const clean  = fenced ? fenced[1] : text;
-  const obj    = clean.match(/(\{[\s\S]*\})/s);
-  if (!obj) throw new Error("AI response did not contain valid JSON.");
-  return JSON.parse(obj[1]);
-}
-
 // ── Part 1 — Extract lesson context from a file ───────────────────────────────
 
 const CONTEXT_SHAPE = `{
@@ -194,7 +186,7 @@ Rules:
   );
 
   onProgress(100, "Complete!");
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Part 2 — Generate 5-day 4As lesson plan ───────────────────────────────────
@@ -285,5 +277,5 @@ Return ONLY valid JSON: ${PLAN_SHAPE}`;
   );
 
   onProgress(100, "5-day lesson plan complete!");
-  return parseJSON(text);
+  return parseAIJson(text);
 }

@@ -1,6 +1,7 @@
 import { getAuth } from 'firebase/auth';
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 import { checkDailyLimit } from './usageLimit';
+import { parseAIJson } from './aiJsonParse';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const DLL_DAILY_LIMIT = 10;
@@ -40,15 +41,14 @@ async function callGemini(prompt) {
         temperature: 0.7,
         maxOutputTokens: 8192,
         thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
       },
     }),
   });
   if (!res.ok) throw new Error(`Gemini error ${res.status}`);
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('');
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error('AI returned no valid JSON');
-  return JSON.parse(m[1] ?? m[0]);
+  return parseAIJson(text);
 }
 
 /**

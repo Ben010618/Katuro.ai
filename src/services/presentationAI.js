@@ -10,6 +10,7 @@
  */
 
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { parseAIJson } from './aiJsonParse';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
@@ -29,6 +30,7 @@ async function callGemini(prompt, { temperature = 0.5, maxTokens = 2048 } = {}) 
         temperature,
         maxOutputTokens: maxTokens,
         thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
       },
     }),
   });
@@ -42,10 +44,11 @@ async function callGemini(prompt, { temperature = 0.5, maxTokens = 2048 } = {}) 
 }
 
 function parseJSON(text, label) {
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error(`AI returned no JSON for ${label} — please try again.`);
-  try   { return JSON.parse(m[0]); }
-  catch { throw new Error(`AI returned malformed JSON for ${label} — please try again.`); }
+  try {
+    return parseAIJson(text);
+  } catch {
+    throw new Error(`AI returned malformed JSON for ${label} — please try again.`);
+  }
 }
 
 // ── Stage 1: Generate outline (free, ~1 API call) ─────────────────────────────

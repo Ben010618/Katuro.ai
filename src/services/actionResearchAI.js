@@ -1,6 +1,7 @@
 import { getAuth } from 'firebase/auth';
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
 import { checkDailyLimit } from './usageLimit';
+import { parseAIJson } from './aiJsonParse';
 
 const MODEL = 'gemini-2.5-flash';
 const ACTION_RESEARCH_DAILY_LIMIT = 30;
@@ -26,6 +27,7 @@ async function callGemini(prompt, maxTokens = 2048) {
         generationConfig: {
           temperature: 0.5, maxOutputTokens: maxTokens,
           thinkingConfig: { thinkingBudget: 0 },
+          responseMimeType: 'application/json',
         },
       }),
     }
@@ -36,14 +38,6 @@ async function callGemini(prompt, maxTokens = 2048) {
   }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-}
-
-function parseJSON(raw) {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const clean  = fenced ? fenced[1] : raw;
-  const match  = clean.match(/(\{[\s\S]*\})/s);
-  if (!match) throw new Error('No JSON in AI response — please try again.');
-  return JSON.parse(match[1]);
 }
 
 // ── Phase 1: 5 research titles ────────────────────────────────────────────────
@@ -86,7 +80,7 @@ Return ONLY this JSON (no markdown):
 { "titles": ["formal title 1", "formal title 2", "formal title 3", "ACRONYM: subtitle", "Project ACRONYM: subtitle"] }`,
     1500
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Phase 2: 5 research questions ────────────────────────────────────────────
@@ -114,7 +108,7 @@ Return ONLY this JSON (no markdown):
 { "questions": ["Q1?", "Q2?", "Q3?", "Q4?", "Q5?"] }`,
     1024
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Phase 3: Literature review (Funnel format) ────────────────────────────────
@@ -153,7 +147,7 @@ Return ONLY this JSON (no markdown):
 }`,
     4096
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Phase 4: Action plan ──────────────────────────────────────────────────────
@@ -188,7 +182,7 @@ Return ONLY this JSON (no markdown):
 }`,
     3072
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Phase 5: Data collection methodology ─────────────────────────────────────
@@ -233,7 +227,7 @@ Return ONLY this JSON (no markdown):
 }`,
     3072
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Research Instruments ─────────────────────────────────────────────────────
@@ -395,7 +389,7 @@ Return ONLY this JSON (no markdown):
   };
 
   const text = await callGemini(prompts[instrumentType] ?? prompts.questionnaire, 6000);
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 // ── Phase 6: Findings & report ────────────────────────────────────────────────
@@ -441,5 +435,5 @@ Return ONLY this JSON (no markdown):
 }`,
     5000
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }

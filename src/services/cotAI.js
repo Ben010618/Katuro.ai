@@ -1,15 +1,5 @@
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
-
-function parseJSON(text) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw    = fenced ? fenced[1] : text.match(/(\{[\s\S]*\})/s)?.[1] ?? text;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    // last-ditch: strip trailing commas
-    return JSON.parse(raw.replace(/,\s*([}\]])/g, '$1'));
-  }
-}
+import { parseAIJson } from './aiJsonParse';
 
 /**
  * Generate a complete PPST-aligned, COT-optimized 4As lesson plan.
@@ -279,6 +269,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
         temperature:     0.7,
         maxOutputTokens: 16384,
         thinkingConfig:  { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
       },
     }),
   });
@@ -298,5 +289,5 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   if (!text) throw new Error('No content returned from Gemini. Please try again.');
 
-  return parseJSON(text);
+  return parseAIJson(text);
 }

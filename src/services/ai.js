@@ -1,5 +1,6 @@
 // ── Gemini configuration ─────────────────────────────────────────────────────
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { parseAIJson } from './aiJsonParse';
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 function geminiUrl(key) {
@@ -32,6 +33,11 @@ async function call(prompt, opts = {}) {
       generationConfig: {
         temperature:     opts.temperature     ?? 0.4,
         maxOutputTokens: opts.maxOutputTokens ?? 4096,
+        // responseMimeType constrains Gemini to emit syntactically valid JSON
+        // (no markdown fences, no trailing commas) at generation time — this
+        // is the primary defense against "invalid_json" failures; parseAIJson's
+        // repair chain is only the fallback for whatever still slips through.
+        ...(opts.json ? { responseMimeType: 'application/json' } : {}),
         ...NO_THINKING,
       },
     }),
@@ -42,64 +48,6 @@ async function call(prompt, opts = {}) {
   }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-}
-
-function closeOpenJSON(raw) {
-  let s = raw.trim();
-  const stack = [];
-  let inStr = false, esc = false, safeEnd = -1;
-
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (esc)                 { esc = false; continue; }
-    if (c === "\\" && inStr) { esc = true;  continue; }
-    if (c === '"')           { inStr = !inStr; continue; }
-    if (inStr)               continue;
-    if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
-    else if (c === "}" || c === "]") {
-      stack.pop();
-      if (stack.length === 1) safeEnd = i;
-    }
-  }
-
-  if (!stack.length) return s;
-
-  // Truncation mid-string (e.g. output cut off by the token limit while
-  // writing a field's value) leaves inStr === true with no safeEnd past
-  // it — the bracket-closing pass below can't fix an unterminated quote,
-  // so close it first or the repair silently fails on every truncation.
-  if (inStr && safeEnd < 0) {
-    s = s + '"';
-  }
-
-  let t = (safeEnd >= 0 ? s.slice(0, safeEnd + 1) : s).replace(/,\s*$/, "");
-  const open = [];
-  inStr = false; esc = false;
-  for (const c of t) {
-    if (esc)                 { esc = false; continue; }
-    if (c === "\\" && inStr) { esc = true;  continue; }
-    if (c === '"')           { inStr = !inStr; continue; }
-    if (inStr)               continue;
-    if (c === "{" || c === "[") open.push(c === "{" ? "}" : "]");
-    else if ((c === "}" || c === "]") && open.length) open.pop();
-  }
-  if (inStr) t += '"';
-  return t + open.reverse().join("");
-}
-
-function parseJSON(text) {
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error("No JSON in AI response");
-  try {
-    return JSON.parse(m[1]);
-  } catch {
-    const repaired = closeOpenJSON(m[1]);
-    try {
-      return JSON.parse(repaired);
-    } catch {
-      throw new Error("AI response was cut short — try fewer questions (10–15).");
-    }
-  }
 }
 
 const trunc = (arr, n, maxChars = 120) =>
@@ -147,9 +95,9 @@ Rules: vary difficulty (recall, comprehension, application), clear language, one
 
 Return ONLY JSON (no markdown fences):
 {"questions":[{"num":1,"text":"...","choices":{${choiceShape}},"answer":"A","competency":"..."}]}`,
-    { temperature: 0.75, maxOutputTokens: 4096 }
+    { temperature: 0.75, maxOutputTokens: 4096, json: true }
   );
-  return parseJSON(text);
+  return parseAIJson(text);
 }
 
 /**
@@ -300,7 +248,7 @@ Just the raw JSON object:
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 8192, ...NO_THINKING },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 8192, responseMimeType: 'application/json', ...NO_THINKING },
     }),
   });
 
@@ -319,7 +267,7 @@ Just the raw JSON object:
 
   let parsed;
   try {
-    parsed = parseJSON(rawText);
+    parsed = parseAIJson(rawText);
   } catch (e) {
     console.error('unpackCompetency parse failed. Raw response:', rawText);
     throw new Error('AI returned invalid format. Retrying…', { cause: e });
@@ -423,7 +371,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 3072, ...NO_THINKING },
+      generationConfig: { temperature: 0.6, maxOutputTokens: 3072, responseMimeType: 'application/json', ...NO_THINKING },
     }),
   });
 
@@ -452,7 +400,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
 
   let parsed;
   try {
-    parsed = parseJSON(rawText);
+    parsed = parseAIJson(rawText);
   } catch (e) {
     console.error(`generateIlawSession (session ${session.day}) parse failed (finishReason: ${finishReason}):`, rawText);
     const err = new Error(`Session ${session.day} — AI returned invalid JSON`, { cause: e });

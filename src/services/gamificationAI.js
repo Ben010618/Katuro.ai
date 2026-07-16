@@ -1,4 +1,5 @@
 import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { parseAIJson } from './aiJsonParse';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function buildCtx(lesson) {
@@ -35,15 +36,13 @@ async function callGemini(prompt) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: 'application/json' },
     }),
   });
   if (!res.ok) throw new Error(`AI error ${res.status}`);
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('');
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error('AI returned no valid JSON');
-  return JSON.parse(m[1] ?? m[0]);
+  return parseAIJson(text);
 }
 
 export async function genMatching(lesson, count = 10) {
