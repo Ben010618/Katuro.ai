@@ -23,10 +23,14 @@ import {
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
-  FileSpreadsheet,
+  FileSpreadsheet, UserCheck,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import { saveAs } from 'file-saver';
+
+// Mirrors MAX_ACCOUNTS in functions/index.js's registerUser — keep in sync.
+// Bulk-approving pending accounts must never push active users past this cap.
+const MAX_ACCOUNTS = 350;
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
@@ -1810,6 +1814,8 @@ export default function AdminDashboard() {
   const [deleteTarget,   setDeleteTarget]    = useState(null);
   const [deleting,       setDeleting]        = useState(false);
   const [deleteError,    setDeleteError]     = useState('');
+  const [approving,      setApproving]       = useState(false);
+  const [approveMsg,     setApproveMsg]      = useState('');
 
   // Notifications
   const [notifications,  setNotifications]  = useState([]);
@@ -1880,6 +1886,47 @@ export default function AdminDashboard() {
       setTeachers(prev => prev.map(t => t.id === teacher.id ? { ...t, disabled: !t.disabled } : t));
     } finally {
       setTogglingUid(null);
+    }
+  }
+
+  // Approves pending accounts oldest-first, but never past MAX_ACCOUNTS active
+  // users — mirrors the registration cap enforced server-side in registerUser.
+  async function handleApproveAllPending() {
+    setApproving(true); setApproveMsg('');
+    try {
+      const activeNow = teachers.filter(t => !t.disabled).length;
+      const slots = MAX_ACCOUNTS - activeNow;
+      if (slots <= 0) {
+        setApproveMsg(`Already at the ${MAX_ACCOUNTS}-user cap (${activeNow} active) — no pending accounts approved.`);
+        return;
+      }
+
+      const pending = teachers
+        .filter(t => t.pendingApproval)
+        .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
+      if (pending.length === 0) {
+        setApproveMsg('No pending accounts to approve.');
+        return;
+      }
+
+      const toApprove = pending.slice(0, slots);
+      for (const t of toApprove) {
+        await adminSetDisabled(t.id, false);
+      }
+      const approvedIds = new Set(toApprove.map(t => t.id));
+      setTeachers(prev => prev.map(t =>
+        approvedIds.has(t.id) ? { ...t, disabled: false, pendingApproval: false } : t
+      ));
+
+      const leftover = pending.length - toApprove.length;
+      setApproveMsg(
+        `Approved ${toApprove.length} pending account${toApprove.length !== 1 ? 's' : ''}.` +
+        (leftover > 0 ? ` ${leftover} still pending — cap reached at ${MAX_ACCOUNTS} active users.` : '')
+      );
+    } catch (err) {
+      setApproveMsg(err.message || 'Failed to approve pending accounts.');
+    } finally {
+      setApproving(false);
     }
   }
 
@@ -2135,11 +2182,34 @@ export default function AdminDashboard() {
               <button onClick={fetchTeachers} style={btnSecondary} title="Refresh">
                 <RefreshCw size={13} />
               </button>
+              {pendingCount > 0 && (
+                <button
+                  onClick={handleApproveAllPending}
+                  disabled={approving}
+                  style={{ ...btnSecondary, opacity: approving ? 0.6 : 1 }}
+                  title={`Approve pending accounts, up to the ${MAX_ACCOUNTS}-user cap`}
+                >
+                  {approving
+                    ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Approving…</>
+                    : <><UserCheck size={13} /> Approve All Pending ({pendingCount})</>
+                  }
+                </button>
+              )}
               <button onClick={() => setAddUserOpen(true)} style={btnPrimary}>
                 <Plus size={14} /> Add User
               </button>
             </div>
           </div>
+
+          {approveMsg && (
+            <div style={{ display: 'flex', gap: 8, background: 'rgba(45,106,79,0.08)', border: '1px solid rgba(45,106,79,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+              <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)', flex: 1 }}>{approveMsg}</p>
+              <button onClick={() => setApproveMsg('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0, flexShrink: 0 }}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {listErr && (
             <div style={{ display: 'flex', gap: 8, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
