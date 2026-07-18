@@ -33,6 +33,7 @@ export default function ActionResearchPhase6() {
   const [downloading, setDownloading] = useState(false);
   const [error,       setError]       = useState('');
   const [completed,   setCompleted]   = useState(false);
+  const [statusMsg,   setStatusMsg]   = useState('');
 
   useEffect(() => {
     if (!user?.uid || !docId) return;
@@ -49,17 +50,41 @@ export default function ActionResearchPhase6() {
 
   async function handleGenerate() {
     if (!user?.uid || !docData || rawData.trim().length < 30) return;
-    setGenerating(true); setError('');
+    setGenerating(true); setError(''); setStatusMsg('Writing your complete Chapter V — this may take 20–40 seconds…');
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-findings', 30);
       elapsedMs = startTimer();
-      const result = await interpretFindings({
-        title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
-        problemText: docData.problemText, beraTheme: docData.beraTheme,
-        subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
-        schoolName: docData.schoolName, schoolYear: docData.schoolYear, rawData,
-      });
+
+      // Gemini occasionally returns a truncated/malformed response for this
+      // call (it's the heaviest payload of the six phases) — retry a couple
+      // times before making the teacher manually re-click, same as ILAW/COT/DLL.
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await interpretFindings({
+            title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
+            problemText: docData.problemText, beraTheme: docData.beraTheme,
+            subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
+            schoolName: docData.schoolName, schoolYear: docData.schoolYear, rawData,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`interpretFindings attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 8000 + attempt * 4000;
+            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s… (attempt ${attempt + 2}/3)`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Re-writing your Chapter V…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate. Please try again.');
+
       setFindings(result);
       await updateDoc(doc(db, 'teachers', user.uid, 'actionResearch', docId), {
         rawData, findings: result, phase: 6, status:'complete', updatedAt: serverTimestamp(),
@@ -69,7 +94,11 @@ export default function ActionResearchPhase6() {
       trackEvent(user.uid, 'action_research_completed', { subject: docData.subjectArea, grade: docData.gradeLevel });
       trackGeneration(user.uid, 'ar_phase6', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase6', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -167,7 +196,7 @@ export default function ActionResearchPhase6() {
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Interpreting findings…</>
               : <><Sparkles size={13} /> {findings ? 'Regenerate' : 'Generate'} findings & report{!freeMode && ' (30 tokens)'}</>}
           </button>
-          {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>Writing your complete Chapter V — this may take 20–40 seconds…</p>}
+          {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{statusMsg}</p>}
         </div>
 
         {/* Findings */}

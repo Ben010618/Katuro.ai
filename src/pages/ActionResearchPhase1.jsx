@@ -98,6 +98,7 @@ export default function ActionResearchPhase1() {
   const [titlesLoading,  setTitlesLoading]  = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState('');
+  const [statusMsg,      setStatusMsg]      = useState('');
   const [loadingResume,  setLoadingResume]  = useState(!!urlDocId);
   const debounceRef = useRef(null);
 
@@ -184,12 +185,33 @@ export default function ActionResearchPhase1() {
   /* ── Generate titles — also saves progress to Firestore ──────────────── */
   async function handleGenerateTitles() {
     if (!user?.uid || problemText.trim().length < 20) return;
-    setTitlesLoading(true); setError('');
+    setTitlesLoading(true); setError(''); setStatusMsg('');
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-titles', 5);
       elapsedMs = startTimer();
-      const result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateResearchTitles attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Regenerating titles…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate titles. Please try again.');
+
       const titles = result.titles ?? [];
       setResearchTitles(titles);
       setSelectedTitle('');
@@ -198,12 +220,16 @@ export default function ActionResearchPhase1() {
       trackEvent(user.uid, 'action_research_phase1_generated', { subject: subjectArea, grade: gradeLevel });
       trackGeneration(user.uid, 'ar_phase1', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate titles. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate titles. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase1', { success: false, durationMs: elapsedMs(), error: err.message });
       }
     } finally {
-      setTitlesLoading(false);
+      setTitlesLoading(false); setStatusMsg('');
     }
   }
 
@@ -387,6 +413,7 @@ export default function ActionResearchPhase1() {
               {titlesLoading ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating titles…</> : <><Sparkles size={13} /> Generate research titles{!freeMode && ' (5 tokens)'}</>}
             </button>
           )}
+          {titlesLoading && statusMsg && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{statusMsg}</p>}
 
           {researchTitles.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>

@@ -30,6 +30,7 @@ export default function ActionResearchPhase3() {
   const [saving,      setSaving]      = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error,       setError]       = useState('');
+  const [statusMsg,   setStatusMsg]   = useState('');
 
   useEffect(() => {
     if (!user?.uid || !docId) return;
@@ -45,22 +46,48 @@ export default function ActionResearchPhase3() {
 
   async function handleGenerate() {
     if (!user?.uid || !docData) return;
-    setGenerating(true); setError('');
+    const initialStatus = 'This may take 15–30 seconds. Researching global, national, local, and classroom literature…';
+    setGenerating(true); setError(''); setStatusMsg(initialStatus);
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-literature', 5);
       elapsedMs = startTimer();
-      const result = await generateLiteratureReview({
-        title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
-        problemText: docData.problemText, beraTheme: docData.beraTheme,
-        subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
-        schoolName: docData.schoolName, schoolYear: docData.schoolYear,
-      });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateLiteratureReview({
+            title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
+            problemText: docData.problemText, beraTheme: docData.beraTheme,
+            subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
+            schoolName: docData.schoolName, schoolYear: docData.schoolYear,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateLiteratureReview attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Re-researching your literature review…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate. Please try again.');
+
       setLitReview(result);
       trackEvent(user.uid, 'action_research_phase3_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
       trackGeneration(user.uid, 'ar_phase3', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase3', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -142,7 +169,7 @@ export default function ActionResearchPhase3() {
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating literature review…</>
               : <><Sparkles size={13} /> {litReview ? 'Regenerate' : 'Generate'} literature review{!freeMode && ' (5 tokens)'}</>}
           </button>
-          {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>This may take 15–30 seconds. Researching global, national, local, and classroom literature…</p>}
+          {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{statusMsg}</p>}
         </div>
 
         {/* Results */}

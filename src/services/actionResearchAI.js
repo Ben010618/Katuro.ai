@@ -433,7 +433,10 @@ Return ONLY this JSON (no markdown):
   ],
   "reflections": "1-2 paragraph personal reflection from the teacher-researcher on conducting this action research..."
 }`,
-    5000
+    // This is the heaviest payload of the six phases (up to 5 findings, a
+    // multi-paragraph discussion, and reflections) — 5000 tokens was tight
+    // enough to truncate mid-response on longer research-question sets.
+    8192
   );
   return parseAIJson(text);
 }

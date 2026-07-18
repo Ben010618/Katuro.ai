@@ -25,6 +25,7 @@ export default function ActionResearchPhase4() {
   const [saving,      setSaving]      = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error,       setError]       = useState('');
+  const [statusMsg,   setStatusMsg]   = useState('');
 
   useEffect(() => {
     if (!user?.uid || !docId) return;
@@ -40,22 +41,47 @@ export default function ActionResearchPhase4() {
 
   async function handleGenerate() {
     if (!user?.uid || !docData) return;
-    setGenerating(true); setError('');
+    setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-plan', 5);
       elapsedMs = startTimer();
-      const result = await generateActionPlan({
-        title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
-        problemText: docData.problemText, beraTheme: docData.beraTheme,
-        subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
-        schoolName: docData.schoolName, schoolYear: docData.schoolYear,
-      });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateActionPlan({
+            title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
+            problemText: docData.problemText, beraTheme: docData.beraTheme,
+            subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
+            schoolName: docData.schoolName, schoolYear: docData.schoolYear,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateActionPlan attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Re-generating your action plan…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate. Please try again.');
+
       setActionPlan(result);
       trackEvent(user.uid, 'action_research_phase4_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
       trackGeneration(user.uid, 'ar_phase4', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase4', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -125,6 +151,7 @@ export default function ActionResearchPhase4() {
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating action plan…</>
               : <><Sparkles size={13} /> {actionPlan ? 'Regenerate' : 'Generate'} action plan{!freeMode && ' (5 tokens)'}</>}
           </button>
+          {generating && statusMsg && <p style={{ margin:'10px 0 0', fontSize:12, color:'var(--kt-text-secondary)' }}>{statusMsg}</p>}
         </div>
 
         {/* Results */}

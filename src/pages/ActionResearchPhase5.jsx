@@ -310,12 +310,14 @@ export default function ActionResearchPhase5() {
   const [saving,              setSaving]              = useState(false);
   const [downloading,         setDownloading]         = useState(false);
   const [error,               setError]               = useState('');
+  const [statusMsg,           setStatusMsg]           = useState('');
 
   // Instrument state
   const [instrumentType,       setInstrumentType]       = useState('questionnaire');
   const [aiRecommended,        setAiRecommended]        = useState(null);
   const [instrument,           setInstrument]           = useState(null);
   const [generatingInstrument, setGeneratingInstrument] = useState(false);
+  const [instrumentStatusMsg,  setInstrumentStatusMsg]  = useState('');
 
   const VALID_TYPES = INSTRUMENT_TYPES.map(t => t.id);
 
@@ -342,16 +344,37 @@ export default function ActionResearchPhase5() {
 
   async function handleGenerate() {
     if (!user?.uid || !docData) return;
-    setGenerating(true); setError('');
+    setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-datacollection', 5);
       elapsedMs = startTimer();
-      const result = await generateDataCollection({
-        title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
-        beraTheme: docData.beraTheme, subjectArea: docData.subjectArea,
-        gradeLevel: docData.gradeLevel,
-      });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateDataCollection({
+            title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
+            beraTheme: docData.beraTheme, subjectArea: docData.subjectArea,
+            gradeLevel: docData.gradeLevel,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateDataCollection attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Re-generating your data collection plan…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate. Please try again.');
+
       setDataCollection(result);
       const rec = result.recommendedInstrument;
       if (rec && VALID_TYPES.includes(rec)) {
@@ -361,7 +384,11 @@ export default function ActionResearchPhase5() {
       trackEvent(user.uid, 'action_research_phase5_generated', { subject: docData.subjectArea, grade: docData.gradeLevel });
       trackGeneration(user.uid, 'ar_phase5_data', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_data', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -370,26 +397,51 @@ export default function ActionResearchPhase5() {
 
   async function handleGenerateInstrument() {
     if (!user?.uid || !docData) return;
-    setGeneratingInstrument(true); setError('');
+    setGeneratingInstrument(true); setError(''); setInstrumentStatusMsg('Building your complete instrument — this takes about 10–20 seconds…');
     let elapsedMs;
     try {
       await deductTokens(user.uid, 'action-research-instrument', 5);
       elapsedMs = startTimer();
-      const result = await generateResearchInstrument({
-        instrumentType,
-        title:             docData.selectedTitle,
-        subjectArea:       docData.subjectArea,
-        gradeLevel:        docData.gradeLevel,
-        selectedQuestions: docData.selectedQuestions,
-        problemText:       docData.problemText,
-      });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateResearchInstrument({
+            instrumentType,
+            title:             docData.selectedTitle,
+            subjectArea:       docData.subjectArea,
+            gradeLevel:        docData.gradeLevel,
+            selectedQuestions: docData.selectedQuestions,
+            problemText:       docData.problemText,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateResearchInstrument attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setInstrumentStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setInstrumentStatusMsg('Re-building your instrument…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Failed to generate instrument. Please try again.');
+
       setInstrument(result);
       await updateDoc(doc(db, 'teachers', user.uid, 'actionResearch', docId), {
         instrument: result, instrumentType, updatedAt: serverTimestamp(),
       });
       trackGeneration(user.uid, 'ar_phase5_instrument', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setError(err.message || 'Failed to generate instrument. Please try again.');
+      setError(
+        err.status === 429
+          ? 'Rate limit reached — wait a moment then try again.'
+          : (err.message || 'Failed to generate instrument. Please try again.')
+      );
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_instrument', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -465,6 +517,7 @@ export default function ActionResearchPhase5() {
               ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating methodology…</>
               : <><Sparkles size={13} /> {dc ? 'Regenerate' : 'Generate'} data collection plan{!freeMode && ' (5 tokens)'}</>}
           </button>
+          {generating && statusMsg && <p style={{ margin:'10px 0 0', fontSize:12, color:'var(--kt-text-secondary)' }}>{statusMsg}</p>}
         </div>
 
         {/* Methodology results */}
@@ -628,8 +681,8 @@ export default function ActionResearchPhase5() {
               ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }} /> Generating instrument…</>
               : <><Sparkles size={13} /> {instrument ? 'Regenerate' : 'Generate'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}{!freeMode && ' (5 tokens)'}</>}
           </button>
-          {generatingInstrument && (
-            <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>Building your complete instrument — this takes about 10–20 seconds…</p>
+          {generatingInstrument && instrumentStatusMsg && (
+            <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{instrumentStatusMsg}</p>
           )}
         </div>
 
