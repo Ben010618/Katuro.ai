@@ -10,7 +10,8 @@
  */
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 
 const CONFIG_REF  = doc(db, 'adminConfig', 'gemini');
 const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
@@ -92,6 +93,44 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
   }
 
   return res;
+}
+
+/**
+ * Runs a Gemini call through the `generateAI` Cloud Function instead of
+ * calling Gemini directly from the browser. The key never reaches the
+ * client, and the server enforces a per-user daily limit for `action`.
+ *
+ * `contents` is the exact Gemini `contents` array a caller would otherwise
+ * have sent straight to the API (text-only or with inlineData images) — the
+ * prompt itself is untouched, only the network hop moves server-side.
+ *
+ * Returns `{ text, finishReason }` — finishReason (e.g. "MAX_TOKENS",
+ * "SAFETY") lets a caller distinguish a truncated response from a genuinely
+ * malformed one, same as the raw Gemini payload used to.
+ *
+ * Throws an Error shaped like geminiWithRetry's: `.status === 429` for both
+ * "Gemini is rate-limited" and "you've hit today's limit" (existing retry
+ * loops already treat 429 as "back off, maybe retry"), plus `.dailyLimit ===
+ * true` specifically for the daily-limit case so a caller can skip retrying
+ * something that won't clear up in the next few seconds.
+ */
+export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType }) {
+  const call = httpsCallable(functions, 'generateAI', { timeout: 150000 });
+  try {
+    const res = await call({ action, contents, temperature, maxTokens, responseMimeType });
+    return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
+  } catch (err) {
+    const code = err?.code || '';
+    const message = err?.message || 'The AI service is unavailable right now. Please try again.';
+    const e = new Error(message);
+    if (code === 'functions/resource-exhausted') {
+      e.status = 429;
+      if (err?.details?.dailyLimit) e.dailyLimit = true;
+    } else if (code === 'functions/unauthenticated') {
+      e.reason = 'unauthenticated';
+    }
+    throw e;
+  }
 }
 
 /** Admin-only: save a new key to Firestore */

@@ -1,4 +1,4 @@
-import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
 
 /**
@@ -23,9 +23,6 @@ export async function generateCotLesson({
   melc, materials, objectives, selectedIndicators,
   contentStandards, performanceStandards,
 }) {
-  const key = await getGeminiKey();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-
   const indicatorsText = selectedIndicators
     .map(ind => `• ${ind.code} (Indicator ${ind.num}): ${ind.description}`)
     .join('\n');
@@ -260,33 +257,13 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
 }
 `.trim();
 
-  const res = await geminiWithRetry(url, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature:     0.7,
-        maxOutputTokens: 16384,
-        thinkingConfig:  { thinkingBudget: 0 },
-        responseMimeType: 'application/json',
-      },
-    }),
+  const { text } = await callGeminiProxy({
+    action: 'cot_gen',
+    contents: [{ parts: [{ text: prompt }] }],
+    temperature: 0.7,
+    maxTokens: 16384,
+    responseMimeType: 'application/json',
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const e   = new Error(err?.error?.message ?? `Gemini error ${res.status}`);
-    e.status  = res.status;
-    if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('Retry-After') || '30', 10);
-      e.retryAfter = retryAfter;
-    }
-    throw e;
-  }
-
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   if (!text) throw new Error('No content returned from Gemini. Please try again.');
 
   return parseAIJson(text);

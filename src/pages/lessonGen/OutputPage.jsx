@@ -213,9 +213,7 @@ export default function OutputPage() {
 
     setPptLoading(true);
     try {
-      setPptPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
-      await deductTokens(user.uid, 'presentation_gen', 3);
-
+      // Tokens are deducted server-side inside expandSlides — don't double-charge here.
       setPptPhase('Generating slide outline…');
       const { outline } = await generateOutline({
         subject:    store.subject    || '',

@@ -5,12 +5,10 @@
 // is what guarantees "only the selected format(s) appear" rather than leaving
 // it to the model's judgment.
 
-import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
 import { buildItemSlots } from '../utils/testBuilderCalc';
 import { deriveLanguage, proficiencyLevelLabel } from '../config/testBuilderConfig';
-
-const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // Filipino, ESP, and Araling Panlipunan are taught in Filipino — every other
 // subject defaults to English. Structural/protocol values (TRUE/FALSE, MC
@@ -55,25 +53,16 @@ const FORMAT_SPEC = {
 };
 
 async function callGemini(prompt, maxOutputTokens = 4096) {
-  const key = await getGeminiKey();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-  const res = await geminiWithRetry(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      // responseMimeType constrains Gemini to emit syntactically valid JSON
-      // (no markdown fences, no trailing commas) — parseAIJson's repair
-      // chain is the fallback for whatever still slips through.
-      generationConfig: { temperature: 0.6, maxOutputTokens, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: 'application/json' },
-    }),
+  // responseMimeType constrains Gemini to emit syntactically valid JSON
+  // (no markdown fences, no trailing commas) — parseAIJson's repair
+  // chain is the fallback for whatever still slips through.
+  const { text } = await callGeminiProxy({
+    action: 'test_builder_items',
+    contents: [{ parts: [{ text: prompt }] }],
+    temperature: 0.6,
+    maxTokens: maxOutputTokens,
+    responseMimeType: 'application/json',
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    throw new Error(errData?.error?.message || `AI error ${res.status}`);
-  }
-  const data = await res.json();
-  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
   return parseAIJson(text);
 }
 

@@ -2,15 +2,8 @@
 // returns the marked answers as structured JSON. Mirrors the vision call
 // pattern already proven in lessonGenAI.js's prepareFileContent().
 
-import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
-
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const NO_THINKING  = { thinkingConfig: { thinkingBudget: 0 } };
-
-function geminiUrl(key) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -50,34 +43,27 @@ Return ONLY valid JSON, no markdown, no explanation:
 }`;
 
   const b64 = await fileToBase64(imageFile);
-  const key = await getGeminiKey();
 
-  const res = await geminiWithRetry(geminiUrl(key), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  let text, finishReason;
+  try {
+    ({ text, finishReason } = await callGeminiProxy({
+      action: 'scan_answer_sheet',
       contents: [{
         parts: [
           { inlineData: { mimeType: imageFile.type, data: b64 } },
           { text: prompt },
         ],
       }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048, responseMimeType: 'application/json', ...NO_THINKING },
-    }),
-  });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    const err = new Error(`Gemini error: ${res.status} — ${errData?.error?.message || res.statusText}`);
-    err.status = res.status;
-    err.reason = 'api_error';
+      temperature: 0.1,
+      maxTokens: 2048,
+      responseMimeType: 'application/json',
+    }));
+  } catch (err) {
+    if (!err.reason && err.status !== 429) err.reason = 'api_error';
     throw err;
   }
 
-  const data       = await res.json();
-  const candidate  = data.candidates?.[0];
-  const finishReason = candidate?.finishReason;
-  const rawText    = candidate?.content?.parts?.[0]?.text?.trim();
+  const rawText = text?.trim();
 
   if (!rawText) {
     const err = new Error('Empty response from AI while reading the answer sheet.');

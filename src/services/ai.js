@@ -1,17 +1,11 @@
 // ── Gemini configuration ─────────────────────────────────────────────────────
-import { getGeminiKey, geminiWithRetry } from './geminiConfig';
+// AI calls run through the generateAI Cloud Function (services/geminiConfig.js)
+// instead of hitting Gemini directly from the browser — the key never reaches
+// the client, and the server enforces a per-user daily limit per action.
+import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
 
-const GEMINI_MODEL = "gemini-2.5-flash";
-function geminiUrl(key) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-}
-
-export const AI_ENABLED = true; // key is fetched dynamically from Firestore
-
-// thinkingBudget:0 prevents Gemini 2.5 Flash from consuming the output token budget
-// on internal reasoning — for structured JSON tasks we only need the output.
-const NO_THINKING = { thinkingConfig: { thinkingBudget: 0 } };
+export const AI_ENABLED = true; // key is managed server-side; always available to a signed-in user
 
 // Subjects officially taught in Filipino medium per DepEd MATATAG curriculum.
 // All other subjects use English as the medium of instruction.
@@ -23,31 +17,19 @@ function langInstruction(subject) {
     : 'LANGUAGE: Write ALL content in English. English is the medium of instruction for this subject.';
 }
 
-async function call(prompt, opts = {}) {
-  const key = await getGeminiKey();
-  const res = await geminiWithRetry(geminiUrl(key), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature:     opts.temperature     ?? 0.4,
-        maxOutputTokens: opts.maxOutputTokens ?? 4096,
-        // responseMimeType constrains Gemini to emit syntactically valid JSON
-        // (no markdown fences, no trailing commas) at generation time — this
-        // is the primary defense against "invalid_json" failures; parseAIJson's
-        // repair chain is only the fallback for whatever still slips through.
-        ...(opts.json ? { responseMimeType: 'application/json' } : {}),
-        ...NO_THINKING,
-      },
-    }),
+async function call(action, prompt, opts = {}) {
+  const { text } = await callGeminiProxy({
+    action,
+    contents: [{ parts: [{ text: prompt }] }],
+    temperature: opts.temperature ?? 0.4,
+    maxTokens: opts.maxOutputTokens ?? 4096,
+    // responseMimeType constrains Gemini to emit syntactically valid JSON
+    // (no markdown fences, no trailing commas) at generation time — this
+    // is the primary defense against "invalid_json" failures; parseAIJson's
+    // repair chain is only the fallback for whatever still slips through.
+    ...(opts.json ? { responseMimeType: 'application/json' } : {}),
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(`Gemini error: ${res.status} — ${errData?.error?.message || res.statusText}`);
-  }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return text;
 }
 
 const trunc = (arr, n, maxChars = 120) =>
@@ -57,8 +39,8 @@ const trunc = (arr, n, maxChars = 120) =>
  * Suggest a short quiz title from lesson context. Returns a plain string.
  */
 export async function suggestQuizTitle(context) {
-  if (!AI_ENABLED) throw new Error("Add VITE_GEMINI_API_KEY to .env to enable AI.");
   const text = await call(
+    'quiz_title',
     `Suggest a short, specific quiz title (6 words max) for a ${context.gradeLevel} ${context.subject} quiz on "${context.topic}". Return ONLY the title text, no quotes, no punctuation at the end.`,
     { temperature: 0.7, maxOutputTokens: 30 }
   );
@@ -71,7 +53,6 @@ export async function suggestQuizTitle(context) {
  * Returns { questions: [{ num, text, choices:{A,B,C,D[,E]}, answer, competency }] }
  */
 export async function generateQuizAI(context, numQ, numChoices, customPrompt = "", lessonPlan = null) {
-  if (!AI_ENABLED) throw new Error("Add VITE_GEMINI_API_KEY to .env to enable AI.");
   const letters     = ["A", "B", "C", "D", "E"].slice(0, numChoices);
   const choiceShape = letters.map((l) => `"${l}":""`).join(",");
 
@@ -85,6 +66,7 @@ export async function generateQuizAI(context, numQ, numChoices, customPrompt = "
     : "";
 
   const text = await call(
+    'quiz_gen',
     `Create a ${numQ}-item multiple choice quiz.
 Subject: ${context.subject} | Topic: ${String(context.topic).slice(0, 150)} | Grade: ${context.gradeLevel}
 Objectives: ${trunc(context.objectives, 4)}
@@ -242,26 +224,16 @@ Just the raw JSON object:
   ]
 }`;
 
-  const key = await getGeminiKey();
-  const res = await geminiWithRetry(geminiUrl(key), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 8192, responseMimeType: 'application/json', ...NO_THINKING },
-    }),
+  const { text, finishReason } = await callGeminiProxy({
+    action: 'ilaw_unpack',
+    contents: [{ parts: [{ text: prompt }] }],
+    temperature: 0.3,
+    maxTokens: 8192,
+    responseMimeType: 'application/json',
   });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    console.error('Gemini unpack error:', errData);
-    throw new Error(`Gemini error: ${res.status} — ${errData?.error?.message || res.statusText}`);
-  }
-
-  const data    = await res.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const rawText = text?.trim();
   if (!rawText) {
-    console.error('unpackCompetency: empty response', data);
+    console.error('unpackCompetency: empty response, finishReason:', finishReason);
     throw new Error('AI returned an empty response. Retrying…');
   }
 
@@ -365,34 +337,24 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
   "extendedLearning": "..."
 }`;
 
-  const key2 = await getGeminiKey();
-  const res = await geminiWithRetry(geminiUrl(key2), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  let text, finishReason;
+  try {
+    ({ text, finishReason } = await callGeminiProxy({
+      action: 'ilaw_session',
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 3072, responseMimeType: 'application/json', ...NO_THINKING },
-    }),
-  });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    console.error(`generateIlawSession (session ${session.day}) API error:`, errData);
-    const err = new Error(`Gemini error: ${res.status} — ${errData?.error?.message || res.statusText}`);
-    err.status = res.status;
-    err.reason = 'api_error';
-    if (res.status === 429) {
-      err.retryAfter = parseInt(res.headers.get('retry-after') || '30', 10);
-    }
+      temperature: 0.6,
+      maxTokens: 3072,
+      responseMimeType: 'application/json',
+    }));
+  } catch (err) {
+    console.error(`generateIlawSession (session ${session.day}) API error:`, err);
+    if (!err.reason && err.status !== 429) err.reason = 'api_error';
     throw err;
   }
 
-  const data        = await res.json();
-  const candidate   = data.candidates?.[0];
-  const finishReason = candidate?.finishReason;
-  const rawText     = candidate?.content?.parts?.[0]?.text?.trim();
+  const rawText = text?.trim();
   if (!rawText) {
-    console.error(`generateIlawSession (session ${session.day}) empty response:`, data);
+    console.error(`generateIlawSession (session ${session.day}) empty response, finishReason:`, finishReason);
     const err = new Error(`Session ${session.day} — empty response from AI`);
     err.reason = finishReason === 'SAFETY' ? 'safety_block' : 'empty_response';
     throw err;

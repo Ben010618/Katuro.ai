@@ -234,6 +234,7 @@ export default function DLLStep2() {
   const { addToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
+  const [statusMsg,  setStatusMsg]  = useState('');
 
   useEffect(() => {
     if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step2' });
@@ -255,20 +256,43 @@ export default function DLLStep2() {
     if (!canGenerate || generating) return;
     setGenerating(true);
     setGenError('');
+    setStatusMsg('');
     let elapsedMs = null;
     try {
       await deductTokens(user.uid, 'dll', 3);
       elapsedMs = startTimer();
 
-      const { objectives, procedure, resources } = await generateDLLProcedure({
-        subject:              store.subject,
-        gradeLevel:           store.gradeLevel,
-        term:                 store.term,
-        contentStandards:     store.contentStandards,
-        performanceStandards: store.performanceStandards,
-        melcList,
-        contentList,
-      });
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await generateDLLProcedure({
+            subject:              store.subject,
+            gradeLevel:           store.gradeLevel,
+            term:                 store.term,
+            contentStandards:     store.contentStandards,
+            performanceStandards: store.performanceStandards,
+            melcList,
+            contentList,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`generateDLLProcedure attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 6000 + attempt * 3000;
+            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setStatusMsg('Retrying…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('Generation failed. Try again.');
+
+      const { objectives, procedure, resources } = result;
 
       store.setObjectives(objectives);
       store.setProcedure(procedure);
@@ -401,7 +425,7 @@ export default function DLLStep2() {
       )}
 
       {/* Nav */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <button
           onClick={() => navigate('/dll-gen/step-1')}
           className="btn-outline"
@@ -410,29 +434,34 @@ export default function DLLStep2() {
           <ArrowLeft size={14} /> Back
         </button>
 
-        <button
-          onClick={handleGenerate}
-          disabled={!canGenerate || generating}
-          className="btn-primary"
-          style={{
-            fontSize: 14, padding: '11px 26px',
-            opacity: canGenerate && !generating ? 1 : 0.45,
-            background: '#4f46e5',
-          }}
-        >
-          {generating ? (
-            <>
-              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-              Generating…
-            </>
-          ) : (
-            <>
-              <Sparkles size={15} />
-              Generate Daily Lesson Log{!freeMode && ' (3 tokens)'}
-              <ArrowRight size={15} />
-            </>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <button
+            onClick={handleGenerate}
+            disabled={!canGenerate || generating}
+            className="btn-primary"
+            style={{
+              fontSize: 14, padding: '11px 26px',
+              opacity: canGenerate && !generating ? 1 : 0.45,
+              background: '#4f46e5',
+            }}
+          >
+            {generating ? (
+              <>
+                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles size={15} />
+                Generate Daily Lesson Log{!freeMode && ' (3 tokens)'}
+                <ArrowRight size={15} />
+              </>
+            )}
+          </button>
+          {generating && statusMsg && (
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)', textAlign: 'right', maxWidth: 260 }}>{statusMsg}</p>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );

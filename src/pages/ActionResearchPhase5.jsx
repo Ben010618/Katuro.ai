@@ -363,11 +363,12 @@ export default function ActionResearchPhase5() {
         } catch (err) {
           lastErr = err;
           console.warn(`generateDataCollection attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 6000 + attempt * 3000;
-            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
             await new Promise(r => setTimeout(r, wait));
             setStatusMsg('Re-generating your data collection plan…');
           }
@@ -419,11 +420,12 @@ export default function ActionResearchPhase5() {
         } catch (err) {
           lastErr = err;
           console.warn(`generateResearchInstrument attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 6000 + attempt * 3000;
-            setInstrumentStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            setInstrumentStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
             await new Promise(r => setTimeout(r, wait));
             setInstrumentStatusMsg('Re-building your instrument…');
           }

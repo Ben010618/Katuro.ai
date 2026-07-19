@@ -91,6 +91,7 @@ export default function QuizBuilderPage() {
   /* generation state */
   const [generating,   setGenerating]  = useState(false);
   const [genError,     setGenError]    = useState(null);
+  const [genStatus,    setGenStatus]   = useState('');
   const [questions,    setQuestions]   = useState([]);
   const [showAnswers,  setShowAnswers] = useState(true);
   const [printModal,   setPrintModal]  = useState(false);
@@ -124,6 +125,7 @@ export default function QuizBuilderPage() {
 
     setGenerating(true);
     setGenError(null);
+    setGenStatus('');
 
     let elapsedMs;
     try {
@@ -170,36 +172,43 @@ export default function QuizBuilderPage() {
 
     const customHint = sessionSummary || dllHint;
 
-    /* attempt 1 */
-    try {
-      const result = await generateQuizAI(context, numQuestions, numChoices, customHint);
-      if (!result?.questions?.length) throw new Error('AI returned no questions — try a lower question count.');
-      setQuestions(result.questions);
-      setStep(2);
-      setGenerating(false);
-      trackGeneration(user.uid, 'quiz', { success: true, durationMs: elapsedMs() });
-      await saveQuizToFirebase(result.questions);
-      return;
-    } catch (err1) {
-      console.warn('Quiz gen attempt 1 failed:', err1.message);
+    let result;
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        result = await generateQuizAI(context, numQuestions, numChoices, customHint);
+        if (!result?.questions?.length) throw new Error('AI returned no questions — try a lower question count.');
+        break;
+      } catch (err) {
+        result = null;
+        lastErr = err;
+        console.warn(`Quiz gen attempt ${attempt + 1} failed:`, err.message);
+        if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
+        if (attempt < 2) {
+          const wait = err.status === 429
+            ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+            : 6000 + attempt * 3000;
+          setGenStatus(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+          await new Promise(r => setTimeout(r, wait));
+          setGenStatus('Retrying…');
+        }
+      }
     }
 
-    /* attempt 2 — retry after 2 s */
-    try {
-      await new Promise(r => setTimeout(r, 2000));
-      const result = await generateQuizAI(context, numQuestions, numChoices, customHint);
-      if (!result?.questions?.length) throw new Error('AI returned no questions — try a lower question count.');
-      setQuestions(result.questions);
-      setStep(2);
+    if (!result) {
+      setGenError(lastErr?.message || 'Generation failed. Check your connection and try again.');
+      trackGeneration(user.uid, 'quiz', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
       setGenerating(false);
-      trackGeneration(user.uid, 'quiz', { success: true, durationMs: elapsedMs() });
-      await saveQuizToFirebase(result.questions);
-    } catch (err2) {
-      setGenError(err2.message || 'Generation failed. Check your connection and try again.');
-      trackGeneration(user.uid, 'quiz', { success: false, durationMs: elapsedMs(), error: err2.message });
-    } finally {
-      setGenerating(false);
+      setGenStatus('');
+      return;
     }
+
+    setQuestions(result.questions);
+    setStep(2);
+    setGenerating(false);
+    setGenStatus('');
+    trackGeneration(user.uid, 'quiz', { success: true, durationMs: elapsedMs() });
+    await saveQuizToFirebase(result.questions);
   }
 
   async function saveQuizToFirebase(qs) {
@@ -529,6 +538,11 @@ export default function QuizBuilderPage() {
             {!generating && (
               <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)', textAlign: 'center', opacity: 0.7 }}>
                 Takes ~15–30 seconds · Uses Gemini AI
+              </p>
+            )}
+            {generating && genStatus && (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
+                {genStatus}
               </p>
             )}
           </div>

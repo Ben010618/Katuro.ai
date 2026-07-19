@@ -190,7 +190,29 @@ export default function ScanAnswerSheetsPage() {
         const { storagePath, downloadURL } = await uploadFile(user.uid, file);
         setProcessing(prev => prev.map(p => p.key === key ? { ...p, status: 'reading' } : p));
 
-        const result = await scanAnswerSheet(file, { numQuestions: quiz.numQuestions, numChoices: quiz.numChoices });
+        let result;
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            result = await scanAnswerSheet(file, { numQuestions: quiz.numQuestions, numChoices: quiz.numChoices });
+            break;
+          } catch (err) {
+            lastErr = err;
+            console.warn(`scanAnswerSheet (${file.name}) attempt ${attempt + 1} failed:`, err);
+            if (err.dailyLimit) break;
+            if (attempt < 2) {
+              const wait = err.status === 429
+                ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+                : 5000 + attempt * 3000;
+              setProcessing(prev => prev.map(p => p.key === key
+                ? { ...p, status: 'reading', note: `Due to high demand, retrying in ${Math.round(wait / 1000)}s…` }
+                : p));
+              await new Promise(r => setTimeout(r, wait));
+            }
+          }
+        }
+        if (!result) throw lastErr || new Error('Could not read this sheet.');
+
         const { score, total } = gradeScan(result.answers, quiz.answerKey);
 
         await createScan(user.uid, quizId, {
@@ -333,7 +355,7 @@ export default function ScanAnswerSheetsPage() {
                   {p.name}
                 </p>
                 <p style={{ margin: 0, fontSize: 11, color: p.status === 'error' ? '#e05c5c' : 'var(--kt-text-secondary)' }}>
-                  {p.status === 'uploading' ? 'Uploading…' : p.status === 'reading' ? 'AI reading answers…' : p.error}
+                  {p.status === 'uploading' ? 'Uploading…' : p.status === 'reading' ? (p.note || 'AI reading answers…') : p.error}
                 </p>
               </div>
               {p.status === 'error' && (

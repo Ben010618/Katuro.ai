@@ -99,6 +99,25 @@ const DAILY_LIMITS = {
   gamification_gen: 10,
 };
 
+// ── generateAI proxy — actions accepted, each with its own daily ceiling ──────
+// This is the ONLY set of actions the generic proxy (below) will run — keeps it
+// from becoming an open "run any prompt" endpoint. Reuses dll_gen/cot_gen/
+// quiz_gen/gamification_gen above so those features have exactly one limit.
+const PROXY_LIMITS = {
+  ilaw_unpack:         20,  // unpackCompetency — one call per lesson plan
+  ilaw_session:        60,  // generateIlawSession — one call per session, several per plan
+  quiz_title:         100,  // suggestQuizTitle — tiny, cheap, near-free
+  quiz_gen:            10,
+  cot_gen:              8,
+  dll_gen:             10,
+  gamification_gen:    10,  // shared across all 6 worksheet generators
+  test_builder_blooms: 30,  // suggestCognitiveWeights
+  test_builder_items:  60,  // generateItemsForCompetency — one call per TOS row
+  action_research_ai:  30,  // shared across all 6 AR generation phases (matches existing client limit)
+  scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
+};
+Object.assign(DAILY_LIMITS, PROXY_LIMITS);
+
 async function checkAndIncrementDailyUsage(uid, action) {
   const limit = DAILY_LIMITS[action];
   if (!limit) return;
@@ -111,7 +130,8 @@ async function checkAndIncrementDailyUsage(uid, action) {
     if (current >= limit) {
       throw new HttpsError(
         'resource-exhausted',
-        `You've reached today's limit (${limit}) for this feature. kaTuro resets at midnight. Come back tomorrow!`
+        `You've reached today's limit (${limit}) for this feature. kaTuro resets at midnight. Come back tomorrow!`,
+        { dailyLimit: true } // lets the client skip retrying — this won't clear up in the next few seconds
       );
     }
     tx.set(ref, {
@@ -406,6 +426,91 @@ Return ONLY this JSON (no markdown, no explanation):
     // Return all slides sorted by original id
     const allSlides = [...expanded, ...filled].sort((a, b) => a.id - b.id);
     return { slides: allSlides };
+  }
+);
+
+// ── generateAI — generic Gemini proxy for every AI feature not (yet) split
+// into its own dedicated function like generateOutline/expandSlides above.
+//
+// The Gemini key never leaves the server, and this is a single chokepoint for
+// per-user daily limits across every feature — closing both the "key exposed
+// to the browser" gap and the "one heavy user exhausts the shared quota for
+// everyone" gap in one piece of infrastructure.
+//
+// Deliberately thin: the client still builds `contents` (the exact prompt/
+// image payload it always built) and still parses the returned text with its
+// own JSON-repair logic — only the network hop to Gemini itself moves here,
+// so no prompt is duplicated/transcribed server-side and business logic for
+// each feature stays exactly where it already was reviewed and tested.
+const MAX_TOKENS_CEILING = 20000; // hard ceiling regardless of what a client requests — COT's full PPST lesson plan needs up to 16384
+
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, _attempt = 0 } = {}) {
+  const res = await fetch(geminiUrl(key), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents,
+      generationConfig: {
+        temperature,
+        maxOutputTokens: maxTokens,
+        thinkingConfig: { thinkingBudget: 0 },
+        ...(responseMimeType ? { responseMimeType } : {}),
+      },
+    }),
+  });
+
+  if ((res.status === 429 || res.status === 503) && _attempt < 4) {
+    const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
+    await new Promise(r => setTimeout(r, delay));
+    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 });
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const isRateLimit = res.status === 429;
+    throw new HttpsError(
+      isRateLimit ? 'resource-exhausted' : 'internal',
+      isRateLimit
+        ? 'The AI service is busy right now. Please try again in a moment.'
+        : `Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`
+    );
+  }
+
+  const data      = await res.json();
+  const candidate = data.candidates?.[0];
+  const parts     = candidate?.content?.parts ?? [];
+  const text      = parts.map(p => p.text ?? '').join('');
+  // finishReason (e.g. "MAX_TOKENS", "SAFETY") lets callers tell a truncated
+  // response apart from a genuinely malformed one, and a safety block apart
+  // from an empty response — the same distinctions the old direct-fetch
+  // client code made from the raw Gemini payload.
+  return { text, finishReason: candidate?.finishReason ?? null };
+}
+
+exports.generateAI = onCall(
+  { region: 'us-central1', timeoutSeconds: 120 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const { action, contents, temperature, maxTokens, responseMimeType } = req.data || {};
+
+    if (!action || !(action in PROXY_LIMITS)) {
+      throw new HttpsError('invalid-argument', 'Unknown or missing action.');
+    }
+    if (!Array.isArray(contents) || contents.length === 0) {
+      throw new HttpsError('invalid-argument', 'contents array is required.');
+    }
+
+    await checkAndIncrementDailyUsage(req.auth.uid, action);
+
+    const key = await getGeminiKey();
+    const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
+
+    return callGeminiRaw(key, contents, {
+      temperature: temperature ?? 0.5,
+      maxTokens: clampedMaxTokens,
+      responseMimeType,
+    });
   }
 );
 

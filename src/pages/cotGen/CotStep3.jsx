@@ -74,11 +74,12 @@ export default function CotStep3() {
         break;
       } catch (err) {
         lastErr = err;
+        if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
         if (attempt < 2) {
           const wait = err.status === 429
             ? Math.min((err.retryAfter || 30) * 1000, 30_000)
             : 8000 + attempt * 4000;
-          setStatusMsg(`Retrying in ${Math.round(wait / 1000)}s… (attempt ${attempt + 2}/3)`);
+          setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
           await new Promise(r => setTimeout(r, wait));
           setStatusMsg('Re-generating your lesson plan…');
         }

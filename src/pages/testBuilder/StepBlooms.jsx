@@ -28,6 +28,7 @@ export default function StepBlooms() {
 
   const [aiLoading,    setAiLoading]    = useState(false);
   const [aiError,      setAiError]      = useState('');
+  const [aiStatus,     setAiStatus]     = useState('');
   const [aiSuggestion, setAiSuggestion] = useState(null); // { ...weights, rationale }
 
   const hasCompetencyText = store.competencies.some((c) => c.text?.trim());
@@ -44,20 +45,44 @@ export default function StepBlooms() {
     if (!canSuggest || !user?.uid) return;
     setAiLoading(true);
     setAiError('');
+    setAiStatus('');
     try {
       await deductTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST);
-      const result = await suggestCognitiveWeights({
-        gradeLevel: store.gradeLevel,
-        subject: store.subject,
-        keyStage,
-        hotsFloorPct: hotsFloor,
-        competencies: store.competencies,
-      });
+
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await suggestCognitiveWeights({
+            gradeLevel: store.gradeLevel,
+            subject: store.subject,
+            keyStage,
+            hotsFloorPct: hotsFloor,
+            competencies: store.competencies,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`suggestCognitiveWeights attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break;
+          if (attempt < 2) {
+            const wait = err.status === 429
+              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+              : 5000 + attempt * 3000;
+            setAiStatus(`Due to high demand, this may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+            await new Promise(r => setTimeout(r, wait));
+            setAiStatus('Retrying…');
+          }
+        }
+      }
+      if (!result) throw lastErr || new Error('AI suggestion failed. Please try again.');
+
       setAiSuggestion(result);
     } catch (err) {
       setAiError(err.message || 'AI suggestion failed. Please try again.');
     } finally {
       setAiLoading(false);
+      setAiStatus('');
     }
   }
 
@@ -146,9 +171,11 @@ export default function StepBlooms() {
           <div style={{ flex: 1 }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Let AI suggest a starting distribution</p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
-              {hasCompetencyText
-                ? 'Based on your competencies — you always have the final say on the sliders.'
-                : 'Add competency text in Setup first so the AI has something to analyze.'}
+              {aiLoading && aiStatus
+                ? aiStatus
+                : hasCompetencyText
+                  ? 'Based on your competencies — you always have the final say on the sliders.'
+                  : 'Add competency text in Setup first so the AI has something to analyze.'}
             </p>
           </div>
           <button

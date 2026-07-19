@@ -200,11 +200,12 @@ export default function ActionResearchPhase1() {
         } catch (err) {
           lastErr = err;
           console.warn(`generateResearchTitles attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 6000 + attempt * 3000;
-            setStatusMsg(`That attempt didn't come back clean — retrying in ${Math.round(wait / 1000)}s…`);
+            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
             await new Promise(r => setTimeout(r, wait));
             setStatusMsg('Regenerating titles…');
           }

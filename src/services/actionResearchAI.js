@@ -1,10 +1,5 @@
-import { getAuth } from 'firebase/auth';
-import { getGeminiKey, geminiWithRetry } from './geminiConfig';
-import { checkDailyLimit } from './usageLimit';
+import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
-
-const MODEL = 'gemini-2.5-flash';
-const ACTION_RESEARCH_DAILY_LIMIT = 30;
 
 export const THEME_LABELS = {
   'teaching-learning': 'Teaching and Learning',
@@ -14,30 +9,14 @@ export const THEME_LABELS = {
 };
 
 async function callGemini(prompt, maxTokens = 2048) {
-  const uid = getAuth().currentUser?.uid;
-  await checkDailyLimit(uid, 'action_research_ai', ACTION_RESEARCH_DAILY_LIMIT);
-  const key = await getGeminiKey();
-  const res = await geminiWithRetry(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-    {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.5, maxOutputTokens: maxTokens,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: 'application/json',
-        },
-      }),
-    }
-  );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? `AI error ${res.status}`);
-  }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const { text } = await callGeminiProxy({
+    action: 'action_research_ai',
+    contents: [{ parts: [{ text: prompt }] }],
+    temperature: 0.5,
+    maxTokens,
+    responseMimeType: 'application/json',
+  });
+  return text;
 }
 
 // ── Phase 1: 5 research titles ────────────────────────────────────────────────

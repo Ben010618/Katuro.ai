@@ -116,11 +116,12 @@ export default function Step3() {
         } catch (err) {
           lastErr = err;
           console.warn(`Session ${s.day} attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
           if (attempt < 2) {
             const backOff = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 5000 + attempt * 3000;
-            setStatusMsg(`Session ${s.day} failed — retrying in ${Math.round(backOff / 1000)}s…`);
+            setStatusMsg(`Due to high demand, Session ${s.day} is slow — retrying in ${Math.round(backOff / 1000)}s…`);
             await new Promise(r => setTimeout(r, backOff));
             setStatusMsg(`Retrying Session ${s.day} of ${n}…`);
           }

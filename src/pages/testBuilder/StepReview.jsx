@@ -70,19 +70,40 @@ export default function StepReview() {
       for (let i = 0; i < store.tos.rows.length; i++) {
         const row = store.tos.rows[i];
         if (row.total === 0) continue;
-        setGenPhase(`Writing items for competency ${i + 1} of ${store.tos.rows.length}…`);
-        const { items, nextIndex } = await generateItemsForCompetency({
-          competencyText: row.label,
-          cells: row.cells,
-          subject: store.subject,
-          gradeLevel: store.gradeLevel,
-          questionFormats: store.questionFormats,
-          proficiencyLevel: store.proficiencyLevel,
-          contextNotes: store.contextNotes,
-          startIndex: cursor,
-        });
-        allItems.push(...items);
-        cursor = nextIndex;
+
+        let result;
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          setGenPhase(`Writing items for competency ${i + 1} of ${store.tos.rows.length}…`);
+          try {
+            result = await generateItemsForCompetency({
+              competencyText: row.label,
+              cells: row.cells,
+              subject: store.subject,
+              gradeLevel: store.gradeLevel,
+              questionFormats: store.questionFormats,
+              proficiencyLevel: store.proficiencyLevel,
+              contextNotes: store.contextNotes,
+              startIndex: cursor,
+            });
+            break;
+          } catch (err) {
+            lastErr = err;
+            console.warn(`generateItemsForCompetency (row ${i + 1}) attempt ${attempt + 1} failed:`, err);
+            if (err.dailyLimit) break;
+            if (attempt < 2) {
+              const wait = err.status === 429
+                ? Math.min((err.retryAfter || 30) * 1000, 30_000)
+                : 5000 + attempt * 3000;
+              setGenPhase(`Due to high demand, competency ${i + 1} is slow — retrying in ${Math.round(wait / 1000)}s…`);
+              await new Promise(r => setTimeout(r, wait));
+            }
+          }
+        }
+        if (!result) throw lastErr || new Error('Item generation failed. Please try again.');
+
+        allItems.push(...result.items);
+        cursor = result.nextIndex;
       }
 
       setGeneratedParts(buildTestPaperParts(allItems, deriveLanguage(store.subject)));
