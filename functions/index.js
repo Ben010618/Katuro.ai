@@ -422,7 +422,7 @@ exports.registerUser = onCall(
     if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email address is required.');
     if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
 
-    const MAX_ACCOUNTS   = 350;
+    const MAX_ACCOUNTS   = 500;
     const WELCOME_TOKENS = 30;
 
     const countSnap   = await db.collection('teachers').get();
