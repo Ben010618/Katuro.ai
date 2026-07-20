@@ -194,7 +194,7 @@ export default function ScanAnswerSheetsPage() {
         let lastErr;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            result = await scanAnswerSheet(file, { numQuestions: quiz.numQuestions, numChoices: quiz.numChoices });
+            result = await scanAnswerSheet(file, { numQuestions: quiz.numQuestions, numChoices: quiz.numChoices, isRetry: attempt > 0 });
             break;
           } catch (err) {
             lastErr = err;

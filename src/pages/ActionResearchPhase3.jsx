@@ -62,6 +62,7 @@ export default function ActionResearchPhase3() {
             problemText: docData.problemText, beraTheme: docData.beraTheme,
             subjectArea: docData.subjectArea, gradeLevel: docData.gradeLevel,
             schoolName: docData.schoolName, schoolYear: docData.schoolYear,
+            isRetry: attempt > 0,
           });
           break;
         } catch (err) {

@@ -109,7 +109,7 @@ export default function Step3() {
       let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const result = await generateIlawSession(s, context);
+          const result = await generateIlawSession(s, context, { isRetry: attempt > 0 });
           if (activeGenRef.current !== genId) return null;
           setProgress(Math.round(5 + ((i + 1) / n) * 75));
           return result;

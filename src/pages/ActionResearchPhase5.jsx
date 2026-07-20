@@ -358,6 +358,7 @@ export default function ActionResearchPhase5() {
             title: docData.selectedTitle, selectedQuestions: docData.selectedQuestions,
             beraTheme: docData.beraTheme, subjectArea: docData.subjectArea,
             gradeLevel: docData.gradeLevel,
+            isRetry: attempt > 0,
           });
           break;
         } catch (err) {
@@ -415,6 +416,7 @@ export default function ActionResearchPhase5() {
             gradeLevel:        docData.gradeLevel,
             selectedQuestions: docData.selectedQuestions,
             problemText:       docData.problemText,
+            isRetry:           attempt > 0,
           });
           break;
         } catch (err) {

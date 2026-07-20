@@ -28,6 +28,7 @@ async function call(action, prompt, opts = {}) {
     // is the primary defense against "invalid_json" failures; parseAIJson's
     // repair chain is only the fallback for whatever still slips through.
     ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+    isRetry: opts.isRetry,
   });
   return text;
 }
@@ -52,7 +53,7 @@ export async function suggestQuizTitle(context) {
  * lessonPlan (optional) is the parsed 4As plan object — used for richer question content.
  * Returns { questions: [{ num, text, choices:{A,B,C,D[,E]}, answer, competency }] }
  */
-export async function generateQuizAI(context, numQ, numChoices, customPrompt = "", lessonPlan = null) {
+export async function generateQuizAI(context, numQ, numChoices, customPrompt = "", lessonPlan = null, { isRetry } = {}) {
   const letters     = ["A", "B", "C", "D", "E"].slice(0, numChoices);
   const choiceShape = letters.map((l) => `"${l}":""`).join(",");
 
@@ -77,7 +78,7 @@ Rules: vary difficulty (recall, comprehension, application), clear language, one
 
 Return ONLY JSON (no markdown fences):
 {"questions":[{"num":1,"text":"...","choices":{${choiceShape}},"answer":"A","competency":"..."}]}`,
-    { temperature: 0.75, maxOutputTokens: 4096, json: true }
+    { temperature: 0.75, maxOutputTokens: 4096, json: true, isRetry }
   );
   return parseAIJson(text);
 }
@@ -86,7 +87,7 @@ Return ONLY JSON (no markdown fences):
  * Unpack a MATATAG learning competency across N teaching days using Bloom's Taxonomy.
  * Returns { competencyCeiling, fullLadder, sessions: [{ day, date, bloomsLevel, objective }] }
  */
-export async function unpackCompetency({ competencyText, content, contentStandards, learningContext = '', subject, gradeLevel, term, numberOfDays, selectedDates }) {
+export async function unpackCompetency({ competencyText, content, contentStandards, learningContext = '', subject, gradeLevel, term, numberOfDays, selectedDates, isRetry }) {
   const prompt = `You are a Filipino DepEd MATATAG curriculum expert and master teacher.
 
 A teacher has provided this learning competency:
@@ -230,6 +231,7 @@ Just the raw JSON object:
     temperature: 0.3,
     maxTokens: 8192,
     responseMimeType: 'application/json',
+    isRetry,
   });
   const rawText = text?.trim();
   if (!rawText) {
@@ -262,7 +264,7 @@ Just the raw JSON object:
  * Returns the session object merged with: prelesson, flow, resources, integration,
  * formativeAssessment, extendedLearning, reflection
  */
-export async function generateIlawSession(session, context) {
+export async function generateIlawSession(session, context, { isRetry } = {}) {
   const {
     subject, gradeLevel, term, weekNumber, lessonName,
     competencyText, content, contentStandards, learningContext = '',
@@ -345,6 +347,7 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation, no text befor
       temperature: 0.6,
       maxTokens: 3072,
       responseMimeType: 'application/json',
+      isRetry,
     }));
   } catch (err) {
     console.error(`generateIlawSession (session ${session.day}) API error:`, err);

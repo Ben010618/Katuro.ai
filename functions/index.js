@@ -118,10 +118,18 @@ const PROXY_LIMITS = {
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 
+// `new Date().toISOString()` is UTC — Philippine time is UTC+8, so that date
+// flips at 8 AM local time, not midnight, leaving teachers blocked for hours
+// after their own clock says "tomorrow." Every daily-limit bucket must use
+// the Manila calendar date instead.
+function todayInManila() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // en-CA formats as YYYY-MM-DD
+}
+
 async function checkAndIncrementDailyUsage(uid, action) {
   const limit = DAILY_LIMITS[action];
   if (!limit) return;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInManila();
   const ref   = db.doc(`teachers/${uid}/usage/${today}`);
 
   await db.runTransaction(async tx => {
@@ -492,7 +500,7 @@ exports.generateAI = onCall(
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
-    const { action, contents, temperature, maxTokens, responseMimeType } = req.data || {};
+    const { action, contents, temperature, maxTokens, responseMimeType, isRetry } = req.data || {};
 
     if (!action || !(action in PROXY_LIMITS)) {
       throw new HttpsError('invalid-argument', 'Unknown or missing action.');
@@ -501,7 +509,17 @@ exports.generateAI = onCall(
       throw new HttpsError('invalid-argument', 'contents array is required.');
     }
 
-    await checkAndIncrementDailyUsage(req.auth.uid, action);
+    // Callers retry a single logical generation up to 3x internally on
+    // transient failures (truncated/malformed JSON, 429s) — without this,
+    // one "Generate" click that needed 2 retries burned 3 units of the daily
+    // budget instead of 1, and teachers were hitting "today's limit" after
+    // only a handful of real clicks. isRetry is client-declared and thus not
+    // airtight against a user editing their own request, but this endpoint
+    // already trusts authenticated accounts for `action`/`maxTokens` the same
+    // way — daily limits here are abuse-prevention, not a security boundary.
+    if (!isRetry) {
+      await checkAndIncrementDailyUsage(req.auth.uid, action);
+    }
 
     const key = await getGeminiKey();
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);

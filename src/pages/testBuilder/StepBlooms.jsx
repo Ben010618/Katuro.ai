@@ -59,7 +59,7 @@ export default function StepBlooms() {
             keyStage,
             hotsFloorPct: hotsFloor,
             competencies: store.competencies,
-          });
+          }, { isRetry: attempt > 0 });
           break;
         } catch (err) {
           lastErr = err;

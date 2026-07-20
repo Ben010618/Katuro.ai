@@ -195,7 +195,7 @@ export default function ActionResearchPhase1() {
       let lastErr;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel });
+          result = await generateResearchTitles({ beraTheme:selectedTheme, problemText, subjectArea, gradeLevel, isRetry: attempt > 0 });
           break;
         } catch (err) {
           lastErr = err;

@@ -22,13 +22,14 @@ function isTagalogSubject(s) {
   return TAGALOG_SUBJECTS.some(t => sl.includes(t));
 }
 
-async function callGemini(prompt) {
+async function callGemini(prompt, isRetry) {
   const { text } = await callGeminiProxy({
     action: 'dll_gen',
     contents: [{ parts: [{ text: prompt }] }],
     temperature: 0.7,
     maxTokens: 8192,
     responseMimeType: 'application/json',
+    isRetry,
   });
   return parseAIJson(text);
 }
@@ -69,7 +70,7 @@ function buildDayMap(list) {
 export async function generateDLLProcedure({
   subject, gradeLevel, term,
   contentStandards, performanceStandards,
-  melcList, contentList,
+  melcList, contentList, isRetry,
 }) {
   const lang       = isTagalogSubject(subject) ? 'Filipino/Tagalog' : 'English';
   const melcMap    = buildDayMap(melcList);
@@ -160,7 +161,7 @@ Return ONLY valid JSON (no markdown, no explanation):
   }
 }`;
 
-  const raw = await callGemini(prompt);
+  const raw = await callGemini(prompt, isRetry);
 
   // Normalise objectives — fallback from day's content if AI returned empty
   const objectives = {};

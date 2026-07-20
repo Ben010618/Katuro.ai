@@ -52,7 +52,7 @@ const FORMAT_SPEC = {
   'Essay':           'An open-ended prompt as "question". Return "answer" as a brief model-answer / key points summary.',
 };
 
-async function callGemini(prompt, maxOutputTokens = 4096) {
+async function callGemini(prompt, maxOutputTokens = 4096, isRetry) {
   // responseMimeType constrains Gemini to emit syntactically valid JSON
   // (no markdown fences, no trailing commas) — parseAIJson's repair
   // chain is the fallback for whatever still slips through.
@@ -62,6 +62,7 @@ async function callGemini(prompt, maxOutputTokens = 4096) {
     temperature: 0.6,
     maxTokens: maxOutputTokens,
     responseMimeType: 'application/json',
+    isRetry,
   });
   return parseAIJson(text);
 }
@@ -74,7 +75,7 @@ async function callGemini(prompt, maxOutputTokens = 4096) {
  * format assignment across competencies (pass the running total item count).
  * Returns { items, nextIndex }.
  */
-export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, proficiencyLevel, contextNotes, startIndex = 0 }) {
+export async function generateItemsForCompetency({ competencyText, cells, subject, gradeLevel, questionFormats, proficiencyLevel, contextNotes, startIndex = 0, isRetry }) {
   const slots = buildItemSlots(cells, questionFormats, startIndex);
   if (slots.length === 0) return { items: [], nextIndex: startIndex };
 
@@ -102,7 +103,7 @@ Return ONLY JSON, no markdown fences, no explanation before or after, in exactly
 { "items": [ { "question": "...", "choices": { "A": "...", "B": "...", "C": "...", "D": "..." }, "matchDefinition": "...", "answer": "..." } ] }
 Include "choices" only for Multiple Choice slots and "matchDefinition" only for Matching Type slots. The items array must have exactly ${slots.length} entries, in the same order as the slot list.`;
 
-  const result = await callGemini(prompt);
+  const result = await callGemini(prompt, undefined, isRetry);
   const rawItems = result.items || [];
 
   // Zip our own deterministic cognitiveLevel/format onto each item by

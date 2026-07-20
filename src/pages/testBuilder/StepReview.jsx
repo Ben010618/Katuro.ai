@@ -85,6 +85,7 @@ export default function StepReview() {
               proficiencyLevel: store.proficiencyLevel,
               contextNotes: store.contextNotes,
               startIndex: cursor,
+              isRetry: attempt > 0,
             });
             break;
           } catch (err) {

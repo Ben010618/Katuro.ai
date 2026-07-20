@@ -176,7 +176,7 @@ export default function QuizBuilderPage() {
     let lastErr;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        result = await generateQuizAI(context, numQuestions, numChoices, customHint);
+        result = await generateQuizAI(context, numQuestions, numChoices, customHint, null, { isRetry: attempt > 0 });
         if (!result?.questions?.length) throw new Error('AI returned no questions — try a lower question count.');
         break;
       } catch (err) {

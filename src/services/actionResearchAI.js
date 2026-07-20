@@ -8,20 +8,21 @@ export const THEME_LABELS = {
   'governance':        'Governance',
 };
 
-async function callGemini(prompt, maxTokens = 2048) {
+async function callGemini(prompt, maxTokens = 2048, isRetry) {
   const { text } = await callGeminiProxy({
     action: 'action_research_ai',
     contents: [{ parts: [{ text: prompt }] }],
     temperature: 0.5,
     maxTokens,
     responseMimeType: 'application/json',
+    isRetry,
   });
   return text;
 }
 
 // ── Phase 1: 5 research titles ────────────────────────────────────────────────
 
-export async function generateResearchTitles({ beraTheme, problemText, subjectArea, gradeLevel }) {
+export async function generateResearchTitles({ beraTheme, problemText, subjectArea, gradeLevel, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are a DepEd action research expert helping Filipino public school teachers write BERF-ready action research papers.
@@ -57,14 +58,14 @@ General rules:
 
 Return ONLY this JSON (no markdown):
 { "titles": ["formal title 1", "formal title 2", "formal title 3", "ACRONYM: subtitle", "Project ACRONYM: subtitle"] }`,
-    1500
+    1500, isRetry
   );
   return parseAIJson(text);
 }
 
 // ── Phase 2: 5 research questions ────────────────────────────────────────────
 
-export async function generateResearchQuestions({ title, problemText, beraTheme, subjectArea, gradeLevel }) {
+export async function generateResearchQuestions({ title, problemText, beraTheme, subjectArea, gradeLevel, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are a DepEd action research expert. Generate exactly 5 research questions.
@@ -85,14 +86,14 @@ Rules:
 
 Return ONLY this JSON (no markdown):
 { "questions": ["Q1?", "Q2?", "Q3?", "Q4?", "Q5?"] }`,
-    1024
+    1024, isRetry
   );
   return parseAIJson(text);
 }
 
 // ── Phase 3: Literature review (Funnel format) ────────────────────────────────
 
-export async function generateLiteratureReview({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear }) {
+export async function generateLiteratureReview({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are an expert in academic writing for Philippine DepEd action research. Write a comprehensive Review of Related Literature using the FUNNEL FORMAT (Global → National → Local → Classroom → Synthesis).
@@ -124,14 +125,14 @@ Return ONLY this JSON (no markdown):
   "classroomPerspective": "...",
   "synthesis": "..."
 }`,
-    4096
+    4096, isRetry
   );
   return parseAIJson(text);
 }
 
 // ── Phase 4: Action plan ──────────────────────────────────────────────────────
 
-export async function generateActionPlan({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear }) {
+export async function generateActionPlan({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are a DepEd action research expert. Create a comprehensive, implementable action plan for a Filipino public school teacher.
@@ -159,14 +160,14 @@ Return ONLY this JSON (no markdown):
   "successIndicators": ["Indicator 1 with target %", "Indicator 2", "Indicator 3"],
   "ethicalConsiderations": "Brief statement on learner privacy, parental consent, and ethical conduct of the research..."
 }`,
-    3072
+    3072, isRetry
   );
   return parseAIJson(text);
 }
 
 // ── Phase 5: Data collection methodology ─────────────────────────────────────
 
-export async function generateDataCollection({ title, selectedQuestions, beraTheme, subjectArea, gradeLevel }) {
+export async function generateDataCollection({ title, selectedQuestions, beraTheme, subjectArea, gradeLevel, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are a DepEd educational research expert in measurement and evaluation. Design a practical data collection methodology for a Filipino public school teacher.
@@ -204,14 +205,14 @@ Return ONLY this JSON (no markdown):
   "analysisApproach": "Narrative description of how you will analyze all data and how analysis answers each research question...",
   "recommendedInstrument": "pretest-posttest"
 }`,
-    3072
+    3072, isRetry
   );
   return parseAIJson(text);
 }
 
 // ── Research Instruments ─────────────────────────────────────────────────────
 
-export async function generateResearchInstrument({ instrumentType, title, subjectArea, gradeLevel, selectedQuestions, problemText }) {
+export async function generateResearchInstrument({ instrumentType, title, subjectArea, gradeLevel, selectedQuestions, problemText, isRetry }) {
   const qText = (selectedQuestions ?? []).map((q, i) => `${i + 1}. ${q}`).join('\n');
   const ctx = `Research Title: "${title}"
 Subject: ${subjectArea || 'Not specified'}
@@ -367,13 +368,13 @@ Return ONLY this JSON (no markdown):
 }`,
   };
 
-  const text = await callGemini(prompts[instrumentType] ?? prompts.questionnaire, 6000);
+  const text = await callGemini(prompts[instrumentType] ?? prompts.questionnaire, 6000, isRetry);
   return parseAIJson(text);
 }
 
 // ── Phase 6: Findings & report ────────────────────────────────────────────────
 
-export async function interpretFindings({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear, rawData }) {
+export async function interpretFindings({ title, selectedQuestions, problemText, beraTheme, subjectArea, gradeLevel, schoolName, schoolYear, rawData, isRetry }) {
   const theme = THEME_LABELS[beraTheme] ?? beraTheme;
   const text = await callGemini(
     `You are a DepEd action research expert. Analyze the teacher's collected data and write the complete Findings, Discussion, Conclusions, and Recommendations chapter.
@@ -415,7 +416,7 @@ Return ONLY this JSON (no markdown):
     // This is the heaviest payload of the six phases (up to 5 findings, a
     // multi-paragraph discussion, and reflections) — 5000 tokens was tight
     // enough to truncate mid-response on longer research-question sets.
-    8192
+    8192, isRetry
   );
   return parseAIJson(text);
 }

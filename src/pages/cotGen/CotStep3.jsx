@@ -70,6 +70,7 @@ export default function CotStep3() {
           contentStandards:     store.contentStandards     || '',
           performanceStandards: store.performanceStandards || '',
           selectedIndicators,
+          isRetry: attempt > 0,
         });
         break;
       } catch (err) {

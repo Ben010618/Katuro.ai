@@ -60,6 +60,7 @@ export default function ActionResearchPhase2() {
             title: docData.selectedTitle, problemText: docData.problemText,
             beraTheme: docData.beraTheme, subjectArea: docData.subjectArea,
             gradeLevel: docData.gradeLevel,
+            isRetry: attempt > 0,
           });
           break;
         } catch (err) {

@@ -21,7 +21,7 @@ import { parseAIJson } from './aiJsonParse';
 export async function generateCotLesson({
   teacherName, school, subject, grade, quarter, topic,
   melc, materials, objectives, selectedIndicators,
-  contentStandards, performanceStandards,
+  contentStandards, performanceStandards, isRetry,
 }) {
   const indicatorsText = selectedIndicators
     .map(ind => `• ${ind.code} (Indicator ${ind.num}): ${ind.description}`)
@@ -263,6 +263,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
     temperature: 0.7,
     maxTokens: 16384,
     responseMimeType: 'application/json',
+    isRetry,
   });
   if (!text) throw new Error('No content returned from Gemini. Please try again.');
 

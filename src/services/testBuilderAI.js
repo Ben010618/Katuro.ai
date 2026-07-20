@@ -21,13 +21,14 @@ Competencies covered:
 ${compLines || '(none entered yet)'}`;
 }
 
-async function callGemini(prompt) {
+async function callGemini(prompt, isRetry) {
   const { text } = await callGeminiProxy({
     action: 'test_builder_blooms',
     contents: [{ parts: [{ text: prompt }] }],
     temperature: 0.4,
     maxTokens: 512,
     responseMimeType: 'application/json',
+    isRetry,
   });
   return parseAIJson(text);
 }
@@ -37,7 +38,7 @@ async function callGemini(prompt) {
  * weight split (intended to sum to 100) based on the teacher's competencies.
  * Returns { remembering, understanding, applying, analyzing, evaluating, creating, rationale }.
  */
-export async function suggestCognitiveWeights(context) {
+export async function suggestCognitiveWeights(context, { isRetry } = {}) {
   const prompt = `You are a Filipino DepEd MATATAG curriculum expert and master teacher, helping a teacher build a Table of Specifications for a classroom test.
 
 ${buildCtx(context)}
@@ -48,5 +49,5 @@ Return ONLY JSON, no markdown fences, no explanation before or after, in exactly
 { "remembering": number, "understanding": number, "applying": number, "analyzing": number, "evaluating": number, "creating": number, "rationale": "one short sentence explaining the suggestion" }
 The six numbers must be integers that sum to exactly 100.`;
 
-  return callGemini(prompt);
+  return callGemini(prompt, isRetry);
 }

@@ -108,16 +108,21 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  * "SAFETY") lets a caller distinguish a truncated response from a genuinely
  * malformed one, same as the raw Gemini payload used to.
  *
+ * Pass `isRetry: true` when this call is an automatic retry of a request the
+ * caller already made (not a new user-initiated generation) — the server
+ * skips the daily-limit charge in that case, so a generation that needed 2
+ * internal retries costs 1 unit of the daily budget, not 3.
+ *
  * Throws an Error shaped like geminiWithRetry's: `.status === 429` for both
  * "Gemini is rate-limited" and "you've hit today's limit" (existing retry
  * loops already treat 429 as "back off, maybe retry"), plus `.dailyLimit ===
  * true` specifically for the daily-limit case so a caller can skip retrying
  * something that won't clear up in the next few seconds.
  */
-export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType }) {
+export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry }) {
   const call = httpsCallable(functions, 'generateAI', { timeout: 150000 });
   try {
-    const res = await call({ action, contents, temperature, maxTokens, responseMimeType });
+    const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
     const code = err?.code || '';

@@ -166,6 +166,11 @@ export default function Step2() {
           term:             store.term       || 'Term 1',
           numberOfDays:     comp.days,
           selectedDates:    dateSlices[ci],
+          // This whole loop re-runs from competency 1 on retry (attempt 1) —
+          // treat every call in that re-run as part of the same logical
+          // "unpack this lesson" action so it isn't charged twice against
+          // the daily limit.
+          isRetry:          attempt > 0,
         });
 
         const tagged = result.sessions.map((s, si) => ({

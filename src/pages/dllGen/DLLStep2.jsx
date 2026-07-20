@@ -274,6 +274,7 @@ export default function DLLStep2() {
             performanceStandards: store.performanceStandards,
             melcList,
             contentList,
+            isRetry: attempt > 0,
           });
           break;
         } catch (err) {

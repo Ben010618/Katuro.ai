@@ -22,7 +22,7 @@ const LETTERS = { 4: 'A, B, C, D', 5: 'A, B, C, D, E' };
  * @param {{ numQuestions: number, numChoices: number }} config
  * @returns {Promise<{ studentNo: string, section: string, answers: Record<string,string|null>, uncertain: string[] }>}
  */
-export async function scanAnswerSheet(imageFile, { numQuestions, numChoices }) {
+export async function scanAnswerSheet(imageFile, { numQuestions, numChoices, isRetry }) {
   const letters = LETTERS[numChoices] || LETTERS[4];
 
   const prompt = `You are reading a photo of a shaded bubble answer sheet (OMR format).
@@ -57,6 +57,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       temperature: 0.1,
       maxTokens: 2048,
       responseMimeType: 'application/json',
+      isRetry,
     }));
   } catch (err) {
     if (!err.reason && err.status !== 429) err.reason = 'api_error';
