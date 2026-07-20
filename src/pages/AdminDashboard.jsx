@@ -30,7 +30,7 @@ import { saveAs } from 'file-saver';
 
 // Mirrors MAX_ACCOUNTS in functions/index.js's registerUser — keep in sync.
 // Bulk-approving pending accounts must never push active users past this cap.
-const MAX_ACCOUNTS = 500;
+const MAX_ACCOUNTS = 600;
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
@@ -1685,7 +1685,7 @@ function FreeModeSection({ adminUid }) {
             style={inputStyle}
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 500 active users'}
+            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 600 active users'}
           />
         </div>
       </div>
