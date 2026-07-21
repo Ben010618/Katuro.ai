@@ -10,7 +10,9 @@ import {
   subscribeAdminNotifications, markAllNotificationsRead,
   adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
-import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
+import FeedbackArchive from '../features/feedback/FeedbackArchive';
+import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import { db } from '../firebase';
 import {
   BarChart, Bar, LineChart, Line,
@@ -23,7 +25,7 @@ import {
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
-  FileSpreadsheet, UserCheck,
+  FileSpreadsheet, UserCheck, MessageSquare, Lightbulb,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import { saveAs } from 'file-saver';
@@ -1816,6 +1818,16 @@ export default function AdminDashboard() {
   const [deleteError,    setDeleteError]     = useState('');
   const [approving,      setApproving]       = useState(false);
   const [approveMsg,     setApproveMsg]      = useState('');
+  const [unreadFeedback, setUnreadFeedback]  = useState(0);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'feedback_inbox'), where('read', '==', false)),
+      (snap) => setUnreadFeedback(snap.docs.filter(d => !d.data().archived).length),
+      () => {},
+    );
+    return unsub;
+  }, []);
 
   // Notifications
   const [notifications,  setNotifications]  = useState([]);
@@ -2116,9 +2128,11 @@ export default function AdminDashboard() {
         {/* Tab bar */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--kt-card)', borderRadius: 12, padding: 4, border: '1px solid var(--kt-border)', width: 'fit-content' }}>
           {[
-            { id: 'users',     label: 'Users',     Icon: Users },
-            { id: 'analytics', label: 'Analytics', Icon: BarChart2 },
-          ].map(({ id, label, Icon }) => (
+            { id: 'users',      label: 'Users',            Icon: Users },
+            { id: 'analytics',  label: 'Analytics',        Icon: BarChart2 },
+            { id: 'feedback',   label: 'Feedback Inbox',   Icon: MessageSquare, badge: unreadFeedback },
+            { id: 'featureReq', label: 'Feature Requests', Icon: Lightbulb },
+          ].map(({ id, label, Icon, badge }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -2133,6 +2147,13 @@ export default function AdminDashboard() {
               }}
             >
               <Icon size={14} /> {label}
+              {!!badge && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 6px',
+                  background: activeTab === id ? 'rgba(255,255,255,0.25)' : '#fef0f0',
+                  color: activeTab === id ? '#fff' : '#e05c5c',
+                }}>{badge}</span>
+              )}
             </button>
           ))}
         </div>
@@ -2162,6 +2183,10 @@ export default function AdminDashboard() {
             <AnalyticsSection teachers={teachers} />
           </div>
         )}
+
+        {activeTab === 'feedback' && <FeedbackArchive />}
+
+        {activeTab === 'featureReq' && <FeatureRequestAdmin />}
 
         {activeTab === 'users' && <>
 

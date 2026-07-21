@@ -11,6 +11,7 @@ import img3 from '../assets/3.webp';
 import img4 from '../assets/4.webp';
 import ktLogo from '../assets/KT-Favicon.webp';
 import TokenBundleModal from './TokenBundleModal';
+import FloatingSuggestButton from '../features/feedback/FloatingSuggestButton';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -18,7 +19,7 @@ import {
   LogOut, Menu, X, ChevronRight, ChevronDown,
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
-  Settings, Camera, Loader2, Images,
+  Settings, Camera, Loader2, Images, Lightbulb,
 } from 'lucide-react';
 
 const MAIN_NAV = [
@@ -276,6 +277,7 @@ export default function AppShell() {
   const { user, tokenBalance, isAdmin, freeMode, loading, photoURL } = useAuth();
   const { dark, toggle } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen,     setMobileOpen]     = useState(false);
   const [slideIdx,       setSlideIdx]       = useState(0);
   const [showBundle,     setShowBundle]     = useState(false);
@@ -377,6 +379,10 @@ export default function AppShell() {
               <ChevronRight size={11} color="var(--kt-border)" />
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{pageTitle}</span>
             </div>
+            <button onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 20, padding: '5px 13px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-surface)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              <Lightbulb size={12} /> Request Feature
+            </button>
             {freeMode ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(5,150,105,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#059669' }}>✦ Free Mode</div>
             ) : tokenBalance === 0 ? (
@@ -400,6 +406,8 @@ export default function AppShell() {
       </div>
 
       {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
+
+      <FloatingSuggestButton />
 
       {/* ── Profile card — rendered at root level, never clipped ─────────────── */}
       {profileData && (

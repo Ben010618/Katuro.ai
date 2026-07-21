@@ -50,6 +50,20 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // ── Feedback inbox — any auth user submits; ONLY admin reads/updates/deletes ──
+    // Submitters cannot read this collection, not even their own past entries.
+    match /feedback_inbox/{feedbackId} {
+      allow create: if request.auth != null &&
+        request.resource.data.createdBy.uid == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Feature requests — public read (curated board); admin-only writes ──
+    match /feature_requests/{requestId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
     // ── Usage analytics — any auth user logs their own events; admin reads all ──
     match /usageEvents/{docId} {
       allow create: if request.auth != null;

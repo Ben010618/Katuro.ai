@@ -57,6 +57,7 @@ const GradingTablePage        = lazy(() => import('./pages/classroomMgmt/Grading
 const InvitePage              = lazy(() => import('./pages/classroomMgmt/InvitePage'));
 const SharedPlanPage          = lazy(() => import('./pages/SharedPlanPage'));
 const SharesLayout            = lazy(() => import('./modules/shares/index'));
+const FeatureRequestBoard     = lazy(() => import('./features/feedback/FeatureRequestBoard'));
 
 function LoadingScreen() {
   return (
@@ -231,6 +232,9 @@ export default function App() {
             <Route path="classroom-management/section/:sectionId" element={<SectionDetailPage />} />
             <Route path="classes-i-teach" element={<ClassesITeachPage />} />
             <Route path="classes-i-teach/grade/:sectionId/:subject" element={<GradingTablePage />} />
+
+            {/* Request Feature — public read-only board of admin-approved feature requests */}
+            <Route path="feature-requests" element={<FeatureRequestBoard />} />
           </Route>
 
           {/* Public invite route — handles logged-in and not-logged-in */}
