@@ -36,8 +36,8 @@ export default function FloatingSuggestButton() {
         aria-label="Send a suggestion"
         title="Send a suggestion"
         style={{
-          position: 'fixed', bottom: 96, right: 24, zIndex: 500,
-          width: 56, height: 56, borderRadius: '50%',
+          position: 'fixed', bottom: 20, right: 20, zIndex: 500,
+          width: 84, height: 84, borderRadius: '50%',
           border: 'none', cursor: 'pointer', padding: 0,
           background: 'var(--kt-card)',
           boxShadow: '0 8px 24px rgba(13,34,24,0.28)',
