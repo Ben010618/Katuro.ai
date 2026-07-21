@@ -8,7 +8,7 @@ import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
   adminChangePassword, adminSendPasswordReset, adminDeleteUser,
   subscribeAdminNotifications, markAllNotificationsRead,
-  adminSetFreeMode, subscribeFreeModeStatus,
+  adminSetFreeMode, subscribeFreeModeStatus, adminEqualizeTokens,
 } from '../services/db';
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
@@ -32,7 +32,7 @@ import { saveAs } from 'file-saver';
 
 // Mirrors MAX_ACCOUNTS in functions/index.js's registerUser — keep in sync.
 // Bulk-approving pending accounts must never push active users past this cap.
-const MAX_ACCOUNTS = 600;
+const MAX_ACCOUNTS = 800;
 
 // ── style tokens ──────────────────────────────────────────────────────────────
 const card = {
@@ -1687,7 +1687,7 @@ function FreeModeSection({ adminUid }) {
             style={inputStyle}
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 600 active users'}
+            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 800 active users'}
           />
         </div>
       </div>
@@ -1696,6 +1696,76 @@ function FreeModeSection({ adminUid }) {
         <div style={{ marginTop: 10, display: 'flex', gap: 7, background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 12px' }}>
           <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ margin: 0, fontSize: 12, color: '#163828' }}>{ok}</p>
+        </div>
+      )}
+      {err && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Token equalizer — one-click reset of every user's balance to a fixed amount ─
+function TokenEqualizerSection({ adminUid, teacherCount }) {
+  const [target,  setTarget]  = useState(30);
+  const [running, setRunning] = useState(false);
+  const [result,  setResult]  = useState(null);
+  const [err,     setErr]     = useState('');
+
+  async function handleRun() {
+    setErr(''); setResult(null);
+    const confirmed = window.confirm(
+      `This will set tokenBalance to exactly ${target} for ALL ${teacherCount} accounts ` +
+      `(including admins and disabled/pending accounts). This cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+
+    setRunning(true);
+    try {
+      const updatedCount = await adminEqualizeTokens(adminUid, Number(target));
+      setResult(`Done — ${updatedCount} account(s) updated to ${target} tokens.`);
+    } catch (e) {
+      setErr(e.message || 'Failed to equalize tokens.');
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div style={{ ...card, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fef3c7', display: 'grid', placeItems: 'center' }}>
+          <Coins size={16} color="#d97706" />
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Token Equalizer</h3>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+            Sets EVERY account's token balance to a fixed amount — a one-time reset, not reversible.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div>
+          <label style={labelStyle}>Target balance</label>
+          <input
+            type="number" min="0" style={{ ...inputStyle, width: 120 }}
+            value={target} onChange={e => setTarget(e.target.value)}
+          />
+        </div>
+        <button onClick={handleRun} disabled={running} style={{ ...btnPrimary, background: '#d97706', opacity: running ? 0.6 : 1 }}>
+          {running ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Coins size={14} />}
+          {running ? 'Equalizing…' : `Set all ${teacherCount} accounts to ${target}`}
+        </button>
+      </div>
+
+      {result && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 12px' }}>
+          <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#163828' }}>{result}</p>
         </div>
       )}
       {err && (
@@ -2195,6 +2265,9 @@ export default function AdminDashboard() {
 
         {/* Free Mode control */}
         <FreeModeSection adminUid={user?.uid} />
+
+        {/* Token Equalizer */}
+        <TokenEqualizerSection adminUid={user?.uid} teacherCount={teachers.length} />
 
         {/* AI Error Reports */}
         <AIErrorSection />

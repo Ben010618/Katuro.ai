@@ -25,6 +25,7 @@ import {
   onSnapshot,
   serverTimestamp,
   runTransaction,
+  writeBatch,
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
@@ -575,6 +576,37 @@ export async function adminAddTokens(targetUid, amount, note, adminUid) {
     uid: targetUid, amount, note, action: "top_up",
     addedBy: adminUid, createdAt: serverTimestamp(),
   });
+}
+
+// ─── Admin: equalize every user's token balance to a fixed amount ───────────
+// No per-user tokenLogs (would be one write per user on top of the balance
+// write); a single adminNotifications summary doc is enough of an audit trail.
+
+export async function adminEqualizeTokens(adminUid, target = 30) {
+  const snap = await getDocs(collection(db, "teachers"));
+  let batch = writeBatch(db);
+  let pending = 0;
+  let updated = 0;
+
+  for (const d of snap.docs) {
+    if ((d.data().tokenBalance ?? 0) === target) continue;
+    batch.update(d.ref, { tokenBalance: target, updatedAt: serverTimestamp() });
+    pending++;
+    updated++;
+    if (pending === 450) {
+      await batch.commit();
+      batch = writeBatch(db);
+      pending = 0;
+    }
+  }
+  if (pending > 0) await batch.commit();
+
+  await addDoc(collection(db, "adminNotifications"), {
+    type: "token_equalize", adminUid, target, updatedCount: updated,
+    read: false, createdAt: serverTimestamp(),
+  });
+
+  return updated;
 }
 
 // ─── Admin: permanently delete a user account and all their data ─────────────
