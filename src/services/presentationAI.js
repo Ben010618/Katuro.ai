@@ -6,20 +6,47 @@
  */
 
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { functions, auth } from '../firebase';
+import { reportAIError } from './db';
+
+// A bare code-shaped message ("internal", "unavailable"...) means the request
+// likely never reached the function's code at all — e.g. a lost Cloud Run
+// invoker IAM binding, the exact outage that motivated this reporting.
+async function callPresentationFn(name, data, timeout) {
+  const call = httpsCallable(functions, name, { timeout });
+  try {
+    const res = await call(data);
+    return res.data;
+  } catch (err) {
+    const code = err?.code || '';
+    const rawMessage = err?.message || '';
+    const looksGeneric = !rawMessage || rawMessage.toLowerCase() === code.replace('functions/', '').toLowerCase();
+    const isUnexplainedFailure = (code === 'functions/internal' || code === 'functions/unavailable') && looksGeneric;
+
+    if (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded') {
+      reportAIError({
+        uid: auth.currentUser?.uid,
+        feature: name,
+        errorMessage: `[${code || 'no-code'}]${isUnexplainedFailure ? ' (unexplained — possible deploy/IAM issue)' : ''} ${rawMessage}`,
+        inputContext: { subject: data?.subject, topic: data?.topic },
+      }).catch(() => {});
+    }
+
+    if (isUnexplainedFailure) {
+      throw new Error('Something went wrong on our end. We’ve been notified — please try again shortly.', { cause: err });
+    }
+    throw err;
+  }
+}
 
 // ── Stage 1: Generate outline (free — teachers iterate before committing tokens)
 export async function generateOutline({ subject, gradeLevel, melcCode, topic, slideCount = 12 }) {
-  const call = httpsCallable(functions, 'generateOutline', { timeout: 60000 });
-  const res = await call({ subject, gradeLevel, melcCode, topic, slideCount });
-  return res.data; // { outline, cached }
+  return callPresentationFn('generateOutline', { subject, gradeLevel, melcCode, topic, slideCount }, 60000); // { outline, cached }
 }
 
 // ── Stage 2: Expand slides (costs tokens — deducted server-side inside this function)
 export async function expandSlides({ subject, gradeLevel, melcCode, topic, slides, style = 'Academic' }) {
-  const call = httpsCallable(functions, 'expandSlides', { timeout: 180000 });
-  const res = await call({ subject, gradeLevel, melcCode, topic, slides, style });
-  return res.data; // { slides }
+  return callPresentationFn('expandSlides', { subject, gradeLevel, melcCode, topic, slides, style }, 180000); // { slides }
 }
 
 // ── Map expanded slides → pptxExport format ───────────────────────────────────

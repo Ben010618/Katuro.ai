@@ -11,7 +11,8 @@
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase';
+import { db, functions, auth } from '../firebase';
+import { reportAIError } from './db';
 
 const CONFIG_REF  = doc(db, 'adminConfig', 'gemini');
 const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
@@ -126,7 +127,32 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
     const code = err?.code || '';
-    const message = err?.message || 'The AI service is unavailable right now. Please try again.';
+    const rawMessage = err?.message || '';
+    // A bare code-shaped message ("internal", "unavailable"...) means the
+    // client SDK never got a real error body back — the request likely never
+    // reached our function code at all (e.g. a lost Cloud Run invoker IAM
+    // binding, like the expandSlides outage this was added after). A
+    // descriptive message (e.g. "Gemini 500: ...") means our code DID run and
+    // already explains what happened — leave it alone.
+    const looksGeneric = !rawMessage || rawMessage.toLowerCase() === code.replace('functions/', '').toLowerCase();
+    const isUnexplainedFailure = (code === 'functions/internal' || code === 'functions/unavailable') && looksGeneric;
+
+    // Report any real backend failure (not rate limits / daily limits / bad
+    // input, which are expected and already user-facing) so an admin sees it
+    // in the AI Error inbox instead of it failing silently for days.
+    if (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded') {
+      reportAIError({
+        uid: auth.currentUser?.uid,
+        feature: action,
+        errorMessage: `[${code || 'no-code'}]${isUnexplainedFailure ? ' (unexplained — possible deploy/IAM issue)' : ''} ${rawMessage}`,
+        inputContext: { isRetry: !!isRetry },
+      }).catch(() => {});
+    }
+
+    const message = isUnexplainedFailure
+      ? 'Something went wrong on our end. We’ve been notified — please try again shortly.'
+      : (rawMessage || 'The AI service is unavailable right now. Please try again.');
+
     const e = new Error(message);
     if (code === 'functions/resource-exhausted') {
       e.status = 429;
