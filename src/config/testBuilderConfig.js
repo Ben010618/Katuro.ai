@@ -8,8 +8,8 @@ export const TERMS = ['Term 1', 'Term 2', 'Term 3'];
 
 export const SUBJECTS = [
   'Science', 'Mathematics', 'English', 'Filipino',
-  'Araling Panlipunan', 'MAPEH', 'GMRC', 'Makabansa',
-  'Reading & Literacy', 'Language', 'TLE', 'EPP', 'ESP',
+  'Araling Panlipunan', 'MAPEH', 'GMRC / EPP / ESP', 'Makabansa',
+  'Reading & Literacy', 'Language', 'TLE',
 ];
 
 export const TEST_TYPES = [
@@ -40,7 +40,7 @@ export function proficiencyLevelLabel(value) {
 // Subjects whose medium of instruction is Filipino (Tagalog) — drives both the
 // AI item-generation language and the static document text (directions,
 // headers, answer-key labels). Everything else defaults to English.
-export const FILIPINO_MEDIUM_SUBJECTS = new Set(['Filipino', 'ESP', 'Araling Panlipunan']);
+export const FILIPINO_MEDIUM_SUBJECTS = new Set(['Filipino', 'GMRC / EPP / ESP', 'Araling Panlipunan']);
 
 export function deriveLanguage(subject) {
   return FILIPINO_MEDIUM_SUBJECTS.has(subject) ? 'fil' : 'en';

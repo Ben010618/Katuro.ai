@@ -7,8 +7,8 @@ import { ArrowRight, CalendarDays } from 'lucide-react';
 
 const SUBJECTS = [
   'Science', 'Mathematics', 'English', 'Filipino',
-  'Araling Panlipunan', 'MAPEH', 'GMRC', 'Makabansa',
-  'Reading & Literacy', 'Language', 'TLE', 'EPP', 'ESP',
+  'Araling Panlipunan', 'MAPEH', 'GMRC / EPP / ESP', 'Makabansa',
+  'Reading & Literacy', 'Language', 'TLE',
 ];
 const GRADES = [
   'Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4',

@@ -31,10 +31,22 @@ const CACHE_TTL_DAYS = 30;
 const EXPAND_TOKENS  = 3;
 
 // Subjects that need Tagalog output
-const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
+const TAGALOG_SUBJECTS = ['filipino', 'araling panlipunan'];
+// Values/character-education subjects call for a warmer, conversational
+// register than the more academic-formal Filipino used for Araling Panlipunan.
+const CONVERSATIONAL_TAGALOG_SUBJECTS = ['gmrc', 'epp', 'esp', 'edukasyon sa pagpapakatao'];
+
 function isTagalog(subject) {
   const s = (subject || '').toLowerCase();
-  return TAGALOG_SUBJECTS.some(t => s.includes(t));
+  return TAGALOG_SUBJECTS.some(t => s.includes(t)) || CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => s.includes(t));
+}
+function isConversationalTagalog(subject) {
+  const s = (subject || '').toLowerCase();
+  return CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => s.includes(t));
+}
+function langLabel(subject) {
+  if (isConversationalTagalog(subject)) return 'formal conversational Tagalog';
+  return isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
 }
 
 function geminiUrl(key) {
@@ -250,7 +262,7 @@ exports.generateOutline = onCall(
       }
     }
 
-    const lang = isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
+    const lang = langLabel(subject);
     const key_ = await getGeminiKey();
 
     const prompt = `You are kaTuro, an AI lesson outline planner for Philippine public school teachers following the K–12 MELC curriculum.
@@ -321,7 +333,7 @@ exports.expandSlides = onCall(
     await checkAndIncrementDailyUsage(req.auth.uid, 'expand_slides');
     await deductTokensServer(req.auth.uid, 'presentation-expand', EXPAND_TOKENS);
 
-    const lang      = isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
+    const lang      = langLabel(subject);
     const geminiKey = await getGeminiKey();
     const styleGuide = {
       Academic:  'formal, define terms precisely, include DepEd module examples',

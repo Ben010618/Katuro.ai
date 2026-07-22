@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { deriveLanguage } from './testBuilderConfig';
 
 describe('deriveLanguage', () => {
-  it('uses Filipino for Filipino, ESP, and Araling Panlipunan', () => {
+  it('uses Filipino for Filipino, GMRC / EPP / ESP, and Araling Panlipunan', () => {
     expect(deriveLanguage('Filipino')).toBe('fil');
-    expect(deriveLanguage('ESP')).toBe('fil');
+    expect(deriveLanguage('GMRC / EPP / ESP')).toBe('fil');
     expect(deriveLanguage('Araling Panlipunan')).toBe('fil');
   });
 
@@ -13,7 +13,6 @@ describe('deriveLanguage', () => {
     expect(deriveLanguage('Mathematics')).toBe('en');
     expect(deriveLanguage('English')).toBe('en');
     expect(deriveLanguage('MAPEH')).toBe('en');
-    expect(deriveLanguage('GMRC')).toBe('en');
     expect(deriveLanguage('Makabansa')).toBe('en');
   });
 

@@ -10,14 +10,27 @@ import { parseAIJson } from './aiJsonParse';
 import { buildItemSlots } from '../utils/testBuilderCalc';
 import { deriveLanguage, proficiencyLevelLabel } from '../config/testBuilderConfig';
 
-// Filipino, ESP, and Araling Panlipunan are taught in Filipino — every other
+// Filipino and Araling Panlipunan are taught in Filipino — every other
 // subject defaults to English. Structural/protocol values (TRUE/FALSE, MC
 // letters A-D) stay literal regardless of language so parsing stays reliable;
 // only natural-language content (questions, choices, definitions, free-text
 // answers) follows this rule.
+//
+// GMRC / EPP / ESP get a warmer, conversational Tagalog register instead of
+// the more academic-formal Filipino used for Araling Panlipunan.
+const CONVERSATIONAL_TAGALOG_SUBJECTS = ['gmrc', 'epp', 'esp', 'edukasyon sa pagpapakatao'];
+function isConversationalTagalogSubject(subject) {
+  const sl = (subject || '').toLowerCase();
+  return CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => sl.includes(t));
+}
+
 function langInstruction(subject) {
+  const structuralNote = ' (Exception: for True or False items, still return "answer" as the literal word "TRUE" or "FALSE"; for Multiple Choice, still return "answer" as the literal letter A/B/C/D — these are structural values, not sentence content.)';
+  if (isConversationalTagalogSubject(subject)) {
+    return `LANGUAGE: Write ALL natural-language content — questions, choices, matchDefinition text, and free-text answers — in formal conversational Tagalog: warm and natural, the way a teacher actually speaks to guide values/character formation, while still grammatically formal (not casual slang/jejemon). This subject's medium of instruction is Tagalog.${structuralNote}`;
+  }
   return deriveLanguage(subject) === 'fil'
-    ? 'LANGUAGE: Write ALL natural-language content — questions, choices, matchDefinition text, and free-text answers — in Filipino (Tagalog). Filipino is the medium of instruction for this subject. (Exception: for True or False items, still return "answer" as the literal word "TRUE" or "FALSE"; for Multiple Choice, still return "answer" as the literal letter A/B/C/D — these are structural values, not sentence content.)'
+    ? `LANGUAGE: Write ALL natural-language content — questions, choices, matchDefinition text, and free-text answers — in Filipino (Tagalog). Filipino is the medium of instruction for this subject.${structuralNote}`
     : 'LANGUAGE: Write ALL content in English. English is the medium of instruction for this subject.';
 }
 

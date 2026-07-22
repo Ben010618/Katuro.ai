@@ -1,6 +1,22 @@
 import { callGeminiProxy } from './geminiConfig';
 import { parseAIJson } from './aiJsonParse';
 
+const TAGALOG_SUBJECTS = ['filipino', 'araling panlipunan'];
+// Values/character-education subjects call for a warmer, conversational
+// register than the more academic-formal Filipino used for Araling Panlipunan.
+const CONVERSATIONAL_TAGALOG_SUBJECTS = ['gmrc', 'epp', 'esp', 'edukasyon sa pagpapakatao'];
+
+function langInstruction(subject) {
+  const sl = (subject || '').toLowerCase();
+  if (CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => sl.includes(t))) {
+    return 'LANGUAGE: Write ALL content in formal conversational Tagalog — warm and natural, the way a teacher actually speaks to guide values/character formation, while still being grammatically formal (not casual slang/jejemon). This subject\'s medium of instruction is Tagalog.';
+  }
+  if (TAGALOG_SUBJECTS.some(t => sl.includes(t))) {
+    return 'LANGUAGE: Write ALL content in Filipino (Tagalog). Filipino is the medium of instruction for this subject.';
+  }
+  return 'LANGUAGE: Write ALL content in English. English is the medium of instruction for this subject.';
+}
+
 /**
  * Generate a complete PPST-aligned, COT-optimized 4As lesson plan.
  *
@@ -48,6 +64,8 @@ ${performanceStandards ? `Performance Standards: ${performanceStandards}` : ''}
 ${objectives
   ? `Teacher's Draft Objectives:\n${objectives}\n(Refine these to align with Bloom's Taxonomy and PPST.)`
   : "(No draft objectives provided — generate all three domains using Bloom's Taxonomy.)"}
+
+${langInstruction(subject)}
 
 ═══════════════════════════════════════════════════════
 SELECTED COT INDICATORS — EMBED EVIDENCE FOR EACH

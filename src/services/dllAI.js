@@ -16,10 +16,18 @@ export const STEP_LABELS = {
   J: 'Additional activities for application or remediation',
 };
 
-const TAGALOG_SUBJECTS = ['filipino', 'esp', 'araling panlipunan', 'edukasyon sa pagpapakatao'];
+const TAGALOG_SUBJECTS = ['filipino', 'araling panlipunan'];
+// Values/character-education subjects call for a warmer, conversational
+// register than the more academic-formal Filipino used for Araling Panlipunan.
+const CONVERSATIONAL_TAGALOG_SUBJECTS = ['gmrc', 'epp', 'esp', 'edukasyon sa pagpapakatao'];
+
 function isTagalogSubject(s) {
   const sl = (s || '').toLowerCase();
-  return TAGALOG_SUBJECTS.some(t => sl.includes(t));
+  return TAGALOG_SUBJECTS.some(t => sl.includes(t)) || CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => sl.includes(t));
+}
+function isConversationalTagalogSubject(s) {
+  const sl = (s || '').toLowerCase();
+  return CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => sl.includes(t));
 }
 
 async function callGemini(prompt, isRetry) {
@@ -72,7 +80,8 @@ export async function generateDLLProcedure({
   contentStandards, performanceStandards,
   melcList, contentList, isRetry,
 }) {
-  const lang       = isTagalogSubject(subject) ? 'Filipino/Tagalog' : 'English';
+  const tagalog    = isTagalogSubject(subject);
+  const lang       = isConversationalTagalogSubject(subject) ? 'formal conversational Tagalog' : (tagalog ? 'Filipino/Tagalog' : 'English');
   const melcMap    = buildDayMap(melcList);
   const contentMap = buildDayMap(contentList);
 
@@ -173,7 +182,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     } else if (contentMap[i]) {
       // AI skipped this day — derive a basic objective from content + MELC
       const content = contentMap[i];
-      objectives[day] = lang === 'Filipino/Tagalog'
+      objectives[day] = tagalog
         ? `Natutukoy at naipapaliwanag ng mga mag-aaral ang mga pangunahing konsepto ng ${content}.`
         : `The learners will be able to identify and explain key concepts related to ${content}.`;
     } else {
