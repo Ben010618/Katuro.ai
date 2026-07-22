@@ -38,7 +38,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ addToast }}>
       {children}
       <div style={{
-        position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+        position: 'fixed', bottom: 116, right: 24, zIndex: 9999,
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
         {toasts.map(({ id, message, type }) => {
