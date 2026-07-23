@@ -63,6 +63,13 @@ const btnSecondary = {
   display: 'flex', alignItems: 'center', gap: 5,
 };
 
+// Activity color-coding (usage recency, distinct from account-enablement Status column)
+const ACTIVITY_COLORS = {
+  green:  '#2d6a4f', // Active — used kaTuro in the last 7 days
+  orange: '#d97706', // Mid-active — used it 8–30 days ago
+  red:    '#c0392b', // Inactive — no activity in 30+ days, or never logged in
+};
+
 // ── Modal backdrop ────────────────────────────────────────────────────────────
 function Modal({ onClose, title, children }) {
   return (
@@ -1961,6 +1968,36 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchTeachers(); }, [fetchTeachers]);
 
+  // Activity color-coding — Green: used kaTuro in the last 7 days. Orange:
+  // used it 8-30 days ago. Red: no activity in 30+ days, or never logged in.
+  // This is a separate signal from the Status column (which reflects account
+  // enablement, not usage) — computed from usageEvents (login + every
+  // feature use) rather than a stored field, so it never goes stale.
+  const [activityStatus, setActivityStatus] = useState({}); // uid -> 'green' | 'orange'
+  useEffect(() => {
+    (async () => {
+      try {
+        const cutoff = Timestamp.fromMillis(Date.now() - 30 * 86400000);
+        const snap = await getDocs(query(collection(db, 'usageEvents'), where('ts', '>=', cutoff)));
+        const lastSeen = {};
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (!data.uid) return;
+          const ms = data.ts?.toMillis ? data.ts.toMillis() : (data.ts?.seconds ? data.ts.seconds * 1000 : 0);
+          if (ms > (lastSeen[data.uid] || 0)) lastSeen[data.uid] = ms;
+        });
+        const now = Date.now();
+        const status = {};
+        Object.entries(lastSeen).forEach(([uid, ms]) => {
+          status[uid] = (now - ms) / 86400000 <= 7 ? 'green' : 'orange';
+        });
+        setActivityStatus(status);
+      } catch {
+        // Non-fatal — rows just fall back to "inactive" coloring if this fails
+      }
+    })();
+  }, []);
+
   async function toggleDisabled(teacher) {
     setTogglingUid(teacher.id);
     try {
@@ -2321,6 +2358,31 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Activity color legend */}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center',
+            marginBottom: 16, padding: '10px 14px',
+            background: 'var(--kt-surface)', borderRadius: 8, border: '1px solid var(--kt-border)',
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Activity dot:
+            </span>
+            {[
+              { color: ACTIVITY_COLORS.green,  label: 'Active',     desc: 'used kaTuro in the last 7 days' },
+              { color: ACTIVITY_COLORS.orange, label: 'Mid-active', desc: '8–30 days ago' },
+              { color: ACTIVITY_COLORS.red,    label: 'Inactive',   desc: 'no activity in 30+ days, or never logged in' },
+            ].map(({ color, label, desc }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{label}</span>
+                <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)' }}>— {desc}</span>
+              </div>
+            ))}
+            <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
+              (Reflects product usage — separate from the Status column, which reflects account enablement.)
+            </span>
+          </div>
+
           {loadingList ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10, color: 'var(--kt-text-secondary)' }}>
               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
@@ -2337,7 +2399,7 @@ export default function AdminDashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
-                    {['Email', 'Tokens', 'Status', 'Actions'].map(h => (
+                    {['Name / School', 'Tokens', 'Status', 'Actions'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '6px 12px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -2355,13 +2417,28 @@ export default function AdminDashboard() {
                           title="View user details"
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                              background: t.isAdmin ? 'linear-gradient(135deg,#e8a320,#b47a10)' : 'linear-gradient(135deg,#2d6a4f,#52b788)',
-                              display: 'grid', placeItems: 'center',
-                              fontSize: 10, fontWeight: 700, color: '#fff',
-                            }}>
-                              {(t.givenName?.[0] || t.email?.[0] || 'T').toUpperCase()}
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                              <div style={{
+                                width: 28, height: 28, borderRadius: '50%',
+                                background: t.isAdmin ? 'linear-gradient(135deg,#e8a320,#b47a10)' : 'linear-gradient(135deg,#2d6a4f,#52b788)',
+                                display: 'grid', placeItems: 'center',
+                                fontSize: 10, fontWeight: 700, color: '#fff',
+                              }}>
+                                {(t.givenName?.[0] || t.email?.[0] || 'T').toUpperCase()}
+                              </div>
+                              <span
+                                title={
+                                  activityStatus[t.id] === 'green'  ? 'Active — used kaTuro in the last 7 days' :
+                                  activityStatus[t.id] === 'orange' ? 'Mid-active — used kaTuro 8–30 days ago' :
+                                  'Inactive — no activity in 30+ days, or never logged in'
+                                }
+                                style={{
+                                  position: 'absolute', bottom: -1, right: -1,
+                                  width: 9, height: 9, borderRadius: '50%',
+                                  background: ACTIVITY_COLORS[activityStatus[t.id] || 'red'],
+                                  border: '2px solid var(--kt-card)',
+                                }}
+                              />
                             </div>
                             <div>
                               {(t.givenName || t.surname) && (
@@ -2369,7 +2446,7 @@ export default function AdminDashboard() {
                                   {[t.givenName, t.mi ? `${t.mi}.` : '', t.surname].filter(Boolean).join(' ')}
                                 </p>
                               )}
-                              <p style={{ margin: 0, fontWeight: 600, color: 'var(--kt-text-secondary)', fontSize: 12, textDecoration: 'underline dotted' }}>{t.email}</p>
+                              <p style={{ margin: 0, fontWeight: 600, color: 'var(--kt-text-secondary)', fontSize: 12 }}>{t.school || '—'}</p>
                               {t.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: '#b47a10', background: 'rgba(232,163,32,0.12)', borderRadius: 4, padding: '1px 5px' }}>Admin</span>}
                             </div>
                           </div>
