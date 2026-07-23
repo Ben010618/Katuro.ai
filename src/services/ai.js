@@ -9,12 +9,12 @@ export const AI_ENABLED = true; // key is managed server-side; always available 
 
 // Subjects officially taught in Filipino medium per DepEd MATATAG curriculum.
 // All other subjects use English as the medium of instruction.
-const FILIPINO_MEDIUM = new Set(['Filipino', 'Araling Panlipunan', 'GMRC / EPP / ESP', 'Makabansa']);
+const FILIPINO_MEDIUM = new Set(['Filipino', 'Araling Panlipunan', 'GMRC / ESP', 'Makabansa']);
 
-// Values/character-education subjects (GMRC / EPP / ESP) call for a warmer,
+// Values/character-education subjects (GMRC / ESP) call for a warmer,
 // conversational register than the more academic-formal Filipino used for
 // Araling Panlipunan — closer to how these are actually taught in class.
-const CONVERSATIONAL_TAGALOG_MEDIUM = new Set(['GMRC / EPP / ESP']);
+const CONVERSATIONAL_TAGALOG_MEDIUM = new Set(['GMRC / ESP']);
 
 function langInstruction(subject) {
   if (CONVERSATIONAL_TAGALOG_MEDIUM.has(subject)) {

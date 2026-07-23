@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-const SUBJECTS  = ['Science','Mathematics','English','Filipino','Araling Panlipunan','MAPEH','GMRC / EPP / ESP','Makabansa','Reading & Literacy','Language','TLE'];
+const SUBJECTS  = ['Science','Mathematics','English','Filipino','Araling Panlipunan','MAPEH','GMRC / ESP','Makabansa','Reading & Literacy','Language','TLE / EPP'];
 const GRADES    = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10'];
 const TERMS     = ['Term 1','Term 2','Term 3'];
 const WEEKS     = Array.from({length:10},(_,i)=>`Week ${i+1}`);
