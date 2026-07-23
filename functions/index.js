@@ -557,12 +557,18 @@ exports.registerUser = onCall(
     if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email address is required.');
     if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
 
-    const MAX_ACCOUNTS   = 800;
+    const MAX_ACCOUNTS   = 1000;
     const WELCOME_TOKENS = 30;
 
     const countSnap   = await db.collection('teachers').get();
     const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
-    const atCap       = activeCount >= MAX_ACCOUNTS;
+
+    // Hard cap — registration is rejected outright once full. No more
+    // disabled/pending-approval waitlist state: every account created past
+    // this point is auto-approved with the full welcome bonus immediately.
+    if (activeCount >= MAX_ACCOUNTS) {
+      throw new HttpsError('resource-exhausted', `kaTuro is at capacity (${MAX_ACCOUNTS} accounts). Please try again later.`);
+    }
 
     const displayName = [givenName.trim(), mi?.trim() ? mi.trim() + '.' : '', surname.trim()]
       .filter(Boolean).join(' ');
@@ -578,10 +584,10 @@ exports.registerUser = onCall(
       givenName:       givenName.trim(),
       mi:              mi?.trim() || '',
       school:          school.trim(),
-      tokenBalance:    atCap ? 0 : WELCOME_TOKENS,
+      tokenBalance:    WELCOME_TOKENS,
       isAdmin:         false,
-      disabled:        atCap,
-      pendingApproval: atCap,
+      disabled:        false,
+      pendingApproval: false,
       createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       _registeredViaFunction: true, // marker — enforceRegistrationSecurity checks this
     });
@@ -602,13 +608,11 @@ exports.registerUser = onCall(
 
     // Token log and admin notification — both non-fatal
     try {
-      if (!atCap) {
-        await db.collection(`teachers/${uid}/tokenLogs`).add({
-          uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
-          note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
+      await db.collection(`teachers/${uid}/tokenLogs`).add({
+        uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
+        note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     } catch (_e) {}
 
     try {
@@ -619,7 +623,7 @@ exports.registerUser = onCall(
         givenName:       givenName.trim(),
         surname:         surname.trim(),
         school:          school.trim(),
-        pendingApproval: atCap,
+        pendingApproval: false,
         read:            false,
         createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -646,7 +650,7 @@ exports.registerUser = onCall(
     }
 
     // Client will sign in with email+password — no custom token needed
-    return { pendingApproval: atCap };
+    return { pendingApproval: false };
   }
 );
 
