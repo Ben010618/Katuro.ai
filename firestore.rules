@@ -122,6 +122,41 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── kaTuro Protect — child protection decision-support module ───────────
+    // BrainBank access model calls for role/schoolId scoping (school_head,
+    // cpc_member, guidance, lfo) — that role system doesn't exist in this app
+    // yet (only isAdmin), so every protect_* collection is admin-only for now.
+    // Tighten to real roles once that system is built; do not open these to
+    // regular teachers in the meantime — this is sensitive minor data.
+    match /protect_chunks/{chunkId} {
+      allow read, write: if isAdmin();
+    }
+    match /protect_cases/{caseId} {
+      allow read, write: if isAdmin();
+    }
+    match /protect_chat_sessions/{sessionId} {
+      allow read, write: if isAdmin();
+    }
+    match /incident_registry/{learnerCode} {
+      allow read, write: if isAdmin();
+    }
+    // Real-name <-> code-name mapping — kept separate from incident_registry
+    // per BrainBank Part L2 so a coded record alone never re-identifies a
+    // learner. Same admin-only gate; no client, including the case UI, should
+    // ever bulk-read this collection.
+    match /protect_identities/{learnerCode} {
+      allow read, write: if isAdmin();
+    }
+    match /referral_contacts/{officeId} {
+      allow read, write: if isAdmin();
+    }
+    // Audit trail of every protect_* read/write/export — Cloud Functions
+    // write via Admin SDK; no client writes, matching deletionLogs above.
+    match /protect_audit_logs/{logId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
     // ── Presentation caches (Cloud Functions write via Admin SDK) ───────────
     match /presentationOutlineCache/{doc} {
       allow read: if request.auth != null;
