@@ -12,6 +12,7 @@ import img4 from '../assets/4.webp';
 import ktLogo from '../assets/KT-Favicon.webp';
 import TokenBundleModal from './TokenBundleModal';
 import FloatingSuggestButton from '../features/feedback/FloatingSuggestButton';
+import InactivityAnnouncementModal from './InactivityAnnouncementModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -24,6 +25,7 @@ import {
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
+  { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, adminOnly: true },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
@@ -38,6 +40,7 @@ const CLASSROOM_NAV = [
 
 const TITLES = {
   '/shares':                  'kaTuro Shares',
+  '/protect':                 'kaTuro Protect',
   '/dashboard':               'Dashboard',
   '/lesson-gen':              'Lesson Gen',
   '/dll-gen':                 'Daily Lesson Log',
@@ -110,7 +113,7 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
-        {MAIN_NAV.map(({ to, label, Icon, isNew, highlight }) => (
+        {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => highlight ? {
               display: 'flex', alignItems: 'center', gap: 10,
@@ -408,6 +411,7 @@ export default function AppShell() {
       {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
 
       <FloatingSuggestButton />
+      <InactivityAnnouncementModal />
 
       {/* ── Profile card — rendered at root level, never clipped ─────────────── */}
       {profileData && (

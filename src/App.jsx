@@ -58,6 +58,7 @@ const InvitePage              = lazy(() => import('./pages/classroomMgmt/InviteP
 const SharedPlanPage          = lazy(() => import('./pages/SharedPlanPage'));
 const SharesLayout            = lazy(() => import('./modules/shares/index'));
 const FeatureRequestBoard     = lazy(() => import('./features/feedback/FeatureRequestBoard'));
+const KaturoProtectPage       = lazy(() => import('./features/katuroProtect'));
 
 function LoadingScreen() {
   return (
@@ -177,6 +178,9 @@ export default function App() {
 
             {/* kaTuro Shares — teacher community feed, the app's new landing page */}
             <Route path="shares/*" element={<SharesLayout />} />
+
+            {/* kaTuro Protect — child protection decision-support (admin-only for now) */}
+            <Route path="protect" element={<AdminRoute><KaturoProtectPage /></AdminRoute>} />
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
