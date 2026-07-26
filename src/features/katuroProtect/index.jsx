@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { ShieldCheck, ClipboardList, MessageSquare, LayoutList, Settings as SettingsIcon } from 'lucide-react';
 import DisclaimerBanner from './components/DisclaimerBanner';
+import IntakeWizard from './components/IntakeWizard';
+import CaseBoard from './components/CaseBoard';
+import ReferralDirectory from './components/ReferralDirectory';
 
 const TABS = [
   { id: 'intake',   label: 'Intake',   Icon: ClipboardList },
@@ -9,15 +12,18 @@ const TABS = [
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
-function ComingSoon({ label }) {
+function ChatComingSoon() {
   return (
     <div style={{
       background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)',
       padding: '48px 24px', textAlign: 'center',
     }}>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{label} — coming soon</p>
-      <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
-        This tab is built in a later phase of the kaTuro Protect rollout.
+      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Chat — coming soon</p>
+      <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
+        The AI chat needs the verbatim legal corpus (Layer 2 — the official RA/DepEd Order texts) loaded
+        first. Answering legal questions from BrainBank summaries alone risks exactly the kind of
+        under-sourced guidance the anti-hallucination rules exist to prevent, so this stays off until
+        the corpus is in place.
       </p>
     </div>
   );
@@ -25,9 +31,15 @@ function ComingSoon({ label }) {
 
 export default function KaturoProtectPage() {
   const [activeTab, setActiveTab] = useState('intake');
+  const [openCaseId, setOpenCaseId] = useState(null);
+
+  function handleCaseCreated(caseId) {
+    setOpenCaseId(caseId);
+    setActiveTab('cases');
+  }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <ShieldCheck size={20} color="#2d6a4f" />
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--kt-text-primary)' }}>kaTuro Protect</h1>
@@ -57,7 +69,10 @@ export default function KaturoProtectPage() {
         ))}
       </div>
 
-      {TABS.filter(t => t.id === activeTab).map(t => <ComingSoon key={t.id} label={t.label} />)}
+      {activeTab === 'intake'   && <IntakeWizard onCreated={handleCaseCreated} />}
+      {activeTab === 'chat'     && <ChatComingSoon />}
+      {activeTab === 'cases'    && <CaseBoard initialCaseId={openCaseId} onCaseOpened={setOpenCaseId} />}
+      {activeTab === 'settings' && <ReferralDirectory />}
 
       <p style={{ margin: '24px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
         BrainBank v1.0 · compiled July 2026

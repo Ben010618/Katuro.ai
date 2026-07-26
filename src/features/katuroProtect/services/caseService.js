@@ -1,0 +1,96 @@
+// CRUD + state-machine transitions for protect_cases (BrainBank Part K).
+// No AI/classification here on purpose — see katuroProtect/index.jsx for why
+// Chat and auto-classification are deferred until the Layer 2 corpus exists.
+
+import {
+  collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, arrayUnion,
+} from 'firebase/firestore';
+import { db } from '../../../firebase';
+import { CASE_STATES } from '../types';
+
+// Which states a case may move to FROM its current state. Mostly the linear
+// K1 order, plus REFERRED_OUT as a branch (red-flag/external referral can
+// happen right after classification, or after a decision is issued — BrainBank
+// K2's "red-flag override... at ANY state" is intentionally not fully open-
+// ended here; this keeps the board honest about the two points a referral
+// realistically branches from without letting any state jump anywhere).
+const NEXT_ALLOWED = {
+  REPORTED:         ['INTAKE_DONE'],
+  INTAKE_DONE:      ['CLASSIFIED'],
+  CLASSIFIED:       ['PARENTS_NOTIFIED', 'REFERRED_OUT'],
+  PARENTS_NOTIFIED: ['FACTFINDING'],
+  FACTFINDING:      ['CPC_DELIBERATION'],
+  CPC_DELIBERATION: ['DECISION_ISSUED'],
+  DECISION_ISSUED:  ['REFERRED_OUT', 'MONITORING'],
+  REFERRED_OUT:     ['MONITORING'],
+  MONITORING:       ['REPORTING'],
+  REPORTING:        ['CLOSED'],
+  CLOSED:           [],
+};
+
+export function canAdvanceTo(currentState, nextState) {
+  return (NEXT_ALLOWED[currentState] || []).includes(nextState);
+}
+export function allowedNextStates(currentState) {
+  return NEXT_ALLOWED[currentState] || [];
+}
+
+/** Real-time subscription to all cases, newest first. */
+export function subscribeCases(onData, onError) {
+  return onSnapshot(
+    collection(db, 'protect_cases'),
+    (snap) => {
+      const cases = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      cases.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      onData(cases);
+    },
+    onError,
+  );
+}
+
+/** Creates a case from a completed IntakeForm (Part G1), starting in REPORTED. */
+export async function createCase(intake, createdBy) {
+  const ref = await addDoc(collection(db, 'protect_cases'), {
+    state: 'REPORTED',
+    classification: null,          // set once real classification exists (needs Layer 2 corpus)
+    escalationTier: 'T1_first',    // manual until incident_registry tier computation is built
+    intake,
+    timeline: [{
+      at: new Date().toISOString(), // client timestamp for the embedded array (serverTimestamp() isn't allowed inside arrayUnion)
+      state: 'REPORTED',
+      note: 'Case reported and logged.',
+      by: createdBy || null,
+    }],
+    createdBy: createdBy || null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/** Advances a case to the next state, validating the transition and appending to the timeline. */
+export async function advanceCaseState(caseId, currentState, nextState, note, by) {
+  if (!canAdvanceTo(currentState, nextState)) {
+    throw new Error(`Cannot move a case from ${currentState} to ${nextState} — invalid transition.`);
+  }
+  await updateDoc(doc(db, 'protect_cases', caseId), {
+    state: nextState,
+    updatedAt: serverTimestamp(),
+    timeline: arrayUnion({
+      at: new Date().toISOString(),
+      state: nextState,
+      note: note || '',
+      by: by || null,
+    }),
+  });
+}
+
+/** Manual escalation-tier override (auto-computation from incident_registry is a later phase). */
+export async function setEscalationTier(caseId, tier) {
+  await updateDoc(doc(db, 'protect_cases', caseId), {
+    escalationTier: tier,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export { CASE_STATES };
