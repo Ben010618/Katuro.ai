@@ -13,6 +13,7 @@ import {
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
+import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
 import { db } from '../firebase';
 import {
   BarChart, Bar, LineChart, Line,
@@ -25,7 +26,7 @@ import {
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
-  FileSpreadsheet, UserCheck, MessageSquare, Lightbulb,
+  FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import { saveAs } from 'file-saver';
@@ -2237,8 +2238,9 @@ export default function AdminDashboard() {
           {[
             { id: 'users',      label: 'Users',            Icon: Users },
             { id: 'analytics',  label: 'Analytics',        Icon: BarChart2 },
-            { id: 'feedback',   label: 'Feedback Inbox',   Icon: MessageSquare, badge: unreadFeedback },
-            { id: 'featureReq', label: 'Feature Requests', Icon: Lightbulb },
+            { id: 'feedback',    label: 'Feedback Inbox',   Icon: MessageSquare, badge: unreadFeedback },
+            { id: 'featureReq',  label: 'Feature Requests', Icon: Lightbulb },
+            { id: 'inactivity',  label: 'Inactivity',       Icon: UserX },
           ].map(({ id, label, Icon, badge }) => (
             <button
               key={id}
@@ -2294,6 +2296,8 @@ export default function AdminDashboard() {
         {activeTab === 'feedback' && <FeedbackArchive />}
 
         {activeTab === 'featureReq' && <FeatureRequestAdmin />}
+
+        {activeTab === 'inactivity' && <InactiveUsersSection />}
 
         {activeTab === 'users' && <>
 

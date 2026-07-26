@@ -113,6 +113,15 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // ── Deletion logs — audit trail for the inactivity cleanup job. Admin
+    // SDK (Cloud Functions) bypasses these rules to write; no client, not
+    // even an admin, may write here — it's a record of what happened, not
+    // something to edit.
+    match /deletionLogs/{logId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
     // ── Presentation caches (Cloud Functions write via Admin SDK) ───────────
     match /presentationOutlineCache/{doc} {
       allow read: if request.auth != null;

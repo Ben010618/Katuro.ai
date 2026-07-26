@@ -11,6 +11,7 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
+const { onDocumentCreated }  = require('firebase-functions/v2/firestore');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -863,6 +864,147 @@ exports.autoGrantSeasonalTokens = onSchedule(
       month, read: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+  }
+);
+
+// ── Trigger: roll up last-activity timestamp on the teacher doc ──────────────
+// Fires on every usageEvents write (login + every feature action already logs
+// here — see src/services/usageTracker.js), so no new client-side tracking
+// hooks are needed. Throttled to ~once/hour per user to avoid write
+// amplification. Also reactivates an account this same cleanup pipeline
+// auto-deactivated for inactivity — any sign of life un-deactivates it. Never
+// touches an account an admin disabled manually (no deactivatedForInactivityAt
+// marker means this job didn't disable it, so it isn't this job's to enable).
+exports.onUsageEventCreated = onDocumentCreated(
+  { document: 'usageEvents/{eventId}', region: 'us-central1' },
+  async (event) => {
+    const uid = event.data?.data()?.uid;
+    if (!uid) return;
+
+    const teacherRef  = db.doc(`teachers/${uid}`);
+    const teacherSnap = await teacherRef.get();
+    if (!teacherSnap.exists) return;
+    const teacher = teacherSnap.data();
+
+    const wasDeactivatedForInactivity = !!teacher.deactivatedForInactivityAt;
+    const lastActiveMs = teacher.lastActiveAt?.toMillis?.() ?? 0;
+    if (!wasDeactivatedForInactivity && Date.now() - lastActiveMs < 3600000) return; // throttle
+
+    const update = { lastActiveAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (wasDeactivatedForInactivity) {
+      update.disabled = false;
+      update.deactivatedForInactivityAt = admin.firestore.FieldValue.delete();
+    }
+    await teacherRef.update(update).catch(() => {});
+  }
+);
+
+// ── Scheduled: inactivity policy — deactivate at 90 days, delete at 120 ──────
+// (90 days inactive -> disabled, 30-day grace window -> permanently deleted).
+// Deliberately NOT an immediate hard-delete at 90 days: a 30-day recoverable
+// window means a bug in the inactivity calculation disables accounts instead
+// of destroying them outright. Announced to users via
+// InactivityAnnouncementModal.jsx ("simply logging in keeps your account
+// active" — matches the reactivation behavior in onUsageEventCreated above).
+exports.cleanupInactiveUsers = onSchedule(
+  { schedule: 'every 24 hours', timeZone: 'Asia/Manila', region: 'us-central1', timeoutSeconds: 540 },
+  async () => {
+    const now                = Date.now();
+    const DEACTIVATE_AFTER_MS = 90 * 86400000;
+    const DELETE_AFTER_MS     = 30 * 86400000; // additional days after deactivation (120 total)
+
+    // ── Pass 1: hard-delete accounts already deactivated 30+ days ago ──────
+    const toDeleteSnap = await db.collection('teachers')
+      .where('deactivatedForInactivityAt', '<', admin.firestore.Timestamp.fromMillis(now - DELETE_AFTER_MS))
+      .get();
+
+    let deletedCount = 0;
+    for (const doc of toDeleteSnap.docs) {
+      const uid = doc.id;
+      const t   = doc.data();
+      try {
+        // Class sections live in their own top-level collection (adviser-
+        // owned, not nested under teachers/{uid}) — recursiveDelete on the
+        // teacher doc alone would miss these and orphan student rosters.
+        const sectionsSnap = await db.collection('sections').where('adviserUid', '==', uid).get();
+        for (const sectionDoc of sectionsSnap.docs) {
+          await db.recursiveDelete(sectionDoc.ref);
+        }
+
+        await db.recursiveDelete(doc.ref);
+        await admin.auth().deleteUser(uid).catch(() => {}); // already-gone Auth user is fine
+
+        await db.collection('deletionLogs').add({
+          uid, email: t.email || null, displayName: t.displayName || null,
+          lastActiveAt: t.lastActiveAt || null,
+          deactivatedForInactivityAt: t.deactivatedForInactivityAt || null,
+          reason: 'inactivity_90d_plus_30d_grace',
+          deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        deletedCount++;
+      } catch (err) {
+        await db.collection('deletionLogs').add({
+          uid, email: t.email || null,
+          reason: 'inactivity_delete_failed',
+          error: String(err?.message || err).slice(0, 300),
+          deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    // ── Pass 2: deactivate accounts inactive 90+ days (not already flagged) ─
+    const activeSnap = await db.collection('teachers')
+      .where('isAdmin', '==', false)
+      .where('disabled', '==', false)
+      .get();
+
+    let deactivatedCount = 0;
+    let batch = db.batch();
+    let batchCount = 0;
+    for (const doc of activeSnap.docs) {
+      const t = doc.data();
+      let lastActiveMs = t.lastActiveAt?.toMillis?.() ?? null;
+      const updateFields = {};
+
+      // Lazy backfill — this teacher pre-dates onUsageEventCreated and has no
+      // rolled-up lastActiveAt yet. Look up their real most-recent usageEvent
+      // once so a long-time active user isn't misjudged by their old
+      // registration date instead of when they actually last used the app.
+      if (lastActiveMs === null) {
+        const evSnap = await db.collection('usageEvents')
+          .where('uid', '==', doc.id).orderBy('ts', 'desc').limit(1).get();
+        lastActiveMs = evSnap.empty
+          ? (t.createdAt?.toMillis?.() ?? now)
+          : evSnap.docs[0].data().ts.toMillis();
+        updateFields.lastActiveAt = admin.firestore.Timestamp.fromMillis(lastActiveMs);
+      }
+
+      if (now - lastActiveMs >= DEACTIVATE_AFTER_MS) {
+        updateFields.disabled = true;
+        updateFields.deactivatedForInactivityAt = admin.firestore.FieldValue.serverTimestamp();
+        deactivatedCount++;
+      }
+
+      if (Object.keys(updateFields).length > 0) {
+        batch.update(doc.ref, updateFields);
+        batchCount++;
+      }
+      if (batchCount >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    }
+    if (batchCount > 0) await batch.commit();
+
+    if (deletedCount > 0 || deactivatedCount > 0) {
+      await db.collection('adminNotifications').add({
+        type: 'inactivity_cleanup',
+        message: `Inactivity cleanup: ${deactivatedCount} account(s) deactivated (90+ days inactive), ${deletedCount} account(s) permanently deleted (120+ days).`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
   }
 );
 
