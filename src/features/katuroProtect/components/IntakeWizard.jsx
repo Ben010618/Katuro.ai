@@ -60,7 +60,10 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
     (async () => {
       setSuggesting(true);
       try {
-        const result = await suggestIntakeNarrative(chatHistory);
+        const result = await suggestIntakeNarrative(chatHistory, {
+          complainant: form.complainant.code_name,
+          respondent: form.respondent.code_name,
+        });
         if (result) {
           setForm((prev) => ({
             ...prev,

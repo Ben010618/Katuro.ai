@@ -100,25 +100,30 @@ export async function askProtectChat(userMessage, history = []) {
  * already happened. Reuses the protect_chat proxy action (no new backend
  * action/deploy needed) but with its own narrow prompt, not the full
  * conversational system prompt — this is a one-shot structured extraction,
- * not a chat turn.
+ * not a chat turn. partyNames (complainant/respondent) come from the
+ * already-completed Parties step so the draft names the same parties the
+ * user entered there, instead of generic "Learner A/B" placeholders.
  */
-export async function suggestIntakeNarrative(chatHistory) {
+export async function suggestIntakeNarrative(chatHistory, partyNames = {}) {
   if (!chatHistory || chatHistory.length === 0) return null;
 
   const transcript = chatHistory
     .map((m) => `${m.role === 'user' ? 'Reporter' : 'Assistant'}: ${m.text}`)
     .join('\n\n');
 
+  const complainantName = partyNames.complainant?.trim() || 'ang complainant';
+  const respondentName = partyNames.respondent?.trim() || 'ang respondent';
+
   const prompt = `You are drafting two fields of a formal Case Intake Sheet for a Philippine public school's Child Protection Committee, based on the conversation transcript below.
 
 RULES:
-- Write in formal English regardless of what language the conversation used — this goes into an official case record.
-- Use coded terms only: "Learner A", "Learner B", "the respondent", etc. NEVER use a real name even if one appears in the transcript — replace it with a generic code label.
+- Write in formal conversational Tagalog — this goes into an official case record reviewed by the CPC and school head, who read case documentation in Tagalog.
+- The complainant has already been identified in the Intake form as "${complainantName}" and the respondent as "${respondentName}". Use exactly these names/terms when referring to them — do not invent or substitute a different label like "Learner A".
 - Be factual and neutral. Do not assign blame, guilt, or a legal conclusion — describe only what was reported.
-- immediate_actions must be concrete, doable right now (e.g. "Ensure the learner's immediate safety and separate them from the respondent if still on campus; document the report in the secure case logbook; notify the guidance counselor."), not a citation or legal analysis.
+- immediate_actions must be concrete, doable right now (e.g. "Tiyakin ang kaligtasan ng mag-aaral at ihiwalay mula sa respondent kung nasa paaralan pa; itala ang report sa secure case logbook; ipaalam sa guidance counselor."), not a citation or legal analysis.
 
 Return ONLY valid JSON, no markdown, no explanation:
-{"narrative": "2-4 sentence factual incident summary, de-identified", "immediate_actions": "1-2 sentence suggested immediate next action(s)"}
+{"narrative": "2-4 sentence factual incident summary in Tagalog, naming the parties as instructed above", "immediate_actions": "1-2 sentence suggested immediate next action(s) in Tagalog"}
 
 CONVERSATION TRANSCRIPT:
 ${transcript}`;

@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { ArrowLeft, Clock, AlertCircle, Loader2, Archive, ArchiveRestore } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Clock, AlertCircle, Loader2, Archive, ArchiveRestore, Download } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { advanceCaseState, allowedNextStates, archiveCase, unarchiveCase } from '../services/caseService';
+import { subscribeSchoolProfile } from '../../../services/schoolFormsDb';
 import { CASE_STATE_LABELS } from '../types';
 import NextMoveCard from './NextMoveCard';
 import EscalationBadge from './EscalationBadge';
+import CaseReportDoc from './CaseReportDoc';
 
 const btnSecondary = { background: 'var(--kt-surface)', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 };
 
@@ -17,9 +19,48 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
   const { user, isAdmin } = useAuth();
   const [advancing, setAdvancing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [schoolProfile, setSchoolProfile] = useState({});
   const [error, setError] = useState('');
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    return subscribeSchoolProfile(user.uid, setSchoolProfile);
+  }, [user?.uid]);
 
   const nextStates = allowedNextStates(caseData.state);
+
+  async function downloadPDF() {
+    setExporting(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#fff', useCORS: true, logging: false });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL('image/png');
+
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`CaseReport_${caseData.id.slice(0, 8).toUpperCase()}.pdf`);
+    } catch (err) {
+      setError(err.message || 'Could not generate the PDF export.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function handleAdvance(nextState) {
     setAdvancing(true);
@@ -50,19 +91,38 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
 
   return (
     <div>
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
+        <div ref={exportRef}>
+          <CaseReportDoc caseData={caseData} schoolProfile={schoolProfile} />
+        </div>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <button onClick={onBack} style={btnSecondary}>
           <ArrowLeft size={13} /> {backLabel}
         </button>
-        {isAdmin && (
-          <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
-            {archiving
-              ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
-              : caseData.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-            {caseData.archived ? 'Restore from Archive' : 'Archive Case'}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={downloadPDF} disabled={exporting} style={{ ...btnSecondary, opacity: exporting ? 0.6 : 1 }}>
+            {exporting ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Download size={13} />}
+            {exporting ? 'Generating…' : 'Export PDF'}
           </button>
-        )}
+          {isAdmin && (
+            <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
+              {archiving
+                ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
+                : caseData.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+              {caseData.archived ? 'Restore from Archive' : 'Archive Case'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {error && (
+        <div style={{ marginBottom: 14, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{error}</p>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--kt-text-primary)' }}>
@@ -118,12 +178,6 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
                   </button>
                 ))}
               </div>
-              {error && (
-                <div style={{ marginTop: 10, display: 'flex', gap: 7 }}>
-                  <AlertCircle size={13} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <p style={{ margin: 0, fontSize: 11, color: '#c0392b' }}>{error}</p>
-                </div>
-              )}
             </div>
           )}
         </div>

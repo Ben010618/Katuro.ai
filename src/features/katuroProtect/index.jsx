@@ -1,24 +1,24 @@
 import { useState } from 'react';
-import { ShieldCheck, ClipboardList, MessageSquare, LayoutList, Settings as SettingsIcon, FolderOpen } from 'lucide-react';
+import { ShieldCheck, ClipboardList, MessageSquare, Settings as SettingsIcon, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import DisclaimerBanner from './components/DisclaimerBanner';
 import ProtectChatLanding from './components/ProtectChatLanding';
 import IntakeWizard from './components/IntakeWizard';
 import FiledCases from './components/FiledCases';
-import CaseBoard from './components/CaseBoard';
 import ReferralDirectory from './components/ReferralDirectory';
 
 // Chat, Intake, and Filed Cases are open to every teacher — a class adviser
 // files an initial report here, ahead of formal processing by the LFO/CPC.
-// Cases (the full board, every case school-wide) and Settings stay
-// admin-only: a teacher can file and revisit their OWN reports but shouldn't
-// browse everyone else's (Firestore rules enforce this too, this just
-// matches the UI to it).
+// Filed Cases is scope-aware inside itself: admins see every school case
+// (what the old separate "Cases" tab showed — same list, same detail view,
+// so keeping both was pure duplication), everyone else sees only what they
+// personally filed. Settings (referral directory management) stays
+// admin-only. Firestore rules enforce the same case-data split server-side;
+// this just matches the UI to it.
 const TABS = [
   { id: 'chat',     label: 'Chat',        Icon: MessageSquare },
   { id: 'intake',   label: 'Intake',      Icon: ClipboardList },
   { id: 'filed',    label: 'Filed Cases', Icon: FolderOpen },
-  { id: 'cases',    label: 'Cases',       Icon: LayoutList,   adminOnly: true },
   { id: 'settings', label: 'Settings',    Icon: SettingsIcon, adminOnly: true },
 ];
 
@@ -88,7 +88,6 @@ export default function KaturoProtectPage() {
       )}
 
       {activeTab === 'filed'    && <FiledCases initialCaseId={openCaseId} onCaseOpened={setOpenCaseId} />}
-      {activeTab === 'cases'    && isAdmin && <CaseBoard initialCaseId={openCaseId} onCaseOpened={setOpenCaseId} />}
       {activeTab === 'settings' && isAdmin && <ReferralDirectory />}
 
       <p style={{ margin: '24px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
