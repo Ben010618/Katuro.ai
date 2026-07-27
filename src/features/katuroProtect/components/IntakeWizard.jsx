@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Info, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { createCase } from '../services/caseService';
+import { suggestIntakeNarrative } from '../services/protectGemini';
 import { makeEmptyIntakeForm } from '../types';
 
 const card = { background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '20px 22px' };
@@ -36,12 +37,48 @@ function Toggle({ checked, onChange, children }) {
   );
 }
 
-export default function IntakeWizard({ onCreated }) {
+export default function IntakeWizard({ chatHistory, onCreated }) {
   const { user, profile } = useAuth();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(makeEmptyIntakeForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggested, setSuggested] = useState(false); // has a suggestion attempt already run this session
+  const [suggestionFailed, setSuggestionFailed] = useState(false);
+
+  // Draft the Narrative + Immediate Actions fields from the prior chat
+  // conversation once the user reaches this step — only if there's actually
+  // a conversation to draw from, only once, and never overwriting text the
+  // user already typed themselves. All setState calls live inside the async
+  // IIFE (not directly in the effect body) so this doesn't run into the
+  // "no synchronous setState in an effect" issue.
+  useEffect(() => {
+    const alreadyHasContent = form.incident_narrative.trim() || form.immediate_actions_taken.trim();
+    if (step !== 3 || suggested || !chatHistory?.length || alreadyHasContent) return;
+
+    (async () => {
+      setSuggesting(true);
+      try {
+        const result = await suggestIntakeNarrative(chatHistory);
+        if (result) {
+          setForm((prev) => ({
+            ...prev,
+            incident_narrative: prev.incident_narrative.trim() || result.narrative,
+            immediate_actions_taken: prev.immediate_actions_taken.trim() || result.immediate_actions,
+          }));
+        } else {
+          setSuggestionFailed(true);
+        }
+      } catch {
+        setSuggestionFailed(true);
+      } finally {
+        setSuggesting(false);
+        setSuggested(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   function set(path, value) {
     setForm((prev) => {
@@ -174,6 +211,19 @@ export default function IntakeWizard({ onCreated }) {
 
       {step === 3 && (
         <>
+          {suggesting && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, color: '#2d6a4f' }}>
+              <Loader2 size={12} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
+              Drafting a suggestion from your conversation…
+            </div>
+          )}
+          {suggested && !suggesting && !suggestionFailed && chatHistory?.length > 0 && (form.incident_narrative || form.immediate_actions_taken) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, color: '#2d6a4f' }}>
+              <Sparkles size={12} />
+              Drafted from your conversation — please review and edit before submitting.
+            </div>
+          )}
+
           <label style={labelStyle}>Incident Narrative</label>
           <textarea rows={6} style={{ ...inputStyle, marginBottom: 14, resize: 'vertical' }} placeholder="What happened, in coded/de-identified terms…" value={form.incident_narrative} onChange={(e) => set('incident_narrative', e.target.value)} />
 

@@ -86,8 +86,7 @@ function MessageBubble({ msg, onCitationClick }) {
   );
 }
 
-export default function ProtectChatLanding({ onStartIntake }) {
-  const [messages, setMessages] = useState([]);
+export default function ProtectChatLanding({ onStartIntake, messages, setMessages }) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');

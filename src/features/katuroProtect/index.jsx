@@ -23,6 +23,9 @@ export default function KaturoProtectPage() {
   const [activeTab, setActiveTab] = useState('chat'); // chat-ready landing per product decision
   const [openCaseId, setOpenCaseId] = useState(null);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  // Lifted out of ProtectChatLanding so IntakeWizard can draft a narrative
+  // suggestion from the prior conversation when the user moves from Chat to Intake.
+  const [chatMessages, setChatMessages] = useState([]);
 
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
 
@@ -69,7 +72,13 @@ export default function KaturoProtectPage() {
         ))}
       </div>
 
-      {activeTab === 'chat' && <ProtectChatLanding onStartIntake={() => setActiveTab('intake')} />}
+      {activeTab === 'chat' && (
+        <ProtectChatLanding
+          messages={chatMessages}
+          setMessages={setChatMessages}
+          onStartIntake={() => setActiveTab('intake')}
+        />
+      )}
 
       {activeTab === 'intake' && (
         justSubmitted ? (
@@ -81,7 +90,10 @@ export default function KaturoProtectPage() {
             </p>
           </div>
         ) : (
-          <IntakeWizard onCreated={handleCaseCreated} />
+          <IntakeWizard
+            chatHistory={chatMessages.filter((m) => !m.pending).map((m) => ({ role: m.role, text: m.text }))}
+            onCreated={handleCaseCreated}
+          />
         )
       )}
 

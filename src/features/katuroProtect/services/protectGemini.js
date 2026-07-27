@@ -21,6 +21,7 @@
 // get verified against the real text without exposing that label either.
 import brainBankText from './brainBankSource';
 import { callGeminiProxy } from '../../../services/geminiConfig';
+import { parseAIJson } from '../../../services/aiJsonParse';
 
 function extractPartH(fullText) {
   const start = fullText.indexOf('## PART H');
@@ -89,4 +90,52 @@ export async function askProtectChat(userMessage, history = []) {
     maxTokens: 2048,
   });
   return text;
+}
+
+/**
+ * Drafts an Incident Narrative + Immediate Actions Taken suggestion for the
+ * Intake Wizard from the prior chat conversation — the user still has to
+ * review and can edit both fields freely; this only pre-fills a starting
+ * point instead of leaving the wizard blank when a real conversation
+ * already happened. Reuses the protect_chat proxy action (no new backend
+ * action/deploy needed) but with its own narrow prompt, not the full
+ * conversational system prompt — this is a one-shot structured extraction,
+ * not a chat turn.
+ */
+export async function suggestIntakeNarrative(chatHistory) {
+  if (!chatHistory || chatHistory.length === 0) return null;
+
+  const transcript = chatHistory
+    .map((m) => `${m.role === 'user' ? 'Reporter' : 'Assistant'}: ${m.text}`)
+    .join('\n\n');
+
+  const prompt = `You are drafting two fields of a formal Case Intake Sheet for a Philippine public school's Child Protection Committee, based on the conversation transcript below.
+
+RULES:
+- Write in formal English regardless of what language the conversation used — this goes into an official case record.
+- Use coded terms only: "Learner A", "Learner B", "the respondent", etc. NEVER use a real name even if one appears in the transcript — replace it with a generic code label.
+- Be factual and neutral. Do not assign blame, guilt, or a legal conclusion — describe only what was reported.
+- immediate_actions must be concrete, doable right now (e.g. "Ensure the learner's immediate safety and separate them from the respondent if still on campus; document the report in the secure case logbook; notify the guidance counselor."), not a citation or legal analysis.
+
+Return ONLY valid JSON, no markdown, no explanation:
+{"narrative": "2-4 sentence factual incident summary, de-identified", "immediate_actions": "1-2 sentence suggested immediate next action(s)"}
+
+CONVERSATION TRANSCRIPT:
+${transcript}`;
+
+  const { text } = await callGeminiProxy({
+    action: 'protect_chat',
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    temperature: 0.3,
+    maxTokens: 512,
+    responseMimeType: 'application/json',
+  });
+
+  try {
+    const parsed = parseAIJson(text);
+    if (!parsed?.narrative && !parsed?.immediate_actions) return null;
+    return { narrative: parsed.narrative || '', immediate_actions: parsed.immediate_actions || '' };
+  } catch {
+    return null;
+  }
 }
