@@ -1,19 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, AlertCircle, Loader2, Archive, ArchiveRestore, Download } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { advanceCaseState, allowedNextStates, archiveCase, unarchiveCase } from '../services/caseService';
 import { subscribeSchoolProfile } from '../../../services/schoolFormsDb';
+import { downloadCaseReportDocx } from '../services/caseReportDocx';
 import { CASE_STATE_LABELS } from '../types';
 import NextMoveCard from './NextMoveCard';
 import EscalationBadge from './EscalationBadge';
-import CaseReportDoc from './CaseReportDoc';
+import CaseTimeline from './CaseTimeline';
 
 const btnSecondary = { background: 'var(--kt-surface)', color: '#1a3d2b', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 };
-
-function ts(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 export default function CaseDetail({ caseData, referralContacts, onBack, backLabel = 'Back to Case Board' }) {
   const { user, isAdmin } = useAuth();
@@ -22,7 +18,6 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
   const [exporting, setExporting] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState({});
   const [error, setError] = useState('');
-  const exportRef = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -31,32 +26,13 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
 
   const nextStates = allowedNextStates(caseData.state);
 
-  async function downloadPDF() {
+  async function handleExport() {
     setExporting(true);
+    setError('');
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-      const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#fff', useCORS: true, logging: false });
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      const imgData = canvas.toDataURL('image/png');
-
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position -= pageH;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-        heightLeft -= pageH;
-      }
-      pdf.save(`CaseReport_${caseData.id.slice(0, 8).toUpperCase()}.pdf`);
+      await downloadCaseReportDocx({ caseData, schoolProfile });
     } catch (err) {
-      setError(err.message || 'Could not generate the PDF export.');
+      setError(err.message || 'Could not generate the Word document.');
     } finally {
       setExporting(false);
     }
@@ -91,20 +67,14 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
 
   return (
     <div>
-      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
-        <div ref={exportRef}>
-          <CaseReportDoc caseData={caseData} schoolProfile={schoolProfile} />
-        </div>
-      </div>
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <button onClick={onBack} style={btnSecondary}>
           <ArrowLeft size={13} /> {backLabel}
         </button>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={downloadPDF} disabled={exporting} style={{ ...btnSecondary, opacity: exporting ? 0.6 : 1 }}>
+          <button onClick={handleExport} disabled={exporting} style={{ ...btnSecondary, opacity: exporting ? 0.6 : 1 }}>
             {exporting ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Download size={13} />}
-            {exporting ? 'Generating…' : 'Export PDF'}
+            {exporting ? 'Generating…' : 'Export DOCX'}
           </button>
           {isAdmin && (
             <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
@@ -153,18 +123,10 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
           </div>
 
           <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px' }}>
-            <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h4 style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Clock size={12} /> Timeline
             </h4>
-            {(caseData.timeline || []).map((entry, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 12 }}>
-                <span style={{ color: 'var(--kt-text-secondary)', flexShrink: 0, width: 110 }}>{ts(entry.at)}</span>
-                <span style={{ color: 'var(--kt-text-primary)' }}>
-                  {entry.state && <strong>{CASE_STATE_LABELS[entry.state] || entry.state}</strong>}
-                  {entry.state && entry.note ? ' — ' : ''}{!entry.state ? entry.note : ''}
-                </span>
-              </div>
-            ))}
+            <CaseTimeline timeline={caseData.timeline} />
           </div>
 
           {isAdmin && nextStates.length > 0 && (
