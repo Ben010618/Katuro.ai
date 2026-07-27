@@ -13,8 +13,8 @@ function ts(iso) {
   return new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function CaseDetail({ caseData, referralContacts, onBack }) {
-  const { user } = useAuth();
+export default function CaseDetail({ caseData, referralContacts, onBack, backLabel = 'Back to Case Board' }) {
+  const { user, isAdmin } = useAuth();
   const [advancing, setAdvancing] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState('');
@@ -52,14 +52,16 @@ export default function CaseDetail({ caseData, referralContacts, onBack }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <button onClick={onBack} style={btnSecondary}>
-          <ArrowLeft size={13} /> Back to Case Board
+          <ArrowLeft size={13} /> {backLabel}
         </button>
-        <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
-          {archiving
-            ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
-            : caseData.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-          {caseData.archived ? 'Restore from Archive' : 'Archive Case'}
-        </button>
+        {isAdmin && (
+          <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
+            {archiving
+              ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
+              : caseData.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+            {caseData.archived ? 'Restore from Archive' : 'Archive Case'}
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -105,7 +107,7 @@ export default function CaseDetail({ caseData, referralContacts, onBack }) {
             ))}
           </div>
 
-          {nextStates.length > 0 && (
+          {isAdmin && nextStates.length > 0 && (
             <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px' }}>
               <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Advance State</h4>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

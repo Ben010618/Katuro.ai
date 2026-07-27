@@ -3,7 +3,7 @@
 // Chat and auto-classification are deferred until the Layer 2 corpus exists.
 
 import {
-  collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, arrayUnion,
+  collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, arrayUnion, query, where,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CASE_STATES } from '../types';
@@ -39,6 +39,22 @@ export function allowedNextStates(currentState) {
 export function subscribeCases(onData, onError) {
   return onSnapshot(
     collection(db, 'protect_cases'),
+    (snap) => {
+      const cases = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      cases.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      onData(cases);
+    },
+    onError,
+  );
+}
+
+/** Real-time subscription to cases filed BY this user only — the Filed Cases
+ * tab, open to every teacher (not just admins). Firestore rules only allow a
+ * non-admin to read a case where createdBy matches their own uid, so this is
+ * the client-side counterpart of that same restriction, not just a filter. */
+export function subscribeMyCases(uid, onData, onError) {
+  return onSnapshot(
+    query(collection(db, 'protect_cases'), where('createdBy', '==', uid)),
     (snap) => {
       const cases = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       cases.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));

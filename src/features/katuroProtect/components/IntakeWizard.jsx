@@ -112,7 +112,10 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
       const finalForm = {
         ...form,
         date_reported: form.date_reported || new Date().toISOString().slice(0, 10),
-        received_by: { name: profile?.displayName || user?.email || '', position: form.received_by.position || 'LFO' },
+        received_by: {
+          name: form.received_by.name.trim() || profile?.displayName || user?.email || '',
+          position: form.received_by.position || 'Class Adviser',
+        },
       };
       const caseId = await createCase(finalForm, user?.uid);
       onCreated?.(caseId);
@@ -157,6 +160,15 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
           </div>
           <label style={labelStyle}>Location</label>
           <input style={{ ...inputStyle, marginBottom: 14 }} placeholder="e.g. Grade 8 hallway, canteen" value={form.location} onChange={(e) => set('location', e.target.value)} />
+
+          <label style={labelStyle}>Class Adviser</label>
+          <input
+            style={{ ...inputStyle, marginBottom: 14 }}
+            placeholder="Name of the class adviser filing this report"
+            value={form.received_by.name || profile?.displayName || user?.email || ''}
+            onChange={(e) => set('received_by.name', e.target.value)}
+          />
+
           <label style={labelStyle}>Reporter Role</label>
           <select style={inputStyle} value={form.reporter_role} onChange={(e) => set('reporter_role', e.target.value)}>
             {['learner', 'parent', 'teacher', 'anonymous', 'other'].map((r) => <option key={r} value={r}>{r}</option>)}
