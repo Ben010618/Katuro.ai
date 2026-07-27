@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { ShieldAlert, Send, ArrowRight, Loader2, MessageSquare } from 'lucide-react';
 import { askProtectChat } from '../services/protectGemini';
 import { detectRedFlags, RED_FLAG_PROTOCOLS } from '../constants/emergencyProtocols';
+import { splitTextWithCitations } from '../services/citationLookup';
+import CitationChip from './CitationChip';
+import CitationPanel from './CitationPanel';
 
 const FAQ_SUGGESTIONS = [
   'A learner was hit by a classmate in the hallway — what should we do first?',
@@ -41,7 +44,18 @@ function RedFlagCard({ flagKeys }) {
   );
 }
 
-function MessageBubble({ msg }) {
+function MessageText({ text, onCitationClick }) {
+  const segments = splitTextWithCitations(text);
+  return (
+    <>
+      {segments.map((seg, i) => seg.type === 'citation'
+        ? <CitationChip key={i} code={seg.code} onClick={onCitationClick} />
+        : <span key={i}>{seg.value}</span>)}
+    </>
+  );
+}
+
+function MessageBubble({ msg, onCitationClick }) {
   const isUser = msg.role === 'user';
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
@@ -53,7 +67,7 @@ function MessageBubble({ msg }) {
           border: isUser ? 'none' : '1px solid var(--kt-border)',
           borderRadius: 14, padding: '11px 15px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
         }}>
-          {msg.text}
+          {isUser ? msg.text : <MessageText text={msg.text} onCitationClick={onCitationClick} />}
         </div>
         {!isUser && !msg.pending && (
           <p style={{ margin: '6px 4px 0', fontSize: 10, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
@@ -70,6 +84,7 @@ export default function ProtectChatLanding({ onStartIntake }) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [activeCitation, setActiveCitation] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -168,11 +183,13 @@ export default function ProtectChatLanding({ onStartIntake }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 420 }}>
+      {activeCitation && <CitationPanel code={activeCitation} onClose={() => setActiveCitation(null)} />}
+
       <div style={{ flex: 1, marginBottom: 14 }}>
         {messages.map((m, i) => (
           m.pending
             ? <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}><Loader2 size={16} style={{ animation: 'kt-spin 0.8s linear infinite' }} color="#9bb8a5" /></div>
-            : <MessageBubble key={i} msg={m} />
+            : <MessageBubble key={i} msg={m} onCitationClick={setActiveCitation} />
         ))}
         <div ref={scrollRef} />
       </div>

@@ -13,7 +13,7 @@
 // simplification for a Layer-1-only, low-volume, admin-only chat. Real RAG
 // (Firestore vector search over chunked Layer 1 + Layer 2) is Phase 3 once
 // the corpus exists.
-import brainBankText from '../../../../KaturoProtect/kaTuro_Protect_BrainBank.md?raw';
+import brainBankText from './brainBankSource';
 import { callGeminiProxy } from '../../../services/geminiConfig';
 
 function extractPartH(fullText) {
@@ -32,7 +32,7 @@ Only BrainBank Layer 1 (summaries, routing logic, procedures, form schemas, the 
 Next-Move Engine) is loaded right now. Layer 2 (verbatim RA/DepEd-order text) has NOT been
 ingested yet. Because of this:
 - You may confidently answer ROUTING and PROCEDURAL questions (which law/office likely
-  applies, what the next procedural step is, who to talk to) citing "[BrainBank Part X]".
+  applies, what the next procedural step is, who to talk to).
 - You must treat ANY question asking for sanction ranges, penalty amounts, fines, exact
   day-count deadlines, or a verbatim quote as Tier 2 by default: open with
   "⚠️ OUTSIDE KNOWLEDGE BASE — VERIFY BEFORE ACTING", still name the specific law/issuance,
@@ -40,6 +40,15 @@ ingested yet. Because of this:
   "Please verify with your Division Legal Officer or the LRPO before acting on this."
 - Never fabricate a section number or quote. If you are not certain a section says what
   you're about to claim, say so and route to Tier 2/3 instead.
+
+CITATION FORMAT — follow this EXACTLY, every time you reference the knowledge base, so the
+app can verify your citation against the real text and show it to the user:
+- For a lettered sub-section (the "### X1." headings, e.g. "### A1. RA 7610..."), cite as
+  [BrainBank A1] — just the code in brackets, no extra words, no "Part" prefix.
+- For a whole top-level Part with no sub-heading (e.g. "## PART D"), cite as [BrainBank Part D].
+- Cite EVERY factual claim that comes from the knowledge base, immediately after the sentence
+  it supports. Do not cite anything you did not actually draw from the provided text.
+- Never invent a code that doesn't exist in the knowledge base above.
 `;
 
 const SYSTEM_PROMPT = `${PART_H_SYSTEM_PROMPT}\n${CORPUS_STATE_NOTE}`;
