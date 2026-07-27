@@ -112,9 +112,9 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
         {intake.date_of_incident} · {intake.location} · Complainant {intake.complainant?.code_name} / Respondent {intake.respondent?.code_name}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18, alignItems: 'start' }}>
-        <div style={{ display: 'grid', gap: 14 }}>
-          <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18, alignItems: 'start', minWidth: 0 }}>
+        <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
+          <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px', minWidth: 0 }}>
             <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Narrative</h4>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{intake.incident_narrative || '—'}</p>
             <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
@@ -122,7 +122,7 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
             </p>
           </div>
 
-          <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px', minWidth: 0 }}>
             <h4 style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Clock size={12} /> Timeline
             </h4>
