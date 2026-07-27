@@ -25,7 +25,7 @@ import {
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
-  { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, adminOnly: true },
+  { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, adminOnly: true, highlight: 'red' },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
@@ -118,10 +118,14 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
             style={({ isActive }) => highlight ? {
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '9px 10px', borderRadius: 9, textDecoration: 'none',
-              background: 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)',
+              background: highlight === 'red'
+                ? 'linear-gradient(160deg, #dc2626 0%, #b91c1c 60%, #450a0a 100%)'
+                : 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)',
               color: '#fff', fontWeight: 700, fontSize: 13,
               marginBottom: 6,
-              boxShadow: isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)',
+              boxShadow: isActive
+                ? (highlight === 'red' ? '0 3px 14px rgba(127,29,29,0.55)' : '0 3px 14px rgba(13,34,24,0.55)')
+                : (highlight === 'red' ? '0 2px 8px rgba(127,29,29,0.35)' : '0 2px 8px rgba(13,34,24,0.35)'),
               transition: 'box-shadow 0.14s, transform 0.14s',
               transform: isActive ? 'scale(1.01)' : 'none',
             } : {
@@ -144,7 +148,10 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
                 : isNew ? '3px solid rgba(83,74,183,0.3)' : '3px solid transparent',
             }}
             onMouseEnter={e => {
-              if (highlight) { e.currentTarget.style.boxShadow = '0 4px 18px rgba(13,34,24,0.65)'; return; }
+              if (highlight) {
+                e.currentTarget.style.boxShadow = highlight === 'red' ? '0 4px 18px rgba(127,29,29,0.65)' : '0 4px 18px rgba(13,34,24,0.65)';
+                return;
+              }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
                 Object.assign(e.currentTarget.style, isNew
                   ? { background: dark ? 'rgba(83,74,183,0.18)' : '#ede9ff', color: '#534AB7' }
@@ -154,7 +161,9 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
             onMouseLeave={e => {
               if (highlight) {
                 const isActive = e.currentTarget.getAttribute('aria-current') === 'page';
-                e.currentTarget.style.boxShadow = isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)';
+                e.currentTarget.style.boxShadow = highlight === 'red'
+                  ? (isActive ? '0 3px 14px rgba(127,29,29,0.55)' : '0 2px 8px rgba(127,29,29,0.35)')
+                  : (isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)');
                 return;
               }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
