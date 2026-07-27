@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { trackEvent } from '../../services/usageTracker';
-import { ArrowRight, CalendarDays } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const SUBJECTS = [
   'Science', 'Mathematics', 'English', 'Filipino',
@@ -40,6 +40,12 @@ export default function DLLStep1() {
   }, [user?.uid]);
 
   const canNext = store.subject.trim() && store.gradeLevel.trim() && store.term.trim();
+
+  // "Other" support: SUBJECTS is a fixed list, but a teacher may need a
+  // subject not on it. Track separately from store.subject so the typed
+  // value stays a plain string everywhere downstream — this flag only
+  // controls which UI (dropdown vs text input) is shown.
+  const [showOtherSubject, setShowOtherSubject] = useState(() => !!store.subject && !SUBJECTS.includes(store.subject));
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -78,12 +84,28 @@ export default function DLLStep1() {
             </label>
             <select
               className="select"
-              value={store.subject}
-              onChange={e => store.setField('subject', e.target.value)}
+              value={showOtherSubject ? 'Other' : store.subject}
+              onChange={e => {
+                const v = e.target.value;
+                if (v === 'Other') { setShowOtherSubject(true); store.setField('subject', ''); }
+                else { setShowOtherSubject(false); store.setField('subject', v); }
+              }}
             >
               <option value="">Select subject...</option>
               {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+              <option value="Other">Other</option>
             </select>
+            {showOtherSubject && (
+              <input
+                value={store.subject}
+                onChange={e => store.setField('subject', e.target.value)}
+                placeholder="Type the subject name"
+                style={{ ...inputStyle, marginTop: 8 }}
+                onFocus={e => (e.target.style.borderColor = '#2d6a4f')}
+                onBlur={e  => (e.target.style.borderColor = 'rgba(45,106,79,0.2)')}
+                autoFocus
+              />
+            )}
           </div>
 
           {/* Grade Level */}

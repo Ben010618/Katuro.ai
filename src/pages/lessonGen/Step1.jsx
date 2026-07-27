@@ -3,7 +3,7 @@ import { useLessonGenStore } from '../../store/lessonGenStore';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const SUBJECTS  = ['Science','Mathematics','English','Filipino','Araling Panlipunan','MAPEH','GMRC / ESP','Makabansa','Reading & Literacy','Language','TLE / EPP'];
-const GRADES    = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10'];
+const GRADES    = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
 const TERMS     = ['Term 1','Term 2','Term 3'];
 const WEEKS     = Array.from({length:10},(_,i)=>`Week ${i+1}`);
 const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -121,13 +121,16 @@ export default function Step1() {
   const store = useLessonGenStore();
 
   const [subject,   setSubject]  = useState(store.subject      || '');
+  // "Other" support: SUBJECTS is a fixed list, but a teacher may need a
+  // subject not on it. Track separately from `subject` itself so the typed
+  // value stays a plain string everywhere downstream (store, AI prompts) —
+  // this flag only controls which UI (dropdown vs text input) is shown.
+  const [showOtherSubject, setShowOtherSubject] = useState(() => !!store.subject && !SUBJECTS.includes(store.subject));
   const [grade,     setGrade]    = useState(store.gradeLevel   || '');
   const [term,      setTerm]     = useState(store.term         || '');
   const [week,      setWeek]     = useState(store.weekNumber   || '');
   const [days,      setDays]     = useState(store.selectedDays || []);
-  const [showLabel, setShowLabel]= useState(!!(store.subject && store.gradeLevel && store.term && store.weekNumber));
-
-  useEffect(()=>{ setShowLabel(!!(subject && grade && term && week)); },[subject,grade,term,week]);
+  const showLabel = !!(subject && grade && term && week);
 
   useEffect(()=>{
     store.setStep1({ subject, gradeLevel: grade, term, weekNumber: week, selectedDays: days });
@@ -165,7 +168,30 @@ export default function Step1() {
             <label style={{display:'block',marginBottom:6,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
               Subject area <span style={{color:'#e05c5c'}}>*</span>
             </label>
-            {S('subject',{val:subject,set:setSubject,list:SUBJECTS})}
+            <select
+              className="select"
+              value={showOtherSubject ? 'Other' : subject}
+              onChange={e => {
+                const v = e.target.value;
+                if (v === 'Other') { setShowOtherSubject(true); setSubject(''); }
+                else { setShowOtherSubject(false); setSubject(v); }
+              }}
+            >
+              <option value="">Select subject...</option>
+              {SUBJECTS.map(o=><option key={o} value={o}>{o}</option>)}
+              <option value="Other">Other</option>
+            </select>
+            {showOtherSubject && (
+              <input
+                type="text"
+                className="input"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                placeholder="Type the subject name"
+                style={{marginTop:8}}
+                autoFocus
+              />
+            )}
           </div>
 
           <div>
