@@ -135,10 +135,14 @@
 - **Key points:** risk-based classification of AI uses; chatbots for administrative queries = low risk; PROHIBITED: manipulative chatbots for minors, social scoring, biometric/emotion recognition, untargeted facial-image scraping; AI must not replace human judgment or be sole basis for grading/major decisions; mandates Privacy Impact Assessments and a DepEd AI Registry for deployments; requires compliance with data privacy and child protection laws before deployment.
 - **Action items for kaTuro:** conduct and document a PIA; check AI Registry requirements before school-wide deployment; keep the human-in-the-loop design.
 
-### B5. DepEd Order No. 006, s. 2026 — School Safety guidelines (April 2026)
-- **Status:** In force. Part of the School Safety Campaign.
-- **Key points:** classifies critical security offenses (e.g., bomb threats, deadly weapons) with severe disciplinary penalties; regulates use of portable electronic devices during instructional hours for learners AND personnel (social media, games, vlogging during class prohibited); strengthens campus security, crisis preparedness, and protection mechanisms.
-- **Route here for:** weapons/threat incidents; device-use violations; campus security questions.
+### B5. DepEd Order No. 006, s. 2026 — Guidelines on Ensuring a Safe and Motivating Learning Environment (ESMLE) [✅ VERBATIM COPY IN CORPUS — verified]
+- **Signed:** March 24, 2026 (Sec. Sonny Angara). **Status:** In force. **THE operational harmonizing framework** — consolidates prevention and response guidelines across all LRP (Learner Rights Protection) concerns: bullying, gender-based violence, abuse, discrimination, and more, in physical and virtual settings.
+- **Repeals ONLY:** DO 6 s. 1954 (hazing), DO 70 s. 1999 / DO 26 s. 2000 / DO 83 s. 2003 (old cellphone prohibitions), and inconsistent issuances. **Does NOT repeal** DO 40 s. 2012, DO 18 s. 2015, the Revised Anti-Bullying IRR, etc. — it supplements and harmonizes them (Sec. III).
+- **Governs/coordinates these issuances:** DO 40 s. 2012 (CPP); DO 18 s. 2015 (Children-at-Risk & CICL); DO 32 s. 2017 (Gender-Responsive Basic Ed); DO 57 s. 2017 (Children in Armed Conflict); DO 32 s. 2019 (Zones of Peace); DO 47 & 49 s. 2022 (Professionalism); DM-OUOPS-2024-05-01167 (CSAC handling); DM-OUOPS-2024-05-07998 (Supplemental CPP guidelines); Revised IRR of RA 10627.
+- **Key structures:** ESMLE Framework (whole-of-society approach; prevention strategies = protocols, education/awareness, advocacy; response strategies = SOPs, interventions, monitoring/reporting). Learner Handbook + Standardized Code of Conduct (learners AND personnel). Localized Anti-Bullying Policy per school (Annex D template). Security measures: visitor ID, non-contact bag inspections (NO stop-and-frisk/pat-downs), monthly random bag inspection plan, vehicle inspection, CCTV, prohibited items and confiscation protocol (Annex F), device prohibition during instructional hours with academic/emergency exceptions (Annex G sanctions).
+- **Response machinery (Sec. VII):** Initial Risk Assessment Form (Annex H) by CPC through guidance counselor/LFO/school head; incident reporting with 48-hour referral rule; Fact-Finding Investigations; referral protocols; investigation protocols per DO 40 s. 2012, DO 15 s. 2012 (ADR/mediation), DO 49 s. 2006 (Revised Rules of Procedure in Administrative Cases); due process minimums; annexed process flows (Annex A: Adult→Learner; Annex B: Learner→Learner; Annex C: Learner→Community/CAR-CICL).
+- **Confidentiality (Sec. XII):** strict; access limited to authorized personnel; breaches = administrative action; RA 10173 applies.
+- **Route here for:** ANY LRP case as the current operational playbook; the workflow ladder (Part P); sanctions tables (Part P4); security/device incidents; hotlines.
 
 ### B6. DepEd Order No. 32, s. 2017 — Gender-Responsive Basic Education Policy
 - **Status:** In force. Frames gender-responsiveness duties; pairs with RA 11313 for GBSH cases and SOGIE-based discrimination/bullying.
@@ -397,11 +401,18 @@ STRICT RULES:
 | 13 | RA 10173 + IRR; NPC advisories on schools/children's data | Official Gazette / privacy.gov.ph |
 | 14 | RA 11036; RA 12080 | Official Gazette |
 | 15 | DO 003, s. 2026 (AI in Basic Education) | deped.gov.ph (posted Feb 20, 2026) |
-| 16 | DO 006, s. 2026 (School Safety) | deped.gov.ph |
+| 16 | DO 006, s. 2026 (ESMLE) + Annexes A–K | ✅ OBTAINED — in `katuroProtect/corpus/` (verified; Part P sourced from it) |
 | 17 | DO 32, s. 2017 (Gender-Responsive Basic Ed) | deped.gov.ph |
 | 18 | 2017 RACCS (CSC Resolution No. 1701077) | csc.gov.ph |
 | 19 | RA 4670 (Magna Carta for Public School Teachers) | Official Gazette / lawphil.net |
 | 20 | Your Division Office's prescribed CP/bullying report templates | Your SDO records section |
+| 21 | DO 18, s. 2015 (Children-at-Risk & CICL management, incl. Appendix A risk tools + CICL Intake Form) | deped.gov.ph |
+| 22 | DO 49, s. 2006 (Revised Rules of Procedure in Administrative Cases) | deped.gov.ph |
+| 23 | DO 15, s. 2012 (Alternative Dispute Resolution / mediation framework) | deped.gov.ph |
+| 24 | DO 57, s. 2017 (Protection of Children in Armed Conflict) + DM-OUOPS-2024-05-01167 (CSAC protocols) | deped.gov.ph |
+| 25 | DO 32, s. 2019 (Learners and Schools as Zones of Peace) | deped.gov.ph |
+| 26 | DO 47, s. 2022 + DO 49, s. 2022 (Promotion of Professionalism) | deped.gov.ph |
+| 27 | DM-OUOPS-2024-05-07998 (Supplemental CPP guidelines — source of the Annex H risk form) + OM-OUPS-2024-05-01115 (Safe Spaces Act implementation in basic education) | deped.gov.ph / SDO |
 
 **Ingestion pipeline (fits your stack):** PDF → text extraction → clean → chunk (per Section, ~500–800 tokens, with parent-document metadata) → embed → Firestore vector search collection `brain_chunks` → retrieval top-k 6–10 with metadata filter `status: in_force` by default.
 
@@ -617,3 +628,108 @@ Cover at least: first-incident bullying; repeat cyberbullying (T2); pattern case
 4. Pass all Part O pre-deployment gates, including the Division Legal Officer sign-off.
 
 **Bottom line:** the brain's skeleton, nervous system, and safety reflexes are done and internally consistent; the verbatim memory (Layer 2) and the local contacts are the remaining work before real CPC members should rely on it.
+
+---
+
+## PART P — VERIFIED WORKFLOW LADDER & SANCTIONS (from DO 006, s. 2026 verbatim + Annexes)
+
+> ✅ This Part is sourced directly from the official DO 006, s. 2026 PDF now in `katuroProtect/corpus/`. Timelines and penalties here are VERIFIED. The chatbot may quote them with citation [DO 006, s. 2026, Sec./Annex ___]. Note: the Annex D penalty tables are DepEd's TEMPLATE — they become binding for a school once adopted in that school's Localized Anti-Bullying Policy; the bot should ask whether the school has adopted Annex D in full or modified it.
+
+### P1. The three-level discipline ladder (WHO handles WHAT)
+
+**Level 1 — Teacher / Class Adviser** (minor bullying acts & precursors; minor non-bullying offenses)
+1. Observe or receive report of a minor incident (profanity at a learner, pranks/disruptive behavior, grabbing belongings, punching/pinching or fighting WITHOUT physical injuries; precursors to bullying).
+2. Immediately conduct initial assessment and apply intervention/guidance at classroom level (positive discipline only — corporal punishment strictly prohibited, DO 40).
+3. DOCUMENT even if resolved on the spot: accomplish Incident Report; report to designated school authorities (documentation duty exists even for resolved incidents — Sec. 26.c).
+4. Refer report to the proper Disciplining Authority **within 48 hours of receipt** (Sec. VII.A.2.a).
+5. If behavior persists or escalates → refer to the **Learner Formation Officer** (and follow school policy).
+
+**Level 2 — Learner Formation Officer (LFO / "Discipline Officer")** (serious bullying acts; serious non-bullying offenses)
+- Designated by the School Head; **the School Counselor may NOT be designated as LFO** (Annex D Sec. 23.a). Renders **desk duty at least 2 hours per day** for reporting/consultations (Sec. 25.e). Contact details must be posted in every classroom (Sec. 23.d).
+1. Receive referrals/reports (including anonymous reports — these must be entertained and reporters protected from retaliation, BUT no sanction may rest solely on an anonymous report without substantiating evidence — Annex D Sec. 12).
+2. Ensure immediate safety: stop the act, separate learners, remove victim (or bully) from the scene, secure medical attention + medical certificate where there's physical injury (Sec. 10).
+3. Accomplish Intake Sheet + Incident Report; trigger the **Initial Risk Assessment Form (Annex H)** through the registered guidance counselor/designate.
+4. Conduct formal proceeding for serious acts; coordinate interventions with the School Counselor (counselor interventions supplement, never substitute, discipline — Annex D Sec. 20).
+5. **Fact-Finding Investigation:** for substantiated reports; separate interviews; assess threat level; inform victim's parents of protective steps; submit complete written report with findings and recommendations to the School Head **within 10 calendar days** (Sec. VII.A.2.b; Annex D Sec. 15).
+6. If beyond LFO resolution → elevate to Principal/School Head (Level 3).
+
+**Level 3 — Principal / School Head + CPC** (severe/complex acts affecting safety and well-being)
+1. Convene/lead the CPC; conduct thorough investigation; notify parents/parent-substitutes; implement safety plans; coordinate with law enforcement as necessary (Annex D Sec. 19.c).
+2. Observe procedural due process minimums (Sec. VII.A.4.a): (i) WRITTEN NOTICE of complaint + evidence; (ii) RIGHT TO ANSWER in writing — within **10 calendar days** with parent/guardian/counsel assistance (general LRP cases) or within **5 school days** in bullying cases under the Annex D policy (Sec. 16.b); (iii) WRITTEN DECISION stating facts and basis; (iv) APPEAL route.
+3. **Decision deadline:** the Disciplining Authority must decide **within 30 calendar days** of receipt of the report/complaint, absent valid postponement (Annex D Sec. 17). School Head submits investigation results to the **SDS and Regional Director within 30 calendar days** of receipt of the complaint (Sec. VII.A.2.c).
+4. **Appeals:** general administrative route per DO 49, s. 2006 — appeal to the immediate higher authority (SDS or RD) **within 15 days** of receipt; late filing = dismissal. BULLYING cases: appeal to the **Office of the Undersecretary for Legal and Legislative Affairs within 10 days**, per the Revised IRR Rule V (Sec. VII.A.4.a.iv; Annex D Sec. 18).
+5. **When crime is involved:** serious physical injuries or death → RA 9344 (Juvenile Justice) governs alongside; school refers criminal aspects to the proper agency; administrative case proceeds independently (Annex D Sec. 9). Notify law enforcement where RPC charges may be pursued (Sec. 23.i.a).
+6. **Reporting up:** annual report on bullying cases/interventions/statistics to the SDO **within the first week of each school year**; SDO consolidates to RO and LRPD **within the first month** (Sec. VII.A.2.d–e).
+
+**Support roles at every level:** School Counselor/Associate (psychosocial assessment, interventions for victim AND bully, monitoring — Annex D Secs. 20, 24); CPC (risk assessment, deliberation, restorative justice panel for CAR cases per DO 18, s. 2015); parents (must be informed promptly and in writing at Level 2/3 and for any formal investigation).
+
+### P2. The three official process flows (Annexes A–C) — routing for the Next-Move Engine
+| Flow | Trigger | Path |
+|---|---|---|
+| **Annex A: Adult → Learner** | Any adult harms/abuses a learner | Risk Assessment → Intake Sheet (DO 40) + Incident Report → IF respondent is school personnel: Investigation Stage per **DO 49, s. 2006** (administrative procedure) → IF non-personnel: refer to **LSWDO, PNP-WCPD, PNP-ACG, or Hospital WPCU** → Interventions (PFA, MHPSS, counseling) → Post-incident support |
+| **Annex B: Learner → Learner** | Bullying (physical, social, verbal, cyber, gender-based, psychological) | Report to school authorities → Identify discipline level (1st/2nd/3rd) → Intake Sheet + Incident Report → Level-appropriate discipline (parents informed in writing; formal investigation for L2/L3) → persists? → LFO per school policy → **If a crime resulted (e.g., physical assault): follow DO 18, s. 2015, inform parents in writing, refer to LSWDO / PNP-WCPD / PNP-ACG** → Incident monitoring → Post-incident support |
+| **Annex C: Learner → Community** | Learner may harm others / CAR / CICL | **Children-at-Risk:** status offense → CAR Restorative Justice Procedures with **CPC as the Restorative Justice Panel** (DO 18, s. 2015); no status offense → profiling + Initial Risk Assessment (DO 18 Appendix A) → case conference → needs-based intervention plan (CPC support per DO 40) → implement/monitor → terminate plan. **CICL (incl. OSAEC/CSAEM, SSA violations):** IMMEDIATE reporting to law enforcement + CICL Intake Form → CICL Management Procedure per DO 18, s. 2015 |
+
+### P3. Verified timeline table (bot may quote)
+| Step | Deadline | Source |
+|---|---|---|
+| Refer accomplished incident report to Disciplining Authority | 48 hours from receipt | DO 006 Sec. VII.A.2.a; Annex D Sec. 14 |
+| FFI report (findings + recommendations) to School Head | 10 calendar days | DO 006 Sec. VII.A.2.b; Annex D Sec. 15.d |
+| Respondent's written answer (bullying policy) | 5 school days from receipt of complaint | Annex D Sec. 16.b |
+| Respondent's written answer (general LRP due process) | 10 calendar days | DO 006 Sec. VII.A.4.a.ii |
+| Disciplining Authority's decision | 30 calendar days from receipt | Annex D Sec. 17 |
+| School Head submits investigation results to SDS + RD | 30 calendar days from receipt | DO 006 Sec. VII.A.2.c |
+| Appeal (general, per DO 49 s. 2006) | 15 days to SDS/RD | DO 006 Sec. VII.A.4.a.iv |
+| Appeal (bullying) | 10 days to Office of the Usec for Legal & Legislative Affairs | Annex D Sec. 18; Revised IRR Rule V |
+| Annual bullying report to SDO | First week of each school year | DO 006 Sec. VII.A.2.d |
+| SDO consolidated report to RO + LRPD | First month of each school year | DO 006 Sec. VII.A.2.e |
+| Preventive suspension (expulsion-level bullying case, strong evidence) | Up to 30 days | Annex D Sec. 21 |
+
+### P4. VERIFIED SANCTIONS TABLES (present as ranges; deciding authority imposes after due process)
+
+**P4.a Bullying cases (Annex D template, Sec. 21) — becomes binding once adopted in the school's localized policy**
+| Level | Example acts | 1st offense | 2nd offense | 3rd+ offense |
+|---|---|---|---|---|
+| **L1 — minor acts & precursors** (profanities at a learner; pranks/disruption; grabbing belongings; punching/pinching/fighting w/o injuries) | Teacher handles | Written reprimand + summon parents | Suspension 3 days | Suspension 5 days |
+| **L2 — serious acts** (stalking; catcalling/slurs incl. misogynistic, transphobic, homophobic, sexist; persistent uninvited comments; sexual comments; assault w/ slight injuries; theft; intimidation/threats) | LFO handles | Suspension 5 days + summon parents + referral to SWDO | Non-readmission | Exclusion |
+| **L3 — severe acts** (injuries needing ≥10 days medical intervention; lewd acts/exposure; uploading/sharing degrading videos; sharing sexual content incl. for profit) | School Head handles | Exclusion | — | — |
+- Definitions: **Suspension** = temporary bar from classes with educational interventions provided; **Non-readmission** = finishes current SY, not admitted next SY; **Exclusion** = immediately dropped from class list with placement support (Annex D Sec. 3). Bully + parents must also undergo an intervention program (Sec. 21). Retaliation and knowingly false accusations are themselves punishable (Secs. 5.d–e).
+
+**P4.b Non-bullying LRP offenses (Annex I) — learners**
+| Level | Example acts | Penalties |
+|---|---|---|
+| **First Level** (minor: profanities; fake news causing commotion; pranks; grabbing belongings; simple vandalism ≤ PHP 500; punching/pinching or fighting w/o injuries; carrying liquor/cigarettes/vapes/porn materials) | 1st: written reprimand + parental notice · 2nd: reprimand + Call Slip summon · 3rd: suspension ≤5 days with alternative learning |
+| **Second Level** (serious: stalking; assault w/ slight injuries (1–9 days medical); theft; threats incl. electronic; gambling; smoking/vaping; serious vandalism > PHP 500; lewd exposure/groping) | 1st: suspension ≤5 days + SWDO referral · 2nd: non-readmission + SWDO · 3rd: exclusion + SWDO |
+| **Third Level** (severe: fraternity/gang recruitment; cheating incl. "sagot for sale"; bomb threats/jokes; serious injuries (≥10 days); drugs (observe RA 9165 Sec. 21 chain of custody); liquor/intoxication; lascivious acts; sexual exploitation/assault/rape; deadly weapons; homicide/murder; hazing; degrading uploads; online sexual content for profit) | 1st: non-readmission + referral (PNP/SWDO) · 2nd: exclusion + referral |
+- **Personnel committing analogous acts:** administrative actions/sanctions per existing DepEd and Civil Service rules, without prejudice to civil/criminal action (Annex I, all levels; investigation per DO 49, s. 2006).
+
+**P4.c Portable electronic device violations (Annex G)**
+- Learners: 1st — temporary confiscation, return end of subject period + Confiscation Slip (Annex J); 2nd — confiscation until end of class hours + slip + formal parental notice; 3rd+ — device deposited with School Head, released only to parent/guardian + Call Slip (Annex K) + disciplinary action.
+- Personnel: violations are ground for administrative disciplinary action initiated by disciplining authorities.
+
+### P5. Emergency hotlines (verified — preload into Referral Directory)
+| Hotline | Number |
+|---|---|
+| National Emergency Hotline | 911 |
+| MAKABATA Helpline (Mahalin at Kalingain Ating Mga Bata) | 1383 |
+| NCMH Crisis Hotline | 1553 |
+| Learners' Telesafe Contact Center Helpline (LTCCH) | (02) 8632-1372 |
+| NBI Anti-Violence Against Women and Children Division | (02) 8525-6028 |
+| DepEd Learner Rights and Protection Division | weprotectlearners@deped.gov.ph · (02) 8632-1372 |
+- Coordination with emergency services does NOT exempt the school from accomplishing the formal incident report immediately after the response (DO 006 Sec. VIII).
+
+### P6. Additional verified definitions (merge into Part C glossary)
+| Term | Definition (DO 006 / Annex D) |
+|---|---|
+| Precursor to Bullying | Acts (physical, verbal, or electronic) indicating bullying may occur or is starting |
+| Retaliation | Intimidation/reprisal/harassment vs. a reporter, witness, or informant of bullying |
+| Upstander | Person who speaks/acts/intervenes on behalf of a bullied learner |
+| Bystander | Person who witnesses or has personal knowledge of bullying/retaliation |
+| Disciplining Authority | The teacher, LFO, or Principal/School Head tasked per discipline level |
+| Hostile environment | Unwelcome/offensive behavior creating an intimidating, unfriendly, aggressive, or abusive atmosphere |
+| Suspension | Temporary bar from classes for a specified number of days; learner marked absent but given educational interventions |
+| Non-readmission | May finish current school year; not admitted the following school year |
+| Exclusion | Immediately dropped from the class list; placement support per assessment |
+| LRP Concerns | Umbrella term: child abuse, violence, exploitation, discrimination, bullying, GBSH, and any condition prejudicial to learners' development on any ground (incl. SOGIE, HIV status, pregnancy, CICL status, disability) |
+| Bullying coverage zones | School grounds; within 2 km of school; school activities before/during/after; bus stops and school vehicles; any technology owned/leased/used by the school; and off-campus/online acts creating a hostile environment at school (Annex D Sec. 5) |
+- **v1.3 (July 2026):** MAJOR VERIFICATION UPDATE. Ingested official DO 006, s. 2026 (ESMLE) PDF into corpus. Rewrote B5 with verified summary. Added Part P: verified three-level workflow ladder (Class Adviser/Teacher → LFO → School Head/CPC), Annex A–C process flows, verified timeline table (48-hr referral, 10-day FFI, 30-day decision, appeal routes), verified sanctions tables for bullying (Annex D template) and non-bullying offenses (Annex I) and device violations (Annex G), verified emergency hotlines, and new definitions. Expanded Part I checklist with 7 newly identified issuance families (DO 18 s. 2015, DO 49 s. 2006, DO 15 s. 2012, DO 57 s. 2017, DO 32 s. 2019, DO 47/49 s. 2022, 2024 memoranda). Several Part E/J.2 [QUOTE FROM SOURCE] items are now resolved by Part P.
