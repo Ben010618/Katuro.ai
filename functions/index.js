@@ -128,6 +128,7 @@ const PROXY_LIMITS = {
   test_builder_items:  60,  // generateItemsForCompetency — one call per TOS row
   action_research_ai:  30,  // shared across all 6 AR generation phases (matches existing client limit)
   scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
+  protect_chat:        40,  // kaTuro Protect chat — admin-only for now, low volume
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 

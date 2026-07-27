@@ -1,36 +1,20 @@
 import { useState } from 'react';
 import { ShieldCheck, ClipboardList, MessageSquare, LayoutList, Settings as SettingsIcon } from 'lucide-react';
 import DisclaimerBanner from './components/DisclaimerBanner';
+import ProtectChatLanding from './components/ProtectChatLanding';
 import IntakeWizard from './components/IntakeWizard';
 import CaseBoard from './components/CaseBoard';
 import ReferralDirectory from './components/ReferralDirectory';
 
 const TABS = [
-  { id: 'intake',   label: 'Intake',   Icon: ClipboardList },
   { id: 'chat',     label: 'Chat',     Icon: MessageSquare },
+  { id: 'intake',   label: 'Intake',   Icon: ClipboardList },
   { id: 'cases',    label: 'Cases',    Icon: LayoutList },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
-function ChatComingSoon() {
-  return (
-    <div style={{
-      background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)',
-      padding: '48px 24px', textAlign: 'center',
-    }}>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Chat — coming soon</p>
-      <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--kt-text-secondary)', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
-        The AI chat needs the verbatim legal corpus (Layer 2 — the official RA/DepEd Order texts) loaded
-        first. Answering legal questions from BrainBank summaries alone risks exactly the kind of
-        under-sourced guidance the anti-hallucination rules exist to prevent, so this stays off until
-        the corpus is in place.
-      </p>
-    </div>
-  );
-}
-
 export default function KaturoProtectPage() {
-  const [activeTab, setActiveTab] = useState('intake');
+  const [activeTab, setActiveTab] = useState('chat'); // chat-ready landing per product decision
   const [openCaseId, setOpenCaseId] = useState(null);
 
   function handleCaseCreated(caseId) {
@@ -69,13 +53,13 @@ export default function KaturoProtectPage() {
         ))}
       </div>
 
+      {activeTab === 'chat'     && <ProtectChatLanding onStartIntake={() => setActiveTab('intake')} />}
       {activeTab === 'intake'   && <IntakeWizard onCreated={handleCaseCreated} />}
-      {activeTab === 'chat'     && <ChatComingSoon />}
       {activeTab === 'cases'    && <CaseBoard initialCaseId={openCaseId} onCaseOpened={setOpenCaseId} />}
       {activeTab === 'settings' && <ReferralDirectory />}
 
       <p style={{ margin: '24px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
-        BrainBank v1.0 · compiled July 2026
+        BrainBank v1.0 · compiled July 2026 · Chat grounded in Layer 1 only — verify sanctions/deadlines against official sources
       </p>
     </div>
   );
