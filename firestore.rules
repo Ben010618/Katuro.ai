@@ -125,14 +125,18 @@ service cloud.firestore {
     // ── kaTuro Protect — child protection decision-support module ───────────
     // BrainBank access model calls for role/schoolId scoping (school_head,
     // cpc_member, guidance, lfo) — that role system doesn't exist in this app
-    // yet (only isAdmin), so every protect_* collection is admin-only for now.
-    // Tighten to real roles once that system is built; do not open these to
-    // regular teachers in the meantime — this is sensitive minor data.
+    // yet (only isAdmin). The tool itself (Chat, Intake) is open to all
+    // authenticated teachers; case DATA stays admin-only — a teacher can file
+    // a report but not browse other people's cases. Tighten further once a
+    // real role system exists.
     match /protect_chunks/{chunkId} {
       allow read, write: if isAdmin();
     }
     match /protect_cases/{caseId} {
-      allow read, write: if isAdmin();
+      // Any authenticated teacher can file a new report via Intake; only
+      // admins can read the Case Board or modify/advance an existing case.
+      allow create: if request.auth != null;
+      allow read, update, delete: if isAdmin();
     }
     match /protect_chat_sessions/{sessionId} {
       allow read, write: if isAdmin();

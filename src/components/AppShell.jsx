@@ -25,7 +25,7 @@ import {
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
-  { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, adminOnly: true, highlight: 'red' },
+  { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, highlight: 'red' },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },

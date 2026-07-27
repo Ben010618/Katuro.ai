@@ -179,8 +179,9 @@ export default function App() {
             {/* kaTuro Shares — teacher community feed, the app's new landing page */}
             <Route path="shares/*" element={<SharesLayout />} />
 
-            {/* kaTuro Protect — child protection decision-support (admin-only for now) */}
-            <Route path="protect" element={<AdminRoute><KaturoProtectPage /></AdminRoute>} />
+            {/* kaTuro Protect — chat + intake open to all teachers; case data
+                stays admin-only, enforced inside the page itself + Firestore rules */}
+            <Route path="protect" element={<KaturoProtectPage />} />
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
