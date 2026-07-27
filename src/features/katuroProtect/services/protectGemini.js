@@ -1,18 +1,24 @@
-// Gemini calls for kaTuro Protect chat. Grounded in BrainBank Layer 1 only —
-// Layer 2 (verbatim law/DepEd-order text) hasn't been ingested yet (empty
-// katuroProtect/corpus/). Per the BrainBank's own Part O1 readiness gate #1
-// ("No deployment on Layer 1 alone") this is deliberately NOT presented as
-// production-ready legal guidance: the system prompt below biases every
-// sanction/deadline/penalty question toward the Tier 2 "OUTSIDE KNOWLEDGE
-// BASE" fallback, and only routing/procedural questions (which Part K's
-// Next-Move Engine already encodes as DepEd procedure, not a legal citation)
-// get confident answers.
+// Gemini calls for kaTuro Protect chat. Grounded in the internal reference
+// document's Layer 1 only — Layer 2 (verbatim law/DepEd-order text) hasn't
+// been ingested yet (empty katuroProtect/corpus/). Per that document's own
+// Part O1 readiness gate #1 ("No deployment on Layer 1 alone") this is
+// deliberately NOT presented as production-ready legal guidance: the system
+// prompt below biases every sanction/deadline/penalty question toward the
+// Tier 2 "OUTSIDE KNOWLEDGE BASE" fallback, and only routing/procedural
+// questions (which Part K's Next-Move Engine already encodes as DepEd
+// procedure, not a legal citation) get confident answers.
 //
-// The BrainBank markdown (~55KB) is small enough to inject wholesale as
+// The reference document (~55KB) is small enough to inject wholesale as
 // context instead of building real chunked retrieval — a deliberate
 // simplification for a Layer-1-only, low-volume, admin-only chat. Real RAG
 // (Firestore vector search over chunked Layer 1 + Layer 2) is Phase 3 once
 // the corpus exists.
+//
+// The document is an internal reference only — the user-facing product
+// requirement is that the AI never names it. Citations must read like real
+// legal citations (e.g. "RA 7610", "DepEd Order No. 40, s. 2012"), not an
+// internal document label. See citationLookup.js for how those citations
+// get verified against the real text without exposing that label either.
 import brainBankText from './brainBankSource';
 import { callGeminiProxy } from '../../../services/geminiConfig';
 
@@ -28,9 +34,9 @@ const PART_H_SYSTEM_PROMPT = extractPartH(brainBankText);
 
 const CORPUS_STATE_NOTE = `
 IMPORTANT — CURRENT CORPUS STATE:
-Only BrainBank Layer 1 (summaries, routing logic, procedures, form schemas, the Part K
-Next-Move Engine) is loaded right now. Layer 2 (verbatim RA/DepEd-order text) has NOT been
-ingested yet. Because of this:
+Only the reference document's Layer 1 (summaries, routing logic, procedures, form schemas,
+the Next-Move Engine) is loaded right now. Layer 2 (verbatim RA/DepEd-order text) has NOT
+been ingested yet. Because of this:
 - You may confidently answer ROUTING and PROCEDURAL questions (which law/office likely
   applies, what the next procedural step is, who to talk to).
 - You must treat ANY question asking for sanction ranges, penalty amounts, fines, exact
@@ -38,25 +44,40 @@ ingested yet. Because of this:
   "⚠️ OUTSIDE KNOWLEDGE BASE — VERIFY BEFORE ACTING", still name the specific law/issuance,
   NEVER state a specific range/amount/deadline as if quoted from the text, and close with
   "Please verify with your Division Legal Officer or the LRPO before acting on this."
-- Never fabricate a section number or quote. If you are not certain a section says what
+- Never fabricate a section number or quote. If you are not certain a source says what
   you're about to claim, say so and route to Tier 2/3 instead.
 
-CITATION FORMAT — follow this EXACTLY, every time you reference the knowledge base, so the
-app can verify your citation against the real text and show it to the user:
-- For a lettered sub-section (the "### X1." headings, e.g. "### A1. RA 7610..."), cite as
-  [BrainBank A1] — just the code in brackets, no extra words, no "Part" prefix.
-- For a whole top-level Part with no sub-heading (e.g. "## PART D"), cite as [BrainBank Part D].
-- Cite EVERY factual claim that comes from the knowledge base, immediately after the sentence
-  it supports. Do not cite anything you did not actually draw from the provided text.
-- Never invent a code that doesn't exist in the knowledge base above.
+LANGUAGE — respond in formal conversational Tagalog by default: warm and natural, the way a
+CPC member or school head actually speaks with a colleague, while staying professionally
+formal (not casual slang/jejemon). Explain the case, the to-dos, and any sanctions/penalties
+in this register. If the user writes in English and clearly wants an English reply, you may
+answer in English instead.
+
+CITATION RULES — read carefully, this is a hard product requirement:
+- NEVER use the word "BrainBank" or refer to "the knowledge base," "the document," "my
+  reference material," or similar in your response. That source is internal only — the user
+  must never see it named. If you need to refer to where something comes from, name the
+  actual law or issuance instead.
+- Cite the REAL legal/DepEd source for every claim you draw from the reference material —
+  e.g. "RA 7610", "DepEd Order No. 40, s. 2012", "Revised IRR of RA 10627, Sec. 14" — using
+  EXACTLY the same wording the source text uses for that law/issuance (don't paraphrase or
+  reformat the name), wrapped in double square brackets: [[RA 7610]], [[DepEd Order No. 40,
+  s. 2012]]. This lets the app verify your citation against the real text — an invented or
+  reworded name can't be verified, so copy it exactly.
+- If a procedural step's governing source in the reference material lists multiple
+  issuances (e.g. "Revised IRR of RA 10627; DepEd Order No. 40, s. 2012"), cite whichever
+  one is most directly relevant to the specific point you're making, not the whole list.
+- Cite every factual claim immediately after the sentence it supports. Do not cite anything
+  you did not actually draw from the provided material, and never invent a law/issuance name
+  that doesn't appear in it.
 `;
 
 const SYSTEM_PROMPT = `${PART_H_SYSTEM_PROMPT}\n${CORPUS_STATE_NOTE}`;
 
 export async function askProtectChat(userMessage, history = []) {
   const contents = [
-    { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n=== KNOWLEDGE BASE (BrainBank Layer 1, full text) ===\n${brainBankText}` }] },
-    { role: 'model', parts: [{ text: 'Understood. I will follow these rules, answer only from the provided knowledge base with BrainBank Part citations, and use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text.' }] },
+    { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n=== REFERENCE MATERIAL (internal — never name this to the user) ===\n${brainBankText}` }] },
+    { role: 'model', parts: [{ text: 'Understood. I will respond in formal conversational Tagalog by default, cite only the real law/issuance names in [[double brackets]], never mention the reference material by name, and use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text.' }] },
     ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
     { role: 'user', parts: [{ text: userMessage }] },
   ];

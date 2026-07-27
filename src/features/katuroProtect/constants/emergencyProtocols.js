@@ -8,7 +8,7 @@
 export const RED_FLAG_PROTOCOLS = {
   osaec: {
     label: 'OSAEC / Intimate Images — Emergency Protocol',
-    citation: 'BrainBank Part E4 (RA 11930, RA 9995)',
+    citation: 'RA 11930, RA 9995',
     steps: [
       'STOP internal handling. Do not download, forward, or screenshot-share the material beyond what reporting requires — preserve the device/evidence as-is.',
       'Report immediately: PNP Anti-Cybercrime Group (PNP-ACG) or NBI Cybercrime Division; DSWD; LRPO/Telesafe.',
@@ -18,7 +18,7 @@ export const RED_FLAG_PROTOCOLS = {
   },
   weapon: {
     label: 'Weapons / Threats — Emergency Protocol',
-    citation: 'BrainBank Part E5 (DepEd Order No. 006, s. 2026)',
+    citation: 'DepEd Order No. 006, s. 2026',
     steps: [
       'Immediate safety response per your school’s crisis protocol.',
       'Classify the offense per DO 006 severity tiers — verify exact tier wording against the verbatim order before acting.',
@@ -28,7 +28,7 @@ export const RED_FLAG_PROTOCOLS = {
   },
   personnel_abuse: {
     label: 'Personnel-Respondent Abuse — Emergency Protocol',
-    citation: 'BrainBank Part E2 (DepEd Order No. 40, s. 2012)',
+    citation: 'DepEd Order No. 40, s. 2012',
     steps: [
       'Immediate protective measures for the learner — separate from the respondent where warranted.',
       'Report upward to the Division Office without delay.',

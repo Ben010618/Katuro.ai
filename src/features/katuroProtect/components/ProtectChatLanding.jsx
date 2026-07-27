@@ -49,7 +49,7 @@ function MessageText({ text, onCitationClick }) {
   return (
     <>
       {segments.map((seg, i) => seg.type === 'citation'
-        ? <CitationChip key={i} code={seg.code} onClick={onCitationClick} />
+        ? <CitationChip key={i} text={seg.text} onClick={onCitationClick} />
         : <span key={i}>{seg.value}</span>)}
     </>
   );
@@ -183,7 +183,7 @@ export default function ProtectChatLanding({ onStartIntake }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 420 }}>
-      {activeCitation && <CitationPanel code={activeCitation} onClose={() => setActiveCitation(null)} />}
+      {activeCitation && <CitationPanel citation={activeCitation} onClose={() => setActiveCitation(null)} />}
 
       <div style={{ flex: 1, marginBottom: 14 }}>
         {messages.map((m, i) => (

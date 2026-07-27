@@ -59,7 +59,7 @@ export default function KaturoProtectPage() {
       {activeTab === 'settings' && <ReferralDirectory />}
 
       <p style={{ margin: '24px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', textAlign: 'center' }}>
-        BrainBank v1.0 · compiled July 2026 · Chat grounded in Layer 1 only — verify sanctions/deadlines against official sources
+        Reference v1.0 · compiled July 2026 · Chat grounded in Layer 1 only — verify sanctions/deadlines against official sources
       </p>
     </div>
   );
