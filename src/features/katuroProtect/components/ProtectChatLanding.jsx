@@ -47,6 +47,34 @@ function RedFlagCard({ flagKeys }) {
   );
 }
 
+// Three staggered bouncing dots inside a bubble matching the AI's own
+// message style, shown in place of a reply while it's still being drafted —
+// gives a "thinking" cue instead of a bare spinner in an otherwise-empty chat.
+function ThinkingDots() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
+      <style>{`
+        @keyframes kt-dot-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+      `}</style>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
+        borderRadius: 14, padding: '14px 18px',
+      }}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 7, height: 7, borderRadius: '50%', background: '#2d6a4f',
+              animation: 'kt-dot-bounce 1.2s ease-in-out infinite', animationDelay: `${i * 0.15}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MessageText({ text, onCitationClick }) {
   const segments = splitMessageSegments(text);
   return (
@@ -194,7 +222,7 @@ export default function ProtectChatLanding({ onStartIntake, messages, setMessage
       <div style={{ flex: 1, marginBottom: 14 }}>
         {messages.map((m, i) => (
           m.pending
-            ? <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}><Loader2 size={16} style={{ animation: 'kt-spin 0.8s linear infinite' }} color="#9bb8a5" /></div>
+            ? <ThinkingDots key={i} />
             : <MessageBubble key={i} msg={m} onCitationClick={setActiveCitation} />
         ))}
         <div ref={scrollRef} />
@@ -202,19 +230,7 @@ export default function ProtectChatLanding({ onStartIntake, messages, setMessage
 
       {error && <p style={{ margin: '0 0 10px', fontSize: 12, color: '#c0392b' }}>{error}</p>}
 
-      <button
-        onClick={onStartIntake}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          background: '#e8a320', color: '#1a3d2b', border: 'none', borderRadius: 10,
-          padding: '11px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-          marginBottom: 10,
-        }}
-      >
-        Start Case Intake <ArrowRight size={14} />
-      </button>
-
-      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} style={{ display: 'flex', gap: 10 }}>
+      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
         <input
           style={inputPillStyle}
           placeholder="Ask a follow-up…"
@@ -234,6 +250,18 @@ export default function ProtectChatLanding({ onStartIntake, messages, setMessage
           {sending ? <Loader2 size={19} color="#fff" style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Send size={19} color="#fff" />}
         </button>
       </form>
+
+      <button
+        onClick={onStartIntake}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)', color: '#fff', border: 'none', borderRadius: 10,
+          padding: '11px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          width: '100%',
+        }}
+      >
+        Start Case Intake <ArrowRight size={14} />
+      </button>
     </div>
   );
 }

@@ -75,11 +75,17 @@ export function splitMessageSegments(text) {
 // small wording differences elsewhere in the phrase (e.g. a trailing
 // ", Sec. 14") don't prevent a match — the identifier itself is what the
 // model was told to copy exactly.
+// "No." is optional in every pattern below — the BrainBank text itself (and
+// therefore the model, which is told to copy its wording exactly) freely
+// mixes the full form ("DepEd Order No. 6, s. 2026") with the abbreviated
+// form used throughout Part P ("DO 006, s. 2026"). Requiring "No." used to
+// make every abbreviated-form citation fail verification even though it was
+// a real, correct citation — not a fabricated one.
 const IDENTIFIER_PATTERNS = [
   /R\.?\s*A\.?\s*(?:No\.?\s*)?\d+/i,
-  /DepEd\s+Order\s+No\.?\s*\d+,?\s*s\.?\s*\d+/i,
-  /D\.?\s*O\.?\s*No\.?\s*\d+,?\s*s\.?\s*\d+/i,
-  /DepEd\s+Memorandum\s+No\.?\s*\d+,?\s*s\.?\s*\d+/i,
+  /DepEd\s+Order\s+(?:No\.?\s*)?\d+,?\s*s\.?\s*\d+/i,
+  /D\.?\s*O\.?\s*(?:No\.?\s*)?\d+,?\s*s\.?\s*\d+/i,
+  /DepEd\s+Memorandum\s+(?:No\.?\s*)?\d+,?\s*s\.?\s*\d+/i,
   /DM\s*\d+,?\s*s\.?\s*\d+/i,
   /P\.?\s*D\.?\s*(?:No\.?\s*)?\d+/i,
 ];
