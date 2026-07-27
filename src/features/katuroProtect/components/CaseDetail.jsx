@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Clock, AlertCircle, Loader2, Archive, ArchiveRestore } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { advanceCaseState, allowedNextStates } from '../services/caseService';
+import { advanceCaseState, allowedNextStates, archiveCase, unarchiveCase } from '../services/caseService';
 import { CASE_STATE_LABELS } from '../types';
 import NextMoveCard from './NextMoveCard';
 import EscalationBadge from './EscalationBadge';
@@ -16,6 +16,7 @@ function ts(iso) {
 export default function CaseDetail({ caseData, referralContacts, onBack }) {
   const { user } = useAuth();
   const [advancing, setAdvancing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState('');
 
   const nextStates = allowedNextStates(caseData.state);
@@ -32,13 +33,34 @@ export default function CaseDetail({ caseData, referralContacts, onBack }) {
     }
   }
 
+  async function handleArchiveToggle() {
+    setArchiving(true);
+    setError('');
+    try {
+      if (caseData.archived) await unarchiveCase(caseData.id, user?.uid);
+      else await archiveCase(caseData.id, user?.uid);
+    } catch (e) {
+      setError(e.message || 'Could not update the archive status.');
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   const intake = caseData.intake || {};
 
   return (
     <div>
-      <button onClick={onBack} style={{ ...btnSecondary, marginBottom: 16 }}>
-        <ArrowLeft size={13} /> Back to Case Board
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <button onClick={onBack} style={btnSecondary}>
+          <ArrowLeft size={13} /> Back to Case Board
+        </button>
+        <button onClick={handleArchiveToggle} disabled={archiving} style={{ ...btnSecondary, opacity: archiving ? 0.6 : 1 }}>
+          {archiving
+            ? <Loader2 size={13} style={{ animation: 'kt-spin 0.8s linear infinite' }} />
+            : caseData.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+          {caseData.archived ? 'Restore from Archive' : 'Archive Case'}
+        </button>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--kt-text-primary)' }}>
@@ -48,6 +70,11 @@ export default function CaseDetail({ caseData, referralContacts, onBack }) {
           {CASE_STATE_LABELS[caseData.state] || caseData.state}
         </span>
         <EscalationBadge tier={caseData.escalationTier} />
+        {caseData.archived && (
+          <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--kt-surface)', color: 'var(--kt-text-secondary)', borderRadius: 20, padding: '2px 9px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Archive size={10} /> Archived
+          </span>
+        )}
       </div>
       <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
         {intake.date_of_incident} · {intake.location} · Complainant {intake.complainant?.code_name} / Respondent {intake.respondent?.code_name}
@@ -71,7 +98,8 @@ export default function CaseDetail({ caseData, referralContacts, onBack }) {
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 12 }}>
                 <span style={{ color: 'var(--kt-text-secondary)', flexShrink: 0, width: 110 }}>{ts(entry.at)}</span>
                 <span style={{ color: 'var(--kt-text-primary)' }}>
-                  <strong>{CASE_STATE_LABELS[entry.state] || entry.state}</strong>{entry.note ? ` — ${entry.note}` : ''}
+                  {entry.state && <strong>{CASE_STATE_LABELS[entry.state] || entry.state}</strong>}
+                  {entry.state && entry.note ? ' — ' : ''}{!entry.state ? entry.note : ''}
                 </span>
               </div>
             ))}

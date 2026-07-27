@@ -2,22 +2,25 @@ import { useState, useRef, useEffect } from 'react';
 import { ShieldAlert, Send, ArrowRight, Loader2, MessageSquare } from 'lucide-react';
 import { askProtectChat } from '../services/protectGemini';
 import { detectRedFlags, RED_FLAG_PROTOCOLS } from '../constants/emergencyProtocols';
-import { splitTextWithCitations } from '../services/citationLookup';
+import { splitMessageSegments } from '../services/citationLookup';
 import CitationChip from './CitationChip';
 import CitationPanel from './CitationPanel';
 
+// Formal conversational Tagalog, matching the chat's default reply register.
 const FAQ_SUGGESTIONS = [
-  'A learner was hit by a classmate in the hallway — what should we do first?',
-  "We received a report of repeated online harassment — what's our next step?",
-  'A student says a teacher touched them inappropriately — what do we do?',
-  "What's the difference between corporal punishment and child abuse?",
-  'A learner showed us private photos of a classmate being circulated — what now?',
-  'The person accused is our school head — who do we report to instead?',
+  'May mag-aaral na sinaktan ng kaklase sa hallway — ano ang unang dapat gawin?',
+  'May natanggap kaming ulat ng paulit-ulat na online harassment — ano ang susunod na hakbang?',
+  'May estudyanteng nagsabing hinipo siya ng guro nang hindi angkop — ano ang gagawin namin?',
+  'Ano ang pagkakaiba ng corporal punishment at child abuse?',
+  'May mag-aaral na nagpakita ng pribadong larawan ng kaklase na kumakalat — ano ngayon?',
+  'Ang inaakusahan ay ang aming school head — kanino kami dapat magreport sa halip?',
 ];
 
+// Input font/padding are ~20% larger than the app's usual form-input scale,
+// per an explicit request to make the chat box bigger and easier to read.
 const inputPillStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '14px 18px',
-  border: '1.5px solid rgba(45,106,79,0.25)', borderRadius: 999, fontSize: 14,
+  width: '100%', boxSizing: 'border-box', padding: '17px 22px',
+  border: '1.5px solid rgba(45,106,79,0.25)', borderRadius: 999, fontSize: 17,
   background: 'var(--kt-card)', color: 'var(--kt-text-primary)', outline: 'none', fontFamily: 'inherit',
 };
 
@@ -45,27 +48,31 @@ function RedFlagCard({ flagKeys }) {
 }
 
 function MessageText({ text, onCitationClick }) {
-  const segments = splitTextWithCitations(text);
+  const segments = splitMessageSegments(text);
   return (
     <>
-      {segments.map((seg, i) => seg.type === 'citation'
-        ? <CitationChip key={i} text={seg.text} onClick={onCitationClick} />
-        : <span key={i}>{seg.value}</span>)}
+      {segments.map((seg, i) => {
+        if (seg.type === 'citation') return <CitationChip key={i} text={seg.text} onClick={onCitationClick} />;
+        if (seg.type === 'bold') return <strong key={i}>{seg.value}</strong>;
+        return <span key={i}>{seg.value}</span>;
+      })}
     </>
   );
 }
 
+// Message text is ~20% larger than the previous 13.5px baseline, matching
+// the enlarged input box so the whole chat reads at a consistent, bigger scale.
 function MessageBubble({ msg, onCitationClick }) {
   const isUser = msg.role === 'user';
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
-      <div style={{ maxWidth: '78%' }}>
+      <div style={{ maxWidth: '82%' }}>
         {!isUser && msg.redFlags?.length > 0 && <RedFlagCard flagKeys={msg.redFlags} />}
         <div style={{
           background: isUser ? '#2d6a4f' : 'var(--kt-card)',
           color: isUser ? '#fff' : 'var(--kt-text-primary)',
           border: isUser ? 'none' : '1px solid var(--kt-border)',
-          borderRadius: 14, padding: '11px 15px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+          borderRadius: 14, padding: '13px 17px', fontSize: 16.2, lineHeight: 1.6, whiteSpace: 'pre-wrap',
         }}>
           {isUser ? msg.text : <MessageText text={msg.text} onCitationClick={onCitationClick} />}
         </div>
@@ -135,7 +142,7 @@ export default function ProtectChatLanding({ onStartIntake }) {
 
         <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          style={{ width: '100%', maxWidth: 560, display: 'flex', gap: 8 }}
+          style={{ width: '100%', maxWidth: 720, display: 'flex', gap: 10 }}
         >
           <input
             style={inputPillStyle}
@@ -148,16 +155,16 @@ export default function ProtectChatLanding({ onStartIntake }) {
             type="submit"
             disabled={!input.trim()}
             style={{
-              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+              width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
               background: '#2d6a4f', border: 'none', cursor: input.trim() ? 'pointer' : 'not-allowed',
               opacity: input.trim() ? 1 : 0.5, display: 'grid', placeItems: 'center',
             }}
           >
-            <Send size={16} color="#fff" />
+            <Send size={19} color="#fff" />
           </button>
         </form>
 
-        <div style={{ marginTop: 26, width: '100%', maxWidth: 560 }}>
+        <div style={{ marginTop: 26, width: '100%', maxWidth: 720 }}>
           <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Or start from a common scenario
           </p>
@@ -168,7 +175,7 @@ export default function ProtectChatLanding({ onStartIntake }) {
                 onClick={() => handleSend(q)}
                 style={{
                   textAlign: 'left', background: 'var(--kt-card)', border: '1px solid var(--kt-border)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: 'var(--kt-text-primary)',
+                  borderRadius: 10, padding: '11px 16px', fontSize: 14, color: 'var(--kt-text-primary)',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -208,7 +215,7 @@ export default function ProtectChatLanding({ onStartIntake }) {
         Start Case Intake <ArrowRight size={14} />
       </button>
 
-      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} style={{ display: 'flex', gap: 8 }}>
+      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} style={{ display: 'flex', gap: 10 }}>
         <input
           style={inputPillStyle}
           placeholder="Ask a follow-up…"
@@ -220,12 +227,12 @@ export default function ProtectChatLanding({ onStartIntake }) {
           type="submit"
           disabled={!input.trim() || sending}
           style={{
-            width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+            width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
             background: '#2d6a4f', border: 'none', cursor: (input.trim() && !sending) ? 'pointer' : 'not-allowed',
             opacity: (input.trim() && !sending) ? 1 : 0.5, display: 'grid', placeItems: 'center',
           }}
         >
-          {sending ? <Loader2 size={16} color="#fff" style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Send size={16} color="#fff" />}
+          {sending ? <Loader2 size={19} color="#fff" style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Send size={19} color="#fff" />}
         </button>
       </form>
     </div>

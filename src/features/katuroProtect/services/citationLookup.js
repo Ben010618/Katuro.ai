@@ -1,13 +1,16 @@
-// Parses [[<real legal citation>]] markers out of a chat response — e.g.
-// [[RA 7610]] or [[DepEd Order No. 40, s. 2012]] — and looks each one up
-// against the REAL bundled reference text, so a citation chip always shows
-// genuine content, never something the model just asserted. A citation that
-// doesn't actually match anything in the text surfaces as "could not
-// verify" rather than silently failing — that itself is a signal the model
-// may have fabricated or misremembered a reference. Nothing here or in the
-// UI ever names the internal reference document — only real law/issuance
-// names are shown.
+// Turns a raw chat response into render-ready segments: parses
+// [[<real legal citation>]] markers — e.g. [[RA 7610]] or [[DepEd Order
+// No. 40, s. 2012]] — and looks each one up against the REAL bundled
+// reference text, so a citation chip always shows genuine content, never
+// something the model just asserted. A citation that doesn't actually match
+// anything surfaces as "could not verify" rather than failing silently —
+// that itself is a signal the model may have fabricated or misremembered a
+// reference. Also bolds case-defining terms (constants/emphasisTerms.js) on
+// every non-citation text run, whether or not the model itself marked them.
+// Nothing here or in the UI ever names the internal reference document —
+// only real law/issuance names are shown.
 import brainBankText from './brainBankSource';
+import { EMPHASIS_TERMS } from '../constants/emphasisTerms';
 
 const CITATION_REGEX = /\[\[([^\]]+)\]\]/g;
 
@@ -24,6 +27,48 @@ export function splitTextWithCitations(text) {
   }
   if (lastIndex < text.length) segments.push({ type: 'text', value: text.slice(lastIndex) });
   return segments;
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Wraps every case-defining term (EMPHASIS_TERMS) in **markdown bold** —
+// guarantees consistent emphasis regardless of whether the model itself
+// thought to bold them. Skips a term that's already inside ** ** (from the
+// model's own markdown) so it doesn't get double-wrapped.
+function autoEmphasize(text) {
+  let result = text;
+  for (const term of EMPHASIS_TERMS) {
+    const re = new RegExp(`(?<!\\*)\\b(${escapeRegex(term)})\\b(?!\\*)`, 'gi');
+    result = result.replace(re, '**$1**');
+  }
+  return result;
+}
+
+/** Splits text into alternating {type:'text'} and {type:'bold', value} segments on **markdown bold**. */
+function splitBoldSegments(text) {
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+  const re = /\*\*(.+?)\*\*/g;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    segments.push({ type: 'bold', value: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) segments.push({ type: 'text', value: text.slice(lastIndex) });
+  return segments;
+}
+
+/** Full render-ready split: citations, then bold (model markdown + auto-emphasized case-defining terms), on plain text runs. */
+export function splitMessageSegments(text) {
+  const result = [];
+  for (const seg of splitTextWithCitations(text)) {
+    if (seg.type === 'citation') { result.push(seg); continue; }
+    result.push(...splitBoldSegments(autoEmphasize(seg.value)));
+  }
+  return result;
 }
 
 // Pulls the distinctive law/issuance identifier out of a citation string so

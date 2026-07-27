@@ -93,4 +93,38 @@ export async function setEscalationTier(caseId, tier) {
   });
 }
 
+// ── Archiving ─────────────────────────────────────────────────────────────
+// Every case is already permanently stored in Firestore (protect_cases) —
+// nothing is ever deleted by the app itself. Archiving is purely a display
+// concern: it keeps closed/old cases out of the default Case Board view
+// without losing them, and they stay one click away via the Archived filter.
+// Available at any state, not just CLOSED, so an admin can declutter the
+// board without being forced through the whole state machine first.
+export async function archiveCase(caseId, by) {
+  await updateDoc(doc(db, 'protect_cases', caseId), {
+    archived: true,
+    archivedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    timeline: arrayUnion({
+      at: new Date().toISOString(),
+      state: null,
+      note: 'Case archived.',
+      by: by || null,
+    }),
+  });
+}
+
+export async function unarchiveCase(caseId, by) {
+  await updateDoc(doc(db, 'protect_cases', caseId), {
+    archived: false,
+    updatedAt: serverTimestamp(),
+    timeline: arrayUnion({
+      at: new Date().toISOString(),
+      state: null,
+      note: 'Case restored from archive.',
+      by: by || null,
+    }),
+  });
+}
+
 export { CASE_STATES };
