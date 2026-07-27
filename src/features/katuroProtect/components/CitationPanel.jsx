@@ -1,14 +1,18 @@
-import { X, BookOpen, AlertTriangle } from 'lucide-react';
+import { X, BookOpen, AlertTriangle, ExternalLink, Search } from 'lucide-react';
 import { lookupCitation } from '../services/citationLookup';
+import { findOfficialSource } from '../constants/officialSources';
+import MarkdownText from './MarkdownText';
 
 // Shows the REAL reference text behind a citation — sourced directly from
 // the bundled reference document, never from the model's own words, and
 // never naming that document to the user. If the citation doesn't actually
 // match anything in it, that's surfaced as "could not verify" rather than
 // hidden — an unverifiable citation is a signal worth showing, not
-// smoothing over.
+// smoothing over. Also links out to the real official source (verified URL
+// where we have one, an honest search link otherwise — never a guessed URL).
 export default function CitationPanel({ citation, onClose }) {
   const result = lookupCitation(citation);
+  const official = findOfficialSource(citation);
 
   return (
     <div
@@ -40,9 +44,7 @@ export default function CitationPanel({ citation, onClose }) {
         </div>
 
         {result ? (
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-            {result.body}
-          </p>
+          <MarkdownText text={result.body} />
         ) : (
           <div style={{ display: 'flex', gap: 8, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.25)', borderRadius: 8, padding: '10px 12px' }}>
             <AlertTriangle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -52,7 +54,21 @@ export default function CitationPanel({ citation, onClose }) {
           </div>
         )}
 
-        <p style={{ margin: '14px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
+        <a
+          href={official.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            marginTop: 14, fontSize: 12, fontWeight: 700,
+            color: '#2d6a4f', textDecoration: 'none',
+          }}
+        >
+          {official.isSearch ? <Search size={13} /> : <ExternalLink size={13} />}
+          {official.isSearch ? `Search for the official text of "${citation}"` : `View official text (${official.source})`}
+        </a>
+
+        <p style={{ margin: '10px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
           Internal summary reference — not the verbatim law. Verify against the official source before acting.
         </p>
       </div>
