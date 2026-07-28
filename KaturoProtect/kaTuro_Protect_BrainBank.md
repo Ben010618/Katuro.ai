@@ -40,24 +40,35 @@
 
 > Summaries below are for routing and orientation. The chatbot must quote operative text from the Layer 2 verbatim corpus.
 
-### A1. RA 7610 (1992) — Special Protection of Children Against Abuse, Exploitation and Discrimination Act
+### A1. RA 7610 (1992) — Special Protection of Children Against Abuse, Exploitation and Discrimination Act [✅ KEY PROVISIONS VERIFIED — lawphil.net, verbatim text, fetched and cross-checked twice]
 - **Scope:** The foundational child-abuse statute. Covers child abuse (physical, psychological, sexual), cruelty, exploitation, and discrimination against children (below 18, or over 18 but unable to protect themselves).
 - **Why it matters for schools:** Serious violations of the DepEd Child Protection Policy by school personnel can escalate from administrative cases into criminal liability under RA 7610.
-- **Key concepts:** "child abuse" includes psychological and physical abuse, cruelty, emotional maltreatment; acts by adults that debase, degrade, or demean the intrinsic worth and dignity of a child.
+- **Key concepts — Sec. 3(b) "child abuse" (verbatim):** "maltreatment, whether habitual or not, of the child which includes psychological and physical abuse, neglect, cruelty, sexual abuse and emotional maltreatment; any act by deeds or words which debases, degrades or demeans the intrinsic worth and dignity of a child as a human being; unreasonable deprivation of basic needs for survival, such as food and shelter; or failure to immediately give medical treatment to an injured child resulting in serious impairment of growth and development or permanent incapacity or death."
 - **Route to this law when:** an adult (teacher/personnel/outsider) harms a learner; corporal punishment causing injury; sexual abuse; exploitation.
-- **Penalties:** Criminal (imprisonment; ranges vary by article — quote from verbatim text only).
+- **Penalties — Sec. 10 "Other Acts of Neglect, Abuse, Cruelty or Exploitation..." (verbatim ranges, verified against lawphil.net):**
+  - (a) catch-all child abuse/cruelty/exploitation acts not covered by the Revised Penal Code: **prision mayor in its minimum period** (6 yrs 1 day – 8 yrs).
+  - (b) keeping a minor in bars/saunas/discotheques/similar establishments: **prision mayor in its maximum period + fine of not less than ₱50,000**.
+  - (c) inducing/delivering a minor to such places: **prision mayor in its medium period + fine of not less than ₱40,000** (enhanced if the offender is an ascendant/guardian).
+  - (d) establishment owner/manager allowing such use: **prision mayor in its medium period + fine of not less than ₱50,000, and loss of the license to operate**.
+  - (e) using/coercing a street child to beg, act as a drug-trafficking conduit, or commit illegal activities: **prision correccional in its medium period to reclusion perpetua** (a genuinely wide statutory range, confirmed on independent re-fetch — not a transcription error).
 
-### A2. RA 10627 (2013) — Anti-Bullying Act of 2013
+### A2. RA 10627 (2013) — Anti-Bullying Act of 2013 [✅ KEY PROVISIONS VERIFIED — lawphil.net verbatim text]
 - **Scope:** Requires ALL elementary and secondary schools (public and private) to adopt anti-bullying policies.
-- **Covers:** physical, verbal, social/relational bullying, and CYBERBULLYING (bullying done through technology or electronic means), including acts committed off-campus/online if they create a hostile environment at school.
+- **Sec. 2 definition (verbatim, verified):** "'bullying' shall refer to any severe or repeated use by one or more students of a written, verbal or electronic expression, or a physical act or gesture, or any combination thereof, directed at another student that has the effect of actually causing or placing the latter in reasonable fear of physical or emotional harm or damage to his property..." — covers physical-contact, verbal, psychological-harm/slander, and "cyber-bullying" (any of the above through technology or electronic means) categories, including acts committed off-campus/online if they create a hostile environment at school.
+- **Sec. 3 — minimum required policy elements (verified, verbatim structure):** every school policy must at minimum (a) prohibit bullying on school grounds and via technology; (b) identify disciplinary actions, with perpetrators required to undergo a rehabilitation program; (c) establish reporting/investigation/victim-protection procedures including counseling/referral; (d) allow anonymous reporting; (e) address false accusations; (f) educate students; (g) educate parents/guardians; (h) maintain confidential incident records.
 - **Implementing rules:** originally DO 55, s. 2013; now superseded/updated by the **Revised IRR (2025)** — see B3. The chatbot must prefer the 2025 Revised IRR.
 - **Route to this law when:** learner-on-learner aggression, including group chats, fake accounts, online shaming, exclusion campaigns.
-- **Sanctions:** Learner discipline is school-based and graduated (see Part F); school personnel who fail to act face administrative sanctions under the IRR's non-compliance provisions.
+- **Sanctions:** Learner discipline is school-based and graduated (see Part F); school personnel who fail to act face administrative sanctions under the IRR's non-compliance provisions (B3, Sec. 17).
 
-### A3. RA 11313 (2019) — Safe Spaces Act ("Bawal Bastos" Law)
+### A3. RA 11313 (2019) — Safe Spaces Act ("Bawal Bastos" Law) [✅ SCHOOL-LIABILITY PROVISIONS VERIFIED — official PCW-published full text + IRR, prc.gov.ph, cross-checked against lawphil.net/elibrary.judiciary.gov.ph section structure]
 - **Scope:** Gender-based sexual harassment (GBSH) in streets/public spaces, ONLINE spaces, workplaces, and EDUCATIONAL/TRAINING INSTITUTIONS.
-- **Why it matters for schools:** Schools have affirmative duties: adopt an anti-GBSH policy; create a mechanism/committee (commonly via the CPC or a Committee on Decorum and Investigation); act on complaints promptly; educate students on the law and reporting channels. School heads face liability for inaction.
-- **Covers:** catcalling, sexist/homophobic/transphobic slurs, unwanted sexual remarks, persistent unwanted courtship, online GBSH (stalking, threats, uploading/sharing photos or information without consent, misogynistic/sexist remarks online).
+- **School duties (Sec. 21):** designate an officer-in-charge to receive complaints; adopt and publish grievance procedures; even without a formal complaint, if school authorities "have knowledge or reasonably know about a possible or impending act of gender-based sexual harassment," the school "should promptly investigate" and must act to eliminate it, prevent recurrence, and address effects.
+- **Required committee (Sec. 22 / IRR Rule VIII Sec. 33) — Committee on Decorum and Investigation (CODI):** school heads must disseminate the law, run prevention campaigns, and establish a CODI within 150 days of IRR effectivity, composed of at least one representative each from school administration, trainers/instructors/professors/coaches, students/trainees, and parents; headed by a woman with ≥50% women members; "equal representation of persons of diverse sexual orientation, gender identity and/or expression... as far as practicable"; members must be unrelated to the alleged perpetrator within the 4th degree of consanguinity/affinity. Complaints must reach the CODI within **48 hours** (IRR Sec. 25); CODI must decide within **10 working days**.
+- **Liability of school heads/personnel (Sec. 23 / IRR Sec. 28)** — applies to principals, school heads, teachers, instructors, professors, coaches, trainers, or anyone with authority/influence/moral ascendancy in the institution:
+  - (a) non-implementation of Sec. 22 duties: fine of **₱5,000 to ₱10,000**.
+  - (b) failure to act on a reported GBSH incident: fine of **₱10,000 to ₱15,000**.
+  - This does not preclude a separate administrative case against the school head with the appropriate disciplining authority. Liability attaches to the individual official, not a separate corporate fine on the school as an entity.
+- **Online GBSH (Sec. 12/14, IRR Sec. 13/16):** covers unwanted sexual/misogynistic/transphobic/homophobic/sexist remarks online, cyberstalking, incessant messaging, non-consensual uploading/sharing of photos/videos/media with sexual content, unauthorized recording/sharing, impersonation, and false abuse reports. **Penalty: prision correccional in its medium period, or a fine of ₱100,000 to ₱500,000, or both, at the court's discretion** — imprescriptible (Sec. 36(d)). If the perpetrator is a juridical person, its license/franchise is automatically revoked and officers held liable.
 - **Route to this law when:** harassment has a gender-based or sexual dimension — whether adult→learner, learner→learner, learner→teacher, or online.
 - **Note (pending change):** Senate Bill 2897 proposes expanding online GBSH to cover AI/emerging technologies and adding "grooming" as harassment. Track this.
 
@@ -83,8 +94,10 @@
 - **Scope:** Prohibits hazing in initiation rites of any organization, including school-based organizations. Schools have registration/supervision duties for student organizations.
 - **Route to this law when:** initiation-related injury or intimidation in clubs, fraternities/sororities, or informal school groups.
 
-### A9. RA 9344 as amended by RA 10630 — Juvenile Justice and Welfare Act
+### A9. RA 9344 as amended by RA 10630 — Juvenile Justice and Welfare Act [✅ SEC. 6 VERIFIED — lawphil.net verbatim text]
 - **Scope:** Children in conflict with the law; minimum age of criminal responsibility (15, with intervention below; 15–18 depends on discernment); diversion programs.
+- **Sec. 6 (verbatim, verified):** "A child fifteen (15) years of age or under at the time of the commission of the offense shall be exempt from criminal liability. However, the child shall be subjected to an intervention program... A child above fifteen (15) years but below eighteen (18) years of age shall likewise be exempt from criminal liability and be subjected to an intervention program, unless he/she has acted with discernment, in which case, such child shall be subjected to the appropriate proceedings in accordance with this Act. The exemption from criminal liability herein established does not include exemption from civil liability."
+- **"Discernment"** — commonly explained as whether the child understood the difference between right and wrong and the likely consequences of the act at the time it was committed; this gloss is interpretive/commentary, not a direct quote from RA 9344/10630's own text — if a user needs the statute's own discernment test wording, treat as Tier 2 until that specific clause is located and quoted.
 - **Why it matters:** When a learner's act is also a crime, school discipline runs PARALLEL to juvenile justice processes — the school does not jail or "charge" learners; it disciplines per its handbook/IRR and refers/coordinates with LSWDO (Local Social Welfare and Development Office) and Barangay Council for the Protection of Children (BCPC).
 
 ### A10. RA 10173 (2012) — Data Privacy Act
@@ -102,31 +115,33 @@
 
 ## PART B — DEPED ISSUANCES (ORDERS & MEMORANDA)
 
-### B1. DepEd Order No. 40, s. 2012 — DepEd Child Protection Policy (CPP)
+### B1. DepEd Order No. 40, s. 2012 — DepEd Child Protection Policy (CPP) [✅ KEY PROVISIONS VERIFIED — verbatim text confirmed against a mirror matching the official DepEd-listed issuance (title/date/signatory); full detail in Part Q]
 - **Status:** In force. THE central DepEd policy for this domain.
 - **What it does:**
   - Zero tolerance for child abuse, exploitation, violence, discrimination, bullying, and other forms of abuse.
-  - **Explicitly prohibits corporal punishment** — any physical or humiliating/degrading punishment (hitting, pinching, kneeling on salt/rice, ear/hair pulling, forcing painful positions, verbal humiliation).
-  - Mandates a **Child Protection Committee (CPC)** in every school.
-  - Defines prohibited acts by teachers/personnel and by learners.
-  - Sets out intake, reporting, and referral procedures, and reporting duties to the Division Office.
-- **CPC composition (per DO 40):** School Head (chair), Guidance Counselor/Teacher (vice-chair), teacher representative, parent representative (PTA), learner representative (supreme student government), community representative (barangay). [Verify exact wording against the Order's verbatim text.]
+  - **Explicitly prohibits corporal punishment** — Sec. 3.O defines it with 12 enumerated act categories, not just examples; see Part Q1 for the full verified list.
+  - Mandates a **Child Protection Committee (CPC)** in every school — exact composition verified, see below.
+  - Defines prohibited acts by teachers/personnel (Sec. 15) and by learners (Sec. 9.A) — see Part Q2.
+  - Sets out intake, reporting, and referral procedures (Secs. 12, 16, 22), and hard reporting deadlines to the Disciplining Authority/Division Office — see Part Q3.
+- **CPC composition (Sec. 10, verbatim, verified):** School Head/Administrator — Chairperson; Guidance Counselor/Teacher — Vice Chairperson; a teacher representative designated by the Faculty Club; a parent representative designated by the PTA; a learner representative designated by the Supreme Student Council; a community representative designated by the Punong Barangay, preferably a Barangay Council for the Protection of Children (BCPC) member. **No quorum rule is specified anywhere in the Order** — confirmed absent, not merely unverified.
 - **Route here for:** ANY child protection case as the procedural backbone; corporal punishment; teacher misconduct toward learners.
 
 ### B2. DepEd Order No. 55, s. 2013 — Original IRR of the Anti-Bullying Act
 - **Status:** SUPERSEDED IN LARGE PART by the 2025 Revised IRR (B3). Keep in corpus for historical reference, tagged `status: superseded`.
 
-### B3. Revised IRR of RA 10627 (signed August 2025; disseminated via DepEd Memorandum DM 090, s. 2025)
+### B3. Revised IRR of RA 10627 (signed August 2025; disseminated via DepEd Memorandum DM 090, s. 2025) [✅ SECS. 11/14/15/16/17 VERIFIED — official DepEd-hosted "Anti-bullying IRR Clean version as of 25 March 2025" PDF, text-extractable; note this specific copy is a pre-signature draft (blank signature date), so re-confirm against the final signed August 2025 version if a discrepancy is ever suspected]
 - **Status:** IN FORCE — this is the current controlling framework for bullying. The chatbot must prefer this over DO 55, s. 2013.
-- **Key changes / features (verify all details against verbatim text):**
+- **⚠️ TERMINOLOGY CORRECTION:** This IRR's own text calls the first-responder role the **"Discipline Officer,"** NOT "Learner Formation Officer (LFO)." "LFO" does not appear anywhere in this IRR — it is DepEd Order No. 006, s. 2026 (ESMLE, see B5/Part P) that later uses "Learner Formation Officer (LFO)" for essentially this same position, and media coverage has since popularized "LFO" as the everyday term. Both terms refer to the same first-responder role; when citing THIS 2025 IRR specifically, cite "Discipline Officer," not "LFO." See the Part C glossary entry for the full explanation.
+- **Key changes / features:**
   - Applies to all public and private basic education schools, Philippine Schools Overseas, international schools, and Community Learning Centers.
   - Expands coverage to **precursor behaviors** — acts that may not cause physical harm but create emotional distress or social exclusion; recognizes patterns of intimidation.
-  - Designates a **Learner Formation Officer (LFO)** as first responder to bullying complaints, coordinating interventions. (If your users say "LPO," confirm whether they mean the LFO or an LRP focal person.)
-  - Graduated, leveled disciplinary/intervention responses (including restorative-justice conferencing at defined levels).
+  - **Discipline Officer (Sec. 11.1(a)(i), verified):** the Principal/School Head "shall Designate a disciplinary officer to handle the bullying incidents, taking into consideration the population of the school and the historical data on the prevalence of bullying." Duties (Sec. 11.1(c)): provide students/parents a copy of the anti-bullying policy; enable anonymous reporting (no disciplinary action may rest solely on an anonymous report); handle/resolve complaints while protecting the rights of victim, bully, and bystander and maintaining confidentiality; maintain bullying statistics (names of bullies kept strictly confidential — shared only with school admin and the teachers directly responsible for the affected students). No qualification requirements are specified in the IRR text.
+  - **Leveled response (Sec. 14(d), verified) — 3 levels defined by WHO HANDLES the case, not a sanctions table:** Level 1 (precursors/minor acts) — teacher does initial assessment + intervention, must still report, escalates to the Discipline Officer if it persists/escalates. Level 2 (serious acts) — Discipline Officer/designated personnel run a formal proceeding. Level 3 (cannot be resolved below) — Principal/School Head conducts a thorough investigation, notifies parents, implements safety plans, coordinates with law enforcement if needed. The School Counselor may intervene at any level as a support role, never a substitute for discipline. **This IRR does NOT itself prescribe a sanctions/offense table** — Sec. 6(d) only requires each school's own localized policy to include "a range of disciplinary administrative sanctions that considers the nature and gravity of the offense." The verified sanctions TABLE your bot can actually quote (Annex D, with specific 1st/2nd/3rd-offense penalties) comes from a different, later document — DO 006, s. 2026's Annex D — see Part P4.a. Do not attribute Annex D's sanctions table to this IRR.
   - **Jurisdiction:** bullying complaints fall within primary jurisdiction of DepEd or the private school; acts outside the Act's coverage get referred to the proper authorities.
-  - **Confidentiality (Sec. 15):** identity/personal information of learners involved is protected.
-  - **Reportorial requirements (Sec. 16):** schools must submit consolidated bullying statistics through official channels (semestral and year-end).
-  - **Sanctions for non-compliance (Sec. 17):** administrative sanctions for public and private school personnel who fail to comply; accountability runs up to school heads.
+  - **Confidentiality — Sec. 15 (verbatim, verified):** "Any information relating to the identity and personal circumstances of all parties involved in a bullying or retaliatory incident shall be treated with the utmost confidentiality by all parties that collected the said data... Furthermore, all personal information, sensitive personal information, and/or privileged information collected shall be subject to the rules and regulations set forth in Republic Act No. 10173, or the Data Privacy Act of 2012 and its IRR. Any school personnel who commits a breach of confidentiality shall be subject to appropriate administrative action... without prejudice to any civil or criminal action."
+  - **Reportorial requirements — Sec. 16 (verbatim, verified):** schools submit updated anti-bullying policies to the Division Office **within 6 months of IRR effectivity** (also required before a new private school may operate, or an existing one continue operating); schools also submit an annual bullying statistics report to the Division Office **within the first week of each school year**.
+  - **Sanctions for non-compliance — Sec. 17 (verbatim, verified):** Public schools — personnel who fail to comply "shall be subject to administrative proceedings in accordance with the Civil Service Rules and other relevant issuances of the Department of Education. The school administrator shall be held accountable for the non-compliance... and the zero reporting of incidents of bullying shall not automatically be construed as a reflection of positive performance of the school." Private schools — personnel face sanctions "as may be imposed by the private school," with a copy of the decision submitted to DepEd; non-compliant private schools face DepEd's own administrative proceedings. The Secretary of DepEd, through the Regional Director, may suspend or revoke a non-compliant private school's permit/recognition.
+  - **No fixed investigation/decision day-count exists in this IRR itself** — confirmed absent, not just unverified: Sec. 11.1(a)(v) explicitly leaves the resolution timeline to "the period of time as decided upon by the school in its policies," and Sec. 14(b) only sets "minimum response standards" (immediate response, thorough investigation, due process, referrals) without day-counts. Any specific day-count (e.g. "5 days," "10 days") for bullying investigation/decision should NOT be attributed to this IRR — the verified day-counts your bot CAN cite (48-hr referral, 10-day fact-finding, 30-day decision, etc.) come from DO 006, s. 2026 instead — see Part P3.
   - Requires anti-bullying procedures in student handbooks and posted on campus; DepEd monitors CPC functionality.
 - **Route here for:** all learner-on-learner bullying and cyberbullying; school compliance duties; reporting timelines; sanctions for inaction.
 
@@ -175,7 +190,7 @@
 | Hazing | Physical/psychological suffering as prerequisite to organization membership | RA 8049 / RA 11053 |
 | Child in conflict with the law (CICL) | Child alleged/accused/adjudged to have committed an offense | RA 9344 |
 | CPC | Child Protection Committee — school-level body handling child protection cases | DO 40 s. 2012 |
-| LFO | Learner Formation Officer — first responder for bullying complaints | Revised IRR (2025) |
+| LFO / Discipline Officer | First-responder role for bullying complaints, designated by the Principal/School Head. Established as the **"Discipline Officer"** in the 2025 Revised IRR of RA 10627 (Sec. 11) — that IRR never uses the term "LFO." DepEd Order No. 006, s. 2026 (ESMLE) later refers to the same role as **"Learner Formation Officer (LFO)"** (paired with "Discipline Officer" in its own text), and that term is now the common usage in media/practice. Same position, two names from two different issuances — cite whichever issuance you're actually quoting. | Revised IRR (2025) Sec. 11; DO 006 s. 2026 |
 | LRPO | Learner Rights and Protection Office (DepEd Central), with division/school-level counterparts | DepEd (2022) |
 | Sensitive personal information | Includes data about minors; requires highest protection | RA 10173 |
 
@@ -386,29 +401,29 @@ STRICT RULES:
 
 | # | Document | Where to get the official text |
 |---|---|---|
-| 1 | RA 7610 | Official Gazette / lawphil.net |
-| 2 | RA 10627 | Official Gazette / lawphil.net |
-| 3 | **Revised IRR of RA 10627 (2025)** | deped.gov.ph (PDF: "Anti-bullying IRR Clean version as of 25 March 2025"; disseminated via DM 090, s. 2025) |
+| 1 | RA 7610 | ✅ Key provisions (Sec. 3(b), Sec. 10 penalties) verified verbatim via lawphil.net — see A1. Full-text chunking still pending. |
+| 2 | RA 10627 | ✅ Key provisions (Sec. 2, Sec. 3) verified verbatim via lawphil.net — see A2. Full-text chunking still pending. |
+| 3 | **Revised IRR of RA 10627 (2025)** | ✅ Secs. 11, 14, 15, 16, 17 verified verbatim via deped.gov.ph's "Anti-bullying IRR Clean version as of 25 March 2025" PDF — see B3. That copy is a pre-signature draft; re-confirm against the final signed version if a discrepancy is suspected. |
 | 4 | DO 55, s. 2013 (old IRR — tag superseded) | deped.gov.ph |
-| 5 | DO 40, s. 2012 (Child Protection Policy) + annexes/forms | deped.gov.ph |
-| 6 | RA 11313 + its IRR | Official Gazette / PCW website |
+| 5 | DO 40, s. 2012 (Child Protection Policy) + annexes/forms | ✅ Main Order verified verbatim (mirror confirmed against DepEd's official issuance listing) — see B1 and Part Q. Annex A–D form templates themselves still not text-extractable. |
+| 6 | RA 11313 + its IRR | ✅ School-liability provisions (Secs. 12, 14, 21, 22, 23; IRR Rule VIII Sec. 33) verified verbatim via the official PCW-published text — see A3. |
 | 7 | RA 10175 | Official Gazette / lawphil.net |
 | 8 | RA 11930 + IRR (2023) | Official Gazette |
 | 9 | RA 9995 | Official Gazette / lawphil.net |
 | 10 | RA 7877 | Official Gazette / lawphil.net |
 | 11 | RA 11053 (Anti-Hazing, amending RA 8049) | Official Gazette |
-| 12 | RA 9344 as amended by RA 10630 | Official Gazette |
+| 12 | RA 9344 as amended by RA 10630 | ✅ Sec. 6 (age of criminal responsibility) verified verbatim via lawphil.net — see A9. |
 | 13 | RA 10173 + IRR; NPC advisories on schools/children's data | Official Gazette / privacy.gov.ph |
 | 14 | RA 11036; RA 12080 | Official Gazette |
 | 15 | DO 003, s. 2026 (AI in Basic Education) | deped.gov.ph (posted Feb 20, 2026) |
 | 16 | DO 006, s. 2026 (ESMLE) + Annexes A–K | ✅ OBTAINED — in `katuroProtect/corpus/` (verified; Part P sourced from it) |
 | 17 | DO 32, s. 2017 (Gender-Responsive Basic Ed) | deped.gov.ph |
-| 18 | 2017 RACCS (CSC Resolution No. 1701077) | csc.gov.ph |
-| 19 | RA 4670 (Magna Carta for Public School Teachers) | Official Gazette / lawphil.net |
+| 18 | 2017 RACCS (CSC Resolution No. 1701077) | ⚠️ Sourced from secondary legal commentary, not the CSC's own PDF (403/access error) — see Part R4. Primary text still needed before treating penalty figures as fully settled. |
+| 19 | RA 4670 (Magna Carta for Public School Teachers) | ✅ Sec. 9 (investigating committee composition) verified verbatim via lawphil.net — see Part R5. |
 | 20 | Your Division Office's prescribed CP/bullying report templates | Your SDO records section |
-| 21 | DO 18, s. 2015 (Children-at-Risk & CICL management, incl. Appendix A risk tools + CICL Intake Form) | deped.gov.ph |
-| 22 | DO 49, s. 2006 (Revised Rules of Procedure in Administrative Cases) | deped.gov.ph |
-| 23 | DO 15, s. 2012 (Alternative Dispute Resolution / mediation framework) | deped.gov.ph |
+| 21 | DO 18, s. 2015 (Children-at-Risk & CICL management, incl. Appendix A risk tools + CICL Intake Form) | ⚠️ Procedure sourced from deped.gov.ph's issuance listing + secondary summary, not the Order's own machine-readable text — see Part R1. |
+| 22 | DO 49, s. 2006 (Revised Rules of Procedure in Administrative Cases) | ⚠️ Sourced from secondary summary, not the Order's own machine-readable text — see Part R2. |
+| 23 | DO 15, s. 2012 (Alternative Dispute Resolution / mediation framework) | ⚠️ Sourced from deped.gov.ph's issuance listing; primary PDF 404'd — see Part R3. |
 | 24 | DO 57, s. 2017 (Protection of Children in Armed Conflict) + DM-OUOPS-2024-05-01167 (CSAC protocols) | deped.gov.ph |
 | 25 | DO 32, s. 2019 (Learners and Schools as Zones of Peace) | deped.gov.ph |
 | 26 | DO 47, s. 2022 + DO 49, s. 2022 (Promotion of Professionalism) | deped.gov.ph |
@@ -427,11 +442,12 @@ STRICT RULES:
 - Quarterly review task: check deped.gov.ph issuances page + LRPO channels for new orders/memos; log updates in a CHANGELOG section here.
 
 ### J2. Known open items to verify against verbatim text (do NOT let the bot answer these from this file alone)
-- Exact reporting timelines (days) in DO 40, s. 2012 and the Revised IRR.
-- Exact CPC composition wording and quorum rules.
-- Exact leveled-response matrix in the Revised IRR (levels, corresponding acts, corresponding responses).
-- Exact Sec. 17 sanction wording for non-compliant personnel.
-- RA 11313 penalty tables for educational institutions.
+- ~~Exact reporting timelines (days) in DO 40, s. 2012 and the Revised IRR.~~ **RESOLVED for DO 40** — see Part Q3 (48-hr/72-hr/90-day/15-day/3-day). **Confirmed the Revised IRR itself has NO investigation/decision day-count** — it explicitly leaves that to each school's own policy (Sec. 11.1(a)(v), Sec. 14(b)); this is a real finding, not a remaining gap.
+- ~~Exact CPC composition wording and quorum rules.~~ **RESOLVED** — see Part Q (Sec. 10, DO 40). Composition is exact; **confirmed no quorum rule exists** in the Order at all.
+- ~~Exact leveled-response matrix in the Revised IRR (levels, corresponding acts, corresponding responses).~~ **RESOLVED** — a 3-level who-handles-what system exists (Sec. 14(d), see B3), but **confirmed the Revised IRR itself contains no sanctions/offense table** — that table (Annex D) comes from the separate, later DO 006, s. 2026 (Part P4.a). Do not attribute Annex D's sanctions to the Revised IRR.
+- ~~Exact Sec. 17 sanction wording for non-compliant personnel.~~ **RESOLVED** — verbatim text now in B3.
+- ~~RA 11313 penalty tables for educational institutions.~~ **RESOLVED** — exact fines (₱5,000–10,000 / ₱10,000–15,000) and the online-GBSH criminal penalty now in A3.
+- **New from this pass — still open, Tier 2 until a primary source is confirmed:** DO 49, s. 2006's exact procedural deadlines (Part R2), DO 15, s. 2012's exact ADR exclusion list (Part R3), and 2017 RACCS's exact penalty tiers including where Sexual Harassment falls (Part R4) are currently sourced from secondary legal-commentary sites, not the primary CSC/DepEd PDFs (which were scanned-image-only or returned access errors). Also open: DO 40's Annexes A–D exact form field layouts (only the main Order text, not the annexes, was machine-readable).
 - Whether your Division has issued local memoranda supplementing these (division memos bind locally).
 
 ### J3. Privacy rules for the feature itself
@@ -446,6 +462,8 @@ STRICT RULES:
 - **v1.0 (July 2026):** Initial compilation. Corpus index of 12 national laws + 7 DepEd issuance families; decision tree; procedures; sanctions framework; form schemas; system prompt; ingestion checklist.
 - **v1.1 (July 2026):** Added Part K (Next-Move Engine state machine), Part L (Repeat-Incident Registry & escalation tiers), Part M (Referral Directory), Part N (Case Action File export spec).
 - **v1.2 (July 2026):** Recheck pass. Added tiered fallback policy (corpus-first, labeled outside-knowledge fallback, never-guess floor) in Part 0.2 and Part H; added Part O (QA & Error-Proofing Protocol with golden test set, legal-review gate, runtime safeguards); added Readiness Assessment; flagged RA 12080 for official verification.
+- **v1.3 (July 2026):** MAJOR VERIFICATION UPDATE. Ingested official DO 006, s. 2026 (ESMLE) PDF into corpus. Rewrote B5 with verified summary. Added Part P: verified three-level workflow ladder (Class Adviser/Teacher → LFO → School Head/CPC), Annex A–C process flows, verified timeline table (48-hr referral, 10-day FFI, 30-day decision, appeal routes), verified sanctions tables for bullying (Annex D template) and non-bullying offenses (Annex I) and device violations (Annex G), verified emergency hotlines, and new definitions. Expanded Part I checklist with 7 newly identified issuance families (DO 18 s. 2015, DO 49 s. 2006, DO 15 s. 2012, DO 57 s. 2017, DO 32 s. 2019, DO 47/49 s. 2022, 2024 memoranda). Several Part E/J.2 [QUOTE FROM SOURCE] items are now resolved by Part P.
+- **v1.4 (July 2026):** RESEARCH & VERIFICATION PASS across national laws + DepEd issuances, sourced from lawphil.net (RA 7610, RA 10627, RA 9344/10630, RA 4670 — verbatim text), the official PCW-published RA 11313 + IRR text, and a verbatim mirror of DO 40, s. 2012 confirmed against DepEd's own issuance listing. Updated A1/A2/A3/A9 with verified penalty ranges, definitions, and section text. Rewrote B1 (DO 40) and B3 (Revised IRR of RA 10627) with verified specifics; corrected a terminology conflict — the 2025 Revised IRR itself calls the first-responder role "Discipline Officer," not "LFO" (that term comes from the later DO 006, s. 2026) — see the Part C glossary. Added Part Q (verified DO 40, s. 2012 detail: corporal punishment's 12-act definition, prohibited-acts lists, reporting timelines, intake procedure, annexes) and Part R (procedural backbone: DO 18 s. 2015, DO 49 s. 2006, DO 15 s. 2012, 2017 RACCS, RA 4670 — mixed confidence, several items sourced from secondary legal commentary rather than primary CSC/DepEd PDFs because those were inaccessible/scanned-image-only; flagged accordingly and left as Tier 2 pending primary confirmation). Updated Part I and Part J.2 to reflect what's now resolved vs. still open.
 
 ---
 
@@ -617,15 +635,19 @@ Cover at least: first-incident bullying; repeat cyberbullying (T2); pattern case
 
 ---
 
-## READINESS ASSESSMENT (honest status — v1.2)
+## READINESS ASSESSMENT (honest status — v1.4)
 
 **✅ Complete and usable now (Layer 1):** legal-framework index and routing (Parts A–D), procedures skeleton (E), sanctions framework structure (F), form schemas (G), system prompt with tiered fallback (H), next-move state machine (K), repeat-incident registry design (L), referral directory structure (M), export spec (N), QA protocol (O).
 
-**⛔ NOT yet sufficient for live personnel use until you complete:**
-1. Download and ingest all 20 Layer 2 documents (Part I) — the verbatim law text is the load-bearing layer; without it the bot cannot quote sanctions, timelines, or exact procedures, and MUST stay in Tier 2/3 behavior.
-2. Verify every Part J.2 open item against the verbatim texts (including the RA 12080 number flagged in A11).
+**✅ Now quotable with real citations (verbatim-verified, not just summarized):** RA 7610 Sec. 3(b)/10 (A1), RA 10627 Sec. 2/3 (A2), RA 11313 Secs. 12/14/21/22/23 + IRR Rule VIII Sec. 33 (A3), RA 9344/10630 Sec. 6 (A9), DO 40 s. 2012 in full — CPC composition, corporal punishment's 12-act definition, prohibited acts, reporting timelines, intake procedure (B1, Part Q), Revised IRR of RA 10627 Secs. 11/14/15/16/17 (B3), RA 4670 Sec. 9 (Part R5). This meaningfully shrinks how often the bot should need the "OUTSIDE KNOWLEDGE BASE" fallback for these specific documents.
+
+**⚠️ Verified but only from secondary sources (still Tier 2 until a primary PDF confirms them):** DO 18, s. 2015 (Part R1), DO 49, s. 2006 (Part R2), DO 15, s. 2012 (Part R3), 2017 RACCS (Part R4).
+
+**⛔ NOT yet sufficient for full live personnel use until you complete:**
+1. Obtain and ingest the remaining Layer 2 documents in Part I that are still unmarked (RA 10175, RA 11930+IRR, RA 9995, RA 7877, RA 11053, RA 10173+IRR, RA 11036/12080, DO 32 s.2017, DO 57 s.2017, DO 32 s.2019, DO 47/49 s.2022, and the four Part R items above at primary-source quality) — without full verbatim text the bot must stay in Tier 2/3 for anything those documents alone would answer.
+2. The remaining Part J.2 open items (Annex A–D form layouts for DO 40; the four Part R items).
 3. Obtain your Division's prescribed report templates and fill the Part M contact directory with real offices/numbers.
-4. Pass all Part O pre-deployment gates, including the Division Legal Officer sign-off.
+4. Pass all Part O pre-deployment gates, including the Division Legal Officer sign-off — this is still required even for the newly-verified content above; verified-by-research is not the same as legally reviewed.
 
 **Bottom line:** the brain's skeleton, nervous system, and safety reflexes are done and internally consistent; the verbatim memory (Layer 2) and the local contacts are the remaining work before real CPC members should rely on it.
 
@@ -732,4 +754,81 @@ Cover at least: first-incident bullying; repeat cyberbullying (T2); pattern case
 | Exclusion | Immediately dropped from the class list; placement support per assessment |
 | LRP Concerns | Umbrella term: child abuse, violence, exploitation, discrimination, bullying, GBSH, and any condition prejudicial to learners' development on any ground (incl. SOGIE, HIV status, pregnancy, CICL status, disability) |
 | Bullying coverage zones | School grounds; within 2 km of school; school activities before/during/after; bus stops and school vehicles; any technology owned/leased/used by the school; and off-campus/online acts creating a hostile environment at school (Annex D Sec. 5) |
-- **v1.3 (July 2026):** MAJOR VERIFICATION UPDATE. Ingested official DO 006, s. 2026 (ESMLE) PDF into corpus. Rewrote B5 with verified summary. Added Part P: verified three-level workflow ladder (Class Adviser/Teacher → LFO → School Head/CPC), Annex A–C process flows, verified timeline table (48-hr referral, 10-day FFI, 30-day decision, appeal routes), verified sanctions tables for bullying (Annex D template) and non-bullying offenses (Annex I) and device violations (Annex G), verified emergency hotlines, and new definitions. Expanded Part I checklist with 7 newly identified issuance families (DO 18 s. 2015, DO 49 s. 2006, DO 15 s. 2012, DO 57 s. 2017, DO 32 s. 2019, DO 47/49 s. 2022, 2024 memoranda). Several Part E/J.2 [QUOTE FROM SOURCE] items are now resolved by Part P.
+
+---
+
+## PART Q — VERIFIED DEPED ORDER NO. 40, s. 2012 DETAIL
+
+> ✅ Sourced from the Order's full verbatim text (a mirror confirmed to match the official DepEd-listed issuance: same title, "MAY 14 2012" date, and signatory Br. Armin A. Luistro FSC — the official deped.gov.ph-hosted copy is itself a scanned image and not machine-readable, so this mirror is the working verbatim source). The chatbot may quote everything below with citation [DO 40, s. 2012, Sec. ___].
+
+### Q1. Corporal punishment — full definition (Sec. 3.O)
+Corporal punishment is defined as "a kind of punishment or penalty imposed for an alleged or actual offense, which is carried out or inflicted, for the purpose of discipline, training or control, by a teacher, school administrator, an adult, or any other child who has been given or has assumed authority..." It explicitly **includes, but is not limited to**, these 12 categories of physical, humiliating, or degrading punishment:
+1. Blows — beating, kicking, hitting, slapping, or lashing, with or without an instrument.
+2. Striking a child's face or head — declared a **"no contact zone."**
+3. Pulling hair, shaking, twisting joints, cutting/piercing skin, dragging, pushing, or throwing.
+4. Forcing physically painful positions/acts — e.g. holding weights, kneeling on stones/salt/pebbles.
+5. Deprivation of physical needs as punishment.
+6. Deliberate exposure to fire, ice, water, smoke, sunlight, rain, pepper, alcohol, or forced swallowing of substances.
+7. Tying up a child.
+8. Confinement or imprisonment.
+9. Verbal abuse, threats, cursing, or ridicule.
+10. Forcing a child to wear a sign, undress, or otherwise look foolish.
+11. Permanent confiscation of personal property (except items that are actually dangerous).
+12. Other analogous acts.
+
+### Q2. Prohibited acts
+- **By school personnel (Sec. 15):** child abuse; discrimination against children; child exploitation; violence against children in school; corporal punishment; any analogous or similar acts — penalized as Grave or Simple Misconduct depending on severity.
+- **By learners (Sec. 9.A):** must refrain from (i) discrimination; (ii) inappropriate/sexually provocative acts; (iii) participating in illegal/unsafe/abusive behavior of others; (iv) marking/damaging school property; (v) fights/aggressive behavior; (vi) possessing deadly weapons, drugs, alcohol, toxic substances, cigarettes, or pornographic material; (vii) other similar acts causing damage or injury to another.
+
+### Q3. Reporting timelines & intake procedure
+**Timelines (Sec. 16, public schools):**
+| Step | Deadline |
+|---|---|
+| School Head/SDS forwards complaint to the Disciplining Authority | **48 hours** |
+| Disciplining Authority issues an Order for fact-finding investigation | **72 hours** from submission |
+| Preventive suspension of respondent (grave injury/abuse) | up to **90 days** |
+| Motion for Reconsideration/Appeal to the Civil Service Commission | **15 days** from receipt |
+| Respondent's counter-affidavit in a sexual-harassment complaint | **3 days** from receipt of notice (Sec. 16.E.1) |
+| Annual report + intake form copy to the Division Office | after each school year (periodic, not per-incident) |
+
+**Procedure:**
+- **Bullying (Sec. 12):** report immediately to the School Head → School Head informs both parties' parents/guardians in a called meeting → both referred to the CPC for counseling/interventions → School Head may impose a reprimand (1st offense) or suspension up to 1 week (repeat offense), with due-process minimums: written notice of complaint, written answer, written decision, right to appeal.
+- **General CP cases (Sec. 22):** the CPC accomplishes the **Intake Sheet (Annex B)**. The School Head may refer the victim/offender to the LSWDO for assessment; LSWDO determines the intervention; the School Head and Guidance Counselor/Teacher, with LSWDO, immediately remove an at-risk victim from danger; the family is informed of the action taken.
+- **Formal administrative complaints, public schools (Sec. 16):** School Head/SDS forwards the complaint to the Disciplining Authority (48 hrs) → fact-finding investigation ordered (72 hrs) → Formal Charge issued if a prima facie case exists → possible preventive suspension/reassignment.
+- **Private schools (Secs. 20–21):** complaint filed with the School Head/CEO, handled per the school's own administrative rules of procedure; the school submits its report (Annex A) to the Division Office after each school year.
+
+### Q4. Annexes referenced in DO 40 itself
+- **Annex A** — the incident/case report used in the school → Division → Regional → Central Office consolidated reporting chain (Secs. 4.D, 5.B, 6.E, 7.H, 16.F, 21).
+- **Annex B** — the Intake Sheet, accomplished by the CPC for all abuse/violence/exploitation/discrimination/bullying cases (Secs. 7.H, 22).
+- **Annex C** — template for the school's own child protection policy / used to disseminate awareness of it (Secs. 7.C, 10.B.1).
+- **Annex D** — template for the school-based referral and monitoring system (Sec. 10.B.3). *(Do not confuse with DO 006, s. 2026's own, separate "Annex D" — the localized anti-bullying sanctions template referenced in Part P4.a. Same letter, two unrelated documents.)*
+- The exact field-level content of these annex templates was not accessible (only the main Order text was machine-readable) — if a user needs the literal annex form layout, that remains a Tier 2 item pending a text-extractable copy of DepEd's separate "Annexes to DO 40, s. 2012" file.
+
+---
+
+## PART R — VERIFIED PROCEDURAL BACKBONE (mixed confidence — read the source note on each item)
+
+> Unlike Parts P and Q, several items below rest on secondary legal-commentary sources because the primary CSC/DepEd PDFs were either scanned images (not machine-readable) or returned access errors when fetched directly. Each item is individually marked. Only quote a "✅ PRIMARY VERIFIED" item with full confidence; treat a "⚠️ SECONDARY-SOURCED" item as Tier 2 — name it and route to the Division Legal Officer for confirmation rather than stating it as settled fact.
+
+### R1. DepEd Order No. 18, s. 2015 — Children-at-Risk (CAR) & CICL Management [⚠️ SECONDARY-SOURCED — deped.gov.ph issuance listing + teacherph.com summary; the Order's own PDF was not machine-readable]
+- **CAR procedure:** any school personnel or community member with knowledge of a child-at-risk situation reports it to the guidance counselor, who validates the information and assesses the child using the "Profiling and Initial Risk Assessment Tools for Children-at-Risk" (**Appendix A**). A case conference with parents/guardians produces an intervention plan consented to by the CAR and parent/guardian, implemented under the School Head and monitored by the counselor. Only the School Head may terminate the intervention, on the counselor's recommendation. *(Appendix A is confirmed to exist and is used for risk scoring, but its specific line-item factors could not be verified — treat those specifics as unverified.)*
+- **CICL procedure:** for serious offenses, the School Head must report immediately to the law enforcement officer and refer the case to the LSWDO via the **CICL Intake Form**, and must immediately notify the child's parents/guardians and the LSWDO. For less serious offenses, restorative justice applies instead — the CPC sits as a **Restorative Justice Panel** conducting family group conferencing (this is the source of Part D's Annex C CAR-Restorative-Justice-Panel routing and Part K's CPC restorative-justice references).
+
+### R2. DepEd Order No. 49, s. 2006 — Revised Rules of Procedure in Administrative Cases [⚠️ SECONDARY-SOURCED — teacherph.com comprehensive guide; the official PDF was scanned/not machine-readable]
+- **Stages:** (1) written complaint under oath, filed with the School Superintendent (non-teaching respondent), Regional Director (teacher/regional staff respondent), or Legal Division (presidential appointee/central office respondent); (2) preliminary investigation — respondent files a counter-affidavit, investigator reports findings; (3) Formal Charge + Formal Investigation Committee if a prima facie case is found; (4) formal investigation — pre-hearing conference, hearings, evidence, cross-examination; (5) decision **within 30 days** of receiving the Formal Investigation Report; (6) motion for reconsideration **within 15 days**, or appeal **within 15 days** of receiving the decision (appealable only if the penalty exceeds a 30-day suspension or a ₱300 fine); **preventive suspension capped at 90 days**, with automatic reinstatement if unresolved by then.
+- Cite this as "reportedly per DO 49, s. 2006" rather than a direct quote until the primary PDF is confirmed.
+
+### R3. DepEd Order No. 15, s. 2012 — ADR / Mediation Framework [⚠️ SECONDARY-SOURCED — deped.gov.ph issuance listing; the primary PDF 404'd]
+- Available for complaints/grievances/disputes concerning a DepEd official's or employee's act or omission, where the offense is light (punishable by reprimand) or parties otherwise agree to mediate. A 3-member Mediation Unit (non-mediators, one preferably from the Legal/Administrative Division) operates per office level, using trained/certified DepEd mediators from a roster.
+- **Reported exclusions** (sexual harassment, child abuse, VAWC cases, and performance evaluation matters) appeared consistently across secondary sources but could not be pinned to one exact quoted clause — treat the exclusion list itself as Tier 2 until confirmed against the primary text.
+
+### R4. 2017 RACCS (CSC Resolution No. 1701077) [⚠️ SECONDARY-SOURCED — the CSC's own PDF returned a 403/access error; figures below trace to legal-commentary sites, not the Resolution's own text]
+- **Structure:** three offense tiers — grave, less grave, light (Rule 10, Sec. 50).
+- **Grave Misconduct:** dismissal from service, even on the 1st offense, with accessory penalties (cancellation of eligibility, forfeiture of retirement benefits, perpetual disqualification from public office, bar from civil service exams).
+- **Disgraceful and Immoral Conduct:** dismissal on the 1st offense (mitigable to 6 months + 1 day – 1 year suspension only if mitigating circumstances apply).
+- **Conduct Prejudicial to the Best Interest of the Service:** 6 months + 1 day – 1 year suspension (1st offense), dismissal (2nd offense).
+- **Could not verify:** RACCS's specific classification/penalty for Sexual Harassment as its own offense category — flag this as an open item rather than guessing which tier it falls under. RACCS is a general civil-service instrument with no student-specific offense category; the applicable categories for child-protection matters are Grave Misconduct, Disgraceful and Immoral Conduct, and Oppression.
+
+### R5. RA 4670 (Magna Carta for Public School Teachers), Sec. 9 [✅ PRIMARY VERIFIED — lawphil.net verbatim text]
+> "Administrative charges against a teacher shall be heard initially by a committee composed of the corresponding School Superintendent of the Division or a duly authorized representative who should at least have the rank of a division supervisor, where the teacher belongs, as chairman, a representative of the local or, in its absence, any existing provincial or national teacher's organization and a supervisor of the Division, the last two to be designated by the Director of Public Schools."
+- **Committee composition:** (1) Chairman — the Division's School Superintendent or an authorized representative (minimum rank: division supervisor); (2) a representative of the local (or provincial/national, if no local exists) teachers' organization; (3) a Division supervisor — the latter two designated by the Director of Public Schools. If the School Superintendent is the complainant or an interested party, the Secretary of Education appoints all committee members instead. The committee submits findings/recommendations to the Director of Public Schools **within 30 days** of the hearings' termination.
