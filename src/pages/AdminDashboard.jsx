@@ -728,6 +728,25 @@ function buildSubjectGradeData(featureEvents) {
   return { bySubject: toSorted(subjectCounts), byGrade: toSorted(gradeCounts) };
 }
 
+/**
+ * kaTuro Protect gets its own dedicated analytics portion (not folded into
+ * the generic feature list) since it's a sensitive, purpose-built tool whose
+ * "is this worth keeping" question needs its own clear answer rather than
+ * being buried in a shared chart with a dozen other features.
+ */
+function buildProtectSummary(events) {
+  const viewerUids = new Set(events.filter(e => e.feature === 'protect_step_viewed').map(e => e.uid));
+  const chatEvents = events.filter(e => e.feature === 'protect_chat_used');
+  const caseEvents = events.filter(e => e.feature === 'protect_case_filed');
+  return {
+    uniqueUsers:  viewerUids.size,
+    chatMessages: chatEvents.length,
+    chatUsers:    new Set(chatEvents.map(e => e.uid)).size,
+    casesFiled:   caseEvents.length,
+    filers:       new Set(caseEvents.map(e => e.uid)).size,
+  };
+}
+
 /** Unique teachers reaching each named step of a wizard, in declared order. */
 function buildFunnel(events, eventName, stepOrder) {
   const stepUsers = {};
@@ -1117,6 +1136,9 @@ function AnalyticsSection({ teachers = [] }) {
   const cotGenFunnel       = buildFunnel(visibleEvents, 'cotgen_step_viewed', ['step1', 'step2', 'step3']);
   const testBuilderFunnel  = buildFunnel(visibleEvents, 'test_builder_step_viewed', ['setup', 'blooms', 'tos', 'review']);
   const protectFunnel      = buildFunnel(visibleEvents, 'protect_step_viewed', ['chat', 'intake', 'filed']);
+  const protectSummary     = buildProtectSummary(visibleEvents);
+  const protectChatEvents  = visibleEvents.filter(e => e.feature === 'ai_generation' && e.tool === 'protect_chat');
+  const protectChatStats   = buildGenerationStats(protectChatEvents);
 
   const totalEvents  = visibleEvents.length;
   const uniqueUsers  = new Set(visibleEvents.map(e => e.uid)).size;
@@ -1347,10 +1369,42 @@ function AnalyticsSection({ teachers = [] }) {
                 <FunnelCard title="DLL Gen" stepLabels={DLLGEN_STEPS} funnel={dllGenFunnel} />
                 <FunnelCard title="COT Gen" stepLabels={COTGEN_STEPS} funnel={cotGenFunnel} />
                 <FunnelCard title="Test Builder" stepLabels={TEST_BUILDER_STEPS} funnel={testBuilderFunnel} />
-                <FunnelCard title="kaTuro Protect" stepLabels={PROTECT_STEPS} funnel={protectFunnel} />
               </div>
             </div>
           )}
+
+          {/* kaTuro Protect — dedicated portion, not folded into the shared
+              feature list. Always shown (unlike the wizard funnels above,
+              which hide when empty) so "zero usage" is itself a visible,
+              legible answer to "is this worth keeping" instead of the
+              section just silently disappearing. */}
+          <div style={{ ...card, marginTop: 20, borderLeft: '3px solid #dc2626' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>kaTuro Protect</p>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+              Adoption for the child-protection decision-support tool, tracked separately from every other feature.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <StatChip label="Teachers Who Opened It" value={protectSummary.uniqueUsers} color="#dc2626" />
+              <StatChip label="Chat Messages Sent"     value={protectSummary.chatMessages} color="#2d6a4f" />
+              <StatChip label="Teachers Who Chatted"   value={protectSummary.chatUsers}    color="#0284c7" />
+              <StatChip label="Cases Filed"            value={protectSummary.casesFiled}   color="#e8a320" />
+              <StatChip label="Teachers Who Filed"     value={protectSummary.filers}       color="#6d28d9" />
+              <StatChip
+                label="Chat Reliability"
+                value={protectChatStats.successRate == null ? '—' : `${protectChatStats.successRate}%`}
+                color={protectChatStats.successRate == null ? undefined
+                  : protectChatStats.successRate >= 90 ? '#16a34a'
+                  : protectChatStats.successRate >= 70 ? '#e8a320' : '#e05c5c'}
+              />
+            </div>
+            {protectFunnel[0]?.count > 0 ? (
+              <FunnelCard title="Adoption Funnel" stepLabels={PROTECT_STEPS} funnel={protectFunnel} />
+            ) : (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)', fontStyle: 'italic' }}>
+                No teacher has opened kaTuro Protect in this period yet.
+              </p>
+            )}
+          </div>
 
           {/* Chart 6 & 7 — Subject / Grade Demand */}
           {(bySubject.length > 0 || byGrade.length > 0) && (
