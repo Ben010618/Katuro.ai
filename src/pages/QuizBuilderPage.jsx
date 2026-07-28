@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { generateQuizAI } from '../services/ai';
-import { createQuiz, deductTokens } from '../services/db';
+import { createQuiz, deductTokens, refundTokens } from '../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
 import {
@@ -11,7 +11,7 @@ import {
   Printer, CheckCircle, Eye, EyeOff, AlertCircle,
   BookOpen, Plus, ArrowRight, Scissors, FileDown, Camera,
 } from 'lucide-react';
-import BubbleSheetPrint, { BubbleSheetPreview, A4_PX_W } from '../components/BubbleSheetPrint';
+import BubbleSheetPrint, { BubbleSheetPreview } from '../components/BubbleSheetPrint';
 
 const STEPS = ['Select Lesson', 'Quiz Settings', 'Preview & Print'];
 const NUM_Q_OPTS = [5, 10, 15, 20, 30];
@@ -198,6 +198,7 @@ export default function QuizBuilderPage() {
     if (!result) {
       setGenError(lastErr?.message || 'Generation failed. Check your connection and try again.');
       trackGeneration(user.uid, 'quiz', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
+      refundTokens(user.uid, 'quiz').catch(e => console.error('Token refund failed:', e));
       setGenerating(false);
       setGenStatus('');
       return;

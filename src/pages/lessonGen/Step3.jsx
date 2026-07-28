@@ -4,7 +4,7 @@ import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateIlawSession } from '../../services/ai';
-import { saveIlawPlan, deductTokens } from '../../services/db';
+import { saveIlawPlan, deductTokens, refundTokens } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 
@@ -161,6 +161,10 @@ export default function Step3() {
           ? failed[0].reason.message
           : `${failed.length} sessions could not be generated. Check your connection and try again.`
       );
+      // The lesson charge already went through before generation started —
+      // refund it since no usable plan came out of this attempt. Best-effort:
+      // a refund failure shouldn't replace the real error shown above.
+      refundTokens(user.uid, 'lesson').catch(err => console.error('Token refund failed:', err));
       trackGeneration(user.uid, 'ilaw', {
         success: false,
         durationMs: elapsedMs(),

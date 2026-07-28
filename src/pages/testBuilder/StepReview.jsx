@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { getTeacherProfile, deductTokens } from '../../services/db';
+import { getTeacherProfile, deductTokens, refundTokens } from '../../services/db';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
@@ -60,9 +60,11 @@ export default function StepReview() {
     setGenError('');
     setGeneratedParts(null);
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       setGenPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
       await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       const allItems = [];
@@ -116,6 +118,9 @@ export default function StepReview() {
       trackGeneration(user.uid, 'test_builder_items', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setGenError(err.message || 'Item generation failed. Please try again.');
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'test_builder_items', { success: false, durationMs: elapsedMs(), error: err.message });
       }

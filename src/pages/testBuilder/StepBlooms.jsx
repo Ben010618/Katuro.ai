@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor } from '../../config/testBuilderConfig';
 import { normalizeWeights, computeHotsPct, coerceWeightsTo100, equalDistributionWeights } from '../../utils/testBuilderCalc';
 import { suggestCognitiveWeights } from '../../services/testBuilderAI';
-import { deductTokens } from '../../services/db';
+import { deductTokens, refundTokens } from '../../services/db';
 import { AI_ENABLED } from '../../services/ai';
 import {
   Brain, TrendingUp, CheckCircle2, AlertTriangle,
@@ -46,8 +46,10 @@ export default function StepBlooms() {
     setAiLoading(true);
     setAiError('');
     setAiStatus('');
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST);
+      tokensDeducted = true;
 
       let result;
       let lastErr;
@@ -80,6 +82,9 @@ export default function StepBlooms() {
       setAiSuggestion(result);
     } catch (err) {
       setAiError(err.message || 'AI suggestion failed. Please try again.');
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST).catch(e => console.error('Token refund failed:', e));
+      }
     } finally {
       setAiLoading(false);
       setAiStatus('');

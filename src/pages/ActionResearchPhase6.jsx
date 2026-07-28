@@ -4,7 +4,7 @@ import { Sparkles, Loader2, MessageSquare, BookOpen, ListChecks, Lightbulb, Hear
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens }     from '../services/db';
+import { deductTokens, refundTokens } from '../services/db';
 import { interpretFindings, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx } from '../services/actionResearchDocx';
@@ -29,7 +29,6 @@ export default function ActionResearchPhase6() {
   const [rawData,     setRawData]     = useState('');
   const [findings,    setFindings]    = useState(null);
   const [generating,  setGenerating]  = useState(false);
-  const [saving,      setSaving]      = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error,       setError]       = useState('');
   const [completed,   setCompleted]   = useState(false);
@@ -52,8 +51,10 @@ export default function ActionResearchPhase6() {
     if (!user?.uid || !docData || rawData.trim().length < 30) return;
     setGenerating(true); setError(''); setStatusMsg('Writing your complete Chapter V — this may take 20–40 seconds…');
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-findings', 30);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       // Gemini occasionally returns a truncated/malformed response for this
@@ -100,6 +101,9 @@ export default function ActionResearchPhase6() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-findings', 30).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase6', { success: false, durationMs: elapsedMs(), error: err.message });
       }

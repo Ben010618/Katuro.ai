@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
-import { getTeacherProfile, deductTokens, createSharedPlan } from '../../services/db';
+import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan } from '../../services/db';
 import { downloadIlawDocx } from '../../services/docxExport';
 import { trackEvent } from '../../services/usageTracker';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
@@ -269,8 +269,10 @@ export default function OutputPage() {
     };
     setGameLoading(true);
     setGameModal('loading');
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'game_gen', 0.5);
+      tokensDeducted = true;
       let data;
       if (selGameType === 'matching') {
         const pairs = await genMatching(lesson, gameCount);
@@ -296,6 +298,9 @@ export default function OutputPage() {
     } catch (err) {
       addToast(err.message || 'Game generation failed.', 'error');
       setGameModal('pick');
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'game_gen', 0.5).catch(e => console.error('Token refund failed:', e));
+      }
     } finally {
       setGameLoading(false);
     }

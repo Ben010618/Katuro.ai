@@ -4,7 +4,7 @@ import { Sparkles, Loader2, Globe, MapPin, School, BookOpen, Link2 } from 'lucid
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens }     from '../services/db';
+import { deductTokens, refundTokens } from '../services/db';
 import { generateLiteratureReview, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx }  from '../services/actionResearchDocx';
@@ -49,8 +49,10 @@ export default function ActionResearchPhase3() {
     const initialStatus = 'This may take 15–30 seconds. Researching global, national, local, and classroom literature…';
     setGenerating(true); setError(''); setStatusMsg(initialStatus);
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-literature', 5);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -90,6 +92,9 @@ export default function ActionResearchPhase3() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-literature', 5).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase3', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -104,7 +109,7 @@ export default function ActionResearchPhase3() {
         literatureReview: litReview, phase: 3, updatedAt: serverTimestamp(),
       });
       navigate(`/action-research/phase-4/${docId}`);
-    } catch (err) {
+    } catch {
       setError('Failed to save. Please try again.');
     } finally { setSaving(false); }
   }

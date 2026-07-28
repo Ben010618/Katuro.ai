@@ -114,16 +114,22 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  * skips the daily-limit charge in that case, so a generation that needed 2
  * internal retries costs 1 unit of the daily budget, not 3.
  *
+ * Pass `unitCount` for an action whose per-call "size" (e.g. ILAW's number of
+ * teaching days) is meant to be bounded — the server validates it against
+ * that action's documented max independently of the UI, so a modified/
+ * replayed request can't ask for more than the UI would ever allow. Omit it
+ * for actions with no such per-call size limit.
+ *
  * Throws an Error shaped like geminiWithRetry's: `.status === 429` for both
  * "Gemini is rate-limited" and "you've hit today's limit" (existing retry
  * loops already treat 429 as "back off, maybe retry"), plus `.dailyLimit ===
  * true` specifically for the daily-limit case so a caller can skip retrying
  * something that won't clear up in the next few seconds.
  */
-export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry }) {
+export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount }) {
   const call = httpsCallable(functions, 'generateAI', { timeout: 150000 });
   try {
-    const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry });
+    const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
     const code = err?.code || '';

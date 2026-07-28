@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
-import { deductTokens, createSharedPlan } from '../../services/db';
+import { deductTokens, refundTokens, createSharedPlan } from '../../services/db';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { exportToPptx } from '../../services/pptxExport';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2, Share2 } from 'lucide-react';
@@ -240,8 +240,10 @@ export default function DLLOutputPage() {
     };
     setGameLoading(true);
     setGameModal('loading');
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'game_gen', 0.5);
+      tokensDeducted = true;
       let data;
       if (selGameType === 'matching') {
         const pairs = await genMatching(lesson, gameCount);
@@ -267,6 +269,9 @@ export default function DLLOutputPage() {
     } catch (err) {
       addToast(err.message || 'Game generation failed.', 'error');
       setGameModal('pick');
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'game_gen', 0.5).catch(e => console.error('Token refund failed:', e));
+      }
     } finally {
       setGameLoading(false);
     }

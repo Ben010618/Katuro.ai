@@ -4,7 +4,7 @@ import { Sparkles, Loader2, CheckSquare, Square } from 'lucide-react';
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens }     from '../services/db';
+import { deductTokens, refundTokens } from '../services/db';
 import { generateResearchQuestions, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx }  from '../services/actionResearchDocx';
@@ -48,8 +48,10 @@ export default function ActionResearchPhase2() {
     if (!user?.uid || !docData) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-questions', 5);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -89,6 +91,9 @@ export default function ActionResearchPhase2() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-questions', 5).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase2', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -110,7 +115,7 @@ export default function ActionResearchPhase2() {
         phase: 2, updatedAt: serverTimestamp(),
       });
       navigate(`/action-research/phase-3/${docId}`);
-    } catch (err) {
+    } catch {
       setError('Failed to save. Please try again.');
     } finally { setSaving(false); }
   }

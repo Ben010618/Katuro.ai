@@ -7,13 +7,14 @@ import {
 import { useAuth }    from '../hooks/useAuth';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getGeminiKey, geminiWithRetry } from '../services/geminiConfig';
-import { generateResearchTitles, THEME_LABELS } from '../services/actionResearchAI';
+import { generateResearchTitles } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import {
   actionResearchColRef,
   getActionResearch,
   updateActionResearch,
   deductTokens,
+  refundTokens,
 } from '../services/db';
 import ActionResearchShell from '../components/ActionResearchShell';
 
@@ -106,9 +107,10 @@ export default function ActionResearchPhase1() {
 
   /* ── Load saved data when resuming ─────────────────────────────────── */
   useEffect(() => {
-    if (!urlDocId || !user?.uid) { setLoadingResume(false); return; }
-    getActionResearch(user.uid, urlDocId)
-      .then(data => {
+    (async () => {
+      if (!urlDocId || !user?.uid) { setLoadingResume(false); return; }
+      try {
+        const data = await getActionResearch(user.uid, urlDocId);
         if (data.beraTheme)         setSelectedTheme(data.beraTheme);
         if (data.gradeLevel)        setGradeLevel(data.gradeLevel);
         if (data.subjectArea)       setSubjectArea(data.subjectArea);
@@ -120,10 +122,12 @@ export default function ActionResearchPhase1() {
         if (data.aiProblemStatement) {
           setAiSuggestion({ problemStatement: data.aiProblemStatement, interventions: [] });
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingResume(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      } catch {
+        // no saved data to resume from — proceed with a blank form
+      } finally {
+        setLoadingResume(false);
+      }
+    })();
   }, [urlDocId, user?.uid]);
 
   /* ── Debounced AI problem suggestion ─────────────────────────────────── */
@@ -141,9 +145,12 @@ export default function ActionResearchPhase1() {
   }, []);
 
   useEffect(() => {
-    if (loadingResume) return; // don't fire while restoring saved data
-    triggerAI(problemText, selectedTheme);
-    return () => clearTimeout(debounceRef.current);
+    if (loadingResume) return undefined; // don't fire while restoring saved data
+    // triggerAI can itself call setState synchronously (its own too-short-text
+    // early return) — deferring the call one tick keeps this effect's own
+    // body free of a direct/indirect synchronous setState.
+    const deferId = setTimeout(() => triggerAI(problemText, selectedTheme), 0);
+    return () => { clearTimeout(deferId); clearTimeout(debounceRef.current); };
   }, [problemText, selectedTheme, triggerAI, loadingResume]);
 
   /* Theme change: manually clear titles (not via useEffect) so that
@@ -187,8 +194,10 @@ export default function ActionResearchPhase1() {
     if (!user?.uid || problemText.trim().length < 20) return;
     setTitlesLoading(true); setError(''); setStatusMsg('');
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-titles', 5);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -226,6 +235,9 @@ export default function ActionResearchPhase1() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate titles. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-titles', 5).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase1', { success: false, durationMs: elapsedMs(), error: err.message });
       }

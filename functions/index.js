@@ -132,6 +132,17 @@ const PROXY_LIMITS = {
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 
+// ── Per-call size caps ────────────────────────────────────────────────────
+// A handful of actions have a per-call "size" that the UI already bounds
+// (e.g. ILAW's number of teaching days, capped at 5 by the Step 1 calendar)
+// but that bound is enforced client-side only — a modified/replayed request
+// could otherwise ask for far more per call while staying under the daily
+// call-count limit above. Callers that have such a size pass it as
+// `unitCount`; this re-checks it server-side. Not listed = no such cap.
+const MAX_UNITS = {
+  ilaw_unpack: 5, // numberOfDays — matches Step1.jsx's 5-day teaching calendar cap
+};
+
 // `new Date().toISOString()` is UTC — Philippine time is UTC+8, so that date
 // flips at 8 AM local time, not midnight, leaving teachers blocked for hours
 // after their own clock says "tomorrow." Every daily-limit bucket must use
@@ -514,13 +525,23 @@ exports.generateAI = onCall(
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
-    const { action, contents, temperature, maxTokens, responseMimeType, isRetry } = req.data || {};
+    const { action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount } = req.data || {};
 
     if (!action || !(action in PROXY_LIMITS)) {
       throw new HttpsError('invalid-argument', 'Unknown or missing action.');
     }
     if (!Array.isArray(contents) || contents.length === 0) {
       throw new HttpsError('invalid-argument', 'contents array is required.');
+    }
+    const maxUnits = MAX_UNITS[action];
+    if (maxUnits) {
+      const n = Number(unitCount);
+      // Missing/non-numeric unitCount must also be rejected, not just an
+      // over-limit one — omitting the field entirely would otherwise skip
+      // this check silently (Number(undefined) > maxUnits is false).
+      if (!Number.isFinite(n) || n < 1 || n > maxUnits) {
+        throw new HttpsError('invalid-argument', `unitCount is required for this action and must be between 1 and ${maxUnits}.`);
+      }
     }
 
     // Callers retry a single logical generation up to 3x internally on
@@ -615,7 +636,7 @@ exports.registerUser = onCall(
         note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-    } catch (_e) {}
+    } catch { /* welcome bonus is a nice-to-have — registration already succeeded */ }
 
     try {
       await db.collection('adminNotifications').add({
@@ -629,7 +650,7 @@ exports.registerUser = onCall(
         read:            false,
         createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
-    } catch (_e) {}
+    } catch { /* admin notification is best-effort — registration already succeeded */ }
 
     // Referral bonus — credit 20 tokens to the referrer (non-fatal)
     if (referredBy && typeof referredBy === 'string' && referredBy !== uid) {
@@ -648,7 +669,7 @@ exports.registerUser = onCall(
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
-      } catch (_e) {}
+      } catch { /* referral bonus is best-effort — registration already succeeded */ }
     }
 
     // Client will sign in with email+password — no custom token needed
@@ -789,7 +810,7 @@ exports.adminCreateUserFn = onCall(
           addedBy: req.auth.uid,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-      } catch (_e) {}
+      } catch { /* log entry is best-effort — the account/balance already exist */ }
     }
 
     return { uid, email: email.trim().toLowerCase() };
@@ -1026,7 +1047,7 @@ exports.collabAIReply = onCall(
     try {
       const snap = await db.doc(`teachers/${uid}`).get();
       callerName = snap.data()?.displayName || snap.data()?.givenName || 'Teacher';
-    } catch (_) {}
+    } catch { /* fall back to the generic "Teacher" greeting */ }
 
     const prompt = `You are KaTuro AI, the intelligent assistant inside KaTuro Collab — a real-time collaboration workspace for Filipino public school teachers in the Philippines DepEd system.
 

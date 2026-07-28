@@ -240,6 +240,7 @@ Just the raw JSON object:
     maxTokens: 8192,
     responseMimeType: 'application/json',
     isRetry,
+    unitCount: numberOfDays,
   });
   const rawText = text?.trim();
   if (!rawText) {

@@ -4,7 +4,7 @@ import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateCotLesson } from '../../services/cotAI';
-import { deductTokens, saveCotPlan } from '../../services/db';
+import { deductTokens, refundTokens, saveCotPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -97,6 +97,7 @@ export default function CotStep3() {
           : (lastErr?.message || 'Generation failed. Check your connection and try again.')
       );
       trackGeneration(user.uid, 'cot', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
+      refundTokens(user.uid, 'cot-lesson').catch(e => console.error('Token refund failed:', e));
       return;
     }
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
-import { deductTokens, saveDLLPlan } from '../../services/db';
+import { deductTokens, refundTokens, saveDLLPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
@@ -256,8 +256,10 @@ export default function DLLStep2() {
     setGenError('');
     setStatusMsg('');
     let elapsedMs = null;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'dll', 3);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -327,6 +329,11 @@ export default function DLLStep2() {
       trackGeneration(user.uid, 'dll', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setGenError(err.message || 'Generation failed. Try again.');
+      // Only refund if the charge actually went through — a failure from
+      // deductTokens itself (e.g. insufficient balance) took nothing.
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'dll', 3).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'dll', { success: false, durationMs: elapsedMs(), error: err.message });
       }

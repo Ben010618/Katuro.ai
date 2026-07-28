@@ -408,7 +408,7 @@ export async function getCotPlan(uid, planId) {
  * Stored in the same lessonPlans collection with type: 'cot'.
  */
 export async function saveCotPlan(uid, planData) {
-  const { subject, grade, quarter, topic, melc, plan } = planData;
+  const { subject, grade, topic, melc } = planData;
   const lessonName = `COT – ${topic || subject || 'Lesson'} (${grade || ''})`.trim();
   const ref = await addDoc(lessonPlansRef(uid), {
     type: 'cot',
@@ -477,7 +477,7 @@ export async function getAllTeachers() {
 // ─── Admin: create a new user account ────────────────────────────────────────
 // Uses a secondary Firebase App instance so the admin stays logged in.
 
-export async function adminCreateUser(email, password, initialTokens, _adminUid) {
+export async function adminCreateUser(email, password, initialTokens) {
   const { httpsCallable } = await import('firebase/functions');
   const { functions }     = await import('../firebase');
   const fn = httpsCallable(functions, 'adminCreateUserFn');
@@ -490,7 +490,7 @@ export async function adminCreateUser(email, password, initialTokens, _adminUid)
       .replace(/^Firebase:\s*/i, '')
       .replace(/\s*\(functions\/[\w-]+\)\.?$/i, '')
       .trim();
-    throw new Error(clean || 'Failed to create account.');
+    throw new Error(clean || 'Failed to create account.', { cause: err });
   }
 }
 
@@ -515,7 +515,7 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
       .replace(/\s*\(functions\/[\w-]+\)\.?$/i, '')
       .replace(/\s*\(auth\/[\w-]+\)\.?$/i, '')
       .trim();
-    throw new Error(clean || 'Registration failed. Please try again.');
+    throw new Error(clean || 'Registration failed. Please try again.', { cause: err });
   }
 
   const { pendingApproval } = result.data;
@@ -524,8 +524,8 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const { signInWithEmailAndPassword } = await import('firebase/auth');
   try {
     await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-  } catch (_signInErr) {
-    throw new Error('Account created! Sign-in failed due to a network issue. Please sign in manually.');
+  } catch (signInErr) {
+    throw new Error('Account created! Sign-in failed due to a network issue. Please sign in manually.', { cause: signInErr });
   }
 
   return { pendingApproval };
@@ -638,7 +638,7 @@ export async function adminChangePassword(targetUid, newPassword) {
       const cred = await signInWithEmailAndPassword(tempAuth, email, storedPassword);
       await updatePassword(cred.user, newPassword);
     } catch (err) {
-      throw new Error(err.message || 'Password change failed.');
+      throw new Error(err.message || 'Password change failed.', { cause: err });
     } finally {
       await tempAuth.signOut().catch(() => {});
       await deleteApp(tempApp).catch(() => {});
@@ -761,6 +761,38 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
   });
   await addDoc(tokenLogsRef(uid), {
     uid, amount: -cost, action, createdAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Credits back tokens previously taken by deductTokens for the same action,
+ * for use when a generation totally fails (all internal retries exhausted)
+ * after the charge already went through — without this, a teacher pays for
+ * a lesson/quiz/plan that was never actually produced, and pays again on
+ * every retry. Call sites should catch their own generation errors, call
+ * this, and only then surface the failure to the user — refunding is a
+ * best-effort side effect and should never mask the original error, so
+ * callers should swallow/log a refund failure rather than let it replace
+ * the real error message.
+ */
+export async function refundTokens(uid, action, cost = TOKEN_COST) {
+  const freeMode = await getFreeMode();
+  if (freeMode) {
+    await addDoc(tokenLogsRef(uid), {
+      uid, amount: 0, action, freeMode: true, reason: 'refund', createdAt: serverTimestamp(),
+    }).catch(() => {});
+    return;
+  }
+
+  const ref = teacherRef(uid);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("User profile not found.");
+    const balance = snap.data().tokenBalance ?? 0;
+    tx.update(ref, { tokenBalance: balance + cost, updatedAt: serverTimestamp() });
+  });
+  await addDoc(tokenLogsRef(uid), {
+    uid, amount: cost, action, reason: 'refund', createdAt: serverTimestamp(),
   });
 }
 

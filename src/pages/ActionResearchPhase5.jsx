@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Sparkles, Loader2, ClipboardList, BarChart2, FlaskConical,
-  MessageSquare, Eye, GraduationCap, FileText, CheckCircle2,
+  MessageSquare, Eye, GraduationCap, CheckCircle2,
 } from 'lucide-react';
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens }     from '../services/db';
+import { deductTokens, refundTokens } from '../services/db';
 import { generateDataCollection, generateResearchInstrument, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { downloadResearchDocx } from '../services/actionResearchDocx';
@@ -346,8 +346,10 @@ export default function ActionResearchPhase5() {
     if (!user?.uid || !docData) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-datacollection', 5);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -391,6 +393,9 @@ export default function ActionResearchPhase5() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-datacollection', 5).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_data', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -401,8 +406,10 @@ export default function ActionResearchPhase5() {
     if (!user?.uid || !docData) return;
     setGeneratingInstrument(true); setError(''); setInstrumentStatusMsg('Building your complete instrument — this takes about 10–20 seconds…');
     let elapsedMs;
+    let tokensDeducted = false;
     try {
       await deductTokens(user.uid, 'action-research-instrument', 5);
+      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -446,6 +453,9 @@ export default function ActionResearchPhase5() {
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate instrument. Please try again.')
       );
+      if (tokensDeducted) {
+        refundTokens(user.uid, 'action-research-instrument', 5).catch(e => console.error('Token refund failed:', e));
+      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_instrument', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -460,7 +470,7 @@ export default function ActionResearchPhase5() {
         dataCollection, phase: 5, updatedAt: serverTimestamp(),
       });
       navigate(`/action-research/phase-6/${docId}`);
-    } catch (err) {
+    } catch {
       setError('Failed to save. Please try again.');
     } finally { setSaving(false); }
   }
