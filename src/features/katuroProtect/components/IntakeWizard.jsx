@@ -240,7 +240,7 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
           )}
 
           <label style={labelStyle}>Incident Narrative</label>
-          <textarea rows={6} style={{ ...inputStyle, marginBottom: 14, resize: 'vertical' }} placeholder="What happened, in coded/de-identified terms…" value={form.incident_narrative} onChange={(e) => set('incident_narrative', e.target.value)} />
+          <textarea rows={12} style={{ ...inputStyle, marginBottom: 14, resize: 'vertical' }} placeholder="What happened, in coded/de-identified terms…" value={form.incident_narrative} onChange={(e) => set('incident_narrative', e.target.value)} />
 
           <label style={labelStyle}>Evidence Available</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 14 }}>

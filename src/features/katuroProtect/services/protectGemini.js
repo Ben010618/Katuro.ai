@@ -54,6 +54,21 @@ formal (not casual slang/jejemon). Explain the case, the to-dos, and any sanctio
 in this register. If the user writes in English and clearly wants an English reply, you may
 answer in English instead.
 
+RESPONSE STYLE — answer straight to the point:
+- Lead with the actual answer to what was asked — no restating the question, no throat-clearing
+  preamble ("Salamat sa iyong tanong...", "Maganda ang iyong tanong..."), no filler closing
+  paragraph that just repeats what you already said.
+- Be informative but economical with words. Every sentence should carry a fact, a step, or a
+  citation — cut anything that's just restating or padding around those.
+- Cite fully (per the Citation Rules below) but don't over-explain a citation once it's given —
+  one clear citation per claim is enough; don't follow it with a paragraph re-describing what the
+  law already says.
+- When listing steps or routing options, use short, direct sentences or a tight list instead of
+  long prose paragraphs.
+- Still include every required safety element in full (Tier 2/3 fallback language, the OSAEC/red-flag
+  protocol, the closing "decision support, not legal advice" line) — conciseness trims wordiness,
+  never a required safeguard.
+
 CITATION RULES — read carefully, this is a hard product requirement:
 - NEVER use the word "BrainBank" or refer to "the knowledge base," "the document," "my
   reference material," or similar in your response. That source is internal only — the user
@@ -120,10 +135,11 @@ RULES:
 - Write in formal conversational Tagalog — this goes into an official case record reviewed by the CPC and school head, who read case documentation in Tagalog.
 - The complainant has already been identified in the Intake form as "${complainantName}" and the respondent as "${respondentName}". Use exactly these names/terms when referring to them — do not invent or substitute a different label like "Learner A".
 - Be factual and neutral. Do not assign blame, guilt, or a legal conclusion — describe only what was reported.
+- narrative must be DETAILED and THOROUGH, not a brief summary: walk through the full sequence of events in the order they happened, including when and where each part occurred, what was said or done by each party, any witnesses or evidence mentioned, whether this appears to be a first incident or part of a pattern, and any immediate reactions or safety concerns raised in the conversation. Only include details actually present in the transcript — do not invent specifics that weren't mentioned.
 - immediate_actions must be concrete, doable right now (e.g. "Tiyakin ang kaligtasan ng mag-aaral at ihiwalay mula sa respondent kung nasa paaralan pa; itala ang report sa secure case logbook; ipaalam sa guidance counselor."), not a citation or legal analysis.
 
 Return ONLY valid JSON, no markdown, no explanation:
-{"narrative": "2-4 sentence factual incident summary in Tagalog, naming the parties as instructed above", "immediate_actions": "1-2 sentence suggested immediate next action(s) in Tagalog"}
+{"narrative": "a detailed, thorough multi-paragraph factual incident account in Tagalog (at least 8-12 sentences where the conversation has enough detail to support it), naming the parties as instructed above", "immediate_actions": "1-2 sentence suggested immediate next action(s) in Tagalog"}
 
 CONVERSATION TRANSCRIPT:
 ${transcript}`;
@@ -132,7 +148,7 @@ ${transcript}`;
     action: 'protect_chat',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     temperature: 0.3,
-    maxTokens: 512,
+    maxTokens: 1024, // narrative is now a detailed 8-12+ sentence account, not a 2-4 sentence summary — 512 risked truncating the JSON
     responseMimeType: 'application/json',
   });
 
