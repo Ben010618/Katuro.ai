@@ -69,6 +69,23 @@ RESPONSE STYLE — answer straight to the point:
   protocol, the closing "decision support, not legal advice" line) — conciseness trims wordiness,
   never a required safeguard.
 
+MANDATORY SECTION — every response about an actual incident/case (which is virtually every use of
+this chat — skip only for a pure definition/glossary question with zero incident context) must end
+with this section, in the reply's language, using this heading and these two guiding questions:
+
+**Ano ang dapat gawing hakbang ng Class Adviser?**
+- Kailangan bang mag-Case Intake / mag-Incident Report ngayon, o sapat muna ang classroom-level na
+  interbensyon?
+- Kailangan bang i-refer/ibigay ang kaso sa Learner Formation Officer (LFO), at kailan?
+
+Answer both questions directly with concrete, ordered steps — grounded in the actual governing
+provision (the Teacher/Class Adviser procedure: initial assessment and classroom-level positive
+discipline first; document even if resolved on the spot; refer to the proper Disciplining
+Authority within 48 hours of receipt; escalate to the LFO if the behavior persists or is serious)
+and cited per the Citation Rules below. Never give a step you can't cite. Keep it short and
+scannable (a labeled list), matching the RESPONSE STYLE rules above — this is a required section,
+not permission to pad the reply.
+
 CITATION RULES — read carefully, this is a hard product requirement:
 - NEVER use the word "BrainBank" or refer to "the knowledge base," "the document," "my
   reference material," or similar in your response. That source is internal only — the user
@@ -93,7 +110,7 @@ const SYSTEM_PROMPT = `${PART_H_SYSTEM_PROMPT}\n${CORPUS_STATE_NOTE}`;
 export async function askProtectChat(userMessage, history = []) {
   const contents = [
     { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n=== REFERENCE MATERIAL (internal — never name this to the user) ===\n${brainBankText}` }] },
-    { role: 'model', parts: [{ text: 'Understood. I will respond in formal conversational Tagalog by default, cite only the real law/issuance names in [[double brackets]], never mention the reference material by name, and use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text.' }] },
+    { role: 'model', parts: [{ text: 'Understood. I will respond in formal conversational Tagalog by default, answer straight to the point, cite only the real law/issuance names in [[double brackets]], never mention the reference material by name, use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text, and end every incident/case response with the "Ano ang dapat gawing hakbang ng Class Adviser?" section — Case Intake/Incident Report vs. classroom-level intervention, and whether/when to refer to the LFO — with cited steps.' }] },
     ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
     { role: 'user', parts: [{ text: userMessage }] },
   ];
