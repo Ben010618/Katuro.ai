@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ShieldAlert, Send, ArrowRight, Loader2, MessageSquare } from 'lucide-react';
+import { useAuth } from '../../../hooks/useAuth';
+import { trackEvent, trackGeneration, startTimer } from '../../../services/usageTracker';
 import { askProtectChat } from '../services/protectGemini';
 import { detectRedFlags, RED_FLAG_PROTOCOLS } from '../constants/emergencyProtocols';
 import { splitMessageSegments } from '../services/citationLookup';
@@ -115,6 +117,7 @@ function MessageBubble({ msg, onCitationClick }) {
 }
 
 export default function ProtectChatLanding({ onStartIntake, messages, setMessages }) {
+  const { user } = useAuth();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -140,6 +143,7 @@ export default function ProtectChatLanding({ onStartIntake, messages, setMessage
     setInput('');
     setSending(true);
     setError('');
+    const elapsedMs = startTimer();
 
     try {
       const reply = await askProtectChat(trimmed, history);
@@ -148,9 +152,19 @@ export default function ProtectChatLanding({ onStartIntake, messages, setMessage
         next[next.length - 1] = { role: 'model', text: reply, redFlags };
         return next;
       });
+      // Adoption analytics — a real message actually sent/answered, not just
+      // a tab view, so the admin dashboard can tell "opened the tab" apart
+      // from "actually used it."
+      if (user?.uid) {
+        trackEvent(user.uid, 'protect_chat_used', {});
+        trackGeneration(user.uid, 'protect_chat', { success: true, durationMs: elapsedMs() });
+      }
     } catch (e) {
       setMessages((prev) => prev.slice(0, -1)); // drop the pending bubble
       setError(e.message || 'Could not reach kaTuro Protect chat. Please try again.');
+      if (user?.uid) {
+        trackGeneration(user.uid, 'protect_chat', { success: false, durationMs: elapsedMs(), error: e.message });
+      }
     } finally {
       setSending(false);
     }

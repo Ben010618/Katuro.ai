@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, ClipboardList, MessageSquare, Settings as SettingsIcon, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { trackEvent } from '../../services/usageTracker';
 import DisclaimerBanner from './components/DisclaimerBanner';
 import ProtectChatLanding from './components/ProtectChatLanding';
 import IntakeWizard from './components/IntakeWizard';
@@ -23,7 +24,7 @@ const TABS = [
 ];
 
 export default function KaturoProtectPage() {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('chat'); // chat-ready landing per product decision
   const [openCaseId, setOpenCaseId] = useState(null);
   // Lifted out of ProtectChatLanding so IntakeWizard can draft a narrative
@@ -31,6 +32,15 @@ export default function KaturoProtectPage() {
   const [chatMessages, setChatMessages] = useState([]);
 
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+
+  // Adoption analytics — same '*_step_viewed' convention as every other
+  // multi-tab tool (lessongen_step_viewed, dllgen_step_viewed, etc.), so the
+  // admin dashboard can answer "how many teachers actually use kaTuro
+  // Protect" and "how far do they get" (chat → intake → filed) the same way
+  // it already does for every other feature.
+  useEffect(() => {
+    if (user?.uid) trackEvent(user.uid, 'protect_step_viewed', { step: activeTab });
+  }, [user?.uid, activeTab]);
 
   function handleCaseCreated(caseId) {
     // Everyone (admin or not) can revisit what they just filed via Filed

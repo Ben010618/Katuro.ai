@@ -432,6 +432,8 @@ const FEATURE_LABELS = {
   action_research_phase5_generated: 'Action Research P5',
   action_research_phase6_generated: 'Action Research P6',
   action_research_completed:        'Action Research Completed',
+  protect_chat_used:   'kaTuro Protect Chat',
+  protect_case_filed:  'kaTuro Protect Case Filed',
 };
 
 // Diagnostic event types — power specific charts (reliability, funnels) but
@@ -440,6 +442,7 @@ const FEATURE_LABELS = {
 const NON_FEATURE_EVENTS = new Set([
   'login', 'ai_generation',
   'lessongen_step_viewed', 'dllgen_step_viewed', 'cotgen_step_viewed', 'test_builder_step_viewed',
+  'protect_step_viewed',
 ]);
 
 const FEATURE_COLORS = [
@@ -521,6 +524,7 @@ const TOOL_LABELS = {
   ar_phase5_data: 'Action Research P5 (Data)',
   ar_phase5_instrument: 'Action Research P5 (Instrument)',
   ar_phase6: 'Action Research P6',
+  protect_chat: 'kaTuro Protect Chat',
 };
 
 function formatDuration(ms) {
@@ -744,6 +748,7 @@ const LESSONGEN_STEPS     = { step1: 'Session Setup', step2: 'Competency', step3
 const DLLGEN_STEPS        = { step1: 'Setup', step2: 'Generate' };
 const COTGEN_STEPS        = { step1: 'Lesson Info', step2: 'COT Indicators', step3: 'Generate' };
 const TEST_BUILDER_STEPS  = { setup: 'Setup', blooms: "Bloom's Levels", tos: 'TOS', review: 'Review' };
+const PROTECT_STEPS       = { chat: 'Chat', intake: 'Intake', filed: 'Filed Cases' };
 
 function FunnelCard({ title, stepLabels, funnel }) {
   const maxCount = funnel[0]?.count || 0;
@@ -1111,6 +1116,7 @@ function AnalyticsSection({ teachers = [] }) {
   const dllGenFunnel       = buildFunnel(visibleEvents, 'dllgen_step_viewed', ['step1', 'step2']);
   const cotGenFunnel       = buildFunnel(visibleEvents, 'cotgen_step_viewed', ['step1', 'step2', 'step3']);
   const testBuilderFunnel  = buildFunnel(visibleEvents, 'test_builder_step_viewed', ['setup', 'blooms', 'tos', 'review']);
+  const protectFunnel      = buildFunnel(visibleEvents, 'protect_step_viewed', ['chat', 'intake', 'filed']);
 
   const totalEvents  = visibleEvents.length;
   const uniqueUsers  = new Set(visibleEvents.map(e => e.uid)).size;
@@ -1341,6 +1347,7 @@ function AnalyticsSection({ teachers = [] }) {
                 <FunnelCard title="DLL Gen" stepLabels={DLLGEN_STEPS} funnel={dllGenFunnel} />
                 <FunnelCard title="COT Gen" stepLabels={COTGEN_STEPS} funnel={cotGenFunnel} />
                 <FunnelCard title="Test Builder" stepLabels={TEST_BUILDER_STEPS} funnel={testBuilderFunnel} />
+                <FunnelCard title="kaTuro Protect" stepLabels={PROTECT_STEPS} funnel={protectFunnel} />
               </div>
             </div>
           )}

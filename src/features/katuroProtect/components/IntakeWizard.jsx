@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Info, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
+import { trackEvent } from '../../../services/usageTracker';
 import { createCase } from '../services/caseService';
 import { suggestIntakeNarrative } from '../services/protectGemini';
 import { makeEmptyIntakeForm } from '../types';
@@ -121,6 +122,9 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
         },
       };
       const caseId = await createCase(finalForm, user?.uid);
+      // Adoption analytics — the deepest funnel step: an adviser actually
+      // filed a report, not just chatted or looked at the form.
+      if (user?.uid) trackEvent(user.uid, 'protect_case_filed', {});
       onCreated?.(caseId);
     } catch (e) {
       setError(e.message || 'Could not save this case. Please try again.');
