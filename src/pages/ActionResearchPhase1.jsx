@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useAuth }    from '../hooks/useAuth';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
-import { getGeminiKey, geminiWithRetry } from '../services/geminiConfig';
+import { callGeminiProxy } from '../services/geminiConfig';
+import { parseAIJson } from '../services/aiJsonParse';
 import { generateResearchTitles } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import {
@@ -41,18 +42,26 @@ const BERF_THEMES  = new Set(['teaching-learning','governance']);
 /* ── Debounced AI problem suggestion ─────────────────────────────────────── */
 
 async function fetchAISuggestion(problemText, themeName) {
-  const key = await getGeminiKey();
-  const res = await geminiWithRetry(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-    { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ contents:[{parts:[{text:
-        `You are a DepEd action research assistant. Based on this teacher-observed problem: "${problemText}", and BERA theme: "${themeName}", generate: (1) a clean, formal problem statement in 1–2 sentences suitable for a DepEd action research paper, and (2) three specific intervention suggestions aligned to the BERA theme. Return JSON only, no markdown: { "problemStatement": "...", "interventions": ["...", "...", "..."] }`
-      }]}], generationConfig:{temperature:0.4,maxOutputTokens:512,thinkingConfig:{thinkingBudget:0}} }) }
-  );
-  const data  = await res.json();
-  const text  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const match = text.match(/\{[\s\S]*\}/);
-  return match ? JSON.parse(match[0]) : null;
+  // Routed through the generateAI proxy like every other AI call in the app
+  // (see ai.js's header comment) — this used to call Gemini directly from
+  // the browser with a client-fetched API key, which meant (a) it silently
+  // failed for every non-admin teacher, since adminConfig/gemini is
+  // admin-only per firestore.rules, and (b) it had no daily-limit protection
+  // at all, unlike every other AI feature in the app.
+  const { text } = await callGeminiProxy({
+    action: 'ar_problem_suggest',
+    contents: [{ parts: [{ text:
+      `You are a DepEd action research assistant. Based on this teacher-observed problem: "${problemText}", and BERA theme: "${themeName}", generate: (1) a clean, formal problem statement in 1–2 sentences suitable for a DepEd action research paper, and (2) three specific intervention suggestions aligned to the BERA theme. Return JSON only, no markdown: { "problemStatement": "...", "interventions": ["...", "...", "..."] }`
+    }] }],
+    temperature: 0.4,
+    maxTokens: 512,
+    responseMimeType: 'application/json',
+  });
+  try {
+    return parseAIJson(text);
+  } catch {
+    return null;
+  }
 }
 
 /* ── Styles ──────────────────────────────────────────────────────────────── */
@@ -191,7 +200,7 @@ export default function ActionResearchPhase1() {
 
   /* ── Generate titles — also saves progress to Firestore ──────────────── */
   async function handleGenerateTitles() {
-    if (!user?.uid || problemText.trim().length < 20) return;
+    if (!user?.uid || problemText.trim().length < 20 || titlesLoading) return;
     setTitlesLoading(true); setError(''); setStatusMsg('');
     let elapsedMs;
     let tokensDeducted = false;

@@ -343,7 +343,7 @@ export default function ActionResearchPhase5() {
   }, [user?.uid, docId]);
 
   async function handleGenerate() {
-    if (!user?.uid || !docData) return;
+    if (!user?.uid || !docData || generating) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
     let tokensDeducted = false;
@@ -403,7 +403,7 @@ export default function ActionResearchPhase5() {
   }
 
   async function handleGenerateInstrument() {
-    if (!user?.uid || !docData) return;
+    if (!user?.uid || !docData || generatingInstrument) return;
     setGeneratingInstrument(true); setError(''); setInstrumentStatusMsg('Building your complete instrument — this takes about 10–20 seconds…');
     let elapsedMs;
     let tokensDeducted = false;

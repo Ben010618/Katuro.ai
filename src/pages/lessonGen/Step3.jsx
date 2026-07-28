@@ -76,7 +76,7 @@ export default function Step3() {
   if (n === 0) return null;
 
   async function handleGenerate() {
-    if (!user?.uid) return;
+    if (!user?.uid || generating) return;
 
     setGenerating(true);
     setGenError(null);

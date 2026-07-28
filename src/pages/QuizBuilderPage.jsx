@@ -121,7 +121,7 @@ export default function QuizBuilderPage() {
   }
 
   async function handleGenerate() {
-    if (!selectedLesson || !quizTitle.trim()) return;
+    if (!selectedLesson || !quizTitle.trim() || generating) return;
 
     setGenerating(true);
     setGenError(null);

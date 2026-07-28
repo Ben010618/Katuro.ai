@@ -40,7 +40,7 @@ export default function ActionResearchPhase4() {
   }, [user?.uid, docId]);
 
   async function handleGenerate() {
-    if (!user?.uid || !docData) return;
+    if (!user?.uid || !docData || generating) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
     let tokensDeducted = false;

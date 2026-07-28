@@ -205,7 +205,7 @@ export default function OutputPage() {
   }
 
   async function handleGeneratePresentation() {
-    if (selectedSession === null) return;
+    if (selectedSession === null || pptLoading) return;
     const s = sessions[selectedSession];
     const sessionMelc = s.competencyText || store.competencyText || '';
     const topic = s.keyContentFocus || store.content || '';
@@ -256,7 +256,7 @@ export default function OutputPage() {
   }
 
   async function handleGenerateGame() {
-    if (selectedSession === null) return;
+    if (selectedSession === null || gameLoading) return;
     const s = sessions[selectedSession];
     const lesson = {
       type: 'ilaw',

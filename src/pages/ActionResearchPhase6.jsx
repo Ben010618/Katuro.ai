@@ -48,7 +48,7 @@ export default function ActionResearchPhase6() {
   }, [user?.uid, docId]);
 
   async function handleGenerate() {
-    if (!user?.uid || !docData || rawData.trim().length < 30) return;
+    if (!user?.uid || !docData || rawData.trim().length < 30 || generating) return;
     setGenerating(true); setError(''); setStatusMsg('Writing your complete Chapter V — this may take 20–40 seconds…');
     let elapsedMs;
     let tokensDeducted = false;

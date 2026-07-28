@@ -175,7 +175,7 @@ export default function DLLOutputPage() {
   const contentMap = buildDayMap(store.contentList);
 
   async function handleGeneratePresentation() {
-    if (!user?.uid) return;
+    if (!user?.uid || pptLoading) return;
     const topic    = contentMap[selectedDay] || store.subject || '';
     const melcCode = melcMap[selectedDay]    || store.melc    || '';
 
@@ -228,7 +228,7 @@ export default function DLLOutputPage() {
   }
 
   async function handleGenerateGame() {
-    if (selectedDay === null) return;
+    if (selectedDay === null || gameLoading) return;
     const lesson = {
       type: 'dll',
       subject: store.subject || '',

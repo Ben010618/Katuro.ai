@@ -33,7 +33,7 @@ export default function CotStep3() {
   );
 
   async function handleGenerate() {
-    if (!user?.uid) return;
+    if (!user?.uid || generating) return;
 
     setGenerating(true);
     setGenError(null);

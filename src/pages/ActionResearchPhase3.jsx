@@ -45,7 +45,7 @@ export default function ActionResearchPhase3() {
   }, [user?.uid, docId]);
 
   async function handleGenerate() {
-    if (!user?.uid || !docData) return;
+    if (!user?.uid || !docData || generating) return;
     const initialStatus = 'This may take 15–30 seconds. Researching global, national, local, and classroom literature…';
     setGenerating(true); setError(''); setStatusMsg(initialStatus);
     let elapsedMs;

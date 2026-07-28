@@ -127,6 +127,7 @@ const PROXY_LIMITS = {
   test_builder_blooms: 30,  // suggestCognitiveWeights
   test_builder_items:  60,  // generateItemsForCompetency — one call per TOS row
   action_research_ai:  30,  // shared across all 6 AR generation phases (matches existing client limit)
+  ar_problem_suggest:  60,  // live-as-you-type problem-statement suggestion in AR Phase 1 — cheap (512 tokens), debounced, but was previously calling Gemini directly from the client with no limit at all
   scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
   protect_chat:        40,  // kaTuro Protect chat — admin-only for now, low volume
 };
