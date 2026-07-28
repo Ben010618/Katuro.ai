@@ -778,7 +778,8 @@ export default function OutputPage() {
                     <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Number of items:</label>
                     <input
                       type="number" min={5} max={30} value={gameCount}
-                      onChange={e => setGameCount(Math.max(5, Math.min(30, +e.target.value)))}
+                      onChange={e => setGameCount(e.target.value === '' ? '' : Number(e.target.value))}
+                      onBlur={e => setGameCount(Math.max(5, Math.min(30, Number(e.target.value) || 5)))}
                       style={{ width: 68, border: '1.5px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit', textAlign: 'center', outline: 'none' }}
                     />
                   </div>

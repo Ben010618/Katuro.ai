@@ -5,7 +5,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { deductTokens, saveDLLPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
-import { useToast } from '../../context/ToastContext';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
 
 const MAX_DAYS = 5;
@@ -231,7 +230,6 @@ export default function DLLStep2() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
   const { user, tokenBalance, freeMode } = useAuth();
-  const { addToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
   const [statusMsg,  setStatusMsg]  = useState('');

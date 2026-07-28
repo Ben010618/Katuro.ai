@@ -64,6 +64,15 @@ export default function Step3() {
     if (n === 0) navigate('/lesson-gen/step-2', { replace: true });
   }, []);
 
+  // If the user navigates away mid-generation (e.g. clicks Back), this
+  // component unmounts but the in-flight handleGenerate() promise chain
+  // keeps running — it isn't tied to React lifecycle. Bumping activeGenRef
+  // here invalidates its genId, so the staleness checks already in
+  // handleGenerate correctly treat it as abandoned instead of force-
+  // navigating the user to the output page and overwriting the store once
+  // it eventually finishes.
+  useEffect(() => () => { activeGenRef.current++; }, []);
+
   if (n === 0) return null;
 
   async function handleGenerate() {

@@ -40,7 +40,7 @@ function formatDateLong(iso) {
 }
 
 function bloomsBase(level) {
-  return (level || '').split(/\s*[—\-]\s*/)[0].trim();
+  return (level || '').split(/\s*[—-]\s*/)[0].trim();
 }
 
 export default function Step2() {
@@ -351,7 +351,7 @@ export default function Step2() {
                   {Array.from({ length: n }, (_, i) => {
                     const ci    = compIdxForDaySlot(i);
                     const color = ci >= 0 ? LC_COLORS[ci] : null;
-                    let dayLabel = '';
+                    let dayLabel;
                     if (days[i]) {
                       try { dayLabel = new Date(days[i] + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' }); }
                       catch { dayLabel = `D${i + 1}`; }
