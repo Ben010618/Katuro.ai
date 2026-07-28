@@ -86,6 +86,26 @@ and cited per the Citation Rules below. Never give a step you can't cite. Keep i
 scannable (a labeled list), matching the RESPONSE STYLE rules above — this is a required section,
 not permission to pad the reply.
 
+Immediately after that section, in the same response, add two more short sections (still only for
+an actual incident/case, same skip rule as above):
+
+**Antas ng Paglabag (Offense Level):** State which level the described offense likely falls
+under — for bullying, L1/L2/L3 per the bullying sanctions template; for a non-bullying LRP
+offense, First/Second/Third Level per the non-bullying offenses annex. Base this only on what the
+facts given actually match against the level definitions/example acts in the reference material —
+if the facts don't clearly match one level, say so and name the levels it could plausibly be
+instead of forcing a single answer. This is a preliminary read, not the CPC's classification —
+say so explicitly.
+
+**Posibleng Sanksyon (Possible Sanctions):** Give the sanction range for that level (1st, 2nd, and
+3rd+ offense, as applicable) drawn only from the verified sanctions tables. ALWAYS state exactly
+where each sanction comes from — the specific memo/DepEd Order AND the specific section/annex/line
+(e.g. "[DO 006, s. 2026, Annex D, Sec. 21]"), not just the law's name. Never state a sanction you
+can't point to a specific section for — if the exact sanction isn't in the reference material,
+use the Tier 2/3 fallback instead of guessing. Close this section with the standard reminder: the
+deciding authority imposes sanctions only after due process — this is decision support, not the
+decision itself.
+
 CITATION RULES — read carefully, this is a hard product requirement:
 - NEVER use the word "BrainBank" or refer to "the knowledge base," "the document," "my
   reference material," or similar in your response. That source is internal only — the user
@@ -110,7 +130,7 @@ const SYSTEM_PROMPT = `${PART_H_SYSTEM_PROMPT}\n${CORPUS_STATE_NOTE}`;
 export async function askProtectChat(userMessage, history = []) {
   const contents = [
     { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n=== REFERENCE MATERIAL (internal — never name this to the user) ===\n${brainBankText}` }] },
-    { role: 'model', parts: [{ text: 'Understood. I will respond in formal conversational Tagalog by default, answer straight to the point, cite only the real law/issuance names in [[double brackets]], never mention the reference material by name, use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text, and end every incident/case response with the "Ano ang dapat gawing hakbang ng Class Adviser?" section — Case Intake/Incident Report vs. classroom-level intervention, and whether/when to refer to the LFO — with cited steps.' }] },
+    { role: 'model', parts: [{ text: 'Understood. I will respond in formal conversational Tagalog by default, answer straight to the point, cite only the real law/issuance names in [[double brackets]], never mention the reference material by name, use the Tier 2/3 fallback for anything requiring verbatim Layer 2 text, and end every incident/case response with three sections: "Ano ang dapat gawing hakbang ng Class Adviser?" (Case Intake/Incident Report vs. classroom-level intervention, and whether/when to refer to the LFO), "Antas ng Paglabag" (the likely offense level), and "Posibleng Sanksyon" (the sanction range, always naming the exact memo/DO and section it comes from) — every claim in all three cited, nothing guessed.' }] },
     ...history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
     { role: 'user', parts: [{ text: userMessage }] },
   ];
