@@ -4,7 +4,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTeacherProfile, deductTokens, refundTokens } from '../../services/db';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
-import { buildTestPaperParts, downloadTestQuestionsDocx, downloadAnswerKeyDocx, downloadTosDocx } from '../../services/testBuilderDocx';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
 import { totalDays } from '../../utils/testBuilderCalc';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
@@ -109,6 +108,7 @@ export default function StepReview() {
         cursor = result.nextIndex;
       }
 
+      const { buildTestPaperParts } = await import('../../services/testBuilderDocx');
       setGeneratedParts(buildTestPaperParts(allItems, deriveLanguage(store.subject)));
       addToast(
         freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
@@ -133,6 +133,7 @@ export default function StepReview() {
   async function handleDownload(kind) {
     setDownloadingKind(kind);
     try {
+      const { downloadTosDocx, downloadTestQuestionsDocx, downloadAnswerKeyDocx } = await import('../../services/testBuilderDocx');
       if (kind === 'tos') {
         await downloadTosDocx({ tos: store.tos, itemCeiling, meta: docMeta, profile: teacherProfile });
       } else if (kind === 'questions') {

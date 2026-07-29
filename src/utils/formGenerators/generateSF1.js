@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -32,6 +31,7 @@ function formatBD(dateStr) {
 // ─── main generator ───────────────────────────────────────────────────────────
 
 export async function generateSF1(sectionData, students) {
+  const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'kaTuro.ai';
 

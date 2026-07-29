@@ -1,5 +1,4 @@
 import { useRef, useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import { X, Download, FileText } from 'lucide-react';
 import { subscribeSubjectGrades } from '../../../services/classroomDb';
 
@@ -379,7 +378,8 @@ export default function SF5Form({ section, students, allSubjects, schoolProfile,
     }
   }
 
-  function downloadExcel() {
+  async function downloadExcel() {
+    const XLSX = await import('xlsx');
     const sp = schoolProfile || {};
     const computeGA = (studentId) => {
       const grades = allSubjects.map(subj => {

@@ -10,8 +10,7 @@
  */
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../firebase';
+import app, { db, auth } from '../firebase';
 import { reportAIError } from './db';
 
 const CONFIG_REF  = doc(db, 'adminConfig', 'gemini');
@@ -127,7 +126,8 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  * something that won't clear up in the next few seconds.
  */
 export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount }) {
-  const call = httpsCallable(functions, 'generateAI', { timeout: 150000 });
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: 150000 });
   try {
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };

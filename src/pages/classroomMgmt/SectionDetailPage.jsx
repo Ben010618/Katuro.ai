@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { uploadToCloudinary, thumbUrl } from '../../services/cloudinaryUpload';
 import StudentCardModal from '../../components/StudentCardModal';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -66,6 +65,7 @@ function gradingSubjects(subjects, specialSubjects) {
 }
 
 async function exportGradingExcel(section, students, subjects, allGrades) {
+  const XLSX = await import('xlsx');
   const wb   = XLSX.utils.book_new();
   const abbrs = subjects.map(s => SUBJ_ABBR[s] || s);
   const termLabels = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };

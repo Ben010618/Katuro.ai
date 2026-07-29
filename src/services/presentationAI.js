@@ -5,15 +5,15 @@
  * callers here must NOT also deduct tokens for this feature client-side.
  */
 
-import { httpsCallable } from 'firebase/functions';
-import { functions, auth } from '../firebase';
+import app, { auth } from '../firebase';
 import { reportAIError } from './db';
 
 // A bare code-shaped message ("internal", "unavailable"...) means the request
 // likely never reached the function's code at all — e.g. a lost Cloud Run
 // invoker IAM binding, the exact outage that motivated this reporting.
 async function callPresentationFn(name, data, timeout) {
-  const call = httpsCallable(functions, name, { timeout });
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const call = httpsCallable(getFunctions(app, 'us-central1'), name, { timeout });
   try {
     const res = await call(data);
     return res.data;

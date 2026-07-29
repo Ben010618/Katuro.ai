@@ -7,7 +7,6 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { deductTokens, refundTokens } from '../services/db';
 import { interpretFindings, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
-import { downloadResearchDocx } from '../services/actionResearchDocx';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
 const sectionHead = { margin:'0 0 12px', fontSize:13, fontWeight:700, color:'#1a3d2b', display:'flex', alignItems:'center', gap:7 };
@@ -114,6 +113,7 @@ export default function ActionResearchPhase6() {
     if (!docData) return;
     setDownloading(true);
     try {
+      const { downloadResearchDocx } = await import('../services/actionResearchDocx');
       await downloadResearchDocx({ ...docData, rawData, findings }, user.displayName ?? '');
     } finally { setDownloading(false); }
   }

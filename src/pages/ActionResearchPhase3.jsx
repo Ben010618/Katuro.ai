@@ -7,7 +7,6 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { deductTokens, refundTokens } from '../services/db';
 import { generateLiteratureReview, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
-import { downloadResearchDocx }  from '../services/actionResearchDocx';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
 const SECTIONS = [
@@ -118,6 +117,7 @@ export default function ActionResearchPhase3() {
     if (!docData) return;
     setDownloading(true);
     try {
+      const { downloadResearchDocx } = await import('../services/actionResearchDocx');
       await downloadResearchDocx({ ...docData, literatureReview: litReview }, user.displayName ?? '');
     } finally { setDownloading(false); }
   }

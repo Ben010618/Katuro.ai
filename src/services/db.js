@@ -478,9 +478,9 @@ export async function getAllTeachers() {
 // Uses a secondary Firebase App instance so the admin stays logged in.
 
 export async function adminCreateUser(email, password, initialTokens) {
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions }     = await import('../firebase');
-  const fn = httpsCallable(functions, 'adminCreateUserFn');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminCreateUserFn');
   try {
     const result = await fn({ email, password, initialTokens });
     return result.data; // { uid, email }
@@ -499,11 +499,10 @@ export async function adminCreateUser(email, password, initialTokens) {
 export async function selfSignUp({ email, password, surname, givenName, mi, school, referredBy }) {
   // Registration is handled by a Cloud Function — validation runs server-side so it
   // cannot be bypassed by any client version or cached bundle.
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions }     = await import('../firebase');
-  const { auth }          = await import('../firebase');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const { default: app, auth } = await import('../firebase');
 
-  const registerFn = httpsCallable(functions, 'registerUser');
+  const registerFn = httpsCallable(getFunctions(app, 'us-central1'), 'registerUser');
   let result;
   try {
     result = await registerFn({ email, password, surname, givenName, mi, school, referredBy: referredBy || null });
@@ -612,9 +611,9 @@ export async function adminEqualizeTokens(adminUid, target = 30) {
 // ─── Admin: permanently delete a user account and all their data ─────────────
 
 export async function adminDeleteUser(targetUid) {
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions } = await import('../firebase');
-  const fn = httpsCallable(functions, 'adminDeleteUser');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteUser');
   const result = await fn({ uid: targetUid });
   return result.data;
 }
@@ -669,9 +668,9 @@ export async function adminSendPasswordReset(email) {
 }
 
 export async function adminSetFreeMode(enabled, note = '') {
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions }     = await import('../firebase');
-  const fn = httpsCallable(functions, 'adminSetFreeMode');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminSetFreeMode');
   const result = await fn({ enabled, note });
   return result.data;
 }
@@ -799,9 +798,9 @@ export async function refundTokens(uid, action, cost = TOKEN_COST) {
 // ─── MELC Validation ──────────────────────────────────────────────────────────
 
 export async function validateMelcCode({ subject, gradeLevel, quarter, melcCodes }) {
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions }     = await import('../firebase');
-  const fn = httpsCallable(functions, 'validateMelcCode');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'validateMelcCode');
   const result = await fn({ subject, gradeLevel, quarter, melcCodes });
   return result.data;
 }
@@ -809,9 +808,9 @@ export async function validateMelcCode({ subject, gradeLevel, quarter, melcCodes
 // ─── Shareable plan link ──────────────────────────────────────────────────────
 
 export async function createSharedPlan({ planType, ownerName, school, subject, gradeLevel, term, melc, preview }) {
-  const { httpsCallable } = await import('firebase/functions');
-  const { functions }     = await import('../firebase');
-  const fn = httpsCallable(functions, 'createSharedPlan');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'createSharedPlan');
   const result = await fn({ planType, ownerName, school, subject, gradeLevel, term, melc, preview });
   return result.data; // { shareId }
 }

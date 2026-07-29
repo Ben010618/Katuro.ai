@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { downloadCotDocx } from '../../services/cotDocx';
 import { getTeacherProfile } from '../../services/db';
 import {
   FileDown, Sparkles, ChevronDown, ChevronUp, RotateCcw, BookOpenCheck,
@@ -163,6 +162,7 @@ export default function CotOutputPage() {
       if (user?.uid) {
         try { teacherProfile = await getTeacherProfile(user.uid); } catch {}
       }
+      const { downloadCotDocx } = await import('../../services/cotDocx');
       await downloadCotDocx({
         lessonMeta: {
           teacherName:        store.teacherName,

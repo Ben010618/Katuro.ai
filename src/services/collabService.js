@@ -3,9 +3,8 @@ import {
   query, orderBy, where, onSnapshot, serverTimestamp,
   updateDoc, arrayUnion, limit,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
-import { db, storage, auth } from '../firebase';
+import app, { db, auth } from '../firebase';
 
 export const COMMUNITY_ID = 'katuro-community';
 
@@ -184,6 +183,8 @@ export function subscribeToCollabUnread(uid, cb) {
 // ── Profile photo ─────────────────────────────────────────────────────────────
 
 export async function uploadProfilePhoto(uid, file) {
+  const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+  const storage = getStorage(app);
   const storageRef = ref(storage, `profilePhotos/${uid}/avatar.jpg`);
   const snap = await uploadBytes(storageRef, file, { contentType: file.type });
   const url  = await getDownloadURL(snap.ref);

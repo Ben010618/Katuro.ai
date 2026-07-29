@@ -3,7 +3,6 @@ import { ArrowLeft, Clock, AlertCircle, Loader2, Archive, ArchiveRestore, Downlo
 import { useAuth } from '../../../hooks/useAuth';
 import { advanceCaseState, allowedNextStates, archiveCase, unarchiveCase } from '../services/caseService';
 import { subscribeSchoolProfile } from '../../../services/schoolFormsDb';
-import { downloadCaseReportDocx } from '../services/caseReportDocx';
 import { CASE_STATE_LABELS } from '../types';
 import NextMoveCard from './NextMoveCard';
 import EscalationBadge from './EscalationBadge';
@@ -30,6 +29,7 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
     setExporting(true);
     setError('');
     try {
+      const { downloadCaseReportDocx } = await import('../services/caseReportDocx');
       await downloadCaseReportDocx({ caseData, schoolProfile });
     } catch (err) {
       setError(err.message || 'Could not generate the Word document.');

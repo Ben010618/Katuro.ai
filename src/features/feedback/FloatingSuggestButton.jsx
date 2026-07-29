@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import suggestIcon from '../../assets/suggest.png';
+import suggestIcon from '../../assets/suggest.webp';
 import SuggestionModal from './SuggestionModal';
 
 export default function FloatingSuggestButton() {

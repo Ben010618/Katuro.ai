@@ -1,6 +1,8 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../../../firebase';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import app from '../../../firebase';
 import imageCompression from 'browser-image-compression';
+
+const storage = getStorage(app);
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const COMPRESSION_OPTIONS = {

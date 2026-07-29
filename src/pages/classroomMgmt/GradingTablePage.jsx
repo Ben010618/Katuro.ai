@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -146,7 +145,8 @@ export default function GradingTablePage() {
     });
   }
 
-  function handleDownload() {
+  async function handleDownload() {
+    const XLSX = await import('xlsx');
     const termLabel = TERMS.find(t => t.key === activeTerm)?.label || activeTerm;
     const { wwCount, ptCount, writtenWorksWeight, performanceTaskWeight, summativeTestWeight, wwMax, ptMax, stMax } = localWeights;
 

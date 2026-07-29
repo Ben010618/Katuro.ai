@@ -1,8 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getFunctions } from "firebase/functions";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyBAX_OQYqVOh7LmWDrOQubMYZR9zgnZF2M",
@@ -15,9 +13,14 @@ export const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth      = getAuth(app);
-export const db        = getFirestore(app);
-export const storage   = getStorage(app);
-export const functions = getFunctions(app, 'us-central1');
+export const auth = getAuth(app);
+export const db   = getFirestore(app);
+
+// `storage` and `functions` are intentionally NOT initialized here — both are
+// only needed by a handful of features (avatar upload, Gemini Cloud Function
+// calls). Eagerly exporting them from this file would pull the full
+// firebase/storage and firebase/functions SDKs into the main entry bundle,
+// since this module is imported on every page. Callers import them lazily
+// from 'firebase/storage' / 'firebase/functions' directly instead.
 
 export default app;

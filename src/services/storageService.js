@@ -1,17 +1,13 @@
-import {
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
-import { storage } from "../firebase";
-
 /**
  * Upload a file to Firebase Storage under teachers/{uid}/uploads/.
  * onProgress(pct) is called with 0-100 as the upload proceeds.
  * Returns { storagePath, downloadURL }.
  */
-export function uploadFile(uid, file, onProgress) {
+export async function uploadFile(uid, file, onProgress) {
+  const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
+  const app = (await import("../firebase")).default;
+  const storage = getStorage(app);
+
   const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const storagePath = `teachers/${uid}/uploads/${safeName}`;
   const storageRef = ref(storage, storagePath);
@@ -34,6 +30,9 @@ export function uploadFile(uid, file, onProgress) {
 }
 
 export async function deleteFile(storagePath) {
+  const { getStorage, ref, deleteObject } = await import("firebase/storage");
+  const app = (await import("../firebase")).default;
+  const storage = getStorage(app);
   const storageRef = ref(storage, storagePath);
   await deleteObject(storageRef);
 }

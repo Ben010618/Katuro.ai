@@ -2,16 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
-import { downloadDLLDocx } from '../../services/dllDocx';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
 import { deductTokens, refundTokens, createSharedPlan } from '../../services/db';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
-import { exportToPptx } from '../../services/pptxExport';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2, Share2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
-import { downloadGameDocx } from '../../services/gamificationDocx';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
 
@@ -116,6 +113,7 @@ export default function DLLOutputPage() {
   async function handleDownload() {
     setDownloading(true);
     try {
+      const { downloadDLLDocx } = await import('../../services/dllDocx');
       await downloadDLLDocx({ store, profile });
       addToast('Daily Lesson Log downloaded!', 'success');
     } catch (err) {
@@ -203,6 +201,7 @@ export default function DLLOutputPage() {
       });
 
       setPptPhase('Building your PPTX…');
+      const { exportToPptx } = await import('../../services/pptxExport');
       await exportToPptx({
         title:        topic || store.subject,
         subject:      store.subject,
@@ -299,6 +298,7 @@ export default function DLLOutputPage() {
     };
     setGameDownloading(true);
     try {
+      const { downloadGameDocx } = await import('../../services/gamificationDocx');
       await downloadGameDocx({ gameData: gameResult, lesson, inclKey: true, profile });
       addToast('Game worksheet downloaded!', 'success');
     } catch (err) {

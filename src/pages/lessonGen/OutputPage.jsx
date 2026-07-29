@@ -5,14 +5,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
 import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan } from '../../services/db';
-import { downloadIlawDocx } from '../../services/docxExport';
 import { trackEvent } from '../../services/usageTracker';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
-import { exportToPptx } from '../../services/pptxExport';
 import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
-import { downloadGameDocx } from '../../services/gamificationDocx';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
 
@@ -234,6 +231,7 @@ export default function OutputPage() {
       });
 
       setPptPhase('Building your PPTX…');
+      const { exportToPptx } = await import('../../services/pptxExport');
       await exportToPptx({
         title,
         subject:      store.subject    || '',
@@ -328,6 +326,7 @@ export default function OutputPage() {
     };
     setGameDownloading(true);
     try {
+      const { downloadGameDocx } = await import('../../services/gamificationDocx');
       await downloadGameDocx({ gameData: gameResult, lesson, inclKey: true, profile: teacherProfile });
       addToast('Game worksheet downloaded!', 'success');
     } catch (err) {
@@ -425,6 +424,7 @@ export default function OutputPage() {
             onClick={async () => {
               setDocxLoading(true);
               try {
+                const { downloadIlawDocx } = await import('../../services/docxExport');
                 await downloadIlawDocx({
                   lessonMeta: {
                     lessonName:         store.lessonName,

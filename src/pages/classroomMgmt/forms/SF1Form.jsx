@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { X, Download, FileText } from 'lucide-react';
 import { generateSF1 } from '../../../utils/formGenerators/generateSF1';
 
@@ -376,7 +375,8 @@ export default function SF1Form({ section, students, schoolProfile, onClose }) {
   }
 
   // ── Excel export ────────────────────────────────────────────────────────────
-  function downloadExcel() {
+  async function downloadExcel() {
+    const XLSX = await import('xlsx');
     const sp  = schoolProfile || {};
     const rows = [
       ['SCHOOL FORM 1 (SF 1) SCHOOL REGISTER'],
