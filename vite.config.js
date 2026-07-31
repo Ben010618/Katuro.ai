@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/Katuro.ai/', // GitHub Pages project page -- served from /Katuro.ai/, not root
+  base: '/', // custom domain (katuro.website) serves from root, not a /RepoName/ subpath
   plugins: [
     react(),
     tailwindcss(),
