@@ -4,8 +4,9 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
-import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan } from '../../services/db';
+import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan, saveIlawPlan } from '../../services/db';
 import { trackEvent } from '../../services/usageTracker';
+import { retryAsync } from '../../utils/retry';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
@@ -173,6 +174,37 @@ export default function OutputPage() {
   const [gameLoading,      setGameLoading]     = useState(false);
   const [gameResult,       setGameResult]      = useState(null);
   const [gameDownloading,  setGameDownloading] = useState(false);
+  const [retryingSave,     setRetryingSave]    = useState(false);
+
+  async function handleRetrySave() {
+    if (!user?.uid) return;
+    setRetryingSave(true);
+    try {
+      const docId = await retryAsync(() => saveIlawPlan(user.uid, {
+        subject:            store.subject,
+        gradeLevel:         store.gradeLevel,
+        term:               store.term,
+        weekNumber:         store.weekNumber,
+        lessonName:         store.lessonName,
+        competencyText:     store.competencyText,
+        content:            store.content            || '',
+        contentStandards:   store.contentStandards   || '',
+        competencyCeiling:  store.competencyCeiling,
+        fullLadder:         store.fullLadder,
+        selectedDays:       store.selectedDays,
+        declarationOfAIUse: store.declarationOfAIUse,
+        sessions,
+      }));
+      store.setGeneratedPlan({ sessions, planId: docId });
+      store.setSaveStatus('saved');
+      addToast('Saved to cloud!', 'success');
+    } catch (err) {
+      console.error('Retry save failed:', err);
+      addToast('Still could not save. Check your connection and try again.', 'error');
+    } finally {
+      setRetryingSave(false);
+    }
+  }
 
   function handleGoToCOT() {
     if (selectedSession === null) return;
@@ -504,6 +536,36 @@ export default function OutputPage() {
           </button>
         </div>
       </div>
+
+      {/* Not-saved-to-cloud banner -- stays up until the retry succeeds, unlike
+          the toast shown at generation time which disappears in a few seconds.
+          This is the plan's only safety net: it never made it to Firestore,
+          so it won't show up in My Lessons until this succeeds. */}
+      {store.saveStatus === 'failed' && (
+        <div className="no-print" style={{
+          maxWidth: 1100, margin: '14px auto 0',
+          background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.35)',
+          borderRadius: 10, padding: '10px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12.5, color: '#92400e', fontWeight: 500 }}>
+            ⚠ Not saved to the cloud yet — this plan only exists on this device right now. Download it now to be safe, and retry saving when you can.
+          </span>
+          <button
+            onClick={handleRetrySave}
+            disabled={retryingSave}
+            style={{
+              background: '#d97706', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+            }}
+          >
+            {retryingSave
+              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Retrying…</>
+              : 'Retry saving to cloud'}
+          </button>
+        </div>
+      )}
 
       {/* Hint banner */}
       <div className="no-print" style={{

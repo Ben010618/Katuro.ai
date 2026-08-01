@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 import { deductTokens, refundTokens, saveDLLPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
+import { retryAsync } from '../../utils/retry';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
 
 const MAX_DAYS = 5;
@@ -230,6 +232,7 @@ export default function DLLStep2() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
   const { user, tokenBalance, freeMode } = useAuth();
+  const { addToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
   const [statusMsg,  setStatusMsg]  = useState('');
@@ -304,7 +307,11 @@ export default function DLLStep2() {
       store.setField('melc', combinedMelc);
 
       try {
-        const id = await saveDLLPlan(user.uid, {
+        // Retried with backoff -- a dropped hotspot connection right after
+        // generation is the #1 cause of DLLs that "disappear": the plan
+        // never reaches Firestore, so it never shows up in My Lessons
+        // later, even though generation itself succeeded.
+        const id = await retryAsync(() => saveDLLPlan(user.uid, {
           subject:              store.subject,
           gradeLevel:           store.gradeLevel,
           term:                 store.term,
@@ -318,10 +325,13 @@ export default function DLLStep2() {
           objectives,
           procedure,
           resources,
-        });
+        }));
         store.setSavedId(id);
+        store.setSaveStatus('saved');
       } catch (e) {
-        console.warn('DLL auto-save failed:', e.message);
+        console.warn('DLL auto-save failed after retries:', e.message);
+        store.setSaveStatus('failed');
+        addToast('DLL generated but not saved to cloud yet — download it now, then retry saving from this page.', 'warning', 6000);
       }
 
       navigate('/dll-gen/output');

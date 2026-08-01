@@ -30,6 +30,9 @@ export const useDLLStore = create(
   procedure:  null,  // { monday: {A,B,...J}, tuesday: {...}, ... }
   resources:  null,  // { teacherGuidePages, learnersMaterialPages, textbookPages, lrmdsPortal, otherResources }
   savedId:    null,
+  // 'idle' | 'saved' | 'failed' -- whether this plan has been confirmed
+  // written to Firestore. 'failed' means it only exists on this device.
+  saveStatus: 'idle',
 
   setField:        (key, val)    => set({ [key]: val }),
   setMelcList:     (list)        => set({ melcList: list }),
@@ -38,6 +41,7 @@ export const useDLLStore = create(
   setObjectives:   (objectives)  => set({ objectives }),
   setResources:    (resources)   => set({ resources }),
   setSavedId:      (savedId)     => set({ savedId }),
+  setSaveStatus:   (saveStatus)  => set({ saveStatus }),
 
   loadPlan: (doc) => {
     // Reconstruct melcList from legacy single-melc plans
@@ -69,6 +73,8 @@ export const useDLLStore = create(
       procedure:    doc.procedure    || null,
       resources:    doc.resources    || null,
       savedId:      doc.id           || null,
+      // Loaded straight from Firestore, so by definition it's saved.
+      saveStatus:   'saved',
     });
   },
 
@@ -83,6 +89,7 @@ export const useDLLStore = create(
     procedure:  null,
     resources:  null,
     savedId:    null,
+    saveStatus: 'idle',
   }),
 }),
 {
@@ -103,6 +110,7 @@ export const useDLLStore = create(
       procedure:            s.procedure,
       resources:            s.resources,
       savedId:              s.savedId,
+      saveStatus:           s.saveStatus,
     }),
   }
 ));

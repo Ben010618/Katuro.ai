@@ -79,6 +79,10 @@ export const useCotStore = create(
       generatedPlan: null,
       planId:        null,
       status:        'idle',
+      // 'idle' | 'saved' | 'failed' -- whether generatedPlan has been
+      // confirmed written to Firestore. 'failed' means this plan only
+      // exists on this device right now.
+      saveStatus:    'idle',
 
       // ── Actions ─────────────────────────────────────────
       setStep1: (data) => set(data),
@@ -89,9 +93,11 @@ export const useCotStore = create(
         generatedPlan: plan,
         planId:        plan.planId ?? null,
         status:        'generated',
+        saveStatus:    plan.planId ? 'saved' : 'idle',
       }),
 
       setStatus: (status) => set({ status }),
+      setSaveStatus: (saveStatus) => set({ saveStatus }),
 
       loadPlan: (data) => set({
         teacherName:          data.teacherName          || '',
@@ -110,6 +116,8 @@ export const useCotStore = create(
         generatedPlan:      data.plan               || null,
         planId:             data.id                 || null,
         status:             'generated',
+        // Loaded straight from Firestore, so by definition it's saved.
+        saveStatus:         'saved',
       }),
 
       reset: () => set({
@@ -117,7 +125,7 @@ export const useCotStore = create(
         topic: '', melc: '', materials: '', objectives: '', teachingDate: '',
         contentStandards: '', performanceStandards: '',
         selectedIndicators: DEFAULT_SELECTED,
-        generatedPlan: null, planId: null, status: 'idle',
+        generatedPlan: null, planId: null, status: 'idle', saveStatus: 'idle',
       }),
     }),
     {
@@ -138,6 +146,7 @@ export const useCotStore = create(
         selectedIndicators:   s.selectedIndicators,
         generatedPlan:        s.generatedPlan,
         planId:               s.planId,
+        saveStatus:           s.saveStatus,
       }),
     }
   )

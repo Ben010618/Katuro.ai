@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { generateCotLesson } from '../../services/cotAI';
 import { deductTokens, refundTokens, saveCotPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
+import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const KRA_COLOR = {
@@ -129,9 +130,20 @@ export default function CotStep3() {
         selectedIndicators: store.selectedIndicators,
         plan,
       };
-      saveCotPlan(user.uid, planData)
-        .then(docId => store.setGeneratedPlan({ plan, planId: docId }))
-        .catch(() => addToast('Plan generated but could not save to cloud.', 'warning'));
+      // Retried with backoff -- a dropped hotspot connection right after
+      // generation is the #1 cause of COT plans that "disappear": the plan
+      // never reaches Firestore, so it never shows up in My Lessons later,
+      // even though generation itself succeeded.
+      retryAsync(() => saveCotPlan(user.uid, planData))
+        .then(docId => {
+          store.setGeneratedPlan({ plan, planId: docId });
+          store.setSaveStatus('saved');
+        })
+        .catch(err => {
+          console.error('Firestore save failed after retries:', err);
+          store.setSaveStatus('failed');
+          addToast('Plan generated but not saved to cloud yet — download it now, then retry saving from this page.', 'warning', 6000);
+        });
     }
   }
 

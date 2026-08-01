@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { getTeacherProfile } from '../../services/db';
+import { getTeacherProfile, saveCotPlan } from '../../services/db';
 import {
-  FileDown, Sparkles, ChevronDown, ChevronUp, RotateCcw, BookOpenCheck,
+  FileDown, Sparkles, ChevronDown, ChevronUp, RotateCcw, BookOpenCheck, Loader2,
 } from 'lucide-react';
 import AIOutputGuard from '../../components/AIOutputGuard';
+import { retryAsync } from '../../utils/retry';
 
 const KRA_COLOR = {
   'KRA 1': { text: '#0369a1', bg: '#e0f2fe' },
@@ -131,6 +132,7 @@ export default function CotOutputPage() {
   const { addToast } = useToast();
 
   const [exporting, setExporting] = useState(false);
+  const [retryingSave, setRetryingSave] = useState(false);
 
   const plan = store.generatedPlan?.plan;
 
@@ -184,6 +186,34 @@ export default function CotOutputPage() {
       addToast('Export failed: ' + err.message, 'error');
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleRetrySave() {
+    if (!user?.uid) return;
+    setRetryingSave(true);
+    try {
+      const docId = await retryAsync(() => saveCotPlan(user.uid, {
+        teacherName:        store.teacherName,
+        school:             store.school,
+        subject:            store.subject,
+        grade:              store.grade,
+        quarter:            store.quarter,
+        topic:              store.topic,
+        melc:               store.melc,
+        materials:          store.materials,
+        teachingDate:       store.teachingDate,
+        selectedIndicators: store.selectedIndicators,
+        plan,
+      }));
+      store.setGeneratedPlan({ plan, planId: docId });
+      store.setSaveStatus('saved');
+      addToast('Saved to cloud!', 'success');
+    } catch (err) {
+      console.error('Retry save failed:', err);
+      addToast('Still could not save. Check your connection and try again.', 'error');
+    } finally {
+      setRetryingSave(false);
     }
   }
 
@@ -273,6 +303,35 @@ export default function CotOutputPage() {
           </button>
         </div>
       </div>
+
+      {/* Not-saved-to-cloud banner -- stays up until the retry succeeds, unlike
+          the toast shown at generation time which disappears in a few seconds.
+          This is the plan's only safety net: it never made it to Firestore,
+          so it won't show up in My Lessons until this succeeds. */}
+      {store.saveStatus === 'failed' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.35)',
+          borderRadius: 10, padding: '10px 16px', marginBottom: 24,
+        }}>
+          <span style={{ fontSize: 12.5, color: '#92400e', fontWeight: 500 }}>
+            ⚠ Not saved to the cloud yet — this plan only exists on this device right now. Download it now to be safe, and retry saving when you can.
+          </span>
+          <button
+            onClick={handleRetrySave}
+            disabled={retryingSave}
+            style={{
+              background: '#d97706', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+            }}
+          >
+            {retryingSave
+              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Retrying…</>
+              : 'Retry saving to cloud'}
+          </button>
+        </div>
+      )}
 
       {/* COT indicator badges */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>

@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { generateIlawSession } from '../../services/ai';
 import { saveIlawPlan, deductTokens, refundTokens } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
+import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 
 function formatDayShort(iso) {
@@ -206,11 +207,21 @@ export default function Step3() {
         declarationOfAIUse: decl,
         sessions:           enriched,
       };
-      saveIlawPlan(user.uid, planData)
-        .then(docId => store.setGeneratedPlan({ sessions: enriched, planId: docId }))
+      // Retried with backoff -- a dropped hotspot connection right after
+      // generation is the #1 cause of lessons that "disappear": the plan
+      // never reaches Firestore, so it never shows up in My Lessons later,
+      // even though generation itself succeeded. Most such failures are a
+      // few seconds of flaky connectivity, not a permanent problem, so a
+      // couple of retries recovers the overwhelming majority silently.
+      retryAsync(() => saveIlawPlan(user.uid, planData))
+        .then(docId => {
+          store.setGeneratedPlan({ sessions: enriched, planId: docId });
+          store.setSaveStatus('saved');
+        })
         .catch(err => {
-          console.error('Firestore save failed:', err);
-          addToast('Plan generated but could not save to cloud. Check your connection.', 'warning');
+          console.error('Firestore save failed after retries:', err);
+          store.setSaveStatus('failed');
+          addToast('Plan generated but not saved to cloud yet — download it now, then retry saving from this page.', 'warning', 6000);
         });
     }
   }

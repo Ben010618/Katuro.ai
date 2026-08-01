@@ -32,6 +32,10 @@ export const useLessonGenStore = create(
       generatedPlan: null,
       planId:        null,
       status:        'idle',
+      // 'idle' | 'saved' | 'failed' -- whether generatedPlan has been
+      // confirmed written to Firestore. 'failed' means this plan only
+      // exists on this device right now (see OutputPage's save banner).
+      saveStatus:    'idle',
 
       // ── Actions ─────────────────────────────────────────
       setStep1: (data) => set({
@@ -72,14 +76,18 @@ export const useLessonGenStore = create(
         generatedPlan:      { sessions: doc.sessions || [], planId: doc.id },
         planId:             doc.id,
         status:             'generated',
+        // Loaded straight from Firestore, so by definition it's saved.
+        saveStatus:         'saved',
       }),
 
       setStatus: (status) => set({ status }),
+      setSaveStatus: (saveStatus) => set({ saveStatus }),
 
       setGeneratedPlan: (plan) => set({
         generatedPlan: plan,
         planId: plan.planId ?? 'mock-001',
         status: 'generated',
+        saveStatus: plan.planId ? 'saved' : 'idle',
       }),
 
       reset: () => set({
@@ -87,12 +95,14 @@ export const useLessonGenStore = create(
         selectedDays: [], sessionCount: 0,
         selectedCompetency: null, competencies: [{ text: '', days: 1 }], competencyText: '', content: '', contentStandards: '', learningContext: '', lessonName: '', declarationOfAIUse: DEFAULT_DECLARATION,
         competencyCeiling: '', fullLadder: [], unpackedSessions: [],
-        generatedPlan: null, planId: null, status: 'idle',
+        generatedPlan: null, planId: null, status: 'idle', saveStatus: 'idle',
       }),
     }),
     {
       name: 'katuro-lesson-gen-draft',
-      // Only persist the step data — not the generated plan or status
+      // Persists the generated plan + save status too (not just step data) so
+      // a refresh, or the browser reclaiming the tab, doesn't lose a plan that
+      // hasn't been confirmed saved to Firestore yet.
       partialize: (s) => ({
         subject:             s.subject,
         gradeLevel:          s.gradeLevel,
@@ -113,6 +123,7 @@ export const useLessonGenStore = create(
         unpackedSessions:    s.unpackedSessions,
         generatedPlan:       s.generatedPlan,
         planId:              s.planId,
+        saveStatus:          s.saveStatus,
       }),
     }
   )
