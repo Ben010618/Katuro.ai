@@ -532,13 +532,29 @@ function formatDuration(ms) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
+// A failed dynamic import means the *page* went stale mid-session — a tab
+// left open across a deploy, still naming a chunk hash a newer build has
+// since replaced — not an AI/backend reliability problem. main.jsx already
+// self-heals this with one guarded reload ('vite:preloadError' handler), so
+// counting it against the AI success rate would just be noise that doesn't
+// reflect anything actionable about the AI tools themselves. Matched against
+// the handful of phrasings different browsers use for the same failure.
+const STALE_DEPLOY_ERROR_PATTERNS = [
+  /failed to fetch dynamically imported module/i,
+  /error loading dynamically imported module/i,
+  /importing a module script failed/i,
+];
+function isStaleDeployError(message) {
+  return STALE_DEPLOY_ERROR_PATTERNS.some(re => re.test(message || ''));
+}
+
 /**
  * Reliability of AI generation calls — separate from feature-popularity
  * counts, since a failed attempt still logs an 'ai_generation' event but
  * must never be confused with a successful '*_generated' feature use.
  */
 function buildGenerationStats(events) {
-  const genEvents = events.filter(e => e.feature === 'ai_generation');
+  const genEvents = events.filter(e => e.feature === 'ai_generation' && !isStaleDeployError(e.error));
   const total     = genEvents.length;
   const successes = genEvents.filter(e => e.success).length;
   const successRate = total > 0 ? Math.round((successes / total) * 100) : null;
@@ -555,7 +571,14 @@ function buildGenerationStats(events) {
     .sort((a, b) => (b.ts?.toMillis?.() || 0) - (a.ts?.toMillis?.() || 0))
     .slice(0, 5);
 
-  return { total, successes, failures: total - successes, successRate, avgDurationMs, recentErrors };
+  // Shown separately, muted, below the real errors -- visible for awareness
+  // but never mixed into the reliability stats above.
+  const staleDeployErrors = events
+    .filter(e => e.feature === 'ai_generation' && isStaleDeployError(e.error))
+    .sort((a, b) => (b.ts?.toMillis?.() || 0) - (a.ts?.toMillis?.() || 0))
+    .slice(0, 5);
+
+  return { total, successes, failures: total - successes, successRate, avgDurationMs, recentErrors, staleDeployErrors };
 }
 
 function teacherCreatedMs(t) {
@@ -1513,6 +1536,36 @@ function AnalyticsSection({ teachers = [] }) {
                     </div>
                     <p style={{ margin: 0, fontSize: 12, color: '#a13327', fontFamily: '"DM Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {e.error || 'Unknown error'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stale-deploy errors — self-healed automatically, shown for
+              awareness only, kept visually distinct from real errors above
+              so they never read as an actual AI/generation problem. */}
+          {genStats.staleDeployErrors.length > 0 && (
+            <div style={{ ...card, marginTop: 20 }}>
+              <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={14} color="var(--kt-text-secondary)" /> Stale Deploy Errors (self-healed, not an AI issue)
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {genStats.staleDeployErrors.map(e => (
+                  <div key={e.id} style={{
+                    padding: '8px 12px', background: 'var(--kt-surface)', borderRadius: 8,
+                    border: '1px solid var(--kt-border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)' }}>{TOOL_LABELS[e.tool] || e.tool}</span>
+                      <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                        {e.ts?.toDate ? e.ts.toDate().toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                        {typeof e.durationMs === 'number' ? ` · ${formatDuration(e.durationMs)}` : ''}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)', fontFamily: '"DM Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      A tab stayed open across a deploy — self-healed on reload, no action needed.
                     </p>
                   </div>
                 ))}
