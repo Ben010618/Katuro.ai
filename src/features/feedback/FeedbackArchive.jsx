@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   collection, query, orderBy, limit, onSnapshot,
-  updateDoc, deleteDoc, doc,
+  updateDoc, deleteDoc, doc, serverTimestamp,
 } from 'firebase/firestore';
-import { MessageSquare, Trash2, Archive, ArchiveRestore, Mail, MailOpen, Loader2 } from 'lucide-react';
+import { MessageSquare, Trash2, Archive, ArchiveRestore, Mail, MailOpen, Loader2, Reply, Send } from 'lucide-react';
 import { db } from '../../firebase';
+import { useAuth } from '../../hooks/useAuth';
 
 const card = {
   background: 'var(--kt-card)', borderRadius: 14,
@@ -28,11 +29,15 @@ function ts(t) {
 }
 
 export default function FeedbackArchive() {
+  const { user } = useAuth();
   const [entries,      setEntries]      = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [readFilter,   setReadFilter]   = useState('All');
   const [typeFilter,   setTypeFilter]   = useState('All');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [replyingId,   setReplyingId]   = useState(null); // entry.id currently showing its reply box
+  const [replyDraft,    setReplyDraft]   = useState('');
+  const [sendingReply,  setSendingReply] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -65,6 +70,34 @@ export default function FeedbackArchive() {
   async function remove(entry) {
     if (!window.confirm('Delete this feedback entry permanently?')) return;
     await deleteDoc(doc(db, 'feedback_inbox', entry.id)).catch(() => {});
+  }
+
+  function openReply(entry) {
+    setReplyingId(entry.id);
+    setReplyDraft(entry.reply || '');
+  }
+  function cancelReply() {
+    setReplyingId(null);
+    setReplyDraft('');
+  }
+  async function sendReply(entry) {
+    const text = replyDraft.trim();
+    if (!text || sendingReply) return;
+    setSendingReply(true);
+    try {
+      await updateDoc(doc(db, 'feedback_inbox', entry.id), {
+        reply: text,
+        repliedAt: serverTimestamp(),
+        repliedBy: { uid: user?.uid || '', displayName: user?.displayName || '' },
+        // Re-flips to unread for the teacher even if this edits a prior reply.
+        replyRead: false,
+      });
+      cancelReply();
+    } catch {
+      window.alert("Couldn't send this reply. Please try again.");
+    } finally {
+      setSendingReply(false);
+    }
   }
 
   return (
@@ -109,33 +142,80 @@ export default function FeedbackArchive() {
         <>
           {visible.map((e) => (
             <div key={e.id} style={{
-              display: 'flex', gap: 10, alignItems: 'flex-start',
               padding: '10px 12px', borderRadius: 8, marginBottom: 6,
               background: e.read ? 'var(--kt-surface)' : 'rgba(45,106,79,0.05)',
               border: `1px solid ${e.read ? 'var(--kt-border)' : 'rgba(45,106,79,0.15)'}`,
             }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f7ee', color: '#2d6a4f', borderRadius: 4, padding: '1px 6px' }}>{e.type || 'Suggestion'}</span>
-                  <span style={{ fontSize: 10, color: '#9bb8a5' }}>{ts(e.createdAt)}</span>
-                  {e.archived && <span style={{ fontSize: 10, color: '#9bb8a5' }}>Archived</span>}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f7ee', color: '#2d6a4f', borderRadius: 4, padding: '1px 6px' }}>{e.type || 'Suggestion'}</span>
+                    <span style={{ fontSize: 10, color: '#9bb8a5' }}>{ts(e.createdAt)}</span>
+                    {e.archived && <span style={{ fontSize: 10, color: '#9bb8a5' }}>Archived</span>}
+                    {e.reply && <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1' }}>Replied</span>}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{e.message}</p>
+                  <p style={{ margin: '3px 0 0', fontSize: 10, color: '#9bb8a5' }}>
+                    {e.createdBy?.displayName || '(unknown)'} · {e.createdBy?.email || 'no email'}
+                  </p>
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{e.message}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 10, color: '#9bb8a5' }}>
-                  {e.createdBy?.displayName || '(unknown)'} · {e.createdBy?.email || 'no email'}
-                </p>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => (replyingId === e.id ? cancelReply() : openReply(e))} title={e.reply ? 'Edit reply' : 'Reply'} style={{ ...btnSecondary, padding: '4px 8px', color: replyingId === e.id ? '#fff' : '#1a3d2b', background: replyingId === e.id ? '#2d6a4f' : 'var(--kt-surface)' }}>
+                    <Reply size={11} />
+                  </button>
+                  <button onClick={() => toggleRead(e)} title={e.read ? 'Mark unread' : 'Mark read'} style={{ ...btnSecondary, padding: '4px 8px' }}>
+                    {e.read ? <Mail size={11} /> : <MailOpen size={11} />}
+                  </button>
+                  <button onClick={() => toggleArchived(e)} title={e.archived ? 'Unarchive' : 'Archive'} style={{ ...btnSecondary, padding: '4px 8px' }}>
+                    {e.archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
+                  </button>
+                  <button onClick={() => remove(e)} title="Delete" style={{ ...btnSecondary, padding: '4px 8px', color: '#c0392b', borderColor: 'rgba(224,92,92,0.3)' }}>
+                    <Trash2 size={11} />
+                  </button>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button onClick={() => toggleRead(e)} title={e.read ? 'Mark unread' : 'Mark read'} style={{ ...btnSecondary, padding: '4px 8px' }}>
-                  {e.read ? <Mail size={11} /> : <MailOpen size={11} />}
-                </button>
-                <button onClick={() => toggleArchived(e)} title={e.archived ? 'Unarchive' : 'Archive'} style={{ ...btnSecondary, padding: '4px 8px' }}>
-                  {e.archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
-                </button>
-                <button onClick={() => remove(e)} title="Delete" style={{ ...btnSecondary, padding: '4px 8px', color: '#c0392b', borderColor: 'rgba(224,92,92,0.3)' }}>
-                  <Trash2 size={11} />
-                </button>
-              </div>
+
+              {e.reply && replyingId !== e.id && (
+                <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(3,105,161,0.06)', border: '1px solid rgba(3,105,161,0.18)', borderRadius: 6 }}>
+                  <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: '#0369a1' }}>
+                    Your reply {e.repliedBy?.displayName ? `(${e.repliedBy.displayName})` : ''} · {ts(e.repliedAt)}
+                    {e.replyRead ? ' · Seen' : ' · Not seen yet'}
+                  </p>
+                  <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{e.reply}</p>
+                </div>
+              )}
+
+              {replyingId === e.id && (
+                <div style={{ marginTop: 8 }}>
+                  <textarea
+                    autoFocus
+                    rows={2}
+                    value={replyDraft}
+                    onChange={(ev) => setReplyDraft(ev.target.value)}
+                    placeholder="Type your reply — the teacher will be notified…"
+                    style={{
+                      width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                      padding: '8px 10px', border: '1.5px solid rgba(45,106,79,0.2)',
+                      borderRadius: 6, fontSize: 12, background: 'var(--kt-input-bg)',
+                      color: 'var(--kt-text-primary)', outline: 'none', fontFamily: 'inherit',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                    <button onClick={cancelReply} style={{ ...btnSecondary, fontSize: 11 }}>Cancel</button>
+                    <button
+                      onClick={() => sendReply(e)}
+                      disabled={!replyDraft.trim() || sendingReply}
+                      style={{
+                        ...btnSecondary, fontSize: 11, background: '#2d6a4f', color: '#fff',
+                        opacity: (!replyDraft.trim() || sendingReply) ? 0.6 : 1,
+                      }}
+                    >
+                      {sendingReply ? <Loader2 size={11} style={{ animation: 'kt-spin 0.8s linear infinite' }} /> : <Send size={11} />}
+                      Send reply
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           {filtered.length > visible.length && (

@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useDebouncedEffect } from '../../hooks/useDebouncedEffect';
 import { createTestSession, getTestSession, updateTestSession } from '../../services/testBuilderDb';
-import { deriveKeyStage, deriveHotsFloor, DAY_LIMIT, isManualCeilingType, resolveItemCeiling } from '../../config/testBuilderConfig';
+import { deriveKeyStage, deriveHotsFloor, DAY_LIMIT, isManualCeilingType, resolveItemCeiling, MANUAL_CEILING_MIN, MANUAL_CEILING_MAX } from '../../config/testBuilderConfig';
 import { trackEvent } from '../../services/usageTracker';
 import { Check, Lock, Loader2, Save, ClipboardList } from 'lucide-react';
 
@@ -24,7 +24,7 @@ const STEPS = [
       s.gradeLevel && s.subject?.trim() && s.testType && s.terms?.length > 0 &&
       s.questionFormats?.length > 0 &&
       s.competencies?.length > 0 && s.competencies.every((c) => c.text?.trim()) &&
-      (!isManualCeilingType(s.testType) || (s.itemCeilingOverride >= 10 && s.itemCeilingOverride <= 25))
+      (!isManualCeilingType(s.testType) || (s.itemCeilingOverride >= MANUAL_CEILING_MIN && s.itemCeilingOverride <= MANUAL_CEILING_MAX))
     ),
     primaryLabel: () => "Continue to Bloom's Levels →",
     onPrimary: ({ goNext }) => goNext(),

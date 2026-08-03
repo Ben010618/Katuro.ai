@@ -93,12 +93,12 @@ export function deriveItemCeiling(keyStage, testType) {
   return ITEM_CEILINGS[keyStage]?.[testType] ?? 0;
 }
 
-// Summative Tests (ST1/ST2): DepEd memo caps these at 25 items regardless of
+// Summative Tests (ST1/ST2): DepEd memo caps these at 30 items regardless of
 // Key Stage, and lets the teacher pick the count (min 10) rather than a fixed
 // auto value. Term Examination keeps the auto-derived ceiling above.
 export const MANUAL_CEILING_TYPES = new Set(['ST1', 'ST2']);
 export const MANUAL_CEILING_MIN = 10;
-export const MANUAL_CEILING_MAX = 25;
+export const MANUAL_CEILING_MAX = 30;
 
 export function isManualCeilingType(testType) {
   return MANUAL_CEILING_TYPES.has(testType);
