@@ -26,7 +26,7 @@ import {
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
-  FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX,
+  FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import { saveAs } from 'file-saver';
@@ -2011,6 +2011,7 @@ export default function AdminDashboard() {
   const [approving,      setApproving]       = useState(false);
   const [approveMsg,     setApproveMsg]      = useState('');
   const [unreadFeedback, setUnreadFeedback]  = useState(0);
+  const [userSearch,     setUserSearch]      = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -2194,6 +2195,18 @@ export default function AdminDashboard() {
     if (rank(a) !== rank(b)) return rank(a) - rank(b);
     return toMs(a.createdAt) - toMs(b.createdAt);
   });
+
+  // Name/email search over the already-sorted list -- pending/disabled
+  // ordering is preserved for whatever subset matches.
+  const userSearchQuery = userSearch.trim().toLowerCase();
+  const visibleTeachers = userSearchQuery
+    ? sortedTeachers.filter(t => {
+        const fullName = [t.givenName, t.mi, t.surname].filter(Boolean).join(' ').toLowerCase();
+        return fullName.includes(userSearchQuery)
+          || (t.displayName || '').toLowerCase().includes(userSearchQuery)
+          || (t.email || '').toLowerCase().includes(userSearchQuery);
+      })
+    : sortedTeachers;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--kt-surface)', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -2429,7 +2442,7 @@ export default function AdminDashboard() {
 
         {/* Users table */}
         <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Users</h2>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={fetchTeachers} style={btnSecondary} title="Refresh">
@@ -2452,6 +2465,36 @@ export default function AdminDashboard() {
                 <Plus size={14} /> Add User
               </button>
             </div>
+          </div>
+
+          <div style={{ position: 'relative', maxWidth: 320, marginBottom: 16 }}>
+            <Search size={14} color="var(--kt-text-secondary)" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search by name or email…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '8px 12px 8px 32px', fontSize: 13,
+                border: '1px solid var(--kt-border)', borderRadius: 8,
+                background: 'var(--kt-input-bg)', color: 'var(--kt-text-primary)',
+                outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+            {userSearch && (
+              <button
+                onClick={() => setUserSearch('')}
+                title="Clear search"
+                style={{
+                  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: 'var(--kt-text-secondary)', display: 'flex',
+                }}
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           {approveMsg && (
@@ -2512,6 +2555,12 @@ export default function AdminDashboard() {
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No users yet</p>
               <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.7 }}>Click "Add User" to create the first teacher account.</p>
             </div>
+          ) : visibleTeachers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--kt-text-secondary)' }}>
+              <Search size={32} style={{ opacity: 0.3, marginBottom: 10 }} />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No users match "{userSearch}"</p>
+              <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.7 }}>Try a different name or email.</p>
+            </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -2523,7 +2572,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedTeachers.map(t => (
+                  {visibleTeachers.map(t => (
                     <tr key={t.id} style={{ borderBottom: '1px solid rgba(45,106,79,0.06)' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#fafcfa'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
