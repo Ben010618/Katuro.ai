@@ -167,15 +167,15 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
             {showMenu && (
               <div style={{
                 position: 'absolute', right: 0, top: '100%', zIndex: 50,
-                background: 'white', border: '1px solid #e5e7eb',
-                borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                minWidth: 155, padding: 6,
+                background: 'var(--kt-card, #FBF7EC)', border: '1px solid var(--kt-border, #DCD0AE)',
+                borderRadius: 'var(--sh-radius-md, 6px)', boxShadow: '0 4px 16px rgba(31,58,46,0.12)',
+                minWidth: 165, padding: 6,
               }}>
                 {isOwn && (
                   <button
                     onClick={startEdit}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: '#374151', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', borderRadius: 7 }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--kt-text-primary, #262119)', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', borderRadius: 4 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-card-2, #F4EDDB)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                     type="button"
                   >
@@ -184,8 +184,8 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
                 )}
                 <button
                   onClick={handleDelete}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', borderRadius: 7 }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#fff5f5'; }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--kt-danger, #A23B2E)', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', borderRadius: 4 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-danger-tint, #FBEAE8)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                   type="button"
                 >
@@ -234,7 +234,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
               onClick={() => setEditing(false)}
               disabled={savingEdit}
               type="button"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 4, border: '1px solid var(--kt-border, #DCD0AE)', background: 'var(--kt-card-2, #F4EDDB)', color: 'var(--kt-text-secondary, #6E6455)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <X size={13} /> Cancel
             </button>
@@ -242,7 +242,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
               onClick={handleSaveEdit}
               disabled={savingEdit || !editValue.trim()}
               type="button"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1D9E75', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingEdit || !editValue.trim() ? 0.6 : 1 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 16px', borderRadius: 4, border: '1px solid var(--kt-chalkboard, #1F3A2E)', background: 'var(--kt-chalkboard, #1F3A2E)', color: '#ffffff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: savingEdit || !editValue.trim() ? 0.6 : 1 }}
             >
               <Check size={13} /> {savingEdit ? 'Saving…' : 'Save'}
             </button>

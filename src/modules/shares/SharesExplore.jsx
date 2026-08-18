@@ -82,12 +82,12 @@ export default function SharesExplore({ uid, displayName, initials, photoURL, is
           {/* Active hashtag header */}
           {activeTag && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-teal)' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                 #{activeTag}
               </h2>
               <button
                 onClick={() => setSearchParams({})}
-                style={{ fontSize: 12, color: 'var(--sh-text-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ fontSize: 12, color: 'var(--kt-text-secondary, #6E6455)', background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit' }}
                 type="button"
               >
                 ✕ Clear

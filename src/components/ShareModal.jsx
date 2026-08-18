@@ -128,8 +128,8 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(13,34,24,0.6)',
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(38,33,25,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 20,
       }}
@@ -137,39 +137,44 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
     >
       <div
         style={{
-          background: 'var(--kt-card)', borderRadius: 18, width: '100%', maxWidth: 440,
-          boxShadow: '0 24px 64px rgba(13,34,24,0.22)', overflow: 'hidden',
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          width: '100%', maxWidth: 440,
+          boxShadow: '0 16px 40px rgba(31,58,46,0.22)',
+          overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 50%, #2d6a4f 100%)',
-          padding: '18px 22px',
+          background: 'var(--kt-chalkboard, #1F3A2E)',
+          borderBottom: '1px solid var(--kt-manila-border, #C9B583)',
+          padding: '14px 20px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>{modalTitle}</p>
-            {title && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>{title}</p>}
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>{modalTitle}</p>
+            {title && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(251,247,236,0.7)', fontFamily: 'var(--kt-font-mono, monospace)' }}>{title}</p>}
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', color: '#fff', borderRadius: 8, padding: 6 }}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', color: '#FBF7EC', borderRadius: 4, padding: 5, display: 'flex' }}
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
 
-        <div style={{ padding: '20px 22px 24px' }}>
+        <div style={{ padding: '18px 20px 22px' }}>
           {/* URL copy bar */}
           <div style={{
             display: 'flex', gap: 8, alignItems: 'center',
-            background: 'var(--kt-surface)', border: '1.5px solid var(--kt-border)',
-            borderRadius: 10, padding: '8px 10px 8px 14px', marginBottom: 20,
+            background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)',
+            borderRadius: 'var(--kt-radius-sm, 4px)', padding: '6px 8px 6px 12px', marginBottom: 18,
           }}>
             <span style={{
-              flex: 1, fontSize: 12, color: 'var(--kt-text-secondary)',
-              fontFamily: '"DM Mono", monospace',
+              flex: 1, fontSize: 12, color: 'var(--kt-text-secondary, #6E6455)',
+              fontFamily: 'var(--kt-font-mono, "JetBrains Mono", monospace)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {url}
@@ -178,12 +183,13 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
               onClick={handleCopy}
               style={{
                 flexShrink: 0,
-                background: copied ? '#d8f3dc' : '#2d6a4f',
-                color: copied ? '#1a3d2b' : '#fff',
-                border: 'none', borderRadius: 7, padding: '6px 12px',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: copied ? 'var(--kt-manila, #E4D5AC)' : 'var(--kt-chalkboard, #1F3A2E)',
+                color: copied ? 'var(--kt-text-primary, #262119)' : '#ffffff',
+                border: '1px solid ' + (copied ? 'var(--kt-manila-border, #C9B583)' : 'var(--kt-chalkboard, #1F3A2E)'),
+                borderRadius: 4, padding: '5px 12px',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit',
-                transition: 'background 0.2s, color 0.2s',
+                transition: 'background 0.15s, color 0.15s',
               }}
             >
               {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
@@ -196,15 +202,16 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
             <button
               onClick={handleNativeShare}
               style={{
-                width: '100%', marginBottom: 16,
-                background: 'linear-gradient(135deg, #2d6a4f, #40916c)',
-                color: '#fff', border: 'none', borderRadius: 10,
-                padding: '11px 16px', fontSize: 13, fontWeight: 700,
+                width: '100%', marginBottom: 14,
+                background: 'var(--kt-chalkboard, #1F3A2E)',
+                color: '#ffffff', border: '1px solid var(--kt-chalkboard, #1F3A2E)',
+                borderRadius: 'var(--kt-radius-sm, 4px)',
+                padding: '10px 16px', fontSize: 13, fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               }}
             >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
                 <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
               </svg>
               Share via…
@@ -212,7 +219,7 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
           )}
 
           {/* Platform grid */}
-          <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
             Share to platform
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
@@ -222,10 +229,10 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
                 onClick={() => handlePlatform(p)}
                 style={{
                   background: p.bg, color: p.color,
-                  border: `1.5px solid ${p.border}`,
-                  borderRadius: 10, padding: '10px 4px 8px',
+                  border: `1px solid ${p.border}`,
+                  borderRadius: 4, padding: '8px 4px 6px',
                   cursor: 'pointer', fontFamily: 'inherit',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                   transition: 'opacity 0.15s',
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
@@ -233,14 +240,14 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
                 title={p.mobileNote ? `${p.label} — opens app on mobile` : p.label}
               >
                 {Icons[p.id]}
-                <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2, textAlign: 'center' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2, textAlign: 'center', fontFamily: 'var(--kt-font-mono, monospace)' }}>
                   {p.label}
                 </span>
               </button>
             ))}
           </div>
 
-          <p style={{ margin: '14px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+          <p style={{ margin: '14px 0 0', fontSize: 11, color: 'var(--kt-text-secondary, #6E6455)', textAlign: 'center', lineHeight: 1.5, fontFamily: 'var(--kt-font-mono, monospace)' }}>
             Messenger &amp; Viber open on mobile devices with the app installed.
           </p>
         </div>

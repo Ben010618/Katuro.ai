@@ -30,9 +30,9 @@ export default function SharePostPage({ uid, displayName, initials, photoURL, is
       <button
         onClick={() => navigate('/shares')}
         type="button"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-text-secondary)', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', padding: '14px 0 6px' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary, #6E6455)', fontSize: 13, fontWeight: 700, fontFamily: 'var(--kt-font-mono, monospace)', padding: '14px 0 10px' }}
       >
-        <ArrowLeft size={15} /> Back to Explore
+        <ArrowLeft size={15} /> Back to Feed
       </button>
 
       {loading && <SkeletonCard />}

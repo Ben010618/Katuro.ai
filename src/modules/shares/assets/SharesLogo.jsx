@@ -9,10 +9,11 @@ export function SharesLogo({ size = 40, className = '' }) {
       height={size}
       className={className}
       style={{
-        borderRadius: 11,
+        borderRadius: 4,
         objectFit: 'cover',
         display: 'block',
-        boxShadow: '0 2px 14px rgba(34,197,94,0.40)',
+        border: '1px solid rgba(201,181,131,0.3)',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
       }}
     />
   );
@@ -20,30 +21,32 @@ export function SharesLogo({ size = 40, className = '' }) {
 
 export function SharesLogoFull({ height = 40 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <SharesLogo size={height} />
       <div>
         <span style={{
           display: 'block',
-          fontWeight: 800,
-          fontSize: Math.round(height * 0.52),
-          color: '#4ade80',
-          letterSpacing: '-0.02em',
-          fontFamily: '"Plus Jakarta Sans", sans-serif',
+          fontWeight: 700,
+          fontSize: Math.round(height * 0.55),
+          color: '#FBF7EC',
+          letterSpacing: '-0.01em',
+          fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
           lineHeight: 1,
         }}>
-          kaTuro Shares
+          kaTuro <span style={{ color: 'var(--kt-manila, #E4D5AC)' }}>Shares</span>
         </span>
         <span style={{
           display: 'block',
           fontSize: Math.round(height * 0.30),
-          color: 'rgba(255,255,255,0.40)',
+          color: 'rgba(251,247,236,0.65)',
           fontWeight: 600,
-          letterSpacing: '0.05em',
+          letterSpacing: '0.06em',
+          fontFamily: 'var(--kt-font-mono, "JetBrains Mono", monospace)',
           lineHeight: 1.2,
-          marginTop: 3,
+          marginTop: 2,
+          textTransform: 'uppercase',
         }}>
-          Teacher Community
+          Komunidad ng mga Guro
         </span>
       </div>
     </div>

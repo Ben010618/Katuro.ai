@@ -165,7 +165,7 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
           />
 
           {(fileError || postError) && (
-            <p style={{ color: '#ef4444', fontSize: 12, margin: '0 0 10px', fontWeight: 600 }}>
+            <p style={{ color: 'var(--kt-danger, #A23B2E)', fontSize: 12, margin: '0 0 10px', fontWeight: 600, fontFamily: 'var(--sh-mono)' }}>
               {fileError || postError}
             </p>
           )}
