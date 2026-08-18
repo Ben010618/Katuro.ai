@@ -265,8 +265,8 @@ export async function callNvidiaChat({
  */
 export async function generateNvidiaImage({
   prompt,
-  width = 1024,
-  height = 1024,
+  width = 896,
+  height = 512,
   model,
 }) {
   const config = await getNvidiaConfig();
@@ -274,8 +274,8 @@ export async function generateNvidiaImage({
 
   const chosenModel = model || config.imageModel || DEFAULT_NVIDIA_IMAGE_MODEL;
   
-  // Format educational prompt to produce clean, classroom-friendly visuals
-  const enhancedPrompt = `High quality educational illustration for classroom presentation, clear lighting, clean composition, detailed, photorealistic: ${prompt}`;
+  // Format ultra-relevant, lightweight educational visual prompt
+  const enhancedPrompt = `Ultra-relevant educational diagram or high-contrast illustration, clean minimalist 2D infographic or sharp photography, pure clean white background, high legibility, curriculum-aligned visual aid for classroom slide: ${prompt}`;
 
   // 1. Try NVIDIA GenAI Stability AI NIM endpoint
   const url = `https://ai.api.nvidia.com/v1/genai/${chosenModel}`;
@@ -291,13 +291,13 @@ export async function generateNvidiaImage({
       body: JSON.stringify({
         text_prompts: [
           { text: enhancedPrompt, weight: 1 },
-          { text: 'blurry, low quality, distorted, watermark, signature, ugly, text, bad anatomy', weight: -1 },
+          { text: 'blurry, low quality, dark, chaotic, cluttered background, unreadable messy text, watermark, signature, ugly, distorted, heavy file, noise', weight: -1 },
         ],
         cfg_scale: 7,
-        height: Math.min(height, 1024),
+        height: Math.min(height, 768),
         width: Math.min(width, 1024),
         samples: 1,
-        steps: 30,
+        steps: 25,
       }),
     });
 

@@ -189,7 +189,8 @@ Rules:
 1. Provide 3 to 5 comprehensive bullet points. Bold key terms using markdown syntax (e.g., **Key Concept**).
 2. Write a concise subtitle headline (5–9 words).
 3. Provide a realistic teacher spoken note ("teacherNote") — 2 sentences of what the teacher should say when presenting this slide.
-4. If this slide needs a visual, provide a specific visual illustration prompt ("imagePrompt") describing an educational scene, chart, or scientific/cultural diagram.
+4. "imagePrompt": MUST be an ULTRA super-relevant, topic-specific educational visual prompt (scientific diagram, process chart, comparison graph, biological cycle, anatomy illustration, or clear realistic photo) specifically illustrating this exact slide's concept. Specify: "Clean vector infographic / high-contrast educational visual on clean white background, lightweight minimalist presentation style, no messy unreadable text".
+5. "suggestedVisual": A concise 4–8 word descriptive label for the graphic (e.g., "Process Diagram of Cell Respiration").
 
 Return ONLY a valid JSON object matching this structure:
 {
@@ -204,21 +205,21 @@ Return ONLY a valid JSON object matching this structure:
   ],
   "teacherNote": "...",
   "suggestedVisual": "...",
-  "imagePrompt": "Detailed prompt for educational graphic about ${topic}"
+  "imagePrompt": "Detailed prompt for ultra-relevant educational diagram about ${topic}"
 }`;
 
       try {
         const text = await callNvidiaChat({
           messages: [{ role: 'user', content: prompt }],
           model: nvidiaConfig.model,
-          temperature: 0.4,
+          temperature: 0.35,
           maxTokens: 1200,
         });
 
         const parsed = parseAIJson(text);
         
         let imageBase64 = null;
-        // If it's a visual or illustration slide, generate photo/diagram with NVIDIA SDXL
+        // If it's a visual, illustration, or concept slide, generate photo/diagram with NVIDIA SDXL
         if (isVisualSlide && (parsed.imagePrompt || parsed.suggestedVisual)) {
           const imgPrompt = `${parsed.imagePrompt || parsed.suggestedVisual}, educational diagram or photo for ${subject} ${topic}`;
           try {

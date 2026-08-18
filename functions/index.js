@@ -458,7 +458,7 @@ Rules:
 - Short declarative sentences only
 ${useBullets ? '- bullets: 3–5 items, each a complete explanatory sentence (15–25 words)\n- body: leave empty ""' : '- body: short paragraph (3–5 sentences explaining the concept/activity)\n- bullets: leave as []'}
 - teacherNote: 1–2 sentences the teacher says aloud while showing this slide
-- suggestedVisual: brief description of a diagram or image that would complement this slide
+- suggestedVisual: ultra-relevant, topic-specific educational diagram/visual description (clean vector/infographic/photo, pure white background, lightweight classroom visual aid)
 - headline: a short subtitle (5–8 words) reinforcing the slide title
 
 Return ONLY this JSON (no markdown, no explanation):
