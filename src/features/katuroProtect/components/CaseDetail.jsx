@@ -112,7 +112,7 @@ export default function CaseDetail({ caseData, referralContacts, onBack, backLab
         {intake.date_of_incident} · {intake.location} · Complainant {intake.complainant?.code_name} / Respondent {intake.respondent?.code_name}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18, alignItems: 'start', minWidth: 0 }}>
+      <div className="kt-split-sidebar" style={{ gap: 18, alignItems: 'start', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
           <div style={{ background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 14, padding: '16px 18px', minWidth: 0 }}>
             <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Narrative</h4>

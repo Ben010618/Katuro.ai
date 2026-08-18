@@ -354,7 +354,7 @@ export default function CotOutputPage() {
 
       {/* I. OBJECTIVES */}
       <Section title="I. Objectives" icon="🎯" color={accentColor}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <div className="kt-grid-3" style={{ gap: 10, marginBottom: 14 }}>
           <ObjectiveCard domain="Cognitive" text={objectives?.cognitive || '—'} color="#0369a1" bg="#e0f2fe" />
           <ObjectiveCard domain="Affective" text={objectives?.affective || '—'} color="#15803d" bg="#dcfce7" />
           <ObjectiveCard domain="Psychomotor" text={objectives?.psychomotor || '—'} color="#9333ea" bg="#f3e8ff" />
@@ -577,7 +577,7 @@ export default function CotOutputPage() {
       </Section>
 
       {/* REFLECTION & HOMEWORK */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="kt-grid-2" style={{ gap: 16, marginBottom: 16 }}>
         <Section title="V. Reflection" icon="🔁" color="#0369a1" defaultOpen={false}>
           {reflection?.overview && (
             <p style={{ margin: '0 0 12px', fontSize: 13, color: '#0d2218', lineHeight: 1.65 }}>{reflection.overview}</p>

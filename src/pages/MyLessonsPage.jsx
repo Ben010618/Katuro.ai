@@ -369,7 +369,7 @@ export default function MyLessonsPage() {
 
       {/* Search + status filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 0 }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--kt-text-secondary)', pointerEvents: 'none' }} />
           <input
             type="text"
@@ -380,14 +380,14 @@ export default function MyLessonsPage() {
             style={{ paddingLeft: 34 }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', maxWidth: '100%', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
           {FILTERS.map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               style={{
                 padding: '7px 14px', borderRadius: 9, border: '1.5px solid',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
                 borderColor: filter === f ? '#2d6a4f' : 'rgba(45,106,79,0.2)',
                 background:  filter === f ? '#2d6a4f' : '#fff',
                 color:       filter === f ? '#fff'    : '#4a6357',
@@ -442,8 +442,8 @@ export default function MyLessonsPage() {
             <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)' }}>Try a different search or filter.</p>
           </div>
         ) : (
-          /* ── 3-column term layout ── */
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, alignItems: 'start' }}>
+          /* ── 3-column term layout — responsive on tablet & mobile ── */
+          <div className="my-lessons-board">
             {TERM_COLS.map(term => (
               <TermColumn
                 key={term.key}

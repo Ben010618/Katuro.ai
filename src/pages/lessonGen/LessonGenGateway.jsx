@@ -95,7 +95,7 @@ export default function LessonGenGateway() {
       {/* ── Document Dossier Cards Grid (3 Columns) ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
         gap: 22,
         marginBottom: 32,
       }}>

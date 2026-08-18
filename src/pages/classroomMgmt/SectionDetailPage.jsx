@@ -497,7 +497,7 @@ function StudentModal({ sectionId, initial, onClose }) {
 
         {/* Scrollable form body */}
         <form id="student-form" onSubmit={handleSave} style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className="kt-grid-2" style={{ padding: 20, gap: 14 }}>
 
             {tab === 'basic' && (<>
               {/* Photo upload */}

@@ -88,7 +88,7 @@ export default function AssessmentGateway() {
       {/* ── Assessment Dossier Cards Grid (2 Columns) ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
         gap: 24,
         marginBottom: 28,
       }}>

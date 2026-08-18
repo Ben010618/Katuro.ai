@@ -341,9 +341,30 @@ export default function AppShell() {
     <>
       <style>{`
         @keyframes kt-spin { to { transform: rotate(360deg); } }
+        .shell-main {
+          flex: 1;
+          overflow: auto;
+          padding: ${isShares ? '0' : '24px'};
+          position: relative;
+          z-index: 1;
+        }
         @media (max-width: 768px) {
           .shell-sidebar { display: none !important; }
           .shell-menu-btn { display: flex !important; }
+          .shell-main {
+            padding: ${isShares ? '0' : '16px 12px'};
+          }
+          .shell-header-crumb {
+            display: none !important;
+          }
+          .shell-req-btn span {
+            display: none !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .shell-brand-tag {
+            display: none !important;
+          }
         }
       `}</style>
 
@@ -364,7 +385,7 @@ export default function AppShell() {
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,34,24,0.45)' }} onClick={() => setMobileOpen(false)} />
             <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
               <SidebarContent
-                user={user} tokenBalance={tokenBalance} isAdmin={isAdmin}
+                user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
                 freeMode={freeMode} dark={dark} toggle={toggle}
                 onProfileOpen={setProfileData}
                 onClose={() => setMobileOpen(false)}
@@ -379,36 +400,35 @@ export default function AppShell() {
             <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.07 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
           ))}
 
-          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: '0 1px 2px rgba(38,33,25,0.04)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
-            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#1F3A2E', alignItems: 'center' }}>
+          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: '0 1px 2px rgba(38,33,25,0.04)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
+            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--kt-chalkboard, #1F3A2E)', alignItems: 'center' }}>
               <Menu size={20} />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono)' }}>kaTuro AI</span>
-              <ChevronRight size={11} color="var(--kt-border)" />
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>{pageTitle}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+              <span className="shell-brand-tag" style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono)' }}>kaTuro AI</span>
+              <ChevronRight className="shell-header-crumb" size={11} color="var(--kt-border)" />
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageTitle}</span>
             </div>
-            <button onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '5px 12px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+            <button className="shell-req-btn" onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '5px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s', flexShrink: 0 }}
               onMouseEnter={e => { e.currentTarget.style.background = '#E4D5AC'; e.currentTarget.style.color = '#262119'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; e.currentTarget.style.color = 'var(--kt-text-secondary)'; }}>
-              <Lightbulb size={12} /> Request Feature
+              <Lightbulb size={13} /> <span>Request Feature</span>
             </button>
             {freeMode ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-success-tint)', border: '1px solid rgba(95,122,84,0.3)', borderRadius: 'var(--kt-radius-md)', padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-success)' }}>✦ Free Mode</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-success-tint)', border: '1px solid rgba(95,122,84,0.3)', borderRadius: 'var(--kt-radius-md)', padding: '4px 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-success)', flexShrink: 0 }}>✦ Free</div>
             ) : tokenBalance === 0 ? (
-              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-chalkboard)', color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-md)', padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-chalkboard)', color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-md)', padding: '5px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s', flexShrink: 0 }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
-                <Zap size={12} color="#E4D5AC" /> Get Tokens
+                <Zap size={12} color="#E4D5AC" /> Tokens
               </button>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '4px 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-primary)', flexShrink: 0 }}>
                 <Coins size={12} color="#8C7847" />
                 <span style={{ fontFamily: 'var(--kt-font-mono)', color: '#8C7847' }}>{tokenBalance}</span>
-                <span style={{ fontWeight: 500, color: 'var(--kt-text-secondary)' }}>tokens</span>
               </div>
             )}
           </header>
 
-          <main style={{ flex: 1, overflow: 'auto', padding: isShares ? 0 : 24, position: 'relative', zIndex: 1 }}>
+          <main className="shell-main">
             <Outlet />
           </main>
         </div>
@@ -422,11 +442,11 @@ export default function AppShell() {
       {/* ── Profile card — rendered at root level, never clipped ─────────────── */}
       {profileData && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', padding: 16 }}
           onClick={() => setProfileData(null)}
         >
           <div
-            style={{ background: dark ? '#1c2e22' : '#fff', borderRadius: 18, width: 300, overflow: 'hidden', boxShadow: '0 16px 56px rgba(0,0,0,0.28)', border: '1px solid var(--kt-border)' }}
+            style={{ background: dark ? '#1c2e22' : '#fff', borderRadius: 18, width: 300, maxWidth: 'calc(100vw - 32px)', overflow: 'hidden', boxShadow: '0 16px 56px rgba(0,0,0,0.28)', border: '1px solid var(--kt-border)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Banner */}

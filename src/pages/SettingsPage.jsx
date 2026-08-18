@@ -79,36 +79,66 @@ export default function SettingsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`
+        .settings-layout {
+          display: flex;
+          gap: 20px;
+          align-items: flex-start;
+        }
+        .settings-nav {
+          background: var(--kt-card);
+          border-radius: var(--kt-radius-md);
+          border: 1px solid var(--kt-border);
+          padding: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          width: 180px;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .settings-layout {
+            flex-direction: column;
+          }
+          .settings-nav {
+            width: 100%;
+            flex-direction: row;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            box-sizing: border-box;
+          }
+          .settings-nav button {
+            white-space: nowrap;
+          }
+        }
+      `}</style>
 
       {/* Page heading */}
       <div>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0d2218' }}>Settings</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: '#4a6357' }}>
-          Manage your profile and account preferences
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>Settings</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--kt-text-secondary)' }}>
+          Manage your teacher profile and account preferences
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div className="settings-layout">
 
         {/* Tab sidebar */}
-        <div style={{
-          background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)',
-          padding: 8, display: 'flex', flexDirection: 'column', gap: 2,
-          width: 180, flexShrink: 0,
-        }}>
+        <div className="settings-nav">
           {TABS.map(({ label, Icon }, i) => (
             <button
               key={label}
               onClick={() => setTab(i)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 9,
-                padding: '9px 12px', borderRadius: 9, border: 'none',
-                background: tab === i ? '#d8f3dc' : 'transparent',
-                color: tab === i ? '#1a3d2b' : '#4a6357',
-                fontSize: 13, fontWeight: tab === i ? 600 : 500,
+                padding: '9px 12px', borderRadius: 'var(--kt-radius-sm)', border: 'none',
+                background: tab === i ? 'var(--kt-manila)' : 'transparent',
+                color: tab === i ? 'var(--kt-text-primary)' : 'var(--kt-text-secondary)',
+                fontSize: 13, fontWeight: tab === i ? 700 : 500,
                 cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
+                fontFamily: 'inherit',
               }}
-              onMouseEnter={e => { if (tab !== i) e.currentTarget.style.background = '#f5faf7'; }}
+              onMouseEnter={e => { if (tab !== i) e.currentTarget.style.background = 'var(--kt-card-2)'; }}
               onMouseLeave={e => { if (tab !== i) e.currentTarget.style.background = 'transparent'; }}
             >
               <Icon size={14} />
@@ -119,20 +149,20 @@ export default function SettingsPage() {
 
         {/* Tab content */}
         <div style={{
-          flex: 1, background: '#fff', borderRadius: 14,
-          border: '1px solid rgba(45,106,79,0.12)',
-          padding: '24px 28px', minWidth: 0,
+          flex: 1, background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)',
+          border: '1px solid var(--kt-border)',
+          padding: '24px', minWidth: 0, width: '100%', boxSizing: 'border-box',
         }}>
 
           {/* Profile tab */}
           {tab === 0 && (
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Profile Information</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Update your name, school, and subject information.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>Profile Information</h2>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)' }}>Update your name, school, and subject information.</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="kt-grid-2" style={{ gap: 14 }}>
                 <LabeledField label="Full Name">
                   <input className="input" value={profile.name}
                     onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
@@ -148,7 +178,7 @@ export default function SettingsPage() {
                   onChange={e => setProfile(p => ({ ...p, school: e.target.value }))} />
               </LabeledField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="kt-grid-3" style={{ gap: 14 }}>
                 <LabeledField label="Subject">
                   <select className="select" value={profile.subject}
                     onChange={e => setProfile(p => ({ ...p, subject: e.target.value }))}>

@@ -155,7 +155,7 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
 
       {step === 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="kt-grid-2" style={{ gap: 14, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>Date of Incident</label>
               <input type="date" style={inputStyle} value={form.date_of_incident} onChange={(e) => set('date_of_incident', e.target.value)} />
@@ -186,7 +186,7 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
       {step === 1 && (
         <>
           <CodeNameHint />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div className="kt-grid-2" style={{ gap: 20 }}>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Complainant</h4>
               <label style={labelStyle}>Code Name</label>

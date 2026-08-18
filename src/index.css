@@ -307,6 +307,111 @@ h1, h2, h3, .doc-heading, .editorial-heading {
 .badge-danger  { background: var(--kt-danger-tint);  color: var(--kt-danger);      border: 1px solid rgba(162,59,46,0.3);     font-weight: 600; border-radius: var(--kt-radius-sm); }
 
 /* ═══════════════════════════════════════════════════════════
+   Responsive Grid & Layout System
+═══════════════════════════════════════════════════════════ */
+.kt-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kt-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.kt-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.kt-split-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+}
+
+.my-lessons-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kt-tabs-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+/* ── Media Queries for Tablets & Mobile Screens ── */
+@media (max-width: 1024px) {
+  .kt-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kt-split-sidebar {
+    grid-template-columns: 1fr 280px;
+  }
+}
+
+@media (max-width: 900px) {
+  .my-lessons-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kt-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kt-split-sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .kt-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .kt-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .kt-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .my-lessons-board {
+    grid-template-columns: 1fr;
+  }
+  .card {
+    padding: 16px 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --kt-main-padding: 14px 12px;
+  }
+  body {
+    font-size: 14px;
+  }
+  h1, .text-hero {
+    font-size: 22px !important;
+  }
+  h2 {
+    font-size: 18px !important;
+  }
+  .btn-primary, .btn-secondary, .btn-outline, .btn-danger {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    Animations
 ═══════════════════════════════════════════════════════════ */
 @keyframes spin {
@@ -326,3 +431,4 @@ h1, h2, h3, .doc-heading, .editorial-heading {
 @media print {
   body { background: white !important; color: black !important; }
 }
+

@@ -512,7 +512,7 @@ export default function ActionResearchPhase1() {
             Ilagay ang konteksto ng iyong klase at ang partikular na suliraning naobserbahan sa pagkatuto.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="kt-grid-2" style={{ gap: 14, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>Baitang (Grade Level)</label>
               <select value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} style={{ ...fieldStyle, height: 42 }}>
@@ -529,7 +529,7 @@ export default function ActionResearchPhase1() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div className="kt-grid-2" style={{ gap: 14, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>Taong Panuruan (School Year)</label>
               <input type="text" value={schoolYear} onChange={e => setSchoolYear(e.target.value)} placeholder="2025–2026" style={fieldStyle} onFocus={focus} onBlur={blur} />

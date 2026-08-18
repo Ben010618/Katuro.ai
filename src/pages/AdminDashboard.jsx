@@ -2653,8 +2653,8 @@ export default function AdminDashboard() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
 
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--kt-card)', borderRadius: 12, padding: 4, border: '1px solid var(--kt-border)', width: 'fit-content' }}>
+        {/* Tab bar — scrollable on mobile */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--kt-card)', borderRadius: 12, padding: 4, border: '1px solid var(--kt-border)', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: 'fit-content' }}>
           {[
             { id: 'users',      label: 'Users',            Icon: Users },
             { id: 'analytics',  label: 'Analytics',        Icon: BarChart2 },
@@ -2666,7 +2666,7 @@ export default function AdminDashboard() {
               key={id}
               onClick={() => setActiveTab(id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
+                display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                 padding: '8px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: activeTab === id ? 700 : 500,
                 fontFamily: 'inherit',

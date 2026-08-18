@@ -283,7 +283,7 @@ function RenderPretest({ data }) {
               <span style={{ fontFamily:'"DM Mono", monospace', color:'#2d6a4f', marginRight:6 }}>{item.num}.</span>
               {item.question}
             </p>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <div className="kt-grid-2" style={{ gap:6 }}>
               {Object.entries(item.choices || {}).map(([letter, text]) => {
                 const isAns = item.answer === letter;
                 return (
@@ -739,8 +739,8 @@ export default function ActionResearchPhase5() {
 
           <div style={{ borderTop: '1px solid var(--kt-border, #DCD0AE)', margin: '16px 0' }} />
 
-          {/* Type selector — 2×2 grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+          {/* Type selector — 2×2 grid (responsive on mobile) */}
+          <div className="kt-grid-2" style={{ gap: 12, marginBottom: 18 }}>
             {INSTRUMENT_TYPES.map(({ id, label, Icon, desc }) => {
               const active   = instrumentType === id;
               const isAiPick = aiRecommended === id;

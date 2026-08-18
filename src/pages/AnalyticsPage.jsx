@@ -64,8 +64,8 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, borderBottom: '2px solid rgba(45,106,79,0.12)', paddingBottom: 0 }}>
+      {/* Tabs — scrollable on mobile */}
+      <div style={{ display: 'flex', gap: 6, borderBottom: '2px solid rgba(45,106,79,0.12)', paddingBottom: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {TABS.map((t, i) => (
           <button
             key={t}
@@ -73,7 +73,7 @@ export default function AnalyticsPage() {
             style={{
               padding: '9px 16px', background: 'none', border: 'none',
               borderBottom: `2px solid ${tab === i ? '#2d6a4f' : 'transparent'}`,
-              marginBottom: -2, cursor: 'pointer',
+              marginBottom: -2, cursor: 'pointer', whiteSpace: 'nowrap',
               fontSize: 13, fontWeight: tab === i ? 700 : 500,
               color: tab === i ? '#2d6a4f' : '#4a6357',
               transition: 'all 0.15s',
