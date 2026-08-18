@@ -213,7 +213,7 @@ export default function DLLOutputPage() {
     setGenError('');
     try {
       // Tokens are deducted server-side inside expandSlides — don't double-charge here.
-      setPptPhase('Generating slide outline…');
+      setPptPhase('Generating pedagogical slide outline…');
       const { outline: outlineSlides } = await generateOutline({
         subject:    store.subject,
         gradeLevel: store.gradeLevel,
@@ -222,17 +222,18 @@ export default function DLLOutputPage() {
         slideCount: 14,
       });
 
-      setPptPhase('Writing content with AI…');
-      const { slides: expanded } = await expandSlides({
+      setPptPhase('Writing slide content & generating visuals…');
+      const { slides: expanded, engine } = await expandSlides({
         subject:    store.subject,
         gradeLevel: store.gradeLevel,
         melcCode,
         topic,
         slides:     outlineSlides,
         style:      'Academic',
+        onProgress: (pct) => setPptPhase(`Writing slide content & generating visuals… (${pct}%)`),
       });
 
-      setPptPhase('Building your PPTX…');
+      setPptPhase('Building enhanced PPTX…');
       const { exportToPptx } = await import('../../services/pptxExport');
       await exportToPptx({
         title:        topic || store.subject,
@@ -244,7 +245,8 @@ export default function DLLOutputPage() {
         includeNotes: true,
       });
 
-      addToast(freeMode ? 'Presentation downloaded!' : 'Presentation downloaded! (3 tokens used)', 'success');
+      const engineBadge = engine === 'nvidia' ? ' (NVIDIA NIM)' : '';
+      addToast(freeMode ? `Presentation downloaded!${engineBadge}` : `Presentation downloaded! (3 tokens used)${engineBadge}`, 'success');
       setSelectedDay(null);
     } catch (err) {
       if (err.message?.includes('Insufficient tokens') || err.message?.includes('tokens')) {

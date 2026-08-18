@@ -243,7 +243,7 @@ export default function OutputPage() {
     setPptLoading(true);
     try {
       // Tokens are deducted server-side inside expandSlides — don't double-charge here.
-      setPptPhase('Generating slide outline…');
+      setPptPhase('Generating pedagogical slide outline…');
       const { outline } = await generateOutline({
         subject:    store.subject    || '',
         gradeLevel: store.gradeLevel || '',
@@ -252,17 +252,18 @@ export default function OutputPage() {
         slideCount: 14,
       });
 
-      setPptPhase('Writing content with AI…');
-      const { slides: expanded } = await expandSlides({
+      setPptPhase('Writing slide content & generating visuals…');
+      const { slides: expanded, engine } = await expandSlides({
         subject:    store.subject    || '',
         gradeLevel: store.gradeLevel || '',
         melcCode:   sessionMelc,
         topic:      topic || title,
         slides:     outline,
         style:      'Academic',
+        onProgress: (pct) => setPptPhase(`Writing slide content & generating visuals… (${pct}%)`),
       });
 
-      setPptPhase('Building your PPTX…');
+      setPptPhase('Building enhanced PPTX…');
       const { exportToPptx } = await import('../../services/pptxExport');
       await exportToPptx({
         title,
@@ -274,7 +275,8 @@ export default function OutputPage() {
         includeNotes: true,
       });
 
-      addToast(freeMode ? 'Presentation downloaded!' : 'Presentation downloaded! (3 tokens used)', 'success');
+      const engineBadge = engine === 'nvidia' ? ' (NVIDIA NIM)' : '';
+      addToast(freeMode ? `Presentation downloaded!${engineBadge}` : `Presentation downloaded! (3 tokens used)${engineBadge}`, 'success');
       setSelectedSession(null);
     } catch (err) {
       addToast(err.message || 'Presentation generation failed.', 'error');

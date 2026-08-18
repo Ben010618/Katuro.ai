@@ -1,16 +1,40 @@
 /**
- * Presentation AI — thin wrappers around the dedicated generateOutline and
- * expandSlides Cloud Functions (functions/index.js). Both the prompts and
- * the token deduction for expandSlides (3 tokens) live server-side there —
- * callers here must NOT also deduct tokens for this feature client-side.
+ * Presentation AI Service — Powered by NVIDIA NIM AI Engine
+ *
+ * Dedicated pipeline for PPT Lesson Presentation Generation:
+ * 1. Stage 1: Outline Generation (NVIDIA Llama 3.3 / Nemotron)
+ * 2. Stage 2: Rich Slide Content Expansion & Teacher Script Notes
+ * 3. Stage 3: Educational Image Generation for Visual Slides (NVIDIA SDXL)
+ * 4. Stage 4: Layout & Visual Design Mapping for PPTX Export
+ *
+ * Falls back to Firebase Cloud Functions (Gemini) if NVIDIA key is not configured.
  */
 
 import app, { auth } from '../firebase';
 import { reportAIError } from './db';
+import { getNvidiaConfig, callNvidiaChat, generateNvidiaImage } from './nvidiaConfig';
+import { parseAIJson } from './aiJsonParse';
 
-// A bare code-shaped message ("internal", "unavailable"...) means the request
-// likely never reached the function's code at all — e.g. a lost Cloud Run
-// invoker IAM binding, the exact outage that motivated this reporting.
+// Language detection helpers for Philippine Curriculum
+const TAGALOG_SUBJECTS = ['filipino', 'araling panlipunan', 'makabansa'];
+const CONVERSATIONAL_TAGALOG_SUBJECTS = ['gmrc', 'epp', 'esp', 'edukasyon sa pagpapakatao'];
+
+function isTagalog(subject) {
+  const s = (subject || '').toLowerCase();
+  return TAGALOG_SUBJECTS.some(t => s.includes(t)) || CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => s.includes(t));
+}
+
+function isConversationalTagalog(subject) {
+  const s = (subject || '').toLowerCase();
+  return CONVERSATIONAL_TAGALOG_SUBJECTS.some(t => s.includes(t));
+}
+
+function langLabel(subject) {
+  if (isConversationalTagalog(subject)) return 'formal conversational Tagalog (warm, teacher-student dialogue)';
+  return isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
+}
+
+// Cloud Function fallback wrapper
 async function callPresentationFn(name, data, timeout) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   const call = httpsCallable(getFunctions(app, 'us-central1'), name, { timeout });
@@ -39,21 +63,233 @@ async function callPresentationFn(name, data, timeout) {
   }
 }
 
-// ── Stage 1: Generate outline (free — teachers iterate before committing tokens)
-export async function generateOutline({ subject, gradeLevel, melcCode, topic, slideCount = 12 }) {
-  return callPresentationFn('generateOutline', { subject, gradeLevel, melcCode, topic, slideCount }, 60000); // { outline, cached }
+// ── Stage 1: Generate outline (NVIDIA NIM or Cloud Function Fallback) ─────────
+export async function generateOutline({ subject, gradeLevel, melcCode, topic, slideCount = 14 }) {
+  const nvidiaConfig = await getNvidiaConfig();
+
+  // If NVIDIA key is available, use NVIDIA NIM
+  if (nvidiaConfig.apiKey) {
+    const lang = langLabel(subject);
+    const systemPrompt = `You are kaTuro AI, an elite lesson presentation architect for Philippine K-12 DepEd MATATAG curriculum.
+Design an engaging, structured presentation outline for classroom teaching.
+Output ONLY a valid JSON object. Do NOT include markdown fences, code blocks, or conversational commentary.`;
+
+    const userPrompt = `Subject: ${subject}
+Grade Level: ${gradeLevel}
+MELC / Competency: ${melcCode || 'Standard Competency'}
+Topic: ${topic}
+Total Slides: ${slideCount}
+Medium of Instruction: ${lang}
+
+Structure the outline into a clear pedagogical flow:
+1. Title slide (type: "title", expand: false)
+2. Learning Objectives & MELC (type: "objectives", expand: false)
+3. Motivation / Hook (type: "activity", expand: true)
+4. Key Concepts & Definitions (type: "concept", expand: true)
+5. Deep Dive / Analysis (type: "concept", expand: true)
+6. Concrete Example / Case (type: "example", expand: true)
+7. Visual Diagram / Illustration (type: "illustration", expand: true)
+8. Philippine Context / Real-world Application (type: "example", expand: true)
+9. Interactive Question / Discussion (type: "activity", expand: true)
+10. Guided Practice (type: "activity", expand: true)
+11. Key Takeaways & Summary (type: "summary", expand: false)
+12. Formative Check / Exit Ticket (type: "assessment", expand: true)
+
+Return JSON with this EXACT structure:
+{
+  "slides": [
+    {
+      "id": 1,
+      "type": "title",
+      "title": "${topic}",
+      "keyPoints": ["Lesson Overview"],
+      "expand": false
+    },
+    {
+      "id": 2,
+      "type": "objectives",
+      "title": "Learning Objectives",
+      "keyPoints": ["Identify key concepts", "Apply understanding in activities"],
+      "expand": false
+    }
+  ]
+}`;
+
+    try {
+      const reply = await callNvidiaChat({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        model: nvidiaConfig.model,
+        temperature: 0.3,
+        maxTokens: 2500,
+      });
+
+      const parsed = parseAIJson(reply);
+      if (Array.isArray(parsed?.slides) && parsed.slides.length > 0) {
+        const outline = parsed.slides.map((s, i) => ({
+          id:        s.id        ?? i + 1,
+          type:      s.type      ?? 'concept',
+          title:     String(s.title ?? ''),
+          keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints.map(String) : [],
+          expand:    s.expand !== false,
+        }));
+        return { outline, cached: false, engine: 'nvidia' };
+      }
+    } catch (err) {
+      console.warn('NVIDIA outline generation encountered an issue, falling back to Cloud Function:', err);
+    }
+  }
+
+  // Fallback to Cloud Function
+  return callPresentationFn('generateOutline', { subject, gradeLevel, melcCode, topic, slideCount }, 60000);
 }
 
-// ── Stage 2: Expand slides (costs tokens — deducted server-side inside this function)
-export async function expandSlides({ subject, gradeLevel, melcCode, topic, slides, style = 'Academic' }) {
-  return callPresentationFn('expandSlides', { subject, gradeLevel, melcCode, topic, slides, style }, 180000); // { slides }
+// ── Stage 2: Expand Slides & Generate Visuals (NVIDIA NIM or Fallback) ────────
+export async function expandSlides({
+  subject,
+  gradeLevel,
+  melcCode,
+  topic,
+  slides,
+  style = 'Modern',
+  onProgress,
+}) {
+  const nvidiaConfig = await getNvidiaConfig();
+
+  // If NVIDIA key is available, execute high-power expansion with NVIDIA NIM + Image Generation
+  if (nvidiaConfig.apiKey) {
+    const lang = langLabel(subject);
+    const styleDescription = {
+      Academic: 'formal academic tone, precise vocabulary with bold **key terms**, DepEd aligned definitions',
+      Modern:   'clear punchy sentences, highlighted **key concepts**, highly readable cards, dynamic structure',
+      Engaging: 'enthusiastic tone, interactive questions, analogies to daily Philippine life, vivid examples',
+    }[style] || 'clear, professional, structured';
+
+    const needsExpansion = slides.filter(s => s.expand !== false);
+    const templateSlides = slides.filter(s => s.expand === false);
+
+    // Expand individual slide with NVIDIA NIM
+    async function expandOneWithNvidia(slide) {
+      const isVisualSlide = ['illustration', 'example', 'activity', 'concept'].includes(slide.type);
+      
+      const prompt = `You are kaTuro AI, writing high-impact presentation slide content for Philippine teachers.
+Lesson Topic: "${topic}" (${gradeLevel}, ${subject}${melcCode ? `, MELC: ${melcCode}` : ''}).
+Tone & Style: ${style} — ${styleDescription}
+Medium of Instruction: ${lang}
+
+Slide Target:
+ID: ${slide.id}
+Type: ${slide.type}
+Title: "${slide.title}"
+Key Points: ${JSON.stringify(slide.keyPoints || [])}
+
+Rules:
+1. Provide 3 to 5 comprehensive bullet points. Bold key terms using markdown syntax (e.g., **Key Concept**).
+2. Write a concise subtitle headline (5–9 words).
+3. Provide a realistic teacher spoken note ("teacherNote") — 2 sentences of what the teacher should say when presenting this slide.
+4. If this slide needs a visual, provide a specific visual illustration prompt ("imagePrompt") describing an educational scene, chart, or scientific/cultural diagram.
+
+Return ONLY a valid JSON object matching this structure:
+{
+  "id": ${slide.id},
+  "type": "${slide.type}",
+  "title": "${slide.title}",
+  "headline": "...",
+  "bullets": [
+    "**Core Point 1**: Detailed explanation sentence.",
+    "**Core Point 2**: Application or example sentence.",
+    "**Core Point 3**: Key takeaway sentence."
+  ],
+  "teacherNote": "...",
+  "suggestedVisual": "...",
+  "imagePrompt": "Detailed prompt for educational graphic about ${topic}"
+}`;
+
+      try {
+        const text = await callNvidiaChat({
+          messages: [{ role: 'user', content: prompt }],
+          model: nvidiaConfig.model,
+          temperature: 0.4,
+          maxTokens: 1200,
+        });
+
+        const parsed = parseAIJson(text);
+        
+        let imageBase64 = null;
+        // If it's a visual or illustration slide, generate photo/diagram with NVIDIA SDXL
+        if (isVisualSlide && (parsed.imagePrompt || parsed.suggestedVisual)) {
+          const imgPrompt = `${parsed.imagePrompt || parsed.suggestedVisual}, educational diagram or photo for ${subject} ${topic}`;
+          try {
+            imageBase64 = await generateNvidiaImage({ prompt: imgPrompt });
+          } catch (e) {
+            console.warn(`Image generation skipped for slide ${slide.id}:`, e);
+          }
+        }
+
+        return {
+          id:              slide.id,
+          type:            String(parsed.type            ?? slide.type),
+          title:           String(parsed.title           ?? slide.title),
+          headline:        String(parsed.headline        ?? ''),
+          bullets:         Array.isArray(parsed.bullets) ? parsed.bullets.map(String) : (slide.keyPoints || []),
+          teacherNote:     String(parsed.teacherNote     ?? ''),
+          suggestedVisual: String(parsed.suggestedVisual ?? ''),
+          imageBase64:     imageBase64,
+        };
+      } catch (err) {
+        console.warn(`NVIDIA slide expansion fallback for slide ${slide.id}:`, err);
+        return {
+          id:              slide.id,
+          type:            slide.type,
+          title:           slide.title,
+          headline:        '',
+          bullets:         slide.keyPoints || [],
+          teacherNote:     '',
+          suggestedVisual: '',
+          imageBase64:     null,
+        };
+      }
+    }
+
+    // Run parallel expansion in chunks of 4 to manage throughput
+    const chunkSize = 4;
+    const expanded = [];
+    for (let i = 0; i < needsExpansion.length; i += chunkSize) {
+      const chunk = needsExpansion.slice(i, i + chunkSize);
+      const chunkResults = await Promise.all(chunk.map(expandOneWithNvidia));
+      expanded.push(...chunkResults);
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round(((i + chunk.length) / needsExpansion.length) * 100)));
+      }
+    }
+
+    // Format template slides (Title, Objectives, Summary)
+    const filledTemplate = templateSlides.map(s => ({
+      id:              s.id,
+      type:            s.type,
+      title:           s.title,
+      headline:        s.type === 'objectives' ? `MELC: ${melcCode || 'DepEd MATATAG Competency'}` : '',
+      bullets:         s.keyPoints || [],
+      teacherNote:     s.type === 'title' ? `Welcome class. Today we will explore ${topic}.` : '',
+      suggestedVisual: '',
+      imageBase64:     null,
+    }));
+
+    const allSlides = [...expanded, ...filledTemplate].sort((a, b) => a.id - b.id);
+    return { slides: allSlides, engine: 'nvidia' };
+  }
+
+  // Fallback to Cloud Function
+  return callPresentationFn('expandSlides', { subject, gradeLevel, melcCode, topic, slides, style }, 180000);
 }
 
 // ── Map expanded slides → pptxExport format ───────────────────────────────────
 export function toExportSlides(expandedSlides) {
   return expandedSlides.map(s => {
     const isSection = ['title', 'objectives', 'summary'].includes(s.type);
-    const isVisual  = ['illustration', 'example', 'activity'].includes(s.type);
+    const isVisual  = Boolean(s.imageBase64 || ['illustration', 'example', 'activity'].includes(s.type));
     return {
       layout:          isSection ? 'section' : isVisual ? 'visual' : 'content',
       type:            s.type,
@@ -62,6 +298,8 @@ export function toExportSlides(expandedSlides) {
       bullets:         s.bullets?.length ? s.bullets : (s.body ? [s.body] : []),
       notes:           s.teacherNote || '',
       suggestedVisual: s.suggestedVisual || '',
+      imageBase64:     s.imageBase64 || null,
+      imageUrl:        s.imageUrl || null,
     };
   });
 }

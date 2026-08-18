@@ -28,6 +28,59 @@ async function getGeminiKey() {
   }
   return snap.data().apiKey;
 }
+
+// Read NVIDIA API key from adminConfig/nvidia in Firestore
+async function getNvidiaConfigServer() {
+  try {
+    const snap = await db.doc('adminConfig/nvidia').get();
+    if (snap.exists && snap.data()?.apiKey) {
+      return {
+        apiKey: snap.data().apiKey,
+        model:  snap.data().model || 'meta/llama-3.3-70b-instruct',
+      };
+    }
+  } catch {
+    // Fall back to Gemini if reading nvidia config fails
+  }
+  return null;
+}
+
+async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTokens = 2048, _attempt = 0 } = {}) {
+  const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: nvidiaConfig.model || 'meta/llama-3.3-70b-instruct',
+      messages: [{ role: 'user', content: prompt }],
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  if ((res.status === 429 || res.status === 503) && _attempt < 3) {
+    const delay = (2 ** _attempt) * 1000 + Math.random() * 500;
+    await new Promise(r => setTimeout(r, delay));
+    return callNvidiaServer(nvidiaConfig, prompt, { temperature, maxTokens, _attempt: _attempt + 1 });
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const isRateLimit = res.status === 429;
+    throw new HttpsError(
+      isRateLimit ? 'resource-exhausted' : 'internal',
+      isRateLimit
+        ? 'The NVIDIA AI service is busy right now. Please try again in a moment.'
+        : `NVIDIA NIM ${res.status}: ${err?.error?.message ?? res.statusText}`
+    );
+  }
+
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content ?? '';
+}
 const CACHE_TTL_DAYS = 30;
 const EXPAND_TOKENS  = 3;
 
@@ -277,7 +330,8 @@ exports.generateOutline = onCall(
     }
 
     const lang = langLabel(subject);
-    const key_ = await getGeminiKey();
+    const nvidiaConfig = await getNvidiaConfigServer();
+    let text;
 
     const prompt = `You are kaTuro, an AI lesson outline planner for Philippine public school teachers following the K–12 MELC curriculum.
 Generate a structured slide OUTLINE only — not full content. Output ONLY valid JSON, no markdown, no explanation.
@@ -307,7 +361,19 @@ Return ONLY this JSON:
   ]
 }`;
 
-    const text   = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+    if (nvidiaConfig) {
+      try {
+        text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
+      } catch (err) {
+        console.warn('NVIDIA NIM outline generation failed on server, falling back to Gemini:', err);
+        const key_ = await getGeminiKey();
+        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+      }
+    } else {
+      const key_ = await getGeminiKey();
+      text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+    }
+
     const parsed = parseJSON(text, 'outline');
 
     if (!Array.isArray(parsed.slides)) {
@@ -347,8 +413,12 @@ exports.expandSlides = onCall(
     await checkAndIncrementDailyUsage(req.auth.uid, 'expand_slides');
     await deductTokensServer(req.auth.uid, 'presentation-expand', EXPAND_TOKENS);
 
-    const lang      = langLabel(subject);
-    const geminiKey = await getGeminiKey();
+    const lang         = langLabel(subject);
+    const nvidiaConfig = await getNvidiaConfigServer();
+    let geminiKey      = null;
+    if (!nvidiaConfig) {
+      geminiKey = await getGeminiKey();
+    }
     const styleGuide = {
       Academic:  'formal, define terms precisely, include DepEd module examples',
       Modern:    'clear direct sentences, bold key terms, professional and readable',
@@ -403,7 +473,19 @@ Return ONLY this JSON (no markdown, no explanation):
   "suggestedVisual": ""
 }`;
 
-      const text     = await callGemini(geminiKey, prompt, { temperature: 0.6, maxTokens: 1024 });
+      let text;
+      if (nvidiaConfig) {
+        try {
+          text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.5, maxTokens: 1200 });
+        } catch (err) {
+          console.warn('NVIDIA NIM slide expansion failed on server, falling back to Gemini:', err);
+          if (!geminiKey) geminiKey = await getGeminiKey();
+          text = await callGemini(geminiKey, prompt, { temperature: 0.6, maxTokens: 1024 });
+        }
+      } else {
+        text = await callGemini(geminiKey, prompt, { temperature: 0.6, maxTokens: 1024 });
+      }
+
       const expanded = parseJSON(text, `slide ${slide.id}`);
 
       const result = {

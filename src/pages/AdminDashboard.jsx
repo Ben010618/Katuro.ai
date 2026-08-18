@@ -27,8 +27,13 @@ import {
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
+  Cpu, Sparkles, Image as ImageIcon, ExternalLink,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
+import {
+  saveNvidiaConfig, getNvidiaKeyStatus, testNvidiaKey,
+  POPULAR_TEXT_MODELS, POPULAR_IMAGE_MODELS,
+} from '../services/nvidiaConfig';
 import { saveAs } from 'file-saver';
 
 // Mirrors MAX_ACCOUNTS in functions/index.js's registerUser — keep in sync.
@@ -1579,171 +1584,459 @@ function AnalyticsSection({ teachers = [] }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-// ── API Key section ───────────────────────────────────────────────────────────
+// ── AI Engine & API Keys Management Center ───────────────────────────────────
 function ApiKeySection({ adminUid }) {
-  const [keyInput,   setKeyInput]   = useState('');
-  const [showKey,    setShowKey]    = useState(false);
-  const [status,     setStatus]     = useState(null);  // { hasKey, preview, updatedAt } | null
-  const [saving,     setSaving]     = useState(false);
-  const [testing,    setTesting]    = useState(false);
-  const [testResult, setTestResult] = useState(null);  // null | 'ok' | 'fail'
-  const [testMsg,    setTestMsg]    = useState('');
-  const [err,        setErr]        = useState('');
+  const [activeEngineTab, setActiveEngineTab] = useState('nvidia'); // 'gemini' | 'nvidia'
+
+  // Gemini State
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [showGeminiKey, setShowGeminiKey]   = useState(false);
+  const [geminiStatus, setGeminiStatus]     = useState(null);
+  const [savingGemini, setSavingGemini]     = useState(false);
+  const [testingGemini, setTestingGemini]   = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState(null);
+  const [geminiTestMsg, setGeminiTestMsg]   = useState('');
+  const [geminiErr, setGeminiErr]           = useState('');
+
+  // NVIDIA State
+  const [nvidiaKeyInput, setNvidiaKeyInput]   = useState('');
+  const [showNvidiaKey, setShowNvidiaKey]     = useState(false);
+  const [nvidiaTextModel, setNvidiaTextModel] = useState('meta/llama-3.3-70b-instruct');
+  const [nvidiaImgModel, setNvidiaImgModel]   = useState('stabilityai/stable-diffusion-xl');
+  const [nvidiaStatus, setNvidiaStatus]       = useState(null);
+  const [savingNvidia, setSavingNvidia]       = useState(false);
+  const [testingNvidia, setTestingNvidia]     = useState(false);
+  const [nvidiaTestResult, setNvidiaTestResult] = useState(null);
+  const [nvidiaTestMsg, setNvidiaTestMsg]     = useState('');
+  const [nvidiaErr, setNvidiaErr]             = useState('');
 
   useEffect(() => {
-    getGeminiKeyStatus().then(setStatus).catch(() => setStatus({ hasKey: false }));
+    getGeminiKeyStatus().then(setGeminiStatus).catch(() => setGeminiStatus({ hasKey: false }));
+    getNvidiaKeyStatus().then(status => {
+      setNvidiaStatus(status);
+      if (status?.model) setNvidiaTextModel(status.model);
+      if (status?.imageModel) setNvidiaImgModel(status.imageModel);
+    }).catch(() => setNvidiaStatus({ hasKey: false }));
   }, []);
 
-  async function handleSave() {
-    setErr(''); setTestResult(null);
-    setSaving(true);
+  // Gemini handlers
+  async function handleSaveGemini() {
+    setGeminiErr(''); setGeminiTestResult(null);
+    setSavingGemini(true);
     try {
-      await saveGeminiKey(keyInput, adminUid);
-      setKeyInput('');
+      await saveGeminiKey(geminiKeyInput, adminUid);
+      setGeminiKeyInput('');
       const fresh = await getGeminiKeyStatus();
-      setStatus(fresh);
+      setGeminiStatus(fresh);
     } catch (e) {
-      setErr(e.message);
+      setGeminiErr(e.message);
     } finally {
-      setSaving(false);
+      setSavingGemini(false);
     }
   }
 
-  async function handleTest() {
-    if (!keyInput.trim()) { setErr('Enter a key to test first.'); return; }
-    setErr(''); setTestResult(null); setTestMsg('');
-    setTesting(true);
+  async function handleTestGemini() {
+    if (!geminiKeyInput.trim()) { setGeminiErr('Enter a Gemini key to test first.'); return; }
+    setGeminiErr(''); setGeminiTestResult(null); setGeminiTestMsg('');
+    setTestingGemini(true);
     try {
-      await testGeminiKey(keyInput.trim());
-      setTestResult('ok');
-      setTestMsg('Key is valid and responding correctly.');
+      await testGeminiKey(geminiKeyInput.trim());
+      setGeminiTestResult('ok');
+      setGeminiTestMsg('Gemini Key is valid and responding correctly.');
     } catch (e) {
-      setTestResult('fail');
-      setTestMsg(e.message);
+      setGeminiTestResult('fail');
+      setGeminiTestMsg(e.message);
     } finally {
-      setTesting(false);
+      setTestingGemini(false);
     }
   }
 
-  const formattedDate = status?.updatedAt
-    ? (status.updatedAt.toDate ? status.updatedAt.toDate() : new Date(status.updatedAt))
-        .toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
-    : null;
+  // NVIDIA handlers
+  async function handleSaveNvidia() {
+    setNvidiaErr(''); setNvidiaTestResult(null);
+    setSavingNvidia(true);
+    try {
+      await saveNvidiaConfig({
+        apiKey:     nvidiaKeyInput || (nvidiaStatus?.hasKey ? undefined : ''),
+        model:      nvidiaTextModel,
+        imageModel: nvidiaImgModel,
+      }, adminUid);
+      setNvidiaKeyInput('');
+      const fresh = await getNvidiaKeyStatus();
+      setNvidiaStatus(fresh);
+    } catch (e) {
+      setNvidiaErr(e.message);
+    } finally {
+      setSavingNvidia(false);
+    }
+  }
+
+  async function handleTestNvidia() {
+    const keyToTest = nvidiaKeyInput.trim();
+    if (!keyToTest) { setNvidiaErr('Enter a NVIDIA key to test first.'); return; }
+    setNvidiaErr(''); setNvidiaTestResult(null); setNvidiaTestMsg('');
+    setTestingNvidia(true);
+    try {
+      await testNvidiaKey(keyToTest, nvidiaTextModel);
+      setNvidiaTestResult('ok');
+      setNvidiaTestMsg(`NVIDIA NIM connected successfully with ${nvidiaTextModel}!`);
+    } catch (e) {
+      setNvidiaTestResult('fail');
+      setNvidiaTestMsg(e.message);
+    } finally {
+      setTestingNvidia(false);
+    }
+  }
+
+  const formatUpdateDate = (dateVal) => {
+    if (!dateVal) return null;
+    return (dateVal.toDate ? dateVal.toDate() : new Date(dateVal))
+      .toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+  };
 
   return (
     <div style={{ ...card, marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ede9fe', display: 'grid', placeItems: 'center' }}>
-          <Key size={17} color="#6d28d9" />
-        </div>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Gemini API Settings</h2>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-            Key stored in Firestore — teachers cannot read it
-          </p>
-        </div>
-        {/* Current key status */}
-        <div style={{ marginLeft: 'auto' }}>
-          {status === null
-            ? <Loader2 size={14} color="#9BB8A5" style={{ animation: 'spin 1s linear infinite' }} />
-            : status.hasKey
-              ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={14} color="#2d6a4f" />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f' }}>Key active</span>
-                </div>
-              ) : (
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#e05c5c' }}>No key set</span>
-              )
-          }
-        </div>
-      </div>
-
-      {/* Current key preview */}
-      {status?.hasKey && (
-        <div style={{ background: 'var(--kt-surface)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Key size={12} color="#4a6357" />
-          <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-primary)', flex: 1 }}>{status.preview}</span>
-          {formattedDate && (
-            <span style={{ fontSize: 10, color: '#9BB8A5' }}>Updated {formattedDate}</span>
-          )}
-        </div>
-      )}
-
-      {/* Input row */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <label style={labelStyle}>{status?.hasKey ? 'Replace API Key' : 'Set API Key'}</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={keyInput}
-              onChange={e => { setKeyInput(e.target.value); setErr(''); setTestResult(null); }}
-              placeholder="AIzaSy••••••••••••••••••••••••••••••"
-              style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(v => !v)}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
-            >
-              {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: '#76b90018', border: '1px solid #76b90040', display: 'grid', placeItems: 'center' }}>
+            <Cpu size={18} color="#76b900" />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>AI Engines & API Settings</h2>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+              Manage AI models for Core Curriculum and PowerPoint Presentation Generation
+            </p>
           </div>
         </div>
-        <button
-          onClick={handleTest}
-          disabled={testing || !keyInput.trim()}
-          title="Test the key before saving"
-          style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (testing || !keyInput.trim()) ? 0.6 : 1 }}
-        >
-          {testing
-            ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-            : <FlaskConical size={13} />
-          }
-          Test
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving || !keyInput.trim()}
-          style={{ ...btnPrimary, whiteSpace: 'nowrap', opacity: (saving || !keyInput.trim()) ? 0.6 : 1 }}
-        >
-          {saving
-            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
-            : <><Key size={13} /> Save Key</>
-          }
-        </button>
+
+        {/* Engine switcher tabs */}
+        <div style={{ display: 'flex', background: 'var(--kt-surface)', padding: 3, borderRadius: 10, gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setActiveEngineTab('nvidia')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8,
+              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: activeEngineTab === 'nvidia' ? '#76b900' : 'transparent',
+              color: activeEngineTab === 'nvidia' ? '#000' : 'var(--kt-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Sparkles size={13} /> NVIDIA NIM Engine (PPT & Visuals)
+            {nvidiaStatus?.hasKey && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#000' }} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveEngineTab('gemini')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8,
+              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: activeEngineTab === 'gemini' ? '#6d28d9' : 'transparent',
+              color: activeEngineTab === 'gemini' ? '#fff' : 'var(--kt-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Key size={13} /> Gemini API (Core Generator)
+            {geminiStatus?.hasKey && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />}
+          </button>
+        </div>
       </div>
 
-      {/* Test result */}
-      {testResult && (
-        <div style={{
-          marginTop: 10, display: 'flex', gap: 7, alignItems: 'flex-start',
-          background: testResult === 'ok' ? '#d8f3dc' : 'rgba(224,92,92,0.08)',
-          border: `1px solid ${testResult === 'ok' ? 'rgba(45,106,79,0.2)' : 'rgba(224,92,92,0.3)'}`,
-          borderRadius: 8, padding: '8px 12px',
-        }}>
-          {testResult === 'ok'
-            ? <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
-            : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
-          }
-          <p style={{ margin: 0, fontSize: 12, color: testResult === 'ok' ? '#163828' : '#c0392b' }}>{testMsg}</p>
+      {/* ── Tab 1: NVIDIA Engine (PPT Presentation & Image Generation) ── */}
+      {activeEngineTab === 'nvidia' && (
+        <div style={{ background: 'var(--kt-surface)', borderRadius: 12, padding: 18, border: '1px solid rgba(118,185,0,0.25)' }}>
+          {/* Card Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#76b90022', color: '#76b900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  NVIDIA NIM API
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+                  PowerPoint Lesson Presentation & AI Visual Engine
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                Enhances lesson presentation outlines, writes student-centered slide content, and generates educational diagrams/photos.
+              </p>
+            </div>
+
+            {/* Status indicator */}
+            <div>
+              {nvidiaStatus === null ? (
+                <Loader2 size={14} color="#76b900" style={{ animation: 'spin 1s linear infinite' }} />
+              ) : nvidiaStatus.hasKey ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#76b90018', padding: '4px 10px', borderRadius: 20, border: '1px solid #76b90040' }}>
+                  <CheckCircle2 size={13} color="#76b900" />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#76b900' }}>NVIDIA Active</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(224,92,92,0.1)', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(224,92,92,0.3)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#e05c5c' }}>No Key Set</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Active Key Preview */}
+          {nvidiaStatus?.hasKey && (
+            <div style={{ background: 'var(--kt-card)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--kt-border)' }}>
+              <Sparkles size={13} color="#76b900" />
+              <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-primary)', flex: 1 }}>{nvidiaStatus.preview}</span>
+              {nvidiaStatus.updatedAt && (
+                <span style={{ fontSize: 10, color: 'var(--kt-text-secondary)' }}>Updated {formatUpdateDate(nvidiaStatus.updatedAt)}</span>
+              )}
+            </div>
+          )}
+
+          {/* Configuration Form */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 14 }}>
+            {/* API Key Input */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>{nvidiaStatus?.hasKey ? 'Update NVIDIA API Key' : 'NVIDIA API Key'}</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNvidiaKey ? 'text' : 'password'}
+                  value={nvidiaKeyInput}
+                  onChange={e => { setNvidiaKeyInput(e.target.value); setNvidiaErr(''); setNvidiaTestResult(null); }}
+                  placeholder="nvapi-••••••••••••••••••••••••••••••••"
+                  style={{ ...inputStyle, paddingRight: 40, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNvidiaKey(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
+                >
+                  {showNvidiaKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Text / Slide Model */}
+            <div>
+              <label style={labelStyle}>PPT Content Model (Text & Outlines)</label>
+              <select
+                value={nvidiaTextModel}
+                onChange={e => setNvidiaTextModel(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                {POPULAR_TEXT_MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Image / Diagram Model */}
+            <div>
+              <label style={labelStyle}>Slide Visual Model (AI Diagrams & Photos)</label>
+              <select
+                value={nvidiaImgModel}
+                onChange={e => setNvidiaImgModel(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                {POPULAR_IMAGE_MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={handleTestNvidia}
+              disabled={testingNvidia || !nvidiaKeyInput.trim()}
+              title="Test connection to NVIDIA NIM"
+              style={{ ...btnSecondary, opacity: (testingNvidia || !nvidiaKeyInput.trim()) ? 0.6 : 1 }}
+            >
+              {testingNvidia ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FlaskConical size={13} />}
+              Test Connection
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveNvidia}
+              disabled={savingNvidia || (!nvidiaKeyInput.trim() && !nvidiaStatus?.hasKey)}
+              style={{ ...btnPrimary, background: '#76b900', color: '#000', opacity: (savingNvidia || (!nvidiaKeyInput.trim() && !nvidiaStatus?.hasKey)) ? 0.6 : 1 }}
+            >
+              {savingNvidia ? (
+                <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+              ) : (
+                <><Sparkles size={13} /> Save NVIDIA Settings</>
+              )}
+            </button>
+          </div>
+
+          {/* Test feedback */}
+          {nvidiaTestResult && (
+            <div style={{
+              marginTop: 12, display: 'flex', gap: 8, alignItems: 'flex-start',
+              background: nvidiaTestResult === 'ok' ? '#76b90018' : 'rgba(224,92,92,0.08)',
+              border: `1px solid ${nvidiaTestResult === 'ok' ? '#76b90050' : 'rgba(224,92,92,0.3)'}`,
+              borderRadius: 8, padding: '8px 12px',
+            }}>
+              {nvidiaTestResult === 'ok'
+                ? <CheckCircle2 size={14} color="#76b900" style={{ flexShrink: 0, marginTop: 1 }} />
+                : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+              }
+              <p style={{ margin: 0, fontSize: 12, color: nvidiaTestResult === 'ok' ? '#76b900' : '#c0392b' }}>{nvidiaTestMsg}</p>
+            </div>
+          )}
+
+          {/* Error message */}
+          {nvidiaErr && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+              <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{nvidiaErr}</p>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--kt-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+              All PowerPoint lesson presentation requests automatically route to this NVIDIA NIM key.
+            </p>
+            <a
+              href="https://build.nvidia.com"
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 11, fontWeight: 700, color: '#76b900', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              Get Free NVIDIA NIM Key <ExternalLink size={11} />
+            </a>
+          </div>
         </div>
       )}
 
-      {/* Error */}
-      {err && (
-        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
-          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
+      {/* ── Tab 2: Gemini Engine (Core Lesson & Curriculum Generator) ── */}
+      {activeEngineTab === 'gemini' && (
+        <div style={{ background: 'var(--kt-surface)', borderRadius: 12, padding: 18, border: '1px solid rgba(109,40,217,0.25)' }}>
+          {/* Card Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Google Gemini API
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+                  Core Curriculum & Generator Engine
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                Powers DLL, COT, Lesson Plans, Action Research, Test Builder, and OMR Answer Sheet Scanning.
+              </p>
+            </div>
+
+            {/* Status indicator */}
+            <div>
+              {geminiStatus === null ? (
+                <Loader2 size={14} color="#6d28d9" style={{ animation: 'spin 1s linear infinite' }} />
+              ) : geminiStatus.hasKey ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#ede9fe', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(109,40,217,0.3)' }}>
+                  <CheckCircle2 size={13} color="#6d28d9" />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9' }}>Gemini Active</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(224,92,92,0.1)', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(224,92,92,0.3)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#e05c5c' }}>No Key Set</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Current key preview */}
+          {geminiStatus?.hasKey && (
+            <div style={{ background: 'var(--kt-card)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--kt-border)' }}>
+              <Key size={12} color="#6d28d9" />
+              <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-primary)', flex: 1 }}>{geminiStatus.preview}</span>
+              {geminiStatus.updatedAt && (
+                <span style={{ fontSize: 10, color: 'var(--kt-text-secondary)' }}>Updated {formatUpdateDate(geminiStatus.updatedAt)}</span>
+              )}
+            </div>
+          )}
+
+          {/* Input row */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>{geminiStatus?.hasKey ? 'Replace Gemini API Key' : 'Set Gemini API Key'}</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showGeminiKey ? 'text' : 'password'}
+                  value={geminiKeyInput}
+                  onChange={e => { setGeminiKeyInput(e.target.value); setGeminiErr(''); setGeminiTestResult(null); }}
+                  placeholder="AIzaSy••••••••••••••••••••••••••••••"
+                  style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
+                >
+                  {showGeminiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={handleTestGemini}
+              disabled={testingGemini || !geminiKeyInput.trim()}
+              title="Test the key before saving"
+              style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (testingGemini || !geminiKeyInput.trim()) ? 0.6 : 1 }}
+            >
+              {testingGemini ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FlaskConical size={13} />}
+              Test
+            </button>
+            <button
+              onClick={handleSaveGemini}
+              disabled={savingGemini || !geminiKeyInput.trim()}
+              style={{ ...btnPrimary, background: '#6d28d9', whiteSpace: 'nowrap', opacity: (savingGemini || !geminiKeyInput.trim()) ? 0.6 : 1 }}
+            >
+              {savingGemini ? (
+                <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+              ) : (
+                <><Key size={13} /> Save Key</>
+              )}
+            </button>
+          </div>
+
+          {/* Test result */}
+          {geminiTestResult && (
+            <div style={{
+              marginTop: 12, display: 'flex', gap: 7, alignItems: 'flex-start',
+              background: geminiTestResult === 'ok' ? '#ede9fe' : 'rgba(224,92,92,0.08)',
+              border: `1px solid ${geminiTestResult === 'ok' ? 'rgba(109,40,217,0.3)' : 'rgba(224,92,92,0.3)'}`,
+              borderRadius: 8, padding: '8px 12px',
+            }}>
+              {geminiTestResult === 'ok'
+                ? <CheckCircle2 size={14} color="#6d28d9" style={{ flexShrink: 0, marginTop: 1 }} />
+                : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+              }
+              <p style={{ margin: 0, fontSize: 12, color: geminiTestResult === 'ok' ? '#4c1d95' : '#c0392b' }}>{geminiTestMsg}</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {geminiErr && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+              <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{geminiErr}</p>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--kt-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+              Key is write-only and stored securely in Firestore.
+            </p>
+            <a
+              href="https://console.cloud.google.com/apis/credentials"
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              Google Cloud Console <ExternalLink size={11} />
+            </a>
+          </div>
         </div>
       )}
-
-      <p style={{ margin: '12px 0 0', fontSize: 11, color: '#9BB8A5', lineHeight: 1.6 }}>
-        Get your key from{' '}
-        <span style={{ color: '#6d28d9', fontWeight: 600 }}>console.cloud.google.com → APIs & Services → Credentials</span>.
-        The key is write-only — regular teacher accounts cannot read it from Firestore.
-      </p>
     </div>
   );
 }

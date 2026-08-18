@@ -13,7 +13,8 @@
       "Bash(git -C \"c:\\\\Users\\\\USER\\\\katuro-ai\" add functions/index.js src/services/geminiConfig.js src/services/actionResearchAI.js src/services/dllAI.js src/services/gamificationAI.js src/services/presentationAI.js)",
       "Bash(git -C 'c:\\\\Users\\\\USER\\\\katuro-ai' commit -m ' *)",
       "Bash(git commit *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "WebSearch"
     ]
   }
 }
