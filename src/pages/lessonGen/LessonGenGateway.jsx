@@ -10,7 +10,6 @@ const TYPES = [
     badge: 'DETAILED LESSON PLAN (DLP)',
     format: 'DOCX + PPTX',
     title: 'ILAW Lesson Plan',
-    bestFor: 'Para sa Araw-araw na Pagtuturo at Pakitang-Turo',
     points: [
       '3-Step Guided Wizard (~3–5 mins)',
       'Kumpletong Pre-lesson, Lesson Flow & Pagtataya',
@@ -25,7 +24,6 @@ const TYPES = [
     badge: 'DEPED ORDER NO. 42, S. 2016',
     format: 'LANDSCAPE A4',
     title: 'Daily Lesson Log (DLL)',
-    bestFor: 'Para sa Lingguhang Submission sa Punong-Guro',
     points: [
       '5-Day Weekly Matrix (Lunes–Biyernes)',
       'Kumpletong 10 Pamamaraan (Steps A hanggang J)',
@@ -40,7 +38,6 @@ const TYPES = [
     badge: 'RPMS-PPST OBSERVER RATED',
     format: '4AS FRAMEWORK',
     title: 'COT 4As Lesson Plan',
-    bestFor: 'Para sa Classroom Observation at IPCRF Defense',
     points: [
       '4As Framework (Activity, Analysis, Abstraction, App)',
       'Built-in COT Indicator Evidence Map',
@@ -103,7 +100,7 @@ export default function LessonGenGateway() {
         marginBottom: 32,
       }}>
         {TYPES.map(type => {
-          const { key, Icon, badge, format, title, bestFor, points, outputBadge, btnText } = type;
+          const { key, Icon, badge, format, title, points, outputBadge, btnText } = type;
           return (
             <div
               key={key}
@@ -184,9 +181,9 @@ export default function LessonGenGateway() {
               {/* Card Body */}
               <div style={{ padding: '20px 20px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-                {/* Title & Best For */}
+                {/* Title */}
                 <h2 style={{
-                  margin: '0 0 6px',
+                  margin: '0 0 14px',
                   fontSize: 20,
                   fontWeight: 700,
                   color: 'var(--kt-text-primary, #262119)',
@@ -194,19 +191,6 @@ export default function LessonGenGateway() {
                 }}>
                   {title}
                 </h2>
-
-                <div style={{
-                  display: 'inline-block',
-                  background: 'rgba(228, 213, 172, 0.35)',
-                  borderLeft: '3px solid var(--kt-manila-border, #C9B583)',
-                  padding: '4px 8px',
-                  marginBottom: 16,
-                  borderRadius: '0 3px 3px 0',
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary, #262119)' }}>
-                    🏷️ {bestFor}
-                  </span>
-                </div>
 
                 {/* Feature checklist */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 18 }}>
