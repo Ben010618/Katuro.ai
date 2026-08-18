@@ -254,8 +254,8 @@ Return ONLY a valid JSON object matching this structure:
       }
     }
 
-    // Run parallel expansion in chunks of 4 to manage throughput
-    const chunkSize = 4;
+    // Run parallel expansion in chunks of 3 to manage throughput
+    const chunkSize = 3;
     const expanded = [];
     for (let i = 0; i < needsExpansion.length; i += chunkSize) {
       const chunk = needsExpansion.slice(i, i + chunkSize);
@@ -282,17 +282,48 @@ Return ONLY a valid JSON object matching this structure:
     return { slides: allSlides, engine: 'nvidia' };
   }
 
-  // Fallback to Cloud Function
-  return callPresentationFn('expandSlides', { subject, gradeLevel, melcCode, topic, slides, style }, 180000);
+  // Fallback to Cloud Function — but still enrich visual slides with real AI-generated images!
+  const cfResult = await callPresentationFn('expandSlides', { subject, gradeLevel, melcCode, topic, slides, style }, 180000);
+  const rawSlides = Array.isArray(cfResult?.slides) ? cfResult.slides : [];
+
+  // Generate real AI educational visual images for visual/illustration slides in parallel
+  const enrichedSlides = await Promise.all(
+    rawSlides.map(async (s) => {
+      const isVisualSlide = ['illustration', 'example', 'activity', 'concept'].includes(s.type);
+      if (isVisualSlide && (s.suggestedVisual || s.title)) {
+        try {
+          const imgPrompt = `${s.suggestedVisual || s.title}, educational diagram for ${subject} ${topic}`;
+          const imageBase64 = await generateNvidiaImage({ prompt: imgPrompt, subject, topic });
+          return { ...s, imageBase64 };
+        } catch (e) {
+          console.warn(`Fallback image generation skipped for slide ${s.id}:`, e);
+        }
+      }
+      return s;
+    })
+  );
+
+  return { slides: enrichedSlides, engine: 'gemini' };
 }
 
 // ── Map expanded slides → pptxExport format ───────────────────────────────────
 export function toExportSlides(expandedSlides) {
   return expandedSlides.map(s => {
-    const isSection = ['title', 'objectives', 'summary'].includes(s.type);
-    const isVisual  = Boolean(s.imageBase64 || ['illustration', 'example', 'activity'].includes(s.type));
+    const isTitle      = s.type === 'title';
+    const isObjectives = s.type === 'objectives';
+    const isSummary    = s.type === 'summary';
+    const isActivity   = ['activity', 'assessment'].includes(s.type);
+    const isVisual     = Boolean(s.imageBase64 || ['illustration', 'example'].includes(s.type));
+
+    let layout = 'content';
+    if (isTitle) layout = 'title';
+    else if (isObjectives) layout = 'objectives';
+    else if (isSummary) layout = 'summary';
+    else if (isActivity) layout = 'activity';
+    else if (isVisual) layout = 'visual';
+
     return {
-      layout:          isSection ? 'section' : isVisual ? 'visual' : 'content',
+      layout,
       type:            s.type,
       title:           s.title,
       headline:        s.headline || '',
@@ -304,3 +335,4 @@ export function toExportSlides(expandedSlides) {
     };
   });
 }
+

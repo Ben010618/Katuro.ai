@@ -268,80 +268,106 @@ export async function generateNvidiaImage({
   width = 896,
   height = 512,
   model,
+  subject = '',
+  topic = '',
 }) {
   const config = await getNvidiaConfig();
-  if (!config.apiKey) return null;
-
   const chosenModel = model || config.imageModel || DEFAULT_NVIDIA_IMAGE_MODEL;
   
   // Format ultra-relevant, lightweight educational visual prompt
-  const enhancedPrompt = `Ultra-relevant educational diagram or high-contrast illustration, clean minimalist 2D infographic or sharp photography, pure clean white background, high legibility, curriculum-aligned visual aid for classroom slide: ${prompt}`;
+  const enhancedPrompt = `Ultra-relevant educational diagram or high-contrast illustration${subject ? ` for ${subject}` : ''}${topic ? ` on ${topic}` : ''}, clean minimalist 2D infographic or sharp photography, pure clean white background, high legibility, curriculum-aligned visual aid for classroom slide: ${prompt}`;
 
-  // 1. Try NVIDIA GenAI Stability AI NIM endpoint
-  const url = `https://ai.api.nvidia.com/v1/genai/${chosenModel}`;
-  
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        text_prompts: [
-          { text: enhancedPrompt, weight: 1 },
-          { text: 'blurry, low quality, dark, chaotic, cluttered background, unreadable messy text, watermark, signature, ugly, distorted, heavy file, noise', weight: -1 },
-        ],
-        cfg_scale: 7,
-        height: Math.min(height, 768),
-        width: Math.min(width, 1024),
-        samples: 1,
-        steps: 25,
-      }),
-    });
+  // 1. Try NVIDIA GenAI Stability AI NIM endpoint if API key is present
+  if (config.apiKey) {
+    const url = `https://ai.api.nvidia.com/v1/genai/${chosenModel}`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          text_prompts: [
+            { text: enhancedPrompt, weight: 1 },
+            { text: 'blurry, low quality, dark, chaotic, cluttered background, unreadable messy text, watermark, signature, ugly, distorted, heavy file, noise', weight: -1 },
+          ],
+          cfg_scale: 7,
+          height: Math.min(height, 768),
+          width: Math.min(width, 1024),
+          samples: 1,
+          steps: 25,
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      const b64 = data?.artifacts?.[0]?.base64;
-      if (b64) {
-        return `data:image/png;base64,${b64}`;
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data?.artifacts?.[0]?.base64;
+        if (b64) {
+          return `data:image/png;base64,${b64}`;
+        }
       }
+    } catch (err) {
+      console.warn('NVIDIA primary image generation failed, trying standard NIM endpoint:', err);
     }
-  } catch (err) {
-    console.warn('NVIDIA primary image generation failed, trying standard endpoint:', err);
+
+    // 2. Try standard OpenAI-compatible image endpoint format on NVIDIA NIM
+    try {
+      const altUrl = 'https://integrate.api.nvidia.com/v1/images/generations';
+      const altRes = await fetch(altUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: chosenModel,
+          prompt: enhancedPrompt,
+          n: 1,
+          size: `${width}x${height}`,
+          response_format: 'b64_json',
+        }),
+      });
+
+      if (altRes.ok) {
+        const altData = await altRes.json();
+        const b64 = altData?.data?.[0]?.b64_json;
+        if (b64) {
+          return `data:image/png;base64,${b64}`;
+        }
+        const imgUrl = altData?.data?.[0]?.url;
+        if (imgUrl) return imgUrl;
+      }
+    } catch (err) {
+      console.warn('NVIDIA standard image endpoint failed:', err);
+    }
   }
 
-  // 2. Try standard OpenAI-compatible image endpoint format if available on NVIDIA NIM
+  // 3. Guaranteed High-Speed AI Visual Generator (Pollinations Flux / SDXL)
+  // Ensures every classroom slide gets an ultra-relevant, crisp educational photo/diagram
   try {
-    const altUrl = 'https://integrate.api.nvidia.com/v1/images/generations';
-    const altRes = await fetch(altUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: chosenModel,
-        prompt: enhancedPrompt,
-        n: 1,
-        size: `${width}x${height}`,
-        response_format: 'b64_json',
-      }),
-    });
-
-    if (altRes.ok) {
-      const altData = await altRes.json();
-      const b64 = altData?.data?.[0]?.b64_json;
-      if (b64) {
-        return `data:image/png;base64,${b64}`;
-      }
-      const imgUrl = altData?.data?.[0]?.url;
-      if (imgUrl) return imgUrl;
+    const cleanSubject = (subject || '').trim();
+    const cleanTopic = (topic || '').trim();
+    const cleanPromptDesc = (prompt || '').trim();
+    const combinedPrompt = `${cleanSubject ? cleanSubject + ' ' : ''}${cleanTopic ? cleanTopic + ', ' : ''}${cleanPromptDesc}, educational diagram illustration, clean minimalist 2d vector infographic, white background, high contrast, textbook illustration, high resolution`;
+    
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(combinedPrompt)}?width=896&height=512&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+    
+    const res = await fetch(fallbackUrl);
+    if (res.ok) {
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
     }
   } catch (err) {
-    console.warn('NVIDIA image fallback generation failed:', err);
+    console.warn('Educational visual fallback generation failed:', err);
   }
 
   return null;
 }
+
