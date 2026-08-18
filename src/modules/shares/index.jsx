@@ -17,7 +17,7 @@ import './shares.css';
 // Notifications shortcuts, composer modal). Page-level nav (Dashboard,
 // Lesson Gen, etc.) comes from AppShell's own sidebar.
 export default function SharesModule() {
-  const { user, photoURL } = useAuth();
+  const { user, photoURL, isAdmin } = useAuth();
   const [profile,  setProfile]  = useState(null);
   // Deep link from the daily reminder popup (/shares?compose=1) opens the
   // composer immediately on mount.
@@ -48,7 +48,7 @@ export default function SharesModule() {
     }).then(setProfile).catch(() => {});
   }, [user?.uid, photoURL]);
 
-  const pageProps = { uid, displayName, initials, photoURL, school, gradeLevel, subject };
+  const pageProps = { uid, displayName, initials, photoURL, school, gradeLevel, subject, isAdmin };
 
   return (
     <div className="sh-root">
@@ -76,8 +76,8 @@ export default function SharesModule() {
         <main className="sh-main">
           <Routes>
             <Route index element={<SharesFeed {...pageProps} onOpenComposer={() => setComposer(true)} />} />
-            <Route path="explore" element={<SharesExplore uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} />} />
-            <Route path="post/:postId" element={<SharePostPage uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} />} />
+            <Route path="explore" element={<SharesExplore uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} isAdmin={isAdmin} />} />
+            <Route path="post/:postId" element={<SharePostPage uid={uid} displayName={displayName} initials={initials} photoURL={photoURL} isAdmin={isAdmin} />} />
             <Route path="notifications" element={<SharesNotifications uid={uid} />} />
           </Routes>
         </main>

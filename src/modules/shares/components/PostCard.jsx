@@ -71,7 +71,7 @@ function renderPlainCaption(caption) {
   });
 }
 
-export function PostCard({ post, uid, displayName, initials, photoURL, onDelete }) {
+export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, onDelete }) {
   const [lightbox,      setLightbox]      = useState(null);
   const [showMenu,      setShowMenu]      = useState(false);
   const [showComments,  setShowComments]  = useState(false);
@@ -88,15 +88,19 @@ export function PostCard({ post, uid, displayName, initials, photoURL, onDelete 
   const captionIsHTML = useMemo(() => isHTMLCaption(caption), [caption]);
   const safeHTML      = useMemo(() => captionIsHTML ? sanitizeHTML(caption) : '', [captionIsHTML, caption]);
 
-  const isOwn = post.authorUid === uid;
-  const bg    = post.avatarColor || avatarColor(post.authorUid);
+  const isOwn     = post.authorUid === uid;
+  const canManage = isOwn || Boolean(isAdmin);
+  const bg        = post.avatarColor || avatarColor(post.authorUid);
 
   async function handleDelete() {
     setShowMenu(false);
-    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+    const confirmMessage = (isAdmin && !isOwn)
+      ? `Delete this post by ${post.authorName || 'Teacher'} as Admin? This cannot be undone.`
+      : 'Delete this post? This cannot be undone.';
+    if (!window.confirm(confirmMessage)) return;
     setDeleting(true);
     try {
-      await deletePost(post.id, uid);
+      await deletePost(post.id, post.authorUid || uid);
       onDelete?.(post.id);
     } catch (e) {
       setDeleting(false);
@@ -154,7 +158,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, onDelete 
             {editedAt && <span style={{ fontStyle: 'italic' }}>edited</span>}
           </div>
         </div>
-        {isOwn && (
+        {canManage && (
           <div style={{ position: 'relative' }}>
             <button className="sh-card-menu-btn" onClick={() => setShowMenu(v => !v)} type="button" aria-label="Post options">
               <MoreHorizontal size={18} />
@@ -164,17 +168,19 @@ export function PostCard({ post, uid, displayName, initials, photoURL, onDelete 
                 position: 'absolute', right: 0, top: '100%', zIndex: 50,
                 background: 'white', border: '1px solid #e5e7eb',
                 borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                minWidth: 140, padding: 6,
+                minWidth: 155, padding: 6,
               }}>
-                <button
-                  onClick={startEdit}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: '#374151', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', borderRadius: 7 }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
-                  type="button"
-                >
-                  <Pencil size={14} /> Edit post
-                </button>
+                {isOwn && (
+                  <button
+                    onClick={startEdit}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: '#374151', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', borderRadius: 7 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                    type="button"
+                  >
+                    <Pencil size={14} /> Edit post
+                  </button>
+                )}
                 <button
                   onClick={handleDelete}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', borderRadius: 7 }}
@@ -182,7 +188,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, onDelete 
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                   type="button"
                 >
-                  <Trash2 size={14} /> Delete post
+                  <Trash2 size={14} /> {isAdmin && !isOwn ? 'Delete post (Admin)' : 'Delete post'}
                 </button>
               </div>
             )}
@@ -284,6 +290,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, onDelete 
           displayName={displayName}
           initials={initials}
           photoURL={photoURL}
+          isAdmin={isAdmin}
           commentCount={post.commentCount}
         />
       )}
@@ -318,5 +325,6 @@ PostCard.propTypes = {
   displayName: PropTypes.string.isRequired,
   initials:    PropTypes.string.isRequired,
   photoURL:    PropTypes.string,
+  isAdmin:     PropTypes.bool,
   onDelete:    PropTypes.func,
 };

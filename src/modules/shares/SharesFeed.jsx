@@ -21,7 +21,7 @@ const FEED_MODES = [
   { key: 'following', label: 'Following' },
 ];
 
-export default function SharesFeed({ uid, displayName, initials, photoURL, school, gradeLevel, subject, onOpenComposer }) {
+export default function SharesFeed({ uid, displayName, initials, photoURL, school, gradeLevel, subject, isAdmin, onOpenComposer }) {
   const [mode,           setMode]           = useState('global');
   const [suggestions,    setSuggestions]    = useState([]);
   const [trending,       setTrending]       = useState([]);
@@ -110,6 +110,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
                   displayName={displayName}
                   initials={initials}
                   photoURL={photoURL}
+                  isAdmin={isAdmin}
                   onDelete={async (id) => { removePost(id); }}
                 />
               ))
@@ -227,5 +228,6 @@ SharesFeed.propTypes = {
   school:         PropTypes.string,
   gradeLevel:     PropTypes.string,
   subject:        PropTypes.string,
+  isAdmin:        PropTypes.bool,
   onOpenComposer: PropTypes.func,
 };

@@ -101,10 +101,16 @@ export async function createPost(uid, { photoUrls, title, caption, school, grade
   return ref.id;
 }
 
-/** Delete a post (caller must verify ownership). */
-export async function deletePost(postId, uid) {
+/** Delete a post (author or admin). */
+export async function deletePost(postId, authorUid) {
   await deleteDoc(doc(db, 'shares_posts', postId));
-  await updateDoc(doc(db, 'shares_profiles', uid), { postCount: increment(-1) });
+  if (authorUid) {
+    try {
+      await updateDoc(doc(db, 'shares_profiles', authorUid), { postCount: increment(-1) });
+    } catch (err) {
+      console.warn('Could not decrement author postCount:', err);
+    }
+  }
 }
 
 /** Edit a post's title/caption (author only — enforced by firestore.rules). */
@@ -333,6 +339,13 @@ export async function addReply(postId, commentId, uid, { displayName, initials, 
 /** Delete a comment (and decrement post count). */
 export async function deleteComment(postId, commentId) {
   await deleteDoc(doc(db, 'shares_posts', postId, 'comments', commentId));
+  await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(-1) });
+}
+
+/** Delete a reply (and decrement comment replyCount and post commentCount). */
+export async function deleteReply(postId, commentId, replyId) {
+  await deleteDoc(doc(db, 'shares_posts', postId, 'comments', commentId, 'replies', replyId));
+  await updateDoc(doc(db, 'shares_posts', postId, 'comments', commentId), { replyCount: increment(-1) });
   await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(-1) });
 }
 

@@ -6,7 +6,7 @@ import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { getPost }     from './services/sharesService';
 
-export default function SharePostPage({ uid, displayName, initials, photoURL }) {
+export default function SharePostPage({ uid, displayName, initials, photoURL, isAdmin }) {
   const { postId } = useParams();
   const navigate    = useNavigate();
   const [post,     setPost]     = useState(null);
@@ -52,6 +52,7 @@ export default function SharePostPage({ uid, displayName, initials, photoURL }) 
           displayName={displayName}
           initials={initials}
           photoURL={photoURL}
+          isAdmin={isAdmin}
           onDelete={() => navigate('/shares')}
         />
       )}
@@ -64,4 +65,5 @@ SharePostPage.propTypes = {
   displayName: PropTypes.string.isRequired,
   initials:    PropTypes.string.isRequired,
   photoURL:    PropTypes.string,
+  isAdmin:     PropTypes.bool,
 };

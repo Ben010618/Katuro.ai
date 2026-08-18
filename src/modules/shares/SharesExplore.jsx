@@ -10,7 +10,7 @@ import { TeacherCard }  from './components/TeacherCard';
 import { HashtagPill }  from './components/HashtagPill';
 import { useNavigate }  from 'react-router-dom';
 
-export default function SharesExplore({ uid, displayName, initials, photoURL }) {
+export default function SharesExplore({ uid, displayName, initials, photoURL, isAdmin }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
@@ -115,6 +115,7 @@ export default function SharesExplore({ uid, displayName, initials, photoURL }) 
                   displayName={displayName}
                   initials={initials}
                   photoURL={photoURL}
+                  isAdmin={isAdmin}
                   onDelete={removePost}
                 />
               ))
@@ -136,4 +137,5 @@ SharesExplore.propTypes = {
   displayName: PropTypes.string.isRequired,
   initials:    PropTypes.string.isRequired,
   photoURL:    PropTypes.string,
+  isAdmin:     PropTypes.bool,
 };

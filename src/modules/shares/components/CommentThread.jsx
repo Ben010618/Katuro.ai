@@ -18,8 +18,9 @@ function Avatar({ uid, photoURL, initials, size = 'sm' }) {
   );
 }
 
-function ReplyRow({ r, uid, onDelete }) {
+function ReplyRow({ r, uid, onDelete, isAdmin }) {
   const isOwn = r.authorUid === uid;
+  const canDelete = isOwn || Boolean(isAdmin);
   return (
     <div className="sh-comment" style={{ marginBottom: 6 }}>
       <Avatar uid={r.authorUid} photoURL={r.authorPhotoURL} initials={r.authorInitials || getInitials(r.authorName)} size="sm" />
@@ -30,12 +31,13 @@ function ReplyRow({ r, uid, onDelete }) {
         </div>
         <div className="sh-comment-actions">
           <span className="sh-comment-time">{timeAgo(r.createdAt)}</span>
-          {isOwn && (
+          {canDelete && (
             <button
               className="sh-comment-action-btn"
               style={{ color: '#ef4444' }}
               onClick={() => onDelete(r.id)}
               type="button"
+              title={isAdmin && !isOwn ? 'Delete reply as Admin' : 'Delete reply'}
             >
               <Trash2 size={10} />
             </button>
@@ -46,7 +48,7 @@ function ReplyRow({ r, uid, onDelete }) {
   );
 }
 
-function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, addReply, deleteComment, editComment }) {
+function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, isAdmin, addReply, deleteComment, deleteReply, editComment }) {
   const [editing,     setEditing]     = useState(false);
   const [editText,    setEditText]    = useState(c.text);
   const [replyOpen,   setReplyOpen]   = useState(false);
@@ -55,6 +57,7 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, add
   const [showReplies, setShowReplies] = useState(false);
 
   const isOwn      = c.authorUid === uid;
+  const canDelete  = isOwn || Boolean(isAdmin);
   const replyCount = c.replyCount || 0;
 
   // Subscribe to replies only when the user expands them
@@ -125,14 +128,20 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, add
             </button>
           )}
           {isOwn && (
-            <>
-              <button className="sh-comment-action-btn" onClick={() => { setEditing(true); setEditText(c.text); }} type="button">
-                <Pencil size={10} />
-              </button>
-              <button className="sh-comment-action-btn" style={{ color: '#ef4444' }} onClick={() => deleteComment(c.id)} type="button">
-                <Trash2 size={10} />
-              </button>
-            </>
+            <button className="sh-comment-action-btn" onClick={() => { setEditing(true); setEditText(c.text); }} type="button">
+              <Pencil size={10} />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              className="sh-comment-action-btn"
+              style={{ color: '#ef4444' }}
+              onClick={() => deleteComment(c.id)}
+              type="button"
+              title={isAdmin && !isOwn ? 'Delete comment as Admin' : 'Delete comment'}
+            >
+              <Trash2 size={10} />
+            </button>
           )}
         </div>
 
@@ -162,7 +171,8 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, add
                 key={r.id}
                 r={r}
                 uid={uid}
-                onDelete={() => {}}
+                isAdmin={isAdmin}
+                onDelete={(replyId) => deleteReply(c.id, replyId)}
               />
             ))}
           </div>
@@ -172,8 +182,8 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, add
   );
 }
 
-export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, photoURL, commentCount }) {
-  const { comments, loading, addComment, addReply, deleteComment, editComment } = useComments(postId, uid, postAuthorUid);
+export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, photoURL, isAdmin, commentCount }) {
+  const { comments, loading, addComment, addReply, deleteComment, deleteReply, editComment } = useComments(postId, uid, postAuthorUid);
   const [expanded, setExpanded] = useState(false);
   const [text,     setText]     = useState('');
   const [sending,  setSending]  = useState(false);
@@ -210,8 +220,10 @@ export function CommentThread({ postId, uid, postAuthorUid, displayName, initial
           myDisplayName={displayName}
           myInitials={initials}
           myPhotoURL={photoURL}
+          isAdmin={isAdmin}
           addReply={addReply}
           deleteComment={deleteComment}
+          deleteReply={deleteReply}
           editComment={editComment}
         />
       ))}
@@ -248,5 +260,6 @@ CommentThread.propTypes = {
   displayName:   PropTypes.string.isRequired,
   initials:      PropTypes.string.isRequired,
   photoURL:      PropTypes.string,
+  isAdmin:       PropTypes.bool,
   commentCount:  PropTypes.number,
 };

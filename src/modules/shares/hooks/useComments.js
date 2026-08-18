@@ -4,6 +4,7 @@ import {
   addComment as svcAddComment,
   addReply   as svcAddReply,
   deleteComment as svcDeleteComment,
+  deleteReply   as svcDeleteReply,
   editComment   as svcEditComment,
 } from '../services/sharesService';
 import { notifyComment, notifyReply } from '../services/notificationService';
@@ -61,6 +62,14 @@ export function useComments(postId, uid, postAuthorUid) {
     }
   }, [postId]);
 
+  const deleteReply = useCallback(async (commentId, replyId) => {
+    try {
+      await svcDeleteReply(postId, commentId, replyId);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [postId]);
+
   const editComment = useCallback(async (commentId, text) => {
     if (!text.trim()) return;
     try {
@@ -70,5 +79,5 @@ export function useComments(postId, uid, postAuthorUid) {
     }
   }, [postId]);
 
-  return { comments, loading, error, addComment, addReply, deleteComment, editComment };
+  return { comments, loading, error, addComment, addReply, deleteComment, deleteReply, editComment };
 }
