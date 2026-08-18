@@ -101,14 +101,40 @@ export async function createPost(uid, { photoUrls, title, caption, school, grade
   return ref.id;
 }
 
-/** Delete a post (author or admin). */
-export async function deletePost(postId, authorUid) {
-  await deleteDoc(doc(db, 'shares_posts', postId));
-  if (authorUid) {
+/** Delete a post (author or admin with full power). */
+export async function deletePost(postId, authorUid, isAdmin = false) {
+  // If admin, invoke the Cloud Function via Admin SDK for guaranteed deletion
+  if (isAdmin) {
     try {
-      await updateDoc(doc(db, 'shares_profiles', authorUid), { postCount: increment(-1) });
-    } catch (err) {
-      console.warn('Could not decrement author postCount:', err);
+      const { default: app } = await import('../../../firebase');
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteSharePost');
+      await fn({ postId, authorUid });
+      return;
+    } catch (adminErr) {
+      console.warn('adminDeleteSharePost cloud function fallback to direct Firestore delete:', adminErr);
+    }
+  }
+
+  // Direct Firestore delete
+  try {
+    await deleteDoc(doc(db, 'shares_posts', postId));
+    if (authorUid) {
+      try {
+        await updateDoc(doc(db, 'shares_profiles', authorUid), { postCount: increment(-1) });
+      } catch (err) {
+        console.warn('Could not decrement author postCount:', err);
+      }
+    }
+  } catch (directErr) {
+    // If direct delete failed with permission error, try Admin Cloud Function as fallback
+    try {
+      const { default: app } = await import('../../../firebase');
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteSharePost');
+      await fn({ postId, authorUid });
+    } catch (fallbackErr) {
+      throw directErr;
     }
   }
 }
@@ -337,9 +363,32 @@ export async function addReply(postId, commentId, uid, { displayName, initials, 
 }
 
 /** Delete a comment (and decrement post count). */
-export async function deleteComment(postId, commentId) {
-  await deleteDoc(doc(db, 'shares_posts', postId, 'comments', commentId));
-  await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(-1) });
+export async function deleteComment(postId, commentId, isAdmin = false) {
+  if (isAdmin) {
+    try {
+      const { default: app } = await import('../../../firebase');
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteShareComment');
+      await fn({ postId, commentId });
+      return;
+    } catch (adminErr) {
+      console.warn('adminDeleteShareComment cloud function fallback to direct Firestore delete:', adminErr);
+    }
+  }
+
+  try {
+    await deleteDoc(doc(db, 'shares_posts', postId, 'comments', commentId));
+    await updateDoc(doc(db, 'shares_posts', postId), { commentCount: increment(-1) });
+  } catch (directErr) {
+    try {
+      const { default: app } = await import('../../../firebase');
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteShareComment');
+      await fn({ postId, commentId });
+    } catch (fallbackErr) {
+      throw directErr;
+    }
+  }
 }
 
 /** Delete a reply (and decrement comment replyCount and post commentCount). */

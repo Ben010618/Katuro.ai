@@ -100,11 +100,12 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
     if (!window.confirm(confirmMessage)) return;
     setDeleting(true);
     try {
-      await deletePost(post.id, post.authorUid || uid);
+      await deletePost(post.id, post.authorUid || uid, Boolean(isAdmin));
       onDelete?.(post.id);
     } catch (e) {
       setDeleting(false);
-      alert('Could not delete post. Please try again.');
+      console.error('Delete post error:', e);
+      alert('Could not delete post. Please try again: ' + (e?.message || ''));
     }
   }
 

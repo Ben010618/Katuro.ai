@@ -819,6 +819,85 @@ exports.adminDeleteUser = onCall(
   }
 );
 
+// ── Admin: permanently delete any kaTuro Shares post (bypasses Firestore client rules) ──
+exports.adminDeleteSharePost = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+
+    const { postId, authorUid } = req.data;
+    if (!postId) throw new HttpsError('invalid-argument', 'postId is required.');
+
+    // Fetch the post to determine author if not provided
+    const postRef = db.doc(`shares_posts/${postId}`);
+    const postSnap = await postRef.get();
+    const finalAuthorUid = authorUid || (postSnap.exists ? postSnap.data()?.authorUid : null);
+
+    // Recursively delete the post document and all its subcollections
+    if (postSnap.exists) {
+      await db.recursiveDelete(postRef);
+    }
+
+    // Delete associated reactions
+    const reactionsRef = db.doc(`shares_reactions/${postId}`);
+    const reactionsSnap = await reactionsRef.get();
+    if (reactionsSnap.exists) {
+      await db.recursiveDelete(reactionsRef);
+    }
+
+    // Decrement author's post count in shares_profiles
+    if (finalAuthorUid) {
+      try {
+        await db.doc(`shares_profiles/${finalAuthorUid}`).update({
+          postCount: admin.firestore.FieldValue.increment(-1),
+        });
+      } catch (err) {
+        console.warn('Could not update author postCount:', err);
+      }
+    }
+
+    return { success: true };
+  }
+);
+
+// ── Admin: permanently delete any kaTuro Shares comment ───────────────────────
+exports.adminDeleteShareComment = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+
+    const { postId, commentId } = req.data;
+    if (!postId || !commentId) throw new HttpsError('invalid-argument', 'postId and commentId are required.');
+
+    const commentRef = db.doc(`shares_posts/${postId}/comments/${commentId}`);
+    const commentSnap = await commentRef.get();
+    if (commentSnap.exists) {
+      await db.recursiveDelete(commentRef);
+    }
+
+    // Decrement commentCount on the post
+    try {
+      await db.doc(`shares_posts/${postId}`).update({
+        commentCount: admin.firestore.FieldValue.increment(-1),
+      });
+    } catch (err) {
+      console.warn('Could not decrement post commentCount:', err);
+    }
+
+    return { success: true };
+  }
+);
+
 // ── Admin: set any user's password directly via Admin SDK ─────────────────────
 exports.adminSetPassword = onCall(async (request) => {
   // Verify caller is an admin

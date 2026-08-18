@@ -183,7 +183,7 @@ function CommentRow({ c, uid, postId, myDisplayName, myInitials, myPhotoURL, isA
 }
 
 export function CommentThread({ postId, uid, postAuthorUid, displayName, initials, photoURL, isAdmin, commentCount }) {
-  const { comments, loading, addComment, addReply, deleteComment, deleteReply, editComment } = useComments(postId, uid, postAuthorUid);
+  const { comments, loading, addComment, addReply, deleteComment, deleteReply, editComment } = useComments(postId, uid, postAuthorUid, isAdmin);
   const [expanded, setExpanded] = useState(false);
   const [text,     setText]     = useState('');
   const [sending,  setSending]  = useState(false);

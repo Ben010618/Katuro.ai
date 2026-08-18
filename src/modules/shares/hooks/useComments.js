@@ -16,7 +16,7 @@ import { trackEvent } from '../../../services/usageTracker';
  * @param {string} uid — current user uid
  * @param {string} postAuthorUid
  */
-export function useComments(postId, uid, postAuthorUid) {
+export function useComments(postId, uid, postAuthorUid, isAdmin = false) {
   const [comments, setComments] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
@@ -56,11 +56,11 @@ export function useComments(postId, uid, postAuthorUid) {
 
   const deleteComment = useCallback(async (commentId) => {
     try {
-      await svcDeleteComment(postId, commentId);
+      await svcDeleteComment(postId, commentId, isAdmin);
     } catch (e) {
       setError(e.message);
     }
-  }, [postId]);
+  }, [postId, isAdmin]);
 
   const deleteReply = useCallback(async (commentId, replyId) => {
     try {
