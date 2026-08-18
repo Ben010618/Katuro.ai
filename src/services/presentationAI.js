@@ -312,8 +312,8 @@ export function toExportSlides(expandedSlides) {
     const isTitle      = s.type === 'title';
     const isObjectives = s.type === 'objectives';
     const isSummary    = s.type === 'summary';
-    const isActivity   = ['activity', 'assessment'].includes(s.type);
-    const isVisual     = Boolean(s.imageBase64 || ['illustration', 'example'].includes(s.type));
+    const isActivity   = ['activity', 'assessment', 'challenge', 'practice'].includes(s.type);
+    const isVisual     = Boolean(s.imageBase64 || s.imageUrl || ['illustration', 'example', 'concept'].includes(s.type) || s.suggestedVisual);
 
     let layout = 'content';
     if (isTitle) layout = 'title';

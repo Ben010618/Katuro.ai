@@ -354,7 +354,7 @@ export async function generateNvidiaImage({
     
     const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(combinedPrompt)}?width=896&height=512&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
     
-    const res = await fetch(fallbackUrl);
+    const res = await fetch(fallbackUrl, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
       const blob = await res.blob();
       return new Promise((resolve) => {
@@ -365,7 +365,7 @@ export async function generateNvidiaImage({
       });
     }
   } catch (err) {
-    console.warn('Educational visual fallback generation failed:', err);
+    console.warn('Educational visual fallback generation skipped/timed out:', err);
   }
 
   return null;

@@ -456,7 +456,8 @@ Slide scaffold: ${JSON.stringify(slide)}
 Rules:
 - Body/bullets combined: 60–120 words maximum (this is a presentation)
 - Short declarative sentences only
-${useBullets ? '- bullets: 3–5 items, each a complete explanatory sentence (15–25 words)\n- body: leave empty ""' : '- body: short paragraph (3–5 sentences explaining the concept/activity)\n- bullets: leave as []'}
+- Always bold key concepts and terms using markdown **Key Term** syntax
+${useBullets ? '- bullets: 3–5 items, each a complete explanatory sentence with **Key Terms** bolded (15–25 words)\n- body: leave empty ""' : '- body: short paragraph (3–5 sentences explaining the concept/activity with **Key Terms** bolded)\n- bullets: leave as []'}
 - teacherNote: 1–2 sentences the teacher says aloud while showing this slide
 - suggestedVisual: ultra-relevant, topic-specific educational diagram/visual description (clean vector/infographic/photo, pure white background, lightweight classroom visual aid)
 - headline: a short subtitle (5–8 words) reinforcing the slide title
