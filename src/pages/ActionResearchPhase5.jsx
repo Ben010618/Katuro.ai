@@ -12,9 +12,44 @@ import { generateDataCollection, generateResearchInstrument, THEME_LABELS } from
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import ActionResearchShell  from '../components/ActionResearchShell';
 
-const sectionHead = { margin:'0 0 12px', fontSize:13, fontWeight:700, color:'#1a3d2b', display:'flex', alignItems:'center', gap:7 };
-const iconBox = { width:26, height:26, borderRadius:7, background:'#d8f3dc', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 };
-const tag = (t) => <span style={{ fontSize:10, fontWeight:700, background:'#f0f9f4', color:'#2d6a4f', borderRadius:20, padding:'2px 10px', marginRight:6 }}>{t}</span>;
+const sectionHead = {
+  margin: '0 0 14px',
+  fontSize: 15,
+  fontWeight: 700,
+  color: 'var(--kt-text-primary, #262119)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
+};
+
+const iconBox = {
+  width: 28,
+  height: 28,
+  borderRadius: 4,
+  background: 'var(--kt-manila, #E4D5AC)',
+  border: '1px solid var(--kt-manila-border, #C9B583)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+};
+
+const tag = (t) => (
+  <span style={{
+    fontSize: 11,
+    fontWeight: 700,
+    background: 'var(--kt-card-2, #F4EDDB)',
+    border: '1px solid var(--kt-border, #DCD0AE)',
+    color: 'var(--kt-chalkboard, #1F3A2E)',
+    borderRadius: 3,
+    padding: '2px 8px',
+    marginRight: 6,
+    fontFamily: 'var(--kt-font-mono, monospace)',
+  }}>
+    {t}
+  </span>
+);
 
 // ── Instrument type config ────────────────────────────────────────────────────
 const INSTRUMENT_TYPES = [
@@ -490,105 +525,163 @@ export default function ActionResearchPhase5() {
   );
 
   const themeName = THEME_LABELS[docData?.beraTheme] ?? docData?.beraTheme;
-  const dc = dataCollection;
+  const dc        = dataCollection;
 
   return (
     <ActionResearchShell
       phase={5}
-      canNext={!!dataCollection}
-      nextLabel="Next: Findings & Report"
+      canNext={!!dc}
+      nextLabel="Susunod: Findings & Report"
       onNext={handleNext}
       nextLoading={saving}
-      onDownload={dataCollection ? handleDownload : undefined}
+      onDownload={dc ? handleDownload : undefined}
       downloadLoading={downloading}
       onBack={() => navigate(`/action-research/phase-4/${docId}`)}
       themeName={themeName}
     >
-      <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Context */}
-        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 24px' }}>
-          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
-          <p style={{ margin:'0 0 0', fontSize:14, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '20px 24px',
+          boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+        }}>
+          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+            Pamagat ng Pananaliksik (Research Title)
+          </p>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)', lineHeight: 1.4 }}>
+            {docData?.selectedTitle}
+          </h2>
         </div>
 
-        {/* ── Step 1: Data Collection Methodology ─────────────────────────── */}
-        <div style={{ background:'var(--kt-card)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'22px 24px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-            <div style={{ width:26, height:26, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center', flexShrink:0 }}>
-              <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>1</span>
-            </div>
-            <p style={{ margin:0, fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Data Collection Methodology</p>
-          </div>
-          <p style={{ margin:'0 0 16px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.5, paddingLeft:36 }}>AI recommends the best data collection tools, statistical formulas, and analysis approach for your research.</p>
-          <button onClick={handleGenerate} disabled={generating} style={{
-            display:'flex', alignItems:'center', gap:7,
-            background:generating?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff',
-            border:'none', borderRadius:8, padding:'10px 18px', fontSize:13, fontWeight:600,
-            cursor:generating?'not-allowed':'pointer', fontFamily:'inherit',
-          }}>
-            {generating
-              ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating methodology…</>
-              : <><Sparkles size={13} /> {dc ? 'Regenerate' : 'Generate'} data collection plan{!freeMode && ' (5 tokens)'}</>}
+        {/* ── Step 1: Methodology Generator ─────────────────────────────────── */}
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+        }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+            1. Metodolohiya at Pangangalap ng Datos (Data Collection Plan)
+          </h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+            Bumubuo ang AI ng primary at secondary collection tools, statistical treatment, at paraan ng pagsusuri ng datos alinsunod sa DepEd research guidelines.
+          </p>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: generating ? 'var(--kt-border, #DCD0AE)' : 'var(--kt-chalkboard, #1F3A2E)',
+              color: '#FBF7EC',
+              border: 'none',
+              borderRadius: 'var(--kt-radius-sm, 4px)',
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: generating ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--kt-font-ui, "Inter", sans-serif)',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={e => { if (!generating) e.currentTarget.style.background = 'var(--kt-chalkboard-hover, #2B4E3E)'; }}
+            onMouseLeave={e => { if (!generating) e.currentTarget.style.background = 'var(--kt-chalkboard, #1F3A2E)'; }}
+          >
+            {generating ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Bumubuo ng Metodolohiya…
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} /> {dc ? 'Muling Bumuo (Regenerate Plan)' : 'Bumuo ng Data Collection Plan'}{!freeMode && ' (5 tokens)'}
+              </>
+            )}
           </button>
-          {generating && statusMsg && <p style={{ margin:'10px 0 0', fontSize:12, color:'var(--kt-text-secondary)' }}>{statusMsg}</p>}
+          {generating && statusMsg && (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)' }}>
+              {statusMsg}
+            </p>
+          )}
         </div>
 
         {/* Methodology results */}
         {dc && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Primary tool */}
-            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
-              <p style={sectionHead}><span style={iconBox}><ClipboardList size={13} color="#2d6a4f" /></span>Primary Data Collection Tool</p>
-              <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <div style={{
+              background: 'var(--kt-card, #FBF7EC)',
+              borderRadius: 'var(--kt-radius-md, 6px)',
+              border: '1px solid var(--kt-border, #DCD0AE)',
+              padding: '20px 24px',
+              boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+            }}>
+              <p style={sectionHead}><span style={iconBox}><ClipboardList size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Pangunahing Instrumento (Primary Data Collection Tool)</p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 {dc.primaryTool?.name && tag(dc.primaryTool.name)}
                 {dc.primaryTool?.type && tag(dc.primaryTool.type)}
               </div>
-              <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.65 }}>{dc.primaryTool?.description}</p>
-              {dc.primaryTool?.rationale && <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.6, fontStyle:'italic' }}><strong style={{color:'#1a3d2b',fontStyle:'normal'}}>Rationale:</strong> {dc.primaryTool.rationale}</p>}
-              {dc.primaryTool?.administration && <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-secondary)', lineHeight:1.6 }}><strong style={{color:'#1a3d2b'}}>Administration:</strong> {dc.primaryTool.administration}</p>}
+              <p style={{ margin: '0 0 8px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.65 }}>{dc.primaryTool?.description}</p>
+              {dc.primaryTool?.rationale && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard, #1F3A2E)' }}>Batayan (Rationale):</strong> {dc.primaryTool.rationale}</p>}
+              {dc.primaryTool?.administration && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard, #1F3A2E)' }}>Pangangasiwa (Administration):</strong> {dc.primaryTool.administration}</p>}
               {dc.primaryTool?.sampleItems?.length > 0 && (
-                <>
-                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items</p>
-                  {dc.primaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'var(--kt-text-primary)' }}>{i+1}. {s}</p>)}
-                </>
+                <div style={{ marginTop: 12, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)', padding: '12px 14px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>Mga Halimbawang Aytem (Sample Items)</p>
+                  {dc.primaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--kt-text-primary, #262119)' }}>{i + 1}. {s}</p>)}
+                </div>
               )}
             </div>
 
             {/* Secondary tool */}
-            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
-              <p style={sectionHead}><span style={iconBox}><FlaskConical size={13} color="#2d6a4f" /></span>Secondary Data Collection Tool</p>
-              <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <div style={{
+              background: 'var(--kt-card, #FBF7EC)',
+              borderRadius: 'var(--kt-radius-md, 6px)',
+              border: '1px solid var(--kt-border, #DCD0AE)',
+              padding: '20px 24px',
+              boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+            }}>
+              <p style={sectionHead}><span style={iconBox}><FlaskConical size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Sekundaryang Instrumento (Secondary Data Collection Tool)</p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 {dc.secondaryTool?.name && tag(dc.secondaryTool.name)}
                 {dc.secondaryTool?.type && tag(dc.secondaryTool.type)}
               </div>
-              <p style={{ margin:'0 0 8px', fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.65 }}>{dc.secondaryTool?.description}</p>
+              <p style={{ margin: '0 0 8px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.65 }}>{dc.secondaryTool?.description}</p>
               {dc.secondaryTool?.sampleItems?.length > 0 && (
-                <>
-                  <p style={{ margin:'10px 0 6px', fontSize:11, fontWeight:700, color:'var(--kt-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Sample items / criteria</p>
-                  {dc.secondaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'var(--kt-text-primary)' }}>{i+1}. {s}</p>)}
-                </>
+                <div style={{ marginTop: 12, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)', padding: '12px 14px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>Mga Halimbawang Pamantayan (Sample Criteria)</p>
+                  {dc.secondaryTool.sampleItems.map((s, i) => <p key={i} style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--kt-text-primary, #262119)' }}>{i + 1}. {s}</p>)}
+                </div>
               )}
             </div>
 
             {/* Stats table */}
-            <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
-              <p style={sectionHead}><span style={iconBox}><BarChart2 size={13} color="#2d6a4f" /></span>Statistical Treatment</p>
-              <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <div style={{
+              background: 'var(--kt-card, #FBF7EC)',
+              borderRadius: 'var(--kt-radius-md, 6px)',
+              border: '1px solid var(--kt-border, #DCD0AE)',
+              padding: '20px 24px',
+              boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+            }}>
+              <p style={sectionHead}><span style={iconBox}><BarChart2 size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Pang-estadistikang Pagsusuri (Statistical Treatment)</p>
+              <div style={{ overflowX: 'auto', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
-                    <tr style={{ background:'#d8f3dc' }}>
-                      {['Formula / Treatment','Purpose','Interpretation'].map(h => (
-                        <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontWeight:700, color:'#1a3d2b', fontSize:11 }}>{h}</th>
+                    <tr style={{ background: 'var(--kt-manila, #E4D5AC)', borderBottom: '1px solid var(--kt-manila-border, #C9B583)' }}>
+                      {['Pormula / Treatment', 'Layunin (Purpose)', 'Interpretasyon'].map(h => (
+                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontSize: 11, fontFamily: 'var(--kt-font-mono, monospace)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(dc.statisticalTreatment ?? []).map((row, i) => (
-                      <tr key={i} style={{ borderBottom:'1px solid rgba(45,106,79,0.08)' }}>
-                        <td style={{ padding:'8px 10px', fontWeight:600, color:'#1a3d2b', verticalAlign:'top' }}>{row.formula}</td>
-                        <td style={{ padding:'8px 10px', color:'var(--kt-text-primary)', verticalAlign:'top' }}>{row.purpose}</td>
-                        <td style={{ padding:'8px 10px', color:'var(--kt-text-secondary)', verticalAlign:'top' }}>{row.interpretation}</td>
+                      <tr key={i} style={{ borderBottom: '1px solid var(--kt-border, #DCD0AE)', background: i % 2 === 0 ? 'var(--kt-card, #FBF7EC)' : 'var(--kt-card-2, #F4EDDB)' }}>
+                        <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', verticalAlign: 'top' }}>{row.formula}</td>
+                        <td style={{ padding: '9px 12px', color: 'var(--kt-text-primary, #262119)', verticalAlign: 'top' }}>{row.purpose}</td>
+                        <td style={{ padding: '9px 12px', color: 'var(--kt-text-secondary, #6E6455)', verticalAlign: 'top' }}>{row.interpretation}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -598,9 +691,17 @@ export default function ActionResearchPhase5() {
 
             {/* Analysis approach */}
             {dc.analysisApproach && (
-              <div style={{ background:'var(--kt-card)', borderRadius:12, border:'1px solid var(--kt-border)', padding:'18px 22px' }}>
-                <p style={{ margin:'0 0 10px', fontSize:13, fontWeight:700, color:'#1a3d2b' }}>Data Analysis Approach</p>
-                <p style={{ margin:0, fontSize:13, color:'var(--kt-text-primary)', lineHeight:1.7, textAlign:'justify' }}>{dc.analysisApproach}</p>
+              <div style={{
+                background: 'var(--kt-card, #FBF7EC)',
+                borderRadius: 'var(--kt-radius-md, 6px)',
+                border: '1px solid var(--kt-border, #DCD0AE)',
+                padding: '20px 24px',
+                boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+              }}>
+                <h3 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                  Paraan ng Pagsusuri ng Datos (Data Analysis Approach)
+                </h3>
+                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75, textAlign: 'justify' }}>{dc.analysisApproach}</p>
               </div>
             )}
           </div>
@@ -608,73 +709,104 @@ export default function ActionResearchPhase5() {
 
         {/* ── Step 2: Research Instrument Generator ─────────────────────────── */}
         <div style={{
-          background:'var(--kt-card)', borderRadius:14,
-          border:'2px solid rgba(45,106,79,0.15)', padding:'22px 24px',
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
         }}>
           {/* Section header */}
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-            <div style={{ width:26, height:26, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center', flexShrink:0 }}>
-              <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>2</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 4, background: 'var(--kt-chalkboard, #1F3A2E)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-mono, monospace)' }}>2</span>
             </div>
-            <div style={{ flex:1 }}>
-              <p style={{ margin:0, fontSize:15, fontWeight:700, color:'var(--kt-text-primary)' }}>Auto-Generate Research Instruments</p>
-              <p style={{ margin:0, fontSize:11, color:'var(--kt-text-secondary)' }}>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                Bumuo ng Kumpletong Instrumento (Research Instrument)
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)' }}>
                 {aiRecommended
-                  ? 'AI suggests and highlights the best instrument below — choose and generate.'
-                  : 'AI drafts a complete, ready-to-use instrument — select one type below, then generate.'}
+                  ? 'Iminumungkahi ng AI ang pinaka-angkop na instrumento sa ibaba — pumili at mag-generate.'
+                  : 'Bumubuo ang AI ng kumpleto at magagamit agad na survey, checklist, o exam — pumili sa ibaba.'}
               </p>
             </div>
             {instrument && (
-              <span style={{ marginLeft:'auto', background:'#d8f3dc', color:'#1a3d2b', borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                <CheckCircle2 size={11} /> Generated
+              <span style={{ marginLeft: 'auto', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', color: 'var(--kt-chalkboard, #1F3A2E)', borderRadius: 3, padding: '3px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                <CheckCircle2 size={12} /> Nabuong Instrumento
               </span>
             )}
           </div>
 
-          <div style={{ borderTop:'1px solid rgba(45,106,79,0.1)', margin:'16px 0' }} />
+          <div style={{ borderTop: '1px solid var(--kt-border, #DCD0AE)', margin: '16px 0' }} />
 
           {/* Type selector — 2×2 grid */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
             {INSTRUMENT_TYPES.map(({ id, label, Icon, desc }) => {
-              const active     = instrumentType === id;
-              const isAiPick   = aiRecommended === id;
+              const active   = instrumentType === id;
+              const isAiPick = aiRecommended === id;
               return (
                 <button
                   key={id}
                   onClick={() => setInstrumentType(id)}
                   style={{
-                    textAlign:'left', fontFamily:'inherit', cursor:'pointer',
-                    background: active ? '#f0f9f4' : 'var(--kt-card-2)',
-                    border: active ? '2px solid #2d6a4f' : '1.5px solid rgba(45,106,79,0.15)',
-                    borderRadius:10, padding:'13px 14px',
-                    transition:'border 0.15s, background 0.15s', position:'relative',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    background: active ? 'var(--kt-manila, #E4D5AC)' : 'var(--kt-card-2, #F4EDDB)',
+                    border: active ? '1px solid var(--kt-manila-border, #C9B583)' : '1px solid var(--kt-border, #DCD0AE)',
+                    borderRadius: 'var(--kt-radius-sm, 4px)',
+                    padding: '14px 16px',
+                    transition: 'border-color 0.15s, background 0.15s',
+                    position: 'relative',
+                    boxShadow: active ? '0 2px 6px rgba(38, 33, 25, 0.08)' : 'none',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background='var(--kt-surface)'; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background='var(--kt-card-2)'; }}
+                  onMouseEnter={e => {
+                    if (!active) {
+                      e.currentTarget.style.borderColor = 'var(--kt-manila-border, #C9B583)';
+                      e.currentTarget.style.background = '#ebe2cc';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!active) {
+                      e.currentTarget.style.borderColor = 'var(--kt-border, #DCD0AE)';
+                      e.currentTarget.style.background = 'var(--kt-card-2, #F4EDDB)';
+                    }
+                  }}
                 >
-                  {/* AI Recommended badge — top-left */}
                   {isAiPick && (
                     <span style={{
-                      position:'absolute', top:8, left:10,
-                      background:'#e8a320', color:'#fff',
-                      fontSize:9, fontWeight:700, letterSpacing:'0.05em',
-                      borderRadius:20, padding:'2px 7px',
-                      display:'flex', alignItems:'center', gap:3,
+                      position: 'absolute',
+                      top: 10,
+                      left: 12,
+                      background: 'var(--kt-chalkboard, #1F3A2E)',
+                      color: '#FBF7EC',
+                      fontSize: 9.5,
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      borderRadius: 3,
+                      padding: '2px 7px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontFamily: 'var(--kt-font-mono, monospace)',
                     }}>
-                      <Sparkles size={8} /> AI Recommended
+                      <Sparkles size={9} /> AI Recommended
                     </span>
                   )}
-                  {/* Selected check — top-right */}
                   {active && (
-                    <div style={{ position:'absolute', top:8, right:8, width:16, height:16, borderRadius:'50%', background:'#2d6a4f', display:'grid', placeItems:'center' }}>
-                      <CheckCircle2 size={10} color="#fff" />
+                    <div style={{ position: 'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: '50%', background: 'var(--kt-chalkboard, #1F3A2E)', display: 'grid', placeItems: 'center' }}>
+                      <CheckCircle2 size={12} color="#FBF7EC" />
                     </div>
                   )}
-                  <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:5, marginTop: isAiPick ? 18 : 0 }}>
-                    <Icon size={14} color={active ? '#2d6a4f' : '#4a6357'} />
-                    <p style={{ margin:0, fontSize:13, fontWeight:700, color: active ? '#1a3d2b' : '#0d2218' }}>{label}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, marginTop: isAiPick ? 20 : 0 }}>
+                    <Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                      {label}
+                    </p>
                   </div>
-                  <p style={{ margin:0, fontSize:11, color:'#4a6357', lineHeight:1.5 }}>{desc}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+                    {desc}
+                  </p>
                 </button>
               );
             })}
@@ -684,32 +816,56 @@ export default function ActionResearchPhase5() {
             onClick={handleGenerateInstrument}
             disabled={generatingInstrument}
             style={{
-              display:'flex', alignItems:'center', gap:7,
-              background: generatingInstrument ? 'rgba(45,106,79,0.35)' : '#2d6a4f',
-              color:'#fff', border:'none', borderRadius:8, padding:'10px 18px',
-              fontSize:13, fontWeight:600,
-              cursor: generatingInstrument ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: generatingInstrument ? 'var(--kt-border, #DCD0AE)' : 'var(--kt-chalkboard, #1F3A2E)',
+              color: '#FBF7EC',
+              border: 'none',
+              borderRadius: 'var(--kt-radius-sm, 4px)',
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: generatingInstrument ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--kt-font-ui, "Inter", sans-serif)',
+              transition: 'background 0.15s ease',
             }}
+            onMouseEnter={e => { if (!generatingInstrument) e.currentTarget.style.background = 'var(--kt-chalkboard-hover, #2B4E3E)'; }}
+            onMouseLeave={e => { if (!generatingInstrument) e.currentTarget.style.background = 'var(--kt-chalkboard, #1F3A2E)'; }}
           >
-            {generatingInstrument
-              ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }} /> Generating instrument…</>
-              : <><Sparkles size={13} /> {instrument ? 'Regenerate' : 'Generate'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}{!freeMode && ' (5 tokens)'}</>}
+            {generatingInstrument ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Bumubuo ng Instrumento…
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} /> {instrument ? 'Muling Bumuo' : 'Bumuo ng'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}{!freeMode && ' (5 tokens)'}
+              </>
+            )}
           </button>
           {generatingInstrument && instrumentStatusMsg && (
-            <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{instrumentStatusMsg}</p>
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)' }}>
+              {instrumentStatusMsg}
+            </p>
           )}
         </div>
 
         {/* Instrument output */}
         {instrument && (
-          <div style={{ background:'var(--kt-surface)', borderRadius:14, border:'1px solid var(--kt-border)', padding:'20px 22px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-              {(() => { const t = INSTRUMENT_TYPES.find(x => x.id === instrumentType); return t ? <t.Icon size={14} color="#2d6a4f" /> : null; })()}
-              <p style={{ margin:0, fontSize:13, fontWeight:700, color:'#1a3d2b' }}>
+          <div style={{
+            background: 'var(--kt-card, #FBF7EC)',
+            borderRadius: 'var(--kt-radius-md, 6px)',
+            border: '1px solid var(--kt-border, #DCD0AE)',
+            padding: '24px',
+            boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              {(() => { const t = INSTRUMENT_TYPES.find(x => x.id === instrumentType); return t ? <t.Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" /> : null; })()}
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                 {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}
-              </p>
-              <span style={{ fontSize:10, fontWeight:600, color:'#4a6357', background:'#d8f3dc', borderRadius:20, padding:'2px 8px', marginLeft:4 }}>
-                Ready to use
+              </h3>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', borderRadius: 3, padding: '2px 8px', marginLeft: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                Handa nang Gamitin (Ready to Use)
               </span>
             </div>
             <InstrumentDisplay type={instrumentType} data={instrument} />

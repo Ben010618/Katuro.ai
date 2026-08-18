@@ -67,31 +67,52 @@ async function fetchAISuggestion(problemText, themeName) {
 /* ── Styles ──────────────────────────────────────────────────────────────── */
 
 const CSS = `
-  .ar-theme-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media(max-width:640px){ .ar-theme-grid{grid-template-columns:1fr;} }
+  .ar-theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .ar-theme-grid { grid-template-columns: 1fr; } }
 `;
 
 const fieldStyle = {
-  width:'100%', boxSizing:'border-box', padding:'10px 12px',
-  border:'1.5px solid rgba(45,106,79,0.2)', borderRadius:8,
-  fontSize:14, background:'#f5faf7', color:'#163828',
-  outline:'none', fontFamily:'inherit', transition:'border 0.15s, box-shadow 0.15s',
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  border: '1px solid var(--kt-border, #DCD0AE)',
+  borderRadius: 'var(--kt-radius-sm, 4px)',
+  fontSize: 13.5,
+  background: 'var(--kt-card-2, #F4EDDB)',
+  color: 'var(--kt-text-primary, #262119)',
+  outline: 'none',
+  fontFamily: 'inherit',
+  transition: 'border-color 0.15s, background 0.15s',
 };
+
 const labelStyle = {
-  display:'block', fontSize:11, fontWeight:700, color:'#4a6357',
-  textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6,
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--kt-text-secondary, #6E6455)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  marginBottom: 6,
+  fontFamily: 'var(--kt-font-mono, monospace)',
 };
-const focus = e => { e.target.style.borderColor='#2d6a4f'; e.target.style.boxShadow='0 0 0 3px rgba(45,106,79,0.1)'; };
-const blur  = e => { e.target.style.borderColor='rgba(45,106,79,0.2)'; e.target.style.boxShadow='none'; };
+
+const focus = e => {
+  e.target.style.borderColor = 'var(--kt-manila-border, #C9B583)';
+  e.target.style.background = '#ffffff';
+};
+
+const blur = e => {
+  e.target.style.borderColor = 'var(--kt-border, #DCD0AE)';
+  e.target.style.background = 'var(--kt-card-2, #F4EDDB)';
+};
 
 /* ── Component ───────────────────────────────────────────────────────────── */
 
 export default function ActionResearchPhase1() {
   const { user, freeMode } = useAuth();
   const navigate   = useNavigate();
-  const { docId: urlDocId } = useParams(); // present when resuming an existing project
+  const { docId: urlDocId } = useParams();
 
-  // Persisted Firestore doc ID (set when we first save or when resuming)
   const [docId, setDocId] = useState(urlDocId || null);
 
   const [selectedTheme,  setSelectedTheme]  = useState('teaching-learning');
@@ -119,84 +140,86 @@ export default function ActionResearchPhase1() {
     (async () => {
       if (!urlDocId || !user?.uid) { setLoadingResume(false); return; }
       try {
-        const data = await getActionResearch(user.uid, urlDocId);
-        if (data.beraTheme)         setSelectedTheme(data.beraTheme);
-        if (data.gradeLevel)        setGradeLevel(data.gradeLevel);
-        if (data.subjectArea)       setSubjectArea(data.subjectArea);
-        if (data.schoolYear)        setSchoolYear(data.schoolYear);
-        if (data.schoolName)        setSchoolName(data.schoolName);
-        if (data.problemText)       setProblemText(data.problemText);
-        if (data.researchTitles?.length) setResearchTitles(data.researchTitles);
-        if (data.selectedTitle)     setSelectedTitle(data.selectedTitle);
-        if (data.aiProblemStatement) {
-          setAiSuggestion({ problemStatement: data.aiProblemStatement, interventions: [] });
+        const saved = await getActionResearch(user.uid, urlDocId);
+        if (saved) {
+          if (saved.beraTheme)      setSelectedTheme(saved.beraTheme);
+          if (saved.gradeLevel)     setGradeLevel(saved.gradeLevel);
+          if (saved.subjectArea)    setSubjectArea(saved.subjectArea);
+          if (saved.schoolYear)     setSchoolYear(saved.schoolYear);
+          if (saved.schoolName)     setSchoolName(saved.schoolName);
+          if (saved.problemText)    setProblemText(saved.problemText);
+          if (saved.researchTitles) setResearchTitles(saved.researchTitles);
+          if (saved.selectedTitle)  setSelectedTitle(saved.selectedTitle);
+          if (saved.aiSuggestion)   setAiSuggestion(saved.aiSuggestion);
         }
-      } catch {
-        // no saved data to resume from — proceed with a blank form
+      } catch (err) {
+        console.error('Failed to load saved action research:', err);
       } finally {
         setLoadingResume(false);
       }
     })();
   }, [urlDocId, user?.uid]);
 
-  /* ── Debounced AI problem suggestion ─────────────────────────────────── */
-  const triggerAI = useCallback((text, themeId) => {
-    clearTimeout(debounceRef.current);
-    if (!text.trim() || text.length < 20) { setAiSuggestion(null); return; }
-    debounceRef.current = setTimeout(async () => {
-      const theme = BERA_THEMES.find(t => t.id === themeId);
-      if (!theme) return;
-      setAiLoading(true);
-      try   { setAiSuggestion(await fetchAISuggestion(text, theme.name)); }
-      catch { /* silent */ }
-      finally { setAiLoading(false); }
-    }, 800);
-  }, []);
-
-  useEffect(() => {
-    if (loadingResume) return undefined; // don't fire while restoring saved data
-    // triggerAI can itself call setState synchronously (its own too-short-text
-    // early return) — deferring the call one tick keeps this effect's own
-    // body free of a direct/indirect synchronous setState.
-    const deferId = setTimeout(() => triggerAI(problemText, selectedTheme), 0);
-    return () => { clearTimeout(deferId); clearTimeout(debounceRef.current); };
-  }, [problemText, selectedTheme, triggerAI, loadingResume]);
-
-  /* Theme change: manually clear titles (not via useEffect) so that
-     loading saved data doesn't accidentally clear them. */
-  function handleThemeSelect(id) {
-    if (id === selectedTheme) return;
-    setSelectedTheme(id);
-    setBerfDismissed(false);
-    setResearchTitles([]);
-    setSelectedTitle('');
-  }
-
-  /* ── Save helpers ─────────────────────────────────────────────────────── */
-  function buildPayload(extras = {}) {
-    return {
-      phase: 1, status: 'in-progress',
-      beraTheme: selectedTheme,
-      gradeLevel, subjectArea, schoolYear, schoolName, problemText,
-      aiProblemStatement: aiSuggestion?.problemStatement ?? '',
-      ...extras,
-    };
-  }
+  /* ── Save helper: writes to Firestore, returns docId ─────────────────── */
+  const buildPayload = useCallback((extra = {}) => ({
+    userId:        user.uid,
+    phase:         1,
+    beraTheme:     selectedTheme,
+    gradeLevel,
+    subjectArea,
+    schoolYear,
+    schoolName,
+    problemText,
+    researchTitles,
+    selectedTitle,
+    aiSuggestion,
+    updatedAt:     serverTimestamp(),
+    ...extra,
+  }), [user?.uid, selectedTheme, gradeLevel, subjectArea, schoolYear, schoolName, problemText, researchTitles, selectedTitle, aiSuggestion]);
 
   async function saveToFirestore(payload) {
-    if (!user?.uid) return null;
     if (docId) {
       await updateActionResearch(user.uid, docId, payload);
       return docId;
     }
-    const ref = await addDoc(actionResearchColRef(user.uid), {
+    const newDoc = await addDoc(actionResearchColRef(user.uid), {
       ...payload,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
     });
-    setDocId(ref.id);
-    return ref.id;
+    setDocId(newDoc.id);
+    return newDoc.id;
   }
+
+  /* ── Theme select — switches theme and clears BERF dismiss ───────────── */
+  function handleThemeSelect(themeId) {
+    setSelectedTheme(themeId);
+    setBerfDismissed(false);
+    setResearchTitles([]);
+    setSelectedTitle('');
+    setAiSuggestion(null);
+  }
+
+  /* ── Debounced AI problem suggestion ─────────────────────────────────── */
+  useEffect(() => {
+    if (problemText.trim().length < 20) {
+      setAiSuggestion(null);
+      setAiLoading(false);
+      return;
+    }
+    setAiLoading(true);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const suggestion = await fetchAISuggestion(problemText, currentTheme?.name ?? selectedTheme);
+        setAiSuggestion(suggestion);
+      } catch (err) {
+        console.error('AI suggestion failed:', err);
+      } finally {
+        setAiLoading(false);
+      }
+    }, 1200);
+    return () => clearTimeout(debounceRef.current);
+  }, [problemText, selectedTheme, currentTheme?.name]);
 
   /* ── Generate titles — also saves progress to Firestore ──────────────── */
   async function handleGenerateTitles() {
@@ -218,14 +241,14 @@ export default function ActionResearchPhase1() {
         } catch (err) {
           lastErr = err;
           console.warn(`generateResearchTitles attempt ${attempt + 1} failed:`, err);
-          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
+          if (err.dailyLimit) break;
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 6000 + attempt * 3000;
-            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+            setStatusMsg(`May kaunting pagkaantala sa server — muling susubukan sa ${Math.round(wait / 1000)}s…`);
             await new Promise(r => setTimeout(r, wait));
-            setStatusMsg('Regenerating titles…');
+            setStatusMsg('Muling bumubuo ng mga pamagat…');
           }
         }
       }
@@ -234,7 +257,6 @@ export default function ActionResearchPhase1() {
       const titles = result.titles ?? [];
       setResearchTitles(titles);
       setSelectedTitle('');
-      // Save intermediate state so the project appears in the dashboard
       await saveToFirestore(buildPayload({ researchTitles: titles, selectedTitle: '' }));
       trackEvent(user.uid, 'action_research_phase1_generated', { subject: subjectArea, grade: gradeLevel });
       trackGeneration(user.uid, 'ar_phase1', { success: true, durationMs: elapsedMs() });
@@ -278,10 +300,10 @@ export default function ActionResearchPhase1() {
   /* ── Loading skeleton while restoring saved data ─────────────────────── */
   if (loadingResume) {
     return (
-      <ActionResearchShell phase={1} canNext={false} nextLabel="Next: Research Questions" themeName="">
-        <div style={{ textAlign:'center', padding:'60px 0', color:'#4a6357', fontSize:14 }}>
-          <Loader2 size={28} color="#2d6a4f" style={{ animation:'spin 1s linear infinite', marginBottom:12 }} />
-          <p style={{ margin:0 }}>Loading your saved research…</p>
+      <ActionResearchShell phase={1} canNext={false} nextLabel="Susunod na Phase" themeName="">
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--kt-text-secondary, #6E6455)', fontSize: 14 }}>
+          <Loader2 size={28} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+          <p style={{ margin: 0, fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>Ikinakarga ang iyong na-save na pananaliksik…</p>
         </div>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </ActionResearchShell>
@@ -293,55 +315,175 @@ export default function ActionResearchPhase1() {
     <ActionResearchShell
       phase={1}
       canNext={canProceed}
-      nextLabel="Next: Research Questions"
+      nextLabel="Susunod: Research Questions"
       onNext={handleNext}
       nextLoading={saving}
       themeName={currentTheme?.name}
     >
       <style>{CSS}</style>
-      <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Resume banner */}
         {urlDocId && (
-          <div style={{ background:'#eef2ff', border:'1px solid rgba(79,70,229,0.2)', borderRadius:10, padding:'11px 16px', display:'flex', alignItems:'center', gap:10 }}>
-            <CheckCircle2 size={14} color="#4f46e5" />
-            <p style={{ margin:0, fontSize:13, color:'#312e81', fontWeight:500 }}>
-              Resuming your saved research project — all previous inputs have been restored.
+          <div style={{
+            background: 'var(--kt-manila, #E4D5AC)',
+            border: '1px solid var(--kt-manila-border, #C9B583)',
+            borderRadius: 'var(--kt-radius-sm, 4px)',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <CheckCircle2 size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary, #262119)', fontWeight: 600 }}>
+              Ipinagpapatuloy ang na-save na action research project — naibalik ang lahat ng naunang impormasyon.
             </p>
           </div>
         )}
 
         {/* BERF alert */}
         {showBerf && (
-          <div style={{ background:'#fffbeb', border:'1px solid #f59e0b', borderRadius:10, padding:'13px 16px', display:'flex', alignItems:'flex-start', gap:10 }}>
-            <AlertTriangle size={15} color="#d97706" style={{ flexShrink:0, marginTop:1 }} />
-            <div style={{ flex:1 }}>
-              <p style={{ margin:0, fontSize:13, fontWeight:600, color:'#92400e' }}>Possible BERF grant alignment</p>
-              <p style={{ margin:'3px 0 0', fontSize:12, color:'#78350f', lineHeight:1.5 }}>Your topic may align with BERF grant funding priorities. Completing this research could qualify you to apply.</p>
+          <div style={{
+            background: 'var(--kt-manila, #E4D5AC)',
+            border: '1px solid var(--kt-manila-border, #C9B583)',
+            borderRadius: 'var(--kt-radius-md, 6px)',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}>
+            <AlertTriangle size={17} color="var(--kt-chalkboard, #1F3A2E)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                May Posibilidad sa BERF Grant Funding Alignment
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+                Ang napiling tema ay nakahanay sa mga prayoridad ng Basic Education Research Fund (BERF). Ang pagkumpleto sa pananaliksik na ito ay makatutulong para sa opisyal na grant application.
+              </p>
             </div>
-            <button onClick={() => setBerfDismissed(true)} style={{ background:'none', border:'none', cursor:'pointer', color:'#92400e', padding:2 }}><X size={14} /></button>
+            <button
+              onClick={() => setBerfDismissed(true)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary, #6E6455)', padding: 2 }}
+              aria-label="Dismiss alert"
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 
         {/* 1. BERA theme */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>1. Select your BERA theme</p>
-          <p style={{ margin:'0 0 18px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>Choose the research area that matches your classroom problem.</p>
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 8px rgba(38, 33, 25, 0.04)',
+        }}>
+          <h2 style={{
+            margin: '0 0 4px',
+            fontSize: 17,
+            fontWeight: 700,
+            color: 'var(--kt-text-primary, #262119)',
+            fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
+          }}>
+            1. Piliin ang BERA Theme
+          </h2>
+          <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+            Piliin ang research area na tumutugma sa suliranin sa inyong silid-aralan o paaralan.
+          </p>
+
           <div className="ar-theme-grid">
             {BERA_THEMES.map(({ id, name, Icon, description, tags }) => {
               const active = selectedTheme === id;
               return (
-                <button key={id} onClick={() => handleThemeSelect(id)} style={{ textAlign:'left', cursor:'pointer', fontFamily:'inherit', background:active?'#f0f9f4':'#fafafa', border:active?'2px solid #2d6a4f':'1.5px solid rgba(45,106,79,0.15)', borderRadius:12, padding:'16px', transition:'border 0.15s, background 0.15s', position:'relative' }}
-                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background='#f5faf7';}}
-                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='#fafafa';}}>
-                  {active && <div style={{ position:'absolute', top:10, right:10, background:'#2d6a4f', color:'#fff', fontSize:10, fontWeight:700, borderRadius:20, padding:'2px 8px' }}>Selected</div>}
-                  <div style={{ width:38, height:38, borderRadius:9, background:active?'rgba(45,106,79,0.12)':'rgba(45,106,79,0.07)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:10 }}>
-                    <Icon size={18} color={active?'#2d6a4f':'#4a6357'} />
+                <button
+                  key={id}
+                  onClick={() => handleThemeSelect(id)}
+                  style={{
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    background: active ? 'var(--kt-manila, #E4D5AC)' : 'var(--kt-card-2, #F4EDDB)',
+                    border: active ? '1px solid var(--kt-manila-border, #C9B583)' : '1px solid var(--kt-border, #DCD0AE)',
+                    borderRadius: 'var(--kt-radius-sm, 4px)',
+                    padding: '16px',
+                    transition: 'border-color 0.15s, background 0.15s, transform 0.15s',
+                    position: 'relative',
+                    boxShadow: active ? '0 2px 8px rgba(38, 33, 25, 0.08)' : 'none',
+                  }}
+                  onMouseEnter={e => {
+                    if (!active) {
+                      e.currentTarget.style.borderColor = 'var(--kt-manila-border, #C9B583)';
+                      e.currentTarget.style.background = '#ebe2cc';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!active) {
+                      e.currentTarget.style.borderColor = 'var(--kt-border, #DCD0AE)';
+                      e.currentTarget.style.background = 'var(--kt-card-2, #F4EDDB)';
+                    }
+                  }}
+                >
+                  {active && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      background: 'var(--kt-chalkboard, #1F3A2E)',
+                      color: '#FBF7EC',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      borderRadius: 3,
+                      padding: '2px 8px',
+                      fontFamily: 'var(--kt-font-mono, monospace)',
+                      letterSpacing: '0.04em',
+                    }}>
+                      NAPILI
+                    </div>
+                  )}
+
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 4,
+                    background: active ? 'var(--kt-chalkboard, #1F3A2E)' : 'rgba(38, 33, 25, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <Icon size={18} color={active ? '#FBF7EC' : 'var(--kt-chalkboard, #1F3A2E)'} />
                   </div>
-                  <p style={{ margin:'0 0 5px', fontSize:13, fontWeight:700, color:active?'#1a3d2b':'#0d2218', paddingRight:active?52:0 }}>{name}</p>
-                  <p style={{ margin:'0 0 10px', fontSize:12, color:'#4a6357', lineHeight:1.5 }}>{description}</p>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    {tags.map(t => <span key={t} style={{ fontSize:10, fontWeight:600, color:active?'#1a3d2b':'#4a6357', background:active?'rgba(45,106,79,0.1)':'rgba(45,106,79,0.06)', borderRadius:20, padding:'2px 8px' }}>{t}</span>)}
+
+                  <p style={{
+                    margin: '0 0 5px',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--kt-text-primary, #262119)',
+                    fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
+                    paddingRight: active ? 56 : 0,
+                  }}>
+                    {name}
+                  </p>
+                  <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+                    {description}
+                  </p>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {tags.map(t => (
+                      <span key={t} style={{
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        color: 'var(--kt-text-primary, #262119)',
+                        background: active ? 'rgba(38, 33, 25, 0.1)' : 'rgba(38, 33, 25, 0.05)',
+                        border: '1px solid var(--kt-border, #DCD0AE)',
+                        borderRadius: 3,
+                        padding: '2px 7px',
+                        fontFamily: 'var(--kt-font-mono, monospace)',
+                      }}>
+                        {t}
+                      </span>
+                    ))}
                   </div>
                 </button>
               );
@@ -350,66 +492,148 @@ export default function ActionResearchPhase1() {
         </div>
 
         {/* 2. Problem form */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>2. Describe the problem</p>
-          <p style={{ margin:'0 0 20px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>Fill in your classroom context and the problem you have observed.</p>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 8px rgba(38, 33, 25, 0.04)',
+        }}>
+          <h2 style={{
+            margin: '0 0 4px',
+            fontSize: 17,
+            fontWeight: 700,
+            color: 'var(--kt-text-primary, #262119)',
+            fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
+          }}>
+            2. Ilarawan ang Suliranin (Problem Context)
+          </h2>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+            Ilagay ang konteksto ng iyong klase at ang partikular na suliraning naobserbahan sa pagkatuto.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div>
-              <label style={labelStyle}>Grade level</label>
-              <select value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} style={{...fieldStyle,height:42}}>
-                <option value="">Select grade…</option>
-                {GRADE_LEVELS.map(g=><option key={g} value={g}>{g}</option>)}
+              <label style={labelStyle}>Baitang (Grade Level)</label>
+              <select value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} style={{ ...fieldStyle, height: 42 }}>
+                <option value="">Pumili ng baitang…</option>
+                {GRADE_LEVELS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Subject area</label>
-              <select value={subjectArea} onChange={e=>setSubjectArea(e.target.value)} style={{...fieldStyle,height:42}}>
-                <option value="">Select subject…</option>
-                {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+              <label style={labelStyle}>Asignatura (Subject Area)</label>
+              <select value={subjectArea} onChange={e => setSubjectArea(e.target.value)} style={{ ...fieldStyle, height: 42 }}>
+                <option value="">Pumili ng asignatura…</option>
+                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div>
-              <label style={labelStyle}>School year</label>
-              <input type="text" value={schoolYear} onChange={e=>setSchoolYear(e.target.value)} placeholder="2025–2026" style={fieldStyle} onFocus={focus} onBlur={blur} />
+              <label style={labelStyle}>Taong Panuruan (School Year)</label>
+              <input type="text" value={schoolYear} onChange={e => setSchoolYear(e.target.value)} placeholder="2025–2026" style={fieldStyle} onFocus={focus} onBlur={blur} />
             </div>
             <div>
-              <label style={labelStyle}>School name</label>
-              <input type="text" value={schoolName} onChange={e=>setSchoolName(e.target.value)} placeholder="Mabini National High School" style={fieldStyle} onFocus={focus} onBlur={blur} />
+              <label style={labelStyle}>Pangalan ng Paaralan (School Name)</label>
+              <input type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Mabini National High School" style={fieldStyle} onFocus={focus} onBlur={blur} />
             </div>
           </div>
+
           <div>
-            <label style={labelStyle}>Observed classroom problem <span style={{color:'#e05c5c'}}>*</span></label>
-            <textarea rows={4} value={problemText} onChange={e=>setProblemText(e.target.value)}
-              placeholder="Describe the specific problem — e.g., low reading comprehension scores, difficulty with fractions…"
-              style={{...fieldStyle,height:'auto',resize:'vertical',lineHeight:1.6,padding:'10px 12px'}}
-              onFocus={focus} onBlur={blur} />
-            <p style={{ margin:'5px 0 0', fontSize:11, color:'#9bb8ac' }}>Type at least 20 characters to generate AI suggestions and research titles.</p>
+            <label style={labelStyle}>
+              Naobserbahang Suliranin sa Klase <span style={{ color: 'var(--kt-danger, #A23B2E)' }}>*</span>
+            </label>
+            <textarea
+              rows={4}
+              value={problemText}
+              onChange={e => setProblemText(e.target.value)}
+              placeholder="Ilarawan ang suliranin — hal., mababang antas ng pag-unawa sa pagbasa (reading comprehension), kahirapan sa paglutas ng fractions, mababang attendance…"
+              style={{ ...fieldStyle, height: 'auto', resize: 'vertical', lineHeight: 1.6, padding: '10px 12px' }}
+              onFocus={focus}
+              onBlur={blur}
+            />
+            <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--kt-text-secondary, #6E6455)', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+              Mag-type ng hindi bababa sa 20 characters upang makabuo ng AI suggestions at mga pamagat.
+            </p>
           </div>
         </div>
 
         {/* AI problem statement suggestion (free, debounced) */}
         {(aiLoading || aiSuggestion) && (
-          <div style={{ background:'#f0f9f4', border:'1.5px solid rgba(45,106,79,0.2)', borderRadius:12, padding:'18px 20px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-              <Sparkles size={14} color="#2d6a4f" />
-              <span style={{ fontSize:11, fontWeight:700, color:'#2d6a4f', textTransform:'uppercase', letterSpacing:'0.06em' }}>AI suggestion</span>
-              {aiLoading && <Loader2 size={12} color="#4a6357" style={{ animation:'spin 1s linear infinite', marginLeft:4 }} />}
+          <div style={{
+            background: 'var(--kt-card-2, #F4EDDB)',
+            border: '1px solid var(--kt-manila-border, #C9B583)',
+            borderRadius: 'var(--kt-radius-md, 6px)',
+            padding: '20px 22px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+              <Sparkles size={15} color="var(--kt-chalkboard, #1F3A2E)" />
+              <span style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: 'var(--kt-chalkboard, #1F3A2E)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                fontFamily: 'var(--kt-font-mono, monospace)',
+              }}>
+                Mungkahi ng AI Assistant (Problem & Interventions)
+              </span>
+              {aiLoading && <Loader2 size={13} color="var(--kt-text-secondary)" style={{ animation: 'spin 1s linear infinite', marginLeft: 4 }} />}
             </div>
+
             {aiSuggestion && (
               <>
-                <div style={{ background:'#fff', borderRadius:8, border:'1px solid rgba(45,106,79,0.12)', padding:'12px 14px', marginBottom:12 }}>
-                  <p style={{ margin:'0 0 3px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Suggested problem statement</p>
-                  <p style={{ margin:0, fontSize:13, color:'#163828', lineHeight:1.65 }}>{aiSuggestion.problemStatement}</p>
+                <div style={{
+                  background: 'var(--kt-card, #FBF7EC)',
+                  borderRadius: 'var(--kt-radius-sm, 4px)',
+                  border: '1px solid var(--kt-border, #DCD0AE)',
+                  padding: '12px 14px',
+                  marginBottom: 12,
+                }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                    Pormal na Pahayag ng Suliranin (Problem Statement)
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.6 }}>
+                    {aiSuggestion.problemStatement}
+                  </p>
                 </div>
+
                 {aiSuggestion.interventions?.length > 0 && (
                   <>
-                    <p style={{ margin:'0 0 8px', fontSize:10, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Suggested interventions</p>
-                    {aiSuggestion.interventions.map((t,i)=>(
-                      <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#fff', borderRadius:8, border:'1px solid rgba(45,106,79,0.1)', padding:'9px 12px', marginBottom:6 }}>
-                        <div style={{ width:18, height:18, borderRadius:'50%', background:'#2d6a4f', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, flexShrink:0, marginTop:1 }}>{i+1}</div>
-                        <p style={{ margin:0, fontSize:12, color:'#163828', lineHeight:1.55 }}>{t}</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                      Iminungkahing Interbensyon (Suggested Interventions)
+                    </p>
+                    {aiSuggestion.interventions.map((t, i) => (
+                      <div key={i} style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        background: 'var(--kt-card, #FBF7EC)',
+                        borderRadius: 'var(--kt-radius-sm, 4px)',
+                        border: '1px solid var(--kt-border, #DCD0AE)',
+                        padding: '10px 12px',
+                        marginBottom: 6,
+                      }}>
+                        <div style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: 'var(--kt-chalkboard, #1F3A2E)',
+                          color: '#FBF7EC',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          marginTop: 1,
+                        }}>
+                          {i + 1}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.5 }}>
+                          {t}
+                        </p>
                       </div>
                     ))}
                   </>
@@ -420,36 +644,129 @@ export default function ActionResearchPhase1() {
         )}
 
         {/* 3. Generate and choose research title */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>3. Choose a research title</p>
-          <p style={{ margin:'0 0 18px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>Generate 5 AI-suggested titles based on your BERA theme and problem, then select one.</p>
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 8px rgba(38, 33, 25, 0.04)',
+        }}>
+          <h2 style={{
+            margin: '0 0 4px',
+            fontSize: 17,
+            fontWeight: 700,
+            color: 'var(--kt-text-primary, #262119)',
+            fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
+          }}>
+            3. Pumili ng Pamagat ng Pananaliksik (Research Title)
+          </h2>
+          <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+            Bumuo ng 5 AI-suggested titles batay sa iyong BERA theme at inilarawang suliranin, pagkatapos ay pumili ng isa.
+          </p>
 
           {problemText.trim().length < 20 ? (
-            <p style={{ fontSize:13, color:'#9bb8ac', fontStyle:'italic' }}>Complete the problem description above first.</p>
+            <p style={{ fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', fontStyle: 'italic' }}>
+              Mangyaring kumpletuhin muna ang paglalarawan ng suliranin sa itaas.
+            </p>
           ) : (
             <button
               onClick={handleGenerateTitles}
               disabled={titlesLoading}
-              style={{ display:'flex', alignItems:'center', gap:7, background:titlesLoading?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff', border:'none', borderRadius:8, padding:'10px 18px', fontSize:13, fontWeight:600, cursor:titlesLoading?'not-allowed':'pointer', fontFamily:'inherit', marginBottom: researchTitles.length?16:0 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: titlesLoading ? 'var(--kt-border, #DCD0AE)' : 'var(--kt-chalkboard, #1F3A2E)',
+                color: '#FBF7EC',
+                border: 'none',
+                borderRadius: 'var(--kt-radius-sm, 4px)',
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: titlesLoading ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--kt-font-ui, "Inter", sans-serif)',
+                marginBottom: researchTitles.length ? 16 : 0,
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={e => { if (!titlesLoading) e.currentTarget.style.background = 'var(--kt-chalkboard-hover, #2B4E3E)'; }}
+              onMouseLeave={e => { if (!titlesLoading) e.currentTarget.style.background = 'var(--kt-chalkboard, #1F3A2E)'; }}
             >
-              {titlesLoading ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating titles…</> : <><Sparkles size={13} /> Generate research titles{!freeMode && ' (5 tokens)'}</>}
+              {titlesLoading ? (
+                <>
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Bumubuo ng mga pamagat…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  Bumuo ng mga Pamagat (Generate Titles){!freeMode && ' (5 tokens)'}
+                </>
+              )}
             </button>
           )}
-          {titlesLoading && statusMsg && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{statusMsg}</p>}
+          {titlesLoading && statusMsg && (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)' }}>
+              {statusMsg}
+            </p>
+          )}
 
           {researchTitles.length > 0 && (
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {researchTitles.map((title, i) => {
                 const active = selectedTitle === title;
                 return (
-                  <button key={i} onClick={() => setSelectedTitle(title)}
-                    style={{ textAlign:'left', fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:12, background:active?'#f0f9f4':'#fafafa', border:active?'2px solid #2d6a4f':'1.5px solid rgba(45,106,79,0.15)', borderRadius:10, padding:'14px 16px', transition:'border 0.15s, background 0.15s' }}
-                    onMouseEnter={e=>{if(!active)e.currentTarget.style.background='#f5faf7';}}
-                    onMouseLeave={e=>{if(!active)e.currentTarget.style.background='#fafafa';}}>
-                    <div style={{ width:20, height:20, borderRadius:'50%', border:active?'none':'2px solid rgba(45,106,79,0.3)', background:active?'#2d6a4f':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
-                      {active && <CheckCircle2 size={14} color="#fff" />}
+                  <button
+                    key={i}
+                    onClick={() => setSelectedTitle(title)}
+                    style={{
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                      background: active ? 'var(--kt-manila, #E4D5AC)' : 'var(--kt-card-2, #F4EDDB)',
+                      border: active ? '1px solid var(--kt-manila-border, #C9B583)' : '1px solid var(--kt-border, #DCD0AE)',
+                      borderRadius: 'var(--kt-radius-sm, 4px)',
+                      padding: '14px 16px',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      if (!active) {
+                        e.currentTarget.style.borderColor = 'var(--kt-manila-border, #C9B583)';
+                        e.currentTarget.style.background = '#ebe2cc';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!active) {
+                        e.currentTarget.style.borderColor = 'var(--kt-border, #DCD0AE)';
+                        e.currentTarget.style.background = 'var(--kt-card-2, #F4EDDB)';
+                      }
+                    }}
+                  >
+                    <div style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      border: active ? 'none' : '2px solid var(--kt-border, #DCD0AE)',
+                      background: active ? 'var(--kt-chalkboard, #1F3A2E)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}>
+                      {active && <CheckCircle2 size={14} color="#FBF7EC" />}
                     </div>
-                    <p style={{ margin:0, fontSize:13, color:active?'#1a3d2b':'#0d2218', lineHeight:1.6, fontWeight:active?600:400 }}>{title}</p>
+                    <p style={{
+                      margin: 0,
+                      fontSize: 13.5,
+                      color: 'var(--kt-text-primary, #262119)',
+                      lineHeight: 1.6,
+                      fontWeight: active ? 700 : 500,
+                      fontFamily: active ? 'var(--kt-font-heading, "Bitter", serif)' : 'inherit',
+                    }}>
+                      {title}
+                    </p>
                   </button>
                 );
               })}

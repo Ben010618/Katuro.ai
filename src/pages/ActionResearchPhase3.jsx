@@ -10,11 +10,11 @@ import { trackEvent, trackGeneration, startTimer } from '../services/usageTracke
 import ActionResearchShell  from '../components/ActionResearchShell';
 
 const SECTIONS = [
-  { key:'globalPerspective',    label:'Global Perspective',    Icon:Globe },
-  { key:'nationalPerspective',  label:'National Perspective',  Icon:MapPin },
-  { key:'localPerspective',     label:'Local Perspective',     Icon:School },
-  { key:'classroomPerspective', label:'Classroom Perspective', Icon:BookOpen },
-  { key:'synthesis',            label:'Synthesis',             Icon:Link2 },
+  { key:'globalPerspective',    label:'Global Perspective (Pandaigdigang Konteksto)',    Icon:Globe },
+  { key:'nationalPerspective',  label:'National Perspective (Pambansang Konteksto)',  Icon:MapPin },
+  { key:'localPerspective',     label:'Local Perspective (Lokal at Pansangay na Konteksto)',     Icon:School },
+  { key:'classroomPerspective', label:'Classroom Perspective (Konteksto ng Silid-Aralan)', Icon:BookOpen },
+  { key:'synthesis',            label:'Synthesis (Sintesis at Kaugnayan ng Pag-aaral)',             Icon:Link2 },
 ];
 
 export default function ActionResearchPhase3() {
@@ -45,7 +45,7 @@ export default function ActionResearchPhase3() {
 
   async function handleGenerate() {
     if (!user?.uid || !docData || generating) return;
-    const initialStatus = 'This may take 15–30 seconds. Researching global, national, local, and classroom literature…';
+    const initialStatus = 'Maaaring tumagal ito nang 15–30 segundo. Nagsasagawa ng pagsasaliksik sa pandaigdigan, pambansa, at lokal na literatura…';
     setGenerating(true); setError(''); setStatusMsg(initialStatus);
     let elapsedMs;
     let tokensDeducted = false;
@@ -69,14 +69,14 @@ export default function ActionResearchPhase3() {
         } catch (err) {
           lastErr = err;
           console.warn(`generateLiteratureReview attempt ${attempt + 1} failed:`, err);
-          if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
+          if (err.dailyLimit) break;
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
               : 6000 + attempt * 3000;
-            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+            setStatusMsg(`May kaunting pagkaantala sa server — muling susubukan sa ${Math.round(wait / 1000)}s…`);
             await new Promise(r => setTimeout(r, wait));
-            setStatusMsg('Re-researching your literature review…');
+            setStatusMsg('Muling sinasaliksik ang literature review…');
           }
         }
       }
@@ -123,8 +123,8 @@ export default function ActionResearchPhase3() {
   }
 
   if (pageLoading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5faf7' }}>
-      <Loader2 size={24} color="#2d6a4f" style={{ animation:'spin 1s linear infinite' }} />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--kt-surface, #FBF7EC)' }}>
+      <Loader2 size={24} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
@@ -134,7 +134,7 @@ export default function ActionResearchPhase3() {
     <ActionResearchShell
       phase={3}
       canNext={!!litReview}
-      nextLabel="Next: Action Plan"
+      nextLabel="Susunod: Action Plan"
       onNext={handleNext}
       nextLoading={saving}
       onDownload={litReview ? handleDownload : undefined}
@@ -142,57 +142,131 @@ export default function ActionResearchPhase3() {
       onBack={() => navigate(`/action-research/phase-2/${docId}`)}
       themeName={themeName}
     >
-      <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Context */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'20px 24px' }}>
-          <p style={{ margin:'0 0 2px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Research title</p>
-          <p style={{ margin:'0 0 10px', fontSize:15, fontWeight:600, color:'#1a3d2b', lineHeight:1.5 }}>{docData?.selectedTitle}</p>
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '20px 24px',
+          boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+        }}>
+          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+            Pamagat ng Pananaliksik (Research Title)
+          </p>
+          <h2 style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)', lineHeight: 1.4 }}>
+            {docData?.selectedTitle}
+          </h2>
           {docData?.selectedQuestions?.length > 0 && (
-            <>
-              <p style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#4a6357', textTransform:'uppercase', letterSpacing:'0.06em' }}>Selected research questions</p>
+            <div style={{
+              background: 'var(--kt-card-2, #F4EDDB)',
+              border: '1px solid var(--kt-border, #DCD0AE)',
+              borderRadius: 'var(--kt-radius-sm, 4px)',
+              padding: '12px 14px',
+              marginTop: 10,
+            }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                Mga Napiling Katanungan (Selected Research Questions)
+              </p>
               {docData.selectedQuestions.map((q, i) => (
-                <p key={i} style={{ margin:'0 0 4px', fontSize:12, color:'#163828', lineHeight:1.55 }}>
-                  <span style={{ fontWeight:700, color:'#2d6a4f' }}>RQ{i+1}.</span> {q}
+                <p key={i} style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.55 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', marginRight: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>RQ{i + 1}.</span> {q}
                 </p>
               ))}
-            </>
+            </div>
           )}
         </div>
 
         {/* Generate */}
-        <div style={{ background:'#fff', borderRadius:14, border:'1px solid rgba(45,106,79,0.12)', padding:'22px 24px' }}>
-          <p style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:'#0d2218' }}>Literature Review</p>
-          <p style={{ margin:'0 0 16px', fontSize:13, color:'#4a6357', lineHeight:1.5 }}>
-            AI generates a Funnel Format review — from global research down to your classroom context.
+        <div style={{
+          background: 'var(--kt-card, #FBF7EC)',
+          borderRadius: 'var(--kt-radius-md, 6px)',
+          border: '1px solid var(--kt-border, #DCD0AE)',
+          padding: '24px',
+          boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+        }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+            Review of Related Literature (RRL)
+          </h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
+            Bumubuo ang AI ng Funnel Format RRL — mula sa pandaigdigang pag-aaral, pambansang konteksto ng DepEd, hanggang sa lokal at silid-aralan.
           </p>
-          <button onClick={handleGenerate} disabled={generating} style={{
-            display:'flex', alignItems:'center', gap:7,
-            background:generating?'rgba(45,106,79,0.35)':'#2d6a4f', color:'#fff',
-            border:'none', borderRadius:8, padding:'10px 18px', fontSize:13, fontWeight:600,
-            cursor:generating?'not-allowed':'pointer', fontFamily:'inherit',
-          }}>
-            {generating
-              ? <><Loader2 size={13} style={{animation:'spin 1s linear infinite'}} /> Generating literature review…</>
-              : <><Sparkles size={13} /> {litReview ? 'Regenerate' : 'Generate'} literature review{!freeMode && ' (5 tokens)'}</>}
+
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: generating ? 'var(--kt-border, #DCD0AE)' : 'var(--kt-chalkboard, #1F3A2E)',
+              color: '#FBF7EC',
+              border: 'none',
+              borderRadius: 'var(--kt-radius-sm, 4px)',
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: generating ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--kt-font-ui, "Inter", sans-serif)',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={e => { if (!generating) e.currentTarget.style.background = 'var(--kt-chalkboard-hover, #2B4E3E)'; }}
+            onMouseLeave={e => { if (!generating) e.currentTarget.style.background = 'var(--kt-chalkboard, #1F3A2E)'; }}
+          >
+            {generating ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Bumubuo ng Literature Review…
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} /> {litReview ? 'Muling Bumuo (Regenerate RRL)' : 'Bumuo ng Literature Review'}{!freeMode && ' (5 tokens)'}
+              </>
+            )}
           </button>
-          {generating && <p style={{ margin:'10px 0 0', fontSize:12, color:'#4a6357' }}>{statusMsg}</p>}
+          {generating && (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)' }}>
+              {statusMsg}
+            </p>
+          )}
         </div>
 
         {/* Results */}
         {litReview && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {SECTIONS.map(({ key, label, Icon }) => (
               litReview[key] ? (
-                <div key={key} style={{ background:'#fff', borderRadius:12, border:'1px solid rgba(45,106,79,0.12)', padding:'18px 22px' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-                    <div style={{ width:30, height:30, borderRadius:8, background:'#d8f3dc', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <Icon size={14} color="#2d6a4f" />
+                <div
+                  key={key}
+                  style={{
+                    background: 'var(--kt-card, #FBF7EC)',
+                    borderRadius: 'var(--kt-radius-md, 6px)',
+                    border: '1px solid var(--kt-border, #DCD0AE)',
+                    padding: '20px 24px',
+                    boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 4,
+                      background: 'var(--kt-manila, #E4D5AC)',
+                      border: '1px solid var(--kt-manila-border, #C9B583)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" />
                     </div>
-                    <p style={{ margin:0, fontSize:13, fontWeight:700, color:'#1a3d2b' }}>{label}</p>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                      {label}
+                    </p>
                   </div>
                   {litReview[key].split('\n').filter(Boolean).map((para, i) => (
-                    <p key={i} style={{ margin:'0 0 10px', fontSize:13, color:'#163828', lineHeight:1.7, textAlign:'justify', textIndent:'2em' }}>{para}</p>
+                    <p key={i} style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75, textAlign: 'justify', textIndent: '2em' }}>
+                      {para}
+                    </p>
                   ))}
                 </div>
               ) : null
@@ -200,8 +274,22 @@ export default function ActionResearchPhase3() {
           </div>
         )}
 
-        {error && <div style={{ background:'#fde8e8', border:'1px solid rgba(224,92,92,0.3)', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#c0392b', fontWeight:500 }}>{error}</div>}
+        {error && (
+          <div style={{
+            background: 'var(--kt-danger-tint, #FBEAE8)',
+            border: '1px solid rgba(162, 59, 46, 0.3)',
+            borderRadius: 'var(--kt-radius-sm, 4px)',
+            padding: '10px 14px',
+            fontSize: 13,
+            color: 'var(--kt-danger, #A23B2E)',
+            fontWeight: 600,
+            fontFamily: 'var(--kt-font-mono, monospace)',
+          }}>
+            {error}
+          </div>
+        )}
       </div>
     </ActionResearchShell>
   );
 }
+
