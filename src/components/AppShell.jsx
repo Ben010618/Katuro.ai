@@ -89,87 +89,82 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
   const btn = {
     width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-    padding: '7px 10px', borderRadius: 7, border: 'none', cursor: 'pointer',
+    padding: '7px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
     background: 'transparent', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
     transition: 'background 0.14s',
   };
 
   return (
-    <div style={{ width: 220, height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--kt-sidebar-bg)', borderRight: '1px solid var(--kt-border)', padding: '18px 10px' }}>
+    <div style={{ width: 220, height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--kt-sidebar-bg)', borderRight: '1px solid rgba(220,208,174,0.25)', padding: '18px 10px' }}>
 
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px' }}>
-        <img src={ktLogo} alt="kaTuro AI" style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, objectFit: 'cover' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px', borderBottom: '1px solid rgba(220,208,174,0.12)', marginBottom: 12 }}>
+        <img src={ktLogo} alt="kaTuro AI" style={{ width: 32, height: 32, borderRadius: 6, flexShrink: 0, objectFit: 'cover' }} />
         <div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1 }}>kaTuro AI</p>
-          <p style={{ margin: 0, marginTop: 3, fontSize: 10, color: 'var(--kt-text-secondary)', lineHeight: 1 }}>Teacher Co-pilot</p>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#FBF7EC', lineHeight: 1.1, fontFamily: 'var(--kt-font-heading)' }}>kaTuro AI</p>
+          <p style={{ margin: 0, marginTop: 3, fontSize: 10.5, color: '#E4D5AC', lineHeight: 1, letterSpacing: '0.04em' }}>Teacher's Desk</p>
         </div>
         {onClose && (
-          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#4a6357', padding: 4 }}>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#DCD0AE', padding: 4 }}>
             <X size={16} />
           </button>
         )}
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
         {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => highlight ? {
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 10px', borderRadius: 9, textDecoration: 'none',
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px', borderRadius: 6, textDecoration: 'none',
               background: highlight === 'red'
-                ? 'linear-gradient(160deg, #dc2626 0%, #b91c1c 60%, #450a0a 100%)'
-                : 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)',
-              color: '#fff', fontWeight: 700, fontSize: 13,
-              marginBottom: 6,
-              boxShadow: isActive
-                ? (highlight === 'red' ? '0 3px 14px rgba(127,29,29,0.55)' : '0 3px 14px rgba(13,34,24,0.55)')
-                : (highlight === 'red' ? '0 2px 8px rgba(127,29,29,0.35)' : '0 2px 8px rgba(13,34,24,0.35)'),
-              transition: 'box-shadow 0.14s, transform 0.14s',
-              transform: isActive ? 'scale(1.01)' : 'none',
+                ? '#A23B2E'
+                : (isActive ? '#E4D5AC' : 'rgba(0,0,0,0.2)'),
+              border: highlight === 'red'
+                ? '1px solid rgba(255,255,255,0.15)'
+                : (isActive ? '1px solid #C9B583' : '1px solid rgba(220,208,174,0.15)'),
+              color: highlight === 'red'
+                ? '#ffffff'
+                : (isActive ? '#262119' : '#FBF7EC'),
+              fontWeight: isActive ? 700 : 600, fontSize: 13,
+              marginBottom: 4,
+              transition: 'all 0.15s ease',
             } : {
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 10px', borderRadius: 9, textDecoration: 'none',
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px', borderRadius: 6, textDecoration: 'none',
               background: isActive
-                ? isNew
-                  ? (dark ? 'rgba(83,74,183,0.22)' : '#ede9ff')
-                  : (dark ? 'rgba(34,197,94,0.18)' : '#bbf7d0')
-                : isNew
-                  ? (dark ? 'rgba(83,74,183,0.10)' : 'rgba(83,74,183,0.06)')
-                  : 'transparent',
+                ? '#E4D5AC'
+                : 'transparent',
               color: isActive
-                ? isNew ? '#534AB7' : '#14532d'
-                : isNew ? '#534AB7' : 'var(--kt-text-secondary)',
-              fontWeight: isActive ? 700 : isNew ? 600 : 500, fontSize: 13,
+                ? '#262119'
+                : 'rgba(251,247,236,0.85)',
+              fontWeight: isActive ? 700 : 500, fontSize: 13,
+              border: isActive ? '1px solid #C9B583' : '1px solid transparent',
               transition: 'background 0.14s, color 0.14s',
-              borderLeft: isActive
-                ? `3px solid ${isNew ? '#534AB7' : '#22c55e'}`
-                : isNew ? '3px solid rgba(83,74,183,0.3)' : '3px solid transparent',
             }}
             onMouseEnter={e => {
               if (highlight) {
-                e.currentTarget.style.boxShadow = highlight === 'red' ? '0 4px 18px rgba(127,29,29,0.65)' : '0 4px 18px rgba(13,34,24,0.65)';
+                if (highlight === 'red') e.currentTarget.style.background = '#8A3226';
                 return;
               }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
-                Object.assign(e.currentTarget.style, isNew
-                  ? { background: dark ? 'rgba(83,74,183,0.18)' : '#ede9ff', color: '#534AB7' }
-                  : { background: dark ? 'rgba(82,183,136,0.12)' : '#dcfce7', color: '#14532d' });
+                Object.assign(e.currentTarget.style, {
+                  background: 'rgba(228,213,172,0.12)',
+                  color: '#FBF7EC',
+                });
               }
             }}
             onMouseLeave={e => {
               if (highlight) {
-                const isActive = e.currentTarget.getAttribute('aria-current') === 'page';
-                e.currentTarget.style.boxShadow = highlight === 'red'
-                  ? (isActive ? '0 3px 14px rgba(127,29,29,0.55)' : '0 2px 8px rgba(127,29,29,0.35)')
-                  : (isActive ? '0 3px 14px rgba(13,34,24,0.55)' : '0 2px 8px rgba(13,34,24,0.35)');
+                if (highlight === 'red') e.currentTarget.style.background = '#A23B2E';
                 return;
               }
               if (e.currentTarget.getAttribute('aria-current') !== 'page') {
-                Object.assign(e.currentTarget.style, isNew
-                  ? { background: dark ? 'rgba(83,74,183,0.10)' : 'rgba(83,74,183,0.06)', color: '#534AB7' }
-                  : { background: 'transparent', color: 'var(--kt-text-secondary)' });
+                Object.assign(e.currentTarget.style, {
+                  background: 'transparent',
+                  color: 'rgba(251,247,236,0.85)',
+                });
               }
             }}
           >
@@ -177,30 +172,31 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
             <span style={{ flex: 1 }}>{label}</span>
             {isNew && (
               <span style={{
-                background: 'linear-gradient(135deg, #534AB7 0%, #1D9E75 100%)',
-                color: '#fff', borderRadius: 10, fontSize: 9, padding: '2px 7px',
-                fontWeight: 800, letterSpacing: '0.04em', lineHeight: '15px',
-                textTransform: 'uppercase',
+                background: '#E4D5AC',
+                color: '#262119', borderRadius: 4, fontSize: 9, padding: '1px 5px',
+                fontWeight: 700, letterSpacing: '0.04em', lineHeight: '14px',
+                textTransform: 'uppercase', border: '1px solid #C9B583',
               }}>NEW</span>
             )}
           </NavLink>
         ))}
 
         {/* Classroom box */}
-        <div style={{ marginTop: 10, borderRadius: 'var(--kt-radius-md)', background: 'linear-gradient(160deg, var(--kt-green-deep) 0%, var(--kt-green-dark) 60%, #12291d 100%)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 8px 8px', boxShadow: 'var(--kt-shadow-md), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-          <p style={{ margin: '0 0 7px 7px', fontSize: 9, fontWeight: 800, color: 'rgba(216,243,220,0.55)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>Classroom</p>
+        <div style={{ marginTop: 10, borderRadius: 6, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(220,208,174,0.15)', padding: '10px 8px 8px' }}>
+          <p style={{ margin: '0 0 7px 7px', fontSize: 9.5, fontWeight: 700, color: '#E4D5AC', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Classroom</p>
           {CLASSROOM_NAV.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} onClick={onClose}
               style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 10px', borderRadius: 'var(--kt-radius-sm)', textDecoration: 'none', marginBottom: 2,
-                background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                color: '#ffffff', fontWeight: isActive ? 700 : 500, fontSize: 13,
-                transition: 'background var(--kt-duration) var(--kt-ease)',
-                borderLeft: isActive ? '3px solid var(--kt-green-bright)' : '3px solid transparent',
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '8px 10px', borderRadius: 6, textDecoration: 'none', marginBottom: 2,
+                background: isActive ? '#E4D5AC' : 'transparent',
+                color: isActive ? '#262119' : 'rgba(251,247,236,0.85)',
+                fontWeight: isActive ? 700 : 500, fontSize: 13,
+                border: isActive ? '1px solid #C9B583' : '1px solid transparent',
+                transition: 'background 0.14s, color 0.14s',
               })}
-              onMouseEnter={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.09)' }); }}
-              onMouseLeave={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'transparent' }); }}
+              onMouseEnter={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'rgba(228,213,172,0.12)', color: '#FBF7EC' }); }}
+              onMouseLeave={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'transparent', color: 'rgba(251,247,236,0.85)' }); }}
             >
               <Icon size={15} style={{ flexShrink: 0 }} />
               {label}
@@ -210,9 +206,9 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
         {isAdmin && (
           <NavLink to="/admin" onClick={onClose}
-            style={({ isActive }) => ({ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, padding: '8px 10px', borderRadius: 9, textDecoration: 'none', background: isActive ? 'rgba(232,163,32,0.18)' : 'transparent', color: isActive ? '#b47a10' : '#4a6357', fontWeight: isActive ? 700 : 500, fontSize: 13, transition: 'background 0.14s, color 0.14s' })}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,163,32,0.12)'; e.currentTarget.style.color = '#92400e'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#4a6357'; }}
+            style={({ isActive }) => ({ display: 'flex', alignItems: 'center', gap: 9, marginTop: 6, padding: '8px 10px', borderRadius: 6, textDecoration: 'none', background: isActive ? '#E4D5AC' : 'transparent', color: isActive ? '#262119' : '#DCD0AE', border: isActive ? '1px solid #C9B583' : '1px solid transparent', fontWeight: isActive ? 700 : 500, fontSize: 13, transition: 'background 0.14s, color 0.14s' })}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(228,213,172,0.12)'; e.currentTarget.style.color = '#FBF7EC'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#DCD0AE'; }}
           >
             <ShieldCheck size={15} style={{ flexShrink: 0 }} /> Admin
           </NavLink>
@@ -220,42 +216,43 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
       </nav>
 
       {/* ── Bottom panel ─────────────────────────────────────────────────────── */}
-      <div style={{ borderTop: '1px solid var(--kt-border)', paddingTop: 10, marginTop: 4 }}>
+      <div style={{ borderTop: '1px solid rgba(220,208,174,0.18)', paddingTop: 10, marginTop: 4 }}>
 
         {/* Avatar + name — click to open profile card */}
         <button onClick={openProfile}
-          style={{ ...btn, gap: 9, padding: '6px 10px', marginBottom: 6, borderRadius: 9, color: 'var(--kt-text-secondary)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          style={{ ...btn, gap: 9, padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(220,208,174,0.18)', color: '#FBF7EC' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.35)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.22)'; }}
         >
           <div style={{
-            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-            background: photoURL ? 'transparent' : 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+            width: 30, height: 30, borderRadius: 4, flexShrink: 0,
+            background: photoURL ? 'transparent' : '#2B4E3E',
             backgroundImage: photoURL ? `url(${photoURL})` : undefined,
             backgroundSize: 'cover', backgroundPosition: 'center',
-            display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 11, color: '#fff',
+            display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 11, color: '#E4D5AC',
+            border: '1px solid #C9B583',
           }}>{!photoURL && initials}</div>
           <div style={{ overflow: 'hidden', flex: 1, textAlign: 'left' }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--kt-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#FBF7EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
             {!freeMode
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><Coins size={10} color="#b47a10" /><span style={{ fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#c0392b' : '#b47a10', fontFamily: '"DM Mono", monospace' }}>{tokenBalance} tokens</span></div>
-              : <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>✦ Free Mode ON</span></div>
+              ? <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><Coins size={10} color="#E4D5AC" /><span style={{ fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#E06D5E' : '#E4D5AC', fontFamily: 'var(--kt-font-mono)' }}>{tokenBalance} tokens</span></div>
+              : <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><span style={{ fontSize: 10, fontWeight: 700, color: '#5F7A54' }}>✦ Free Mode ON</span></div>
             }
           </div>
         </button>
 
-        {/* Gear — roll-up dropdown (icon only, no label) */}
+        {/* Gear — roll-up dropdown */}
         <div ref={gearRef} style={{ position: 'relative' }}>
           {gearOpen && (
             <div style={{
               position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
-              background: dark ? '#1c2e22' : '#fff',
-              borderRadius: 10, boxShadow: '0 -6px 24px rgba(0,0,0,0.18)',
-              border: '1px solid var(--kt-border)', padding: 6, zIndex: 50,
+              background: '#16251E',
+              borderRadius: 6, boxShadow: '0 -6px 24px rgba(0,0,0,0.35)',
+              border: '1px solid rgba(220,208,174,0.22)', padding: 6, zIndex: 50,
             }}>
               <button onClick={() => { toggle(); setGearOpen(false); }}
-                style={{ ...btn, color: 'var(--kt-text-secondary)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
+                style={{ ...btn, color: '#FBF7EC' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(228,213,172,0.12)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
                 {dark ? <Sun size={13} /> : <Moon size={13} />}
@@ -382,31 +379,31 @@ export default function AppShell() {
             <div key={i} style={{ position: 'absolute', inset: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: i === slideIdx ? 0.07 : 0, transition: 'opacity 1.8s ease-in-out', pointerEvents: 'none', zIndex: 0 }} />
           ))}
 
-          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: 'var(--kt-shadow-sm)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
-            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#1a3d2b', alignItems: 'center' }}>
+          <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: '0 1px 2px rgba(38,33,25,0.04)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
+            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#1F3A2E', alignItems: 'center' }}>
               <Menu size={20} />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>kaTuro AI</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono)' }}>kaTuro AI</span>
               <ChevronRight size={11} color="var(--kt-border)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{pageTitle}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>{pageTitle}</span>
             </div>
-            <button onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 20, padding: '5px 13px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-surface)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+            <button onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '5px 12px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#E4D5AC'; e.currentTarget.style.color = '#262119'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; e.currentTarget.style.color = 'var(--kt-text-secondary)'; }}>
               <Lightbulb size={12} /> Request Feature
             </button>
             {freeMode ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(5,150,105,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#059669' }}>✦ Free Mode</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-success-tint)', border: '1px solid rgba(95,122,84,0.3)', borderRadius: 'var(--kt-radius-md)', padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-success)' }}>✦ Free Mode</div>
             ) : tokenBalance === 0 ? (
-              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1877f2', color: '#fff', border: 'none', borderRadius: 20, padding: '5px 13px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-chalkboard)', color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-md)', padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
-                <Zap size={12} /> Get Tokens
+                <Zap size={12} color="#E4D5AC" /> Get Tokens
               </button>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(232,163,32,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#b47a10' }}>
-                <Coins size={12} />
-                <span style={{ fontFamily: '"DM Mono", monospace' }}>{tokenBalance}</span>
-                <span style={{ fontWeight: 500 }}>tokens</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+                <Coins size={12} color="#8C7847" />
+                <span style={{ fontFamily: 'var(--kt-font-mono)', color: '#8C7847' }}>{tokenBalance}</span>
+                <span style={{ fontWeight: 500, color: 'var(--kt-text-secondary)' }}>tokens</span>
               </div>
             )}
           </header>

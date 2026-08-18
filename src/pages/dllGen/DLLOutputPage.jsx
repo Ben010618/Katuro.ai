@@ -29,11 +29,11 @@ const STEP_LABELS = {
   J: 'Additional activities for application or remediation',
 };
 
-const border = '1px solid #999';
-const base = { border, padding: '4px 6px', fontSize: 11, fontFamily: 'Arial, sans-serif', verticalAlign: 'top' };
-const hdr  = { ...base, background: '#d9e1f2', fontWeight: 700, textAlign: 'center', verticalAlign: 'middle', fontSize: 11 };
-const lbl  = { ...base, background: '#f2f2f2', fontWeight: 600, fontSize: 10, lineHeight: 1.4, verticalAlign: 'top' };
-const sec  = { ...base, background: '#d9e1f2', fontWeight: 700, fontSize: 11 };
+const border = '1px solid var(--kt-border)';
+const base = { border, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--kt-font-heading)', color: 'var(--kt-text-primary)', background: 'var(--kt-card)', verticalAlign: 'top' };
+const hdr  = { ...base, background: 'var(--kt-chalkboard)', color: '#FBF7EC', fontWeight: 700, textAlign: 'center', verticalAlign: 'middle', fontSize: 13, borderBottom: '2px solid var(--kt-manila-border)' };
+const lbl  = { ...base, background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)', fontWeight: 600, fontSize: 11.5, fontFamily: 'var(--kt-font-ui)' };
+const sec  = { ...base, background: 'var(--kt-chalkboard)', color: '#FBF7EC', fontWeight: 700, fontSize: 12, borderTop: '2px solid var(--kt-manila-border)' };
 
 // Maps BOW list → array of 5 entries (one per day Mon–Fri)
 function buildDayMap(list) {

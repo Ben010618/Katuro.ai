@@ -5,52 +5,91 @@ import { ClipboardList, ClipboardCheck, ArrowRight } from 'lucide-react';
 const TYPES = [
   {
     key: 'quiz',
-    color: '#1d4ed8', accentRgb: '29,78,216',
-    iconBg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
     Icon: ClipboardList,
     title: 'kaTuro AI Quiz Builder',
+    badge: 'Quick Assessment',
     description: 'Turn any lesson into a ready-to-print quiz in minutes. Pick a lesson, set your quiz preferences, then preview and print.',
   },
   {
     key: 'test',
-    color: '#534AB7', accentRgb: '83,74,183',
-    iconBg: 'linear-gradient(135deg, #ede9fe, #ddd6fe)',
     Icon: ClipboardCheck,
     title: 'kaTuro AI Test Builder',
-    badge: 'Newly Added · DepEd TOS',
+    badge: 'DepEd Table of Specifications (TOS)',
     description: 'Build a DepEd-compliant test with Bloom’s taxonomy levels and a full Table of Specifications, guided step by step.',
   },
 ];
 
 function TypeCard({ type, freeMode, onClick }) {
-  const { color, accentRgb, iconBg, Icon, title, badge, description } = type;
+  const { Icon, title, badge, description } = type;
   return (
     <button
       onClick={onClick}
-      className="kt-3d-card"
-      style={{ '--card-accent': accentRgb }}
+      style={{
+        background: 'var(--kt-card)',
+        borderRadius: 'var(--kt-radius-md)',
+        border: '1px solid var(--kt-border)',
+        padding: '24px',
+        textAlign: 'left',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        transition: 'all 0.15s ease',
+        boxShadow: 'var(--kt-shadow-sm)',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'var(--kt-manila-border)';
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = 'var(--kt-shadow-md)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--kt-border)';
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = 'var(--kt-shadow-sm)';
+      }}
     >
-      <div className="kt-3d-card-icon" style={{ background: iconBg }}>
-        <Icon size={22} color={color} />
+      <div style={{
+        width: 44,
+        height: 44,
+        borderRadius: 'var(--kt-radius-sm)',
+        background: 'var(--kt-card-2)',
+        border: '1px solid var(--kt-border)',
+        display: 'grid',
+        placeItems: 'center',
+      }}>
+        <Icon size={22} color="var(--kt-chalkboard)" />
       </div>
 
-      <div>
-        <p style={{ margin: badge ? '0 0 4px' : '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
+      <div style={{ flex: 1 }}>
+        <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>
           {title}
         </p>
         {badge && (
-          <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{
+            display: 'inline-block',
+            margin: '0 0 8px',
+            background: 'var(--kt-manila)',
+            color: 'var(--kt-text-primary)',
+            border: '1px solid var(--kt-manila-border)',
+            borderRadius: 'var(--kt-radius-sm)',
+            padding: '2px 8px',
+            fontSize: 10.5,
+            fontWeight: 700,
+            fontFamily: 'var(--kt-font-mono)',
+          }}>
             {badge}
-          </p>
+          </span>
         )}
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
           {description}
         </p>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-        {!freeMode && <span style={{ fontSize: 12, fontWeight: 600, color }}>3 tokens per generation</span>}
-        <ArrowRight size={14} color={color} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--kt-border)' }}>
+        {!freeMode ? <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-secondary)', fontFamily: 'var(--kt-font-mono)' }}>3 tokens per generation</span> : <div />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--kt-chalkboard)', fontWeight: 700, fontSize: 13 }}>
+          Open Tool <ArrowRight size={14} />
+        </div>
       </div>
     </button>
   );
@@ -71,22 +110,26 @@ export default function AssessmentGateway() {
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #0d2218, #2d6a4f)',
-            borderRadius: 10, padding: '6px 10px',
-            display: 'flex', alignItems: 'center', gap: 6,
+          <span style={{
+            background: 'var(--kt-manila)',
+            color: 'var(--kt-text-primary)',
+            border: '1px solid var(--kt-manila-border)',
+            borderRadius: 'var(--kt-radius-sm)',
+            padding: '3px 10px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            fontFamily: 'var(--kt-font-mono)',
           }}>
-            <ClipboardCheck size={13} color="#52b788" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#52b788', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              AI Assessment Tools
-            </span>
-          </div>
+            AI Assessment Tools
+          </span>
         </div>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1.2 }}>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1.2, fontFamily: 'var(--kt-font-heading)' }}>
           What would you like to build?
         </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
-          Choose a tool to get started.
+        <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
+          Choose an assessment tool from your Teacher's Desk.
         </p>
       </div>
 

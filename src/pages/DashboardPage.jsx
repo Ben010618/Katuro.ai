@@ -241,12 +241,20 @@ export default function DashboardPage() {
       <DailyMotivationalPopup />
       <SharesReminderPopup />
 
-      {/* Welcome banner */}
+      {/* Hero banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 50%, #2d6a4f 100%)',
-        borderRadius: 'var(--kt-radius-lg)', padding: '28px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        overflow: 'hidden', position: 'relative', boxShadow: 'var(--kt-shadow-md)',
+        background: 'var(--kt-chalkboard)',
+        borderRadius: 'var(--kt-radius-md)',
+        border: '1px solid var(--kt-manila-border)',
+        padding: '28px 32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 4px 16px rgba(31,58,46,0.15)',
       }}>
         {SLIDE_IMGS.map((src, i) => (
           <div key={i} style={{
@@ -254,37 +262,37 @@ export default function DashboardPage() {
             backgroundImage: `url(${src})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: i === slideIdx ? 0.09 : 0,
+            opacity: i === slideIdx ? 0.08 : 0,
             transition: 'opacity 1.8s ease-in-out',
-            borderRadius: 'var(--kt-radius-lg)',
+            borderRadius: 'var(--kt-radius-md)',
             pointerEvents: 'none',
           }} />
         ))}
 
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative' }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.6)' }}>{greeting()},</p>
-          <h1 style={{ margin: '4px 0 6px', fontSize: 28, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>
+          <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--kt-manila)', fontFamily: 'var(--kt-font-mono)', textTransform: 'uppercase', letterSpacing: '1px' }}>{greeting()},</p>
+          <h1 style={{ margin: '4px 0 6px', fontSize: 26, fontWeight: 700, color: '#FBF7EC', lineHeight: 1.15, fontFamily: 'var(--kt-font-heading)' }}>
             {form.name || displayName}
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
+          <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(251,247,236,0.8)' }}>
             {form.designation
               ? `${form.designation}${form.school ? ` · ${form.school}` : ''}`
               : totalLessons > 0
                 ? `${publishedCount} published lesson${publishedCount !== 1 ? 's' : ''} · ${totalLessons} total`
-                : 'Welcome — create your first AI-powered lesson plan'}
+                : "Welcome to your Teacher's Desk — create your first ILAW lesson plan"}
           </p>
         </div>
         <button
           onClick={() => navigate('/lesson-gen')}
           style={{
             display: 'flex', alignItems: 'center', gap: 8, position: 'relative',
-            background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', transition: 'background 0.2s',
+            background: 'var(--kt-manila)', border: '1px solid var(--kt-manila-border)',
+            borderRadius: 'var(--kt-radius-md)', padding: '10px 18px', color: 'var(--kt-text-primary)', fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', transition: 'background 0.15s, transform 0.15s',
+            fontFamily: 'inherit',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+          onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; e.currentTarget.style.transform = 'translateY(0)'; }}
         >
           <Sparkles size={15} /> New Lesson
         </button>
@@ -293,72 +301,70 @@ export default function DashboardPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
         <div style={{
-          background: 'var(--kt-card)', borderRadius: 14, padding: '18px 20px',
-          border: '1px solid var(--kt-border)', transition: 'all 0.18s',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', padding: '18px 20px',
+          border: '1px solid var(--kt-border)', transition: 'all 0.15s',
+          boxShadow: 'var(--kt-shadow-sm)',
         }}
-          onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: '#2d6a4f', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(45,106,79,0.12)' })}
-          onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(45,106,79,0.12)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
+          onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-manila-border)', transform: 'translateY(-1px)', boxShadow: 'var(--kt-shadow-md)' })}
+          onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-border)', transform: 'none', boxShadow: 'var(--kt-shadow-sm)' })}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#d8f3dc', display: 'grid', placeItems: 'center', marginBottom: 12 }}>
-            <BookOpen size={18} color="#2d6a4f" />
+          <div style={{ width: 34, height: 34, borderRadius: 4, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', display: 'grid', placeItems: 'center', marginBottom: 10 }}>
+            <BookOpen size={17} color="var(--kt-chalkboard)" />
           </div>
-          <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#2d6a4f', lineHeight: 1 }}>{loading ? '—' : totalLessons}</p>
-          <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Lesson Plans</p>
+          <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{loading ? '—' : totalLessons}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Lesson Plans</p>
         </div>
 
         {!researchLoading && (
           <div style={{
-            background: 'var(--kt-card)', borderRadius: 14, padding: '18px 20px',
-            border: '1px solid rgba(3,105,161,0.15)', transition: 'all 0.18s', cursor: 'pointer',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', padding: '18px 20px',
+            border: '1px solid var(--kt-border)', transition: 'all 0.15s', cursor: 'pointer',
+            boxShadow: 'var(--kt-shadow-sm)',
           }}
             onClick={() => navigate('/action-research/phase-1')}
-            onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: '#0369a1', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(3,105,161,0.12)' })}
-            onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'rgba(3,105,161,0.15)', transform: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' })}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-manila-border)', transform: 'translateY(-1px)', boxShadow: 'var(--kt-shadow-md)' })}
+            onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-border)', transform: 'none', boxShadow: 'var(--kt-shadow-sm)' })}
           >
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#e0f2fe', display: 'grid', placeItems: 'center', marginBottom: 12 }}>
-              <FlaskConical size={18} color="#0369a1" />
+            <div style={{ width: 34, height: 34, borderRadius: 4, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', display: 'grid', placeItems: 'center', marginBottom: 10 }}>
+              <FlaskConical size={17} color="var(--kt-chalkboard)" />
             </div>
-            <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: '#0369a1', lineHeight: 1 }}>{researches.length}</p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Research Projects</p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{researches.length}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Research Projects</p>
           </div>
         )}
       </div>
 
       {/* ── Classroom spotlight ──────────────────────────────────────────────── */}
       <div style={{
-        borderRadius: 16, overflow: 'hidden',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1a2236 50%, #1e293b 100%)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        borderRadius: 'var(--kt-radius-md)', overflow: 'hidden',
+        background: 'var(--kt-chalkboard)',
+        border: '1px solid rgba(220,208,174,0.2)',
+        boxShadow: '0 4px 16px rgba(31,58,46,0.12)',
         padding: '22px 24px',
         position: 'relative',
       }}>
-        {/* subtle glow orb */}
-        <div style={{ position: 'absolute', top: -40, right: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: 'rgba(148,163,184,0.7)', textTransform: 'uppercase', letterSpacing: '1.6px' }}>New Feature</p>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>Grading &amp; Classroom</h2>
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '1.4px', fontFamily: 'var(--kt-font-mono)' }}>Classroom Module</p>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>Grading &amp; Classroom Management</h2>
           </div>
         </div>
-        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
           {[
             { to: '/classroom-management', label: 'Classroom Management', sub: 'Manage sections, students & invitations', Icon: School },
             { to: '/classes-i-teach',      label: 'Classes I Teach',       sub: 'Enter grades and submit to adviser',      Icon: GraduationCap },
           ].map(({ to, label, sub, Icon }) => (
             <button key={to} onClick={() => navigate(to)} style={{
               display: 'flex', alignItems: 'center', gap: 13,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
+              background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(220,208,174,0.15)',
+              borderRadius: 'var(--kt-radius-md)', padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
               transition: 'background 0.15s, border-color 0.15s, transform 0.15s',
             }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.22)', transform: 'translateY(-2px)' })}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', transform: 'none' })}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(0,0,0,0.35)', borderColor: 'var(--kt-manila-border)', transform: 'translateY(-1px)' })}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(220,208,174,0.15)', transform: 'none' })}
             >
-              <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <Icon size={20} color="#fff" />
+              <div style={{ width: 38, height: 38, borderRadius: 4, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(220,208,174,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Icon size={18} color="var(--kt-manila)" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</p>

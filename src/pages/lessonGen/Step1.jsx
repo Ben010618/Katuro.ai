@@ -149,11 +149,11 @@ export default function Step1() {
     <div style={{maxWidth:900,margin:'0 auto'}}>
       {/* Phase badge + heading */}
       <div style={{marginBottom:28}}>
-        <span style={{background:'#ccfbf1',color:'#0d9488',borderRadius:20,padding:'4px 12px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'1px'}}>
-          Setup
+        <span style={{background:'var(--kt-manila)',color:'var(--kt-text-primary)',border:'1px solid var(--kt-manila-border)',borderRadius:'var(--kt-radius-sm)',padding:'3px 10px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'1px',fontFamily:'var(--kt-font-mono)'}}>
+          Step 1 · Setup
         </span>
-        <h2 style={{margin:'10px 0 6px',fontSize:22,fontWeight:600,color:'var(--kt-text-primary)'}}>Set up your teaching session</h2>
-        <p style={{margin:0,fontSize:15,color:'#4a6357',lineHeight:1.65,maxWidth:520}}>
+        <h2 style={{margin:'10px 0 6px',fontSize:24,fontWeight:700,color:'var(--kt-text-primary)',fontFamily:'var(--kt-font-heading)'}}>Set up your teaching session</h2>
+        <p style={{margin:0,fontSize:14,color:'var(--kt-text-secondary)',lineHeight:1.6,maxWidth:540}}>
           Select your subject, grade, term, and week. Then choose which days you will teach — each day you pick becomes one session in your ILAW lesson plan.
         </p>
       </div>
@@ -162,11 +162,11 @@ export default function Step1() {
       <div className="kt-grid-2" style={{gap:20,alignItems:'start'}}>
 
         {/* LEFT: Form */}
-        <div style={{background:'var(--kt-card)',border:'1px solid var(--kt-border)',borderRadius:14,padding:24,display:'flex',flexDirection:'column',gap:20}}>
+        <div style={{background:'var(--kt-card)',border:'1px solid var(--kt-border)',borderRadius:'var(--kt-radius-md)',padding:24,display:'flex',flexDirection:'column',gap:20,boxShadow:'var(--kt-shadow-sm)'}}>
 
           <div>
-            <label style={{display:'block',marginBottom:6,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
-              Subject area <span style={{color:'#e05c5c'}}>*</span>
+            <label style={{display:'block',marginBottom:6,fontSize:11.5,fontWeight:700,color:'var(--kt-text-secondary)',textTransform:'uppercase',letterSpacing:'1.2px'}}>
+              Subject area <span style={{color:'var(--kt-danger)'}}>*</span>
             </label>
             <select
               className="select"
@@ -178,16 +178,16 @@ export default function Step1() {
               }}
             >
               <option value="">Select subject...</option>
-              {SUBJECTS.map(o=><option key={o} value={o}>{o}</option>)}
-              <option value="Other">Other</option>
+              {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+              <option value="Other">Other (type manually)...</option>
             </select>
             {showOtherSubject && (
               <input
                 type="text"
                 className="input"
                 value={subject}
-                onChange={e => setSubject(e.target.value)}
-                placeholder="Type the subject name"
+                onChange={e=>setSubject(e.target.value)}
+                placeholder="Type your subject name..."
                 style={{marginTop:8}}
                 autoFocus
               />
@@ -195,51 +195,52 @@ export default function Step1() {
           </div>
 
           <div>
-            <label style={{display:'block',marginBottom:6,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
-              Grade level <span style={{color:'#e05c5c'}}>*</span>
+            <label style={{display:'block',marginBottom:6,fontSize:11.5,fontWeight:700,color:'var(--kt-text-secondary)',textTransform:'uppercase',letterSpacing:'1.2px'}}>
+              Grade level <span style={{color:'var(--kt-danger)'}}>*</span>
             </label>
             {S('grade level',{val:grade,set:setGrade,list:GRADES})}
           </div>
 
           <div>
-            <label style={{display:'block',marginBottom:8,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
-              Term <span style={{color:'#e05c5c'}}>*</span>
+            <label style={{display:'block',marginBottom:8,fontSize:11.5,fontWeight:700,color:'var(--kt-text-secondary)',textTransform:'uppercase',letterSpacing:'1.2px'}}>
+              Term <span style={{color:'var(--kt-danger)'}}>*</span>
             </label>
             <div style={{display:'flex',gap:8}}>
               {TERMS.map(t=>(
                 <button key={t} onClick={()=>setTerm(t)} style={{
-                  flex:1,padding:'9px 4px',borderRadius:10,border:'1.5px solid',
-                  borderColor: term===t ? '#1a3d2b' : 'rgba(45,106,79,0.2)',
-                  background:  term===t ? '#1a3d2b' : 'var(--kt-card)',
-                  color:       term===t ? '#fff' : '#4a6357',
-                  fontSize:13, fontWeight: term===t ? 600 : 400, cursor:'pointer', transition:'all 0.12s',
+                  flex:1,padding:'9px 4px',borderRadius:'var(--kt-radius-md)',border:'1px solid',
+                  borderColor: term===t ? 'var(--kt-chalkboard)' : 'var(--kt-border)',
+                  background:  term===t ? 'var(--kt-chalkboard)' : 'var(--kt-card-2)',
+                  color:       term===t ? '#fff' : 'var(--kt-text-primary)',
+                  fontSize:13, fontWeight: term===t ? 700 : 500, cursor:'pointer', transition:'all 0.12s',
+                  boxShadow: term===t ? '0 1px 2px rgba(31,58,46,0.15)' : 'none',
                 }}>
                   {t}
                 </button>
               ))}
             </div>
-            <p style={{margin:'6px 0 0',fontSize:11,color:'#4a6357',fontStyle:'italic'}}>MATATAG follows a 3-term school calendar</p>
+            <p style={{margin:'6px 0 0',fontSize:11.5,color:'var(--kt-text-secondary)',fontStyle:'italic'}}>MATATAG follows a 3-term school calendar</p>
           </div>
 
           <div>
-            <label style={{display:'block',marginBottom:6,fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>
-              Week <span style={{color:'#e05c5c'}}>*</span>
+            <label style={{display:'block',marginBottom:6,fontSize:11.5,fontWeight:700,color:'var(--kt-text-secondary)',textTransform:'uppercase',letterSpacing:'1.2px'}}>
+              Week <span style={{color:'var(--kt-danger)'}}>*</span>
             </label>
             {S('week',{val:week,set:setWeek,list:WEEKS})}
-            <p style={{margin:'5px 0 0',fontSize:11,color:'#4a6357'}}>Week number within the term</p>
+            <p style={{margin:'5px 0 0',fontSize:11.5,color:'var(--kt-text-secondary)'}}>Week number within the term</p>
           </div>
 
           {/* Lesson label */}
           {showLabel && (
             <div style={{
-              background:'#d8f3dc',border:'1px solid rgba(45,106,79,0.2)',borderRadius:12,padding:'14px 16px',
+              background:'var(--kt-card-2)',border:'1px solid var(--kt-border)',borderRadius:'var(--kt-radius-md)',padding:'14px 16px',
               animation:'fadeUp 0.25s ease',
             }}>
-              <p style={{margin:'0 0 4px',fontSize:11,fontWeight:700,color:'#4a6357',textTransform:'uppercase',letterSpacing:'1.2px'}}>YOUR LESSON</p>
-              <p style={{margin:0,fontSize:15,fontWeight:600,color:'var(--kt-text-primary)'}}>
+              <p style={{margin:'0 0 4px',fontSize:11,fontWeight:700,color:'var(--kt-text-secondary)',textTransform:'uppercase',letterSpacing:'1.2px',fontFamily:'var(--kt-font-mono)'}}>YOUR LESSON</p>
+              <p style={{margin:0,fontSize:15,fontWeight:700,color:'var(--kt-text-primary)',fontFamily:'var(--kt-font-heading)'}}>
                 {subject} {grade} · {term} · {week}
               </p>
-              <p style={{margin:'4px 0 0',fontSize:13,color:'#4a6357'}}>
+              <p style={{margin:'4px 0 0',fontSize:13,color:'var(--kt-text-secondary)'}}>
                 {days.length > 0
                   ? `${days.map(d=>formatChip(d)).join(' · ')} · ${days.length} session${days.length!==1?'s':''}`
                   : '← Select teaching days on the calendar'

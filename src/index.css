@@ -1,82 +1,94 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════
-   Design Tokens — kaTuro Design System
+   Design Tokens — "Modern Filipino Teacher's Desk"
+   Traditional school materials + modern productivity software + restrained AI
 ═══════════════════════════════════════════════════════════ */
 :root {
-  --kt-green-deep:     #0d2218;
-  --kt-green-dark:     #1a3d2b;
-  --kt-green-primary:  #2d6a4f;
-  --kt-green-mid:      #40916c;
-  --kt-green-bright:   #52b788;
-  --kt-green-tint:     #d8f3dc;
-  --kt-surface:        #f5faf7;
-  --kt-card:           #ffffff;
-  --kt-card-2:         #fafafa;
-  --kt-input-bg:       #f6faf8;
-  --kt-accent-amber:   #e8a320;
-  --kt-danger:         #e05c5c;
-  --kt-text-primary:   #0d2218;
-  --kt-text-secondary: #4a6357;
-  --kt-muted:          #9bb8a5;
-  --kt-border:         rgba(45,106,79,0.15);
-  --kt-sidebar-bg:     #ffffff;
-  --kt-topbar-bg:      #ffffff;
+  /* 1. Chalkboard Green (Primary Brand & Sidebar) */
+  --kt-chalkboard:       #1F3A2E;
+  --kt-chalkboard-hover: #2B4E3E;
+  --kt-green-deep:       #1F3A2E;
+  --kt-green-dark:       #1F3A2E;
+  --kt-green-primary:    #1F3A2E;
+  --kt-green-mid:        #2B4E3E;
+  --kt-green-bright:     #3D6A54;
+  --kt-green-tint:       #E7EEDF;
 
-  /* Semantic colors — distinct from brand green, so "success" doesn't have
-     to double as "brand" and both lose their meaning. */
-  --kt-success:      #16a34a;
-  --kt-success-tint: #dcfce7;
-  --kt-info:         #0284c7;
-  --kt-info-tint:    #e0f2fe;
-  --kt-warning:      #e8a320;
-  --kt-warning-tint: #fef3c7;
-  --kt-danger-tint:  #fde8e8;
+  /* 2. Manila Paper / Warm Gold (Accents, Tabs, Badges) */
+  --kt-manila:           #E4D5AC;
+  --kt-manila-border:    #C9B583;
+  --kt-manila-dark:      #8C7847;
 
-  /* Radius scale */
-  --kt-radius-sm:   8px;
-  --kt-radius-md:   14px;
-  --kt-radius-lg:   20px;
-  --kt-radius-pill: 999px;
+  /* 3. Paper Surface (Tactile Warm Paper & Secondary Cream) */
+  --kt-surface:          #FBF7EC;
+  --kt-card:             #FBF7EC;
+  --kt-card-2:           #F4EDDB;
+  --kt-input-bg:         #F4EDDB;
+  --kt-border:           #DCD0AE;
+  --kt-sidebar-bg:       #1F3A2E;
+  --kt-topbar-bg:        #FBF7EC;
 
-  /* Elevation — soft, tactile shadows (light mode). */
-  --kt-shadow-sm: 0 1px 2px rgba(13,34,24,0.06);
-  --kt-shadow-md: 0 8px 24px rgba(13,34,24,0.10);
-  --kt-shadow-lg: 0 24px 64px rgba(13,34,24,0.18);
+  /* 4. Ink Colors (Warm Printed Ink Text Hierarchy) */
+  --kt-text-primary:     #262119;
+  --kt-text-secondary:   #6E6455;
+  --kt-muted:            #A79C87;
+
+  /* 5. Semantic Colors (DepEd Red Warning & Sage Safe) */
+  --kt-danger:           #A23B2E;
+  --kt-danger-hover:     #8A3226;
+  --kt-danger-tint:      #F3E2DD;
+  --kt-success:          #5F7A54;
+  --kt-success-tint:     #E7EEDF;
+  --kt-warning:          #D97706;
+  --kt-warning-tint:     #FEF3C7;
+  --kt-info:             #2B4E3E;
+  --kt-info-tint:        #E7EEDF;
+
+  /* 6. Typography Stacks */
+  --kt-font-heading:     'Bitter', Georgia, "Times New Roman", serif;
+  --kt-font-ui:          'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --kt-font-mono:        'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* 7. Document-Grade Corner Radius (Crisp 6px Standard) */
+  --kt-radius-sm:        4px;
+  --kt-radius-md:        6px;
+  --kt-radius-lg:        8px;
+  --kt-radius-pill:      999px;
+
+  /* 8. Restrained Document Elevation */
+  --kt-shadow-sm:        0 1px 2px rgba(38,33,25,0.05);
+  --kt-shadow-md:        0 4px 12px rgba(38,33,25,0.08);
+  --kt-shadow-lg:        0 12px 28px rgba(38,33,25,0.12);
 
   /* Motion */
-  --kt-ease:     cubic-bezier(0.4, 0, 0.2, 1);
-  --kt-duration: 0.18s;
+  --kt-ease:             cubic-bezier(0.2, 0, 0, 1);
+  --kt-duration:         0.15s;
 }
 
 [data-dark="true"] {
-  --kt-surface:        #0c1a13;
-  --kt-card:           #112218;
-  --kt-card-2:         #182b20;
-  --kt-input-bg:       #1a2e22;
-  --kt-text-primary:   #dff0e5;
-  --kt-text-secondary: #7eb895;
-  --kt-muted:          #4a6357;
-  --kt-border:         rgba(82,183,136,0.16);
-  --kt-green-tint:     rgba(82,183,136,0.12);
-  --kt-green-deep:     #dff0e5;
-  --kt-sidebar-bg:     #0a1710;
-  --kt-topbar-bg:      #0e1f17;
+  --kt-surface:          #16251E;
+  --kt-card:             #1C2E25;
+  --kt-card-2:           #24382E;
+  --kt-input-bg:         #24382E;
+  --kt-text-primary:     #FBF7EC;
+  --kt-text-secondary:   #DCD0AE;
+  --kt-muted:            #8C7847;
+  --kt-border:           rgba(220, 208, 174, 0.22);
+  --kt-sidebar-bg:       #121F19;
+  --kt-topbar-bg:        #16251E;
   color-scheme: dark;
 
-  --kt-success:      #4ade80;
-  --kt-success-tint: rgba(74,222,128,0.12);
-  --kt-info:         #38bdf8;
-  --kt-info-tint:    rgba(56,189,248,0.12);
-  --kt-warning:      #fbbf24;
-  --kt-warning-tint: rgba(251,191,36,0.12);
-  --kt-danger-tint:  rgba(224,92,92,0.14);
+  --kt-danger:           #E06D5E;
+  --kt-danger-tint:      rgba(162, 59, 46, 0.25);
+  --kt-success:          #7DA370;
+  --kt-success-tint:     rgba(95, 122, 84, 0.25);
+  --kt-warning:          #E4D5AC;
+  --kt-warning-tint:     rgba(228, 213, 172, 0.2);
 
-  /* Dark-mode elevation — drop shadows disappear on dark backgrounds, so
-     depth comes from a faint light border/inset highlight instead. */
-  --kt-shadow-sm: 0 0 0 1px rgba(255,255,255,0.04);
-  --kt-shadow-md: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.32);
-  --kt-shadow-lg: 0 0 0 1px rgba(255,255,255,0.08), 0 24px 64px rgba(0,0,0,0.42);
+  --kt-shadow-sm:        0 0 0 1px rgba(220,208,174,0.08);
+  --kt-shadow-md:        0 4px 14px rgba(0,0,0,0.35);
+  --kt-shadow-lg:        0 12px 32px rgba(0,0,0,0.5);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -87,47 +99,39 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: var(--kt-font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--kt-surface);
   color: var(--kt-text-primary);
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 14.5px;
+  line-height: 1.6;
   min-height: 100vh;
 }
 
+h1, h2, h3, .doc-heading, .editorial-heading {
+  font-family: var(--kt-font-heading);
+  letter-spacing: -0.01em;
+}
+
+.mono-tag, .technical-code {
+  font-family: var(--kt-font-mono);
+}
+
 /* ═══════════════════════════════════════════════════════════
-   Scrollbar
+   Scrollbar (Tactile Paper Style)
 ═══════════════════════════════════════════════════════════ */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--kt-surface); }
 ::-webkit-scrollbar-thumb {
-  background: var(--kt-green-tint);
-  border-radius: 100px;
+  background: var(--kt-border);
+  border-radius: var(--kt-radius-sm);
   transition: background 0.2s;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--kt-green-mid); }
+::-webkit-scrollbar-thumb:hover { background: var(--kt-manila-border); }
 
 /* ═══════════════════════════════════════════════════════════
-   Typography Utilities
-═══════════════════════════════════════════════════════════ */
-.text-gradient {
-  background: linear-gradient(135deg, var(--kt-green-deep) 0%, var(--kt-green-primary) 60%, var(--kt-green-mid) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-light {
-  background: linear-gradient(90deg, #ffffff 0%, var(--kt-green-bright) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Card
+   Tactile Cards & Document Containers
 ═══════════════════════════════════════════════════════════ */
 .card {
   background: var(--kt-card);
@@ -135,173 +139,172 @@ body {
   border: 1px solid var(--kt-border);
   padding: 20px 24px;
   box-shadow: var(--kt-shadow-sm);
-  transition: border-color var(--kt-duration) var(--kt-ease), transform var(--kt-duration) var(--kt-ease), box-shadow var(--kt-duration) var(--kt-ease);
+  transition: border-color var(--kt-duration) var(--kt-ease), box-shadow var(--kt-duration) var(--kt-ease);
 }
 .card:hover {
-  border-color: rgba(45,106,79,0.3);
-  transform: translateY(-1px);
+  border-color: var(--kt-manila-border);
   box-shadow: var(--kt-shadow-md);
 }
 
-.card-accent {
-  position: relative;
-  overflow: hidden;
-}
-.card-accent::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--kt-green-deep), var(--kt-green-mid), var(--kt-green-primary));
-  border-radius: 14px 14px 0 0;
+.card-document {
+  background: var(--kt-card);
+  border-radius: var(--kt-radius-md);
+  border: 1px solid var(--kt-border);
+  box-shadow: 0 1px 3px rgba(38,33,25,0.06), 0 6px 16px rgba(38,33,25,0.03);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Buttons
+   Buttons — Professional Teacher's Desk
 ═══════════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: var(--kt-green-primary);
+  gap: 7px;
+  background: var(--kt-chalkboard);
   color: #ffffff;
   font-weight: 600;
-  font-size: 15px;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 20px;
+  font-size: 13.5px;
+  border: 1px solid var(--kt-chalkboard);
+  border-radius: var(--kt-radius-md);
+  padding: 8px 16px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
-  font-family: inherit;
+  font-family: var(--kt-font-ui);
+  box-shadow: 0 1px 2px rgba(31,58,46,0.12);
 }
-.btn-primary:hover:not(:disabled) { background: var(--kt-green-dark); }
-.btn-primary:active:not(:disabled) { background: var(--kt-green-deep); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) {
+  background: var(--kt-chalkboard-hover);
+  border-color: var(--kt-chalkboard-hover);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-secondary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: var(--kt-green-tint);
-  color: var(--kt-green-dark);
+  gap: 7px;
+  background: var(--kt-manila);
+  color: var(--kt-text-primary);
   font-weight: 600;
-  font-size: 15px;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 20px;
+  font-size: 13.5px;
+  border: 1px solid var(--kt-manila-border);
+  border-radius: var(--kt-radius-md);
+  padding: 8px 16px;
   cursor: pointer;
-  transition: background 0.2s ease;
-  font-family: inherit;
+  transition: background 0.15s ease, transform 0.15s ease;
+  font-family: var(--kt-font-ui);
 }
-.btn-secondary:hover:not(:disabled) { background: #c3e6cc; }
-.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary:hover:not(:disabled) {
+  background: #dac797;
+  transform: translateY(-1px);
+}
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-outline {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: var(--kt-green-primary);
-  font-weight: 600;
-  font-size: 15px;
-  border: 1.5px solid var(--kt-green-primary);
-  border-radius: 10px;
-  padding: 10px 20px;
+  gap: 7px;
+  background: var(--kt-card);
+  color: var(--kt-text-primary);
+  font-weight: 500;
+  font-size: 13.5px;
+  border: 1px solid var(--kt-border);
+  border-radius: var(--kt-radius-md);
+  padding: 8px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
+  transition: all 0.15s ease;
+  font-family: var(--kt-font-ui);
+  box-shadow: 0 1px 2px rgba(38,33,25,0.03);
 }
 .btn-outline:hover:not(:disabled) {
-  background: var(--kt-green-tint);
-  color: var(--kt-green-dark);
-  border-color: var(--kt-green-dark);
+  background: var(--kt-card-2);
+  border-color: var(--kt-manila-border);
+  color: var(--kt-chalkboard);
 }
-.btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-danger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: #fde8e8;
+  gap: 7px;
+  background: var(--kt-danger-tint);
   color: var(--kt-danger);
   font-weight: 600;
-  font-size: 15px;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 20px;
+  font-size: 13.5px;
+  border: 1px solid rgba(162, 59, 46, 0.3);
+  border-radius: var(--kt-radius-md);
+  padding: 8px 16px;
   cursor: pointer;
-  transition: background 0.2s ease;
-  font-family: inherit;
+  transition: background 0.15s ease;
+  font-family: var(--kt-font-ui);
 }
-.btn-danger:hover:not(:disabled) { background: #fbd3d3; }
+.btn-danger:hover:not(:disabled) {
+  background: #ebd2cb;
+  color: var(--kt-danger-hover);
+}
 
 /* ═══════════════════════════════════════════════════════════
-   Form Inputs
+   Form Inputs & Selects (Warm Manila / Paper Field Style)
 ═══════════════════════════════════════════════════════════ */
-.input {
+.input, input[type="text"], input[type="number"], textarea {
   width: 100%;
-  background: var(--kt-input-bg);
-  border: 1px solid rgba(45,106,79,0.2);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 15px;
+  background: var(--kt-card-2);
+  border: 1px solid var(--kt-border);
+  border-radius: var(--kt-radius-md);
+  padding: 9px 13px;
+  font-size: 14px;
   color: var(--kt-text-primary);
   outline: none;
-  font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: var(--kt-font-ui);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input:focus {
-  border-color: var(--kt-green-bright);
-  box-shadow: 0 0 0 2px rgba(82,183,136,0.25);
+.input:focus, input[type="text"]:focus, textarea:focus {
+  border-color: var(--kt-chalkboard);
+  box-shadow: 0 0 0 2px rgba(31,58,46,0.15);
+  background: #ffffff;
 }
-.input::placeholder { color: var(--kt-text-secondary); opacity: 0.5; }
-.input:disabled { opacity: 0.6; cursor: not-allowed; }
+.input::placeholder, textarea::placeholder {
+  color: var(--kt-muted);
+}
+.input:disabled, textarea:disabled {
+  opacity: 0.6; cursor: not-allowed;
+}
 
-.select {
+.select, select {
   width: 100%;
-  background: var(--kt-input-bg);
-  border: 1px solid rgba(45,106,79,0.2);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 15px;
+  background: var(--kt-card-2);
+  border: 1px solid var(--kt-border);
+  border-radius: var(--kt-radius-md);
+  padding: 9px 13px;
+  font-size: 14px;
   color: var(--kt-text-primary);
   outline: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234a6357' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236E6455' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
   cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: var(--kt-font-ui);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.select:focus {
-  border-color: var(--kt-green-bright);
-  box-shadow: 0 0 0 2px rgba(82,183,136,0.25);
+.select:focus, select:focus {
+  border-color: var(--kt-chalkboard);
+  box-shadow: 0 0 0 2px rgba(31,58,46,0.15);
+  background-color: #ffffff;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Badge / Status
+   Badges & Indicators
 ═══════════════════════════════════════════════════════════ */
-.badge-active  { background: var(--kt-green-tint);           color: var(--kt-green-dark); font-weight: 700; }
-.badge-draft   { background: rgba(232,163,32,0.15);          color: #b47a10;              font-weight: 700; }
-.badge-final   { background: var(--kt-green-tint);           color: var(--kt-green-dark); font-weight: 700; }
-.badge-failed  { background: #fde8e8;                        color: var(--kt-danger);     font-weight: 700; }
-
-/* ═══════════════════════════════════════════════════════════
-   Progress bar
-═══════════════════════════════════════════════════════════ */
-.progress-track {
-  background: var(--kt-green-tint);
-  border-radius: 100px;
-  overflow: hidden;
-}
-.progress-fill {
-  background: var(--kt-green-primary);
-  border-radius: 100px;
-  transition: width 0.4s ease;
-}
+.badge-active  { background: var(--kt-manila);      color: var(--kt-text-primary); border: 1px solid var(--kt-manila-border); font-weight: 600; border-radius: var(--kt-radius-sm); }
+.badge-draft   { background: var(--kt-warning-tint); color: #854d0e;               border: 1px solid #fde68a;                 font-weight: 600; border-radius: var(--kt-radius-sm); }
+.badge-safe    { background: var(--kt-success-tint); color: var(--kt-success);     border: 1px solid rgba(95,122,84,0.3);     font-weight: 600; border-radius: var(--kt-radius-sm); }
+.badge-danger  { background: var(--kt-danger-tint);  color: var(--kt-danger);      border: 1px solid rgba(162,59,46,0.3);     font-weight: 600; border-radius: var(--kt-radius-sm); }
 
 /* ═══════════════════════════════════════════════════════════
    Animations
@@ -312,105 +315,14 @@ body {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up { animation: fadeUp 0.35s ease forwards; }
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(82,183,136,0); }
-  50%       { box-shadow: 0 0 0 8px rgba(82,183,136,0.15); }
-}
-.animate-glow { animation: pulse-glow 2s ease-in-out infinite; }
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Responsive Grid Utilities
-   Many pages set gridTemplateColumns as an inline style, which
-   can't respond to a media query on its own. These classes own
-   the column count instead — apply as className alongside the
-   inline style (leave gap/marginBottom/etc. inline; just drop
-   `display` and `gridTemplateColumns` from the style object).
-═══════════════════════════════════════════════════════════ */
-.kt-grid-2         { display: grid; grid-template-columns: 1fr 1fr; }
-.kt-grid-3         { display: grid; grid-template-columns: repeat(3, 1fr); }
-.kt-grid-4         { display: grid; grid-template-columns: repeat(4, 1fr); }
-.kt-split-sidebar  { display: grid; grid-template-columns: 1fr 296px; }
-
-@media (max-width: 860px) {
-  .kt-grid-4 { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 640px) {
-  .kt-grid-2,
-  .kt-grid-3,
-  .kt-split-sidebar { grid-template-columns: 1fr; }
-}
-@media (max-width: 480px) {
-  .kt-grid-4 { grid-template-columns: 1fr; }
-}
-
-/* Wraps wide tables/dense rows so they scroll instead of squeezing/breaking. */
-.kt-scroll-x {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   3D Tactile Cards — clickable "choose one" cards with real
-   depth: ambient shadow, inset top-edge highlight, a lift +
-   zoom on hover, and a tactile press-down on click. Set
-   --card-accent to an "R,G,B" triplet to tint the hover glow.
-═══════════════════════════════════════════════════════════ */
-.kt-3d-card {
-  --card-accent: 45,106,79;
-  position: relative;
-  text-align: left;
-  background: linear-gradient(180deg, var(--kt-card) 0%, var(--kt-surface) 100%);
-  border: 1.5px solid rgba(var(--card-accent), 0.18);
-  border-radius: var(--kt-radius-lg);
-  padding: 26px 24px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  box-shadow: 0 1px 2px rgba(13,34,24,0.04), 0 6px 16px rgba(13,34,24,0.05), inset 0 1px 0 rgba(255,255,255,0.7);
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease;
-}
-.kt-3d-card:hover {
-  transform: translateY(-7.5px) scale(1.0375);
-  border-color: rgba(var(--card-accent), 0.55);
-  box-shadow: 0 1px 2px rgba(13,34,24,0.05), 0 22px 44px rgba(var(--card-accent), 0.18), inset 0 1px 0 rgba(255,255,255,0.85);
-}
-.kt-3d-card:active {
-  transform: translateY(-2px) scale(1.01);
-  transition-duration: 0.08s;
-  box-shadow: 0 1px 2px rgba(13,34,24,0.05), 0 10px 20px rgba(var(--card-accent), 0.2), inset 0 1px 0 rgba(255,255,255,0.7);
-}
-.kt-3d-card-icon {
-  width: 48px; height: 48px; border-radius: var(--kt-radius-md);
-  display: grid; place-items: center; flex-shrink: 0;
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.kt-3d-card:hover .kt-3d-card-icon { transform: scale(1.08) rotate(-3deg); }
-
-[data-dark="true"] .kt-3d-card {
-  background: linear-gradient(180deg, var(--kt-card) 0%, var(--kt-card-2) 100%);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 6px 16px rgba(0,0,0,0.3);
-}
-[data-dark="true"] .kt-3d-card:hover {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 22px 44px rgba(var(--card-accent), 0.24), 0 6px 16px rgba(0,0,0,0.35);
-}
-[data-dark="true"] .kt-3d-card:active {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 10px 20px rgba(var(--card-accent), 0.26), 0 6px 16px rgba(0,0,0,0.35);
-}
+.animate-fade-up { animation: fadeUp 0.25s ease forwards; }
 
 /* ═══════════════════════════════════════════════════════════
    Print
 ═══════════════════════════════════════════════════════════ */
 @media print {
-  body { background: white !important; }
+  body { background: white !important; color: black !important; }
 }

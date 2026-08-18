@@ -25,25 +25,29 @@ function sanitizeLessonTitle(name, fallbackTopic, subject) {
 }
 
 const baseTd = {
-  padding: '10px 12px',
+  padding: '10px 14px',
   verticalAlign: 'top',
-  border: '1px solid #d1d5db',
-  fontSize: 13,
+  border: '1px solid var(--kt-border)',
+  fontSize: 13.5,
   lineHeight: 1.65,
-  fontFamily: 'Georgia, "Times New Roman", serif',
+  color: 'var(--kt-text-primary)',
+  background: 'var(--kt-card)',
+  fontFamily: 'var(--kt-font-heading)',
 };
 
 const labelTd = {
   ...baseTd,
-  background: '#f9fafb',
+  background: 'var(--kt-card-2)',
+  color: 'var(--kt-text-secondary)',
   fontWeight: 700,
-  width: 190,
-  minWidth: 190,
+  fontFamily: 'var(--kt-font-ui)',
+  width: 200,
+  minWidth: 200,
 };
 
 function sub(text) {
   return (
-    <div style={{ fontWeight: 400, fontStyle: 'italic', fontSize: 11, color: '#6b7280', marginTop: 3, lineHeight: 1.4 }}>
+    <div style={{ fontWeight: 400, fontStyle: 'italic', fontSize: 11, color: 'var(--kt-text-secondary)', marginTop: 3, lineHeight: 1.4, fontFamily: 'var(--kt-font-ui)' }}>
       {text}
     </div>
   );
@@ -61,8 +65,8 @@ function PerSession({ sessions, get, amber, minHeight }) {
   return sessions.map((s, i) => (
     <td key={i} style={{
       ...baseTd,
-      ...(amber    ? { background: '#fffbeb' } : {}),
-      ...(minHeight ? { minHeight }            : {}),
+      ...(amber    ? { background: 'var(--kt-card-2)' } : {}),
+      ...(minHeight ? { minHeight }                    : {}),
     }}>
       <span style={{ whiteSpace: 'pre-line' }}>{get(s, i)}</span>
     </td>
@@ -72,14 +76,14 @@ function PerSession({ sessions, get, amber, minHeight }) {
 function SectionBanner({ n, title, desc }) {
   return (
     <tr>
-      <td colSpan={n + 1} style={{ ...baseTd, background: '#f3f4f6', padding: '12px 16px', borderTop: '2px solid #e5e7eb' }}>
+      <td colSpan={n + 1} style={{ ...baseTd, background: 'var(--kt-chalkboard)', color: '#FBF7EC', padding: '12px 18px', borderTop: '2px solid var(--kt-manila-border)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             <tr>
-              <td style={{ width: '22%', fontWeight: 800, fontStyle: 'italic', fontSize: 18, fontFamily: 'Georgia, serif', verticalAlign: 'top', paddingRight: 16, color: '#1f2937' }}>
+              <td style={{ width: '22%', fontWeight: 700, fontStyle: 'italic', fontSize: 17, fontFamily: 'var(--kt-font-heading)', verticalAlign: 'top', paddingRight: 16, color: '#FBF7EC' }}>
                 {title}
               </td>
-              <td style={{ fontStyle: 'italic', fontSize: 12, color: '#4b5563', lineHeight: 1.65, verticalAlign: 'top' }}>
+              <td style={{ fontStyle: 'italic', fontSize: 12.5, color: 'var(--kt-manila)', lineHeight: 1.6, verticalAlign: 'top', fontFamily: 'var(--kt-font-ui)' }}>
                 {desc}
               </td>
             </tr>
@@ -458,11 +462,11 @@ export default function OutputPage() {
       {/* ── Professional SaaS Action Toolbar ────────────────────────────── */}
       <div className="no-print" style={{
         position: 'sticky', top: 0, zIndex: 40,
-        background: '#ffffff', borderBottom: '1px solid #e5e7eb',
+        background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)',
         padding: '10px 24px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', gap: 12,
         margin: '-24px -24px 0',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+        boxShadow: '0 1px 3px rgba(38,33,25,0.04)',
       }}>
         {/* Left: Navigation */}
         <button
@@ -471,10 +475,10 @@ export default function OutputPage() {
           style={{
             background: 'transparent', border: '1px solid transparent',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 13, fontWeight: 600, color: '#374151',
-            padding: '7px 12px', borderRadius: 8,
+            fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)',
+            padding: '7px 12px', borderRadius: 'var(--kt-radius-md)',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >
           <ArrowLeft size={14} /> My Lessons
@@ -488,15 +492,15 @@ export default function OutputPage() {
             title="Download Word Document formatted to official DepEd standards"
             disabled={docxLoading}
             style={{
-              background: '#1b4332', color: '#ffffff',
-              border: '1px solid #1b4332', borderRadius: 8,
+              background: 'var(--kt-chalkboard)', color: '#ffffff',
+              border: '1px solid var(--kt-chalkboard)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 16px', fontSize: 12.5, fontWeight: 600,
               cursor: docxLoading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+              boxShadow: '0 1px 2px rgba(31,58,46,0.12)',
             }}
-            onMouseEnter={e => { if (!docxLoading) e.currentTarget.style.background = '#2d6a4f'; }}
-            onMouseLeave={e => { if (!docxLoading) e.currentTarget.style.background = '#1b4332'; }}
+            onMouseEnter={e => { if (!docxLoading) e.currentTarget.style.background = 'var(--kt-chalkboard-hover)'; }}
+            onMouseLeave={e => { if (!docxLoading) e.currentTarget.style.background = 'var(--kt-chalkboard)'; }}
             onClick={async () => {
               setDocxLoading(true);
               try {
@@ -536,34 +540,34 @@ export default function OutputPage() {
             title="Generate structured PowerPoint presentation deck"
             disabled={pptLoading}
             style={{
-              background: '#1e3a8a', color: '#ffffff',
-              border: '1px solid #1e3a8a', borderRadius: 8,
+              background: 'var(--kt-chalkboard)', color: '#ffffff',
+              border: '1px solid var(--kt-chalkboard)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 15px', fontSize: 12.5, fontWeight: 600,
               cursor: pptLoading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+              boxShadow: '0 1px 2px rgba(31,58,46,0.12)',
             }}
-            onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = '#1d4ed8'; }}
-            onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = '#1e3a8a'; }}
+            onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = 'var(--kt-chalkboard-hover)'; }}
+            onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = 'var(--kt-chalkboard)'; }}
             onClick={() => handleGeneratePresentation(0)}
           >
             {pptLoading
               ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
-              : <><Presentation size={14} /> Presentation</>}
+              : <><Presentation size={14} color="var(--kt-manila)" /> Presentation</>}
           </button>
 
           {/* Quiz Builder Action */}
           <button
             className="action-btn-clean"
             style={{
-              background: '#d97706', color: '#ffffff',
-              border: '1px solid #d97706', borderRadius: 8,
+              background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 14px', fontSize: 12.5, fontWeight: 600,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+              boxShadow: '0 1px 2px rgba(38,33,25,0.05)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#b45309'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#d97706'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; }}
             onClick={() => navigate('/quiz-builder')}
           >
             <ClipboardList size={14} /> Create Quiz
@@ -573,46 +577,46 @@ export default function OutputPage() {
           <button
             className="action-btn-clean"
             style={{
-              background: '#ffffff', color: '#374151',
-              border: '1px solid #d1d5db', borderRadius: 8,
+              background: 'var(--kt-card-2)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-manila)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; }}
             onClick={() => window.print()}
           >
-            <Printer size={14} color="#4b5563" /> Print / PDF
+            <Printer size={14} /> Print / PDF
           </button>
 
           <button
             className="action-btn-clean"
             style={{
-              background: '#ffffff', color: '#374151',
-              border: '1px solid #d1d5db', borderRadius: 8,
+              background: 'var(--kt-card-2)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-manila)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; }}
             onClick={() => navigate('/lesson-gen/step-3')}
           >
-            <Pencil size={14} color="#4b5563" /> Edit Plan
+            <Pencil size={14} /> Edit Plan
           </button>
 
           <button
             className="action-btn-clean"
             disabled={sharing || N === 0}
             style={{
-              background: '#ffffff', color: '#374151',
-              border: '1px solid #d1d5db', borderRadius: 8,
+              background: 'var(--kt-card-2)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
               cursor: sharing ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 5,
               opacity: sharing ? 0.7 : 1,
             }}
-            onMouseEnter={e => { if (!sharing) e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { if (!sharing) e.currentTarget.style.background = '#ffffff'; }}
+            onMouseEnter={e => { if (!sharing) e.currentTarget.style.background = 'var(--kt-manila)'; }}
+            onMouseLeave={e => { if (!sharing) e.currentTarget.style.background = 'var(--kt-card-2)'; }}
             onClick={async () => {
               if (shareUrl) { return; }
               setSharing(true);
@@ -639,7 +643,7 @@ export default function OutputPage() {
               }
             }}
           >
-            {sharing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={14} color="#4b5563" />}
+            {sharing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={14} />}
             {sharing ? 'Creating…' : 'Share'}
           </button>
         </div>
@@ -649,18 +653,18 @@ export default function OutputPage() {
       {store.saveStatus === 'failed' && (
         <div className="no-print" style={{
           maxWidth: 1100, margin: '14px auto 0',
-          background: '#fffbeb', border: '1px solid #fde68a',
-          borderRadius: 8, padding: '10px 16px',
+          background: 'var(--kt-danger-tint)', border: '1px solid rgba(162,59,46,0.3)',
+          borderRadius: 'var(--kt-radius-md)', padding: '10px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 13, color: '#92400e', fontWeight: 500 }}>
+          <span style={{ fontSize: 13, color: 'var(--kt-danger)', fontWeight: 600 }}>
             ⚠ Notice: This plan is stored locally on this device. Retry cloud sync to save permanently to My Lessons.
           </span>
           <button
             onClick={handleRetrySave}
             disabled={retryingSave}
             style={{
-              background: '#d97706', color: '#fff', border: 'none', borderRadius: 6,
+              background: 'var(--kt-danger)', color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-sm)',
               padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
             }}
@@ -675,42 +679,42 @@ export default function OutputPage() {
       {/* Clean Document Wrapper */}
       <div className="ilaw-page-wrap" style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 0 48px' }}>
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ fontSize: 12.5, color: '#4b5563', margin: 0, fontWeight: 500 }}>
-            {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} session{N !== 1 ? 's' : ''}
+          <p style={{ fontSize: 12.5, color: 'var(--kt-text-secondary)', margin: 0, fontWeight: 600, fontFamily: 'var(--kt-font-mono)' }}>
+            {store.subject} · {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} SESSION{N !== 1 ? 'S' : ''}
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669', fontWeight: 600 }}>
-            <CheckCircle2 size={14} /> Ready for Submission & Review
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--kt-success)', fontWeight: 600, background: 'var(--kt-success-tint)', padding: '3px 10px', borderRadius: 'var(--kt-radius-sm)', border: '1px solid rgba(95,122,84,0.25)' }}>
+            <CheckCircle2 size={13} /> Ready for Submission & Review
           </div>
         </div>
 
-        <div className="ilaw-wrap" style={{ background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+        <div className="ilaw-wrap" style={{ background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', border: '1px solid var(--kt-border)', boxShadow: '0 1px 3px rgba(38,33,25,0.06)', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="ilaw-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
               <tbody>
                 <tr>
-                  <td colSpan={N + 1} style={{ ...baseTd, background: '#1b4332', color: '#ffffff', textAlign: 'center', fontWeight: 700, fontSize: 13, letterSpacing: '0.04em', padding: '12px 16px' }}>
+                  <td colSpan={N + 1} style={{ ...baseTd, background: 'var(--kt-chalkboard)', color: '#FBF7EC', textAlign: 'center', fontWeight: 700, fontSize: 14, letterSpacing: '0.04em', padding: '14px 16px', fontFamily: 'var(--kt-font-heading)', borderBottom: '2px solid var(--kt-manila-border)' }}>
                     ILAW LESSON PLAN · SY 2026–2027 · DepEd Order No. 16, s. 2026
                   </td>
                 </tr>
-                <tr><Label>Name of Lesson</Label><Merged n={N} style={{ fontWeight: 600, color: '#111827' }}>{displayLessonTitle}</Merged></tr>
+                <tr><Label>Name of Lesson</Label><Merged n={N} style={{ fontWeight: 700, color: 'var(--kt-text-primary)', fontSize: 15 }}>{displayLessonTitle}</Merged></tr>
                 <tr><Label>Learning Area/s</Label><Merged n={N}>{store.subject || '—'}</Merged></tr>
                 <tr><Label>Designed by Teacher/s</Label><Merged n={N}>{teacherName}</Merged></tr>
                 <tr><Label>Designed for which Grade Level and Section</Label><Merged n={N}>{gradeSection}</Merged></tr>
 
-                <tr style={{ background: '#f9fafb' }}>
-                  <td style={{ ...labelTd, background: '#f9fafb' }}>No. of Sessions</td>
+                <tr style={{ background: 'var(--kt-card-2)' }}>
+                  <td style={{ ...labelTd, background: 'var(--kt-card-2)' }}>No. of Sessions</td>
                   {sessions.map((s, i) => (
                     <td
                       key={i}
                       className="ilaw-session-hdr"
                       onClick={() => setSelectedSession(i)}
                       title="Click to view session details or generate COT 4As / PPT"
-                      style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: '#f9fafb' }}
+                      style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: 'var(--kt-card-2)' }}
                     >
-                      <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#1b4332' }}>
+                      <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: 'var(--kt-text-primary)' }}>
                         Session {s.day}
                       </div>
-                      <div className="session-date-sub" style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>{s.date}</div>
+                      <div className="session-date-sub" style={{ fontSize: 11, fontWeight: 500, color: 'var(--kt-text-secondary)', marginTop: 2, fontFamily: 'var(--kt-font-mono)' }}>{s.date}</div>
                     </td>
                   ))}
                 </tr>
@@ -780,29 +784,30 @@ export default function OutputPage() {
             <div
               onClick={e => e.stopPropagation()}
               style={{
-                background: '#ffffff', borderRadius: 12,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+                background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)',
+                boxShadow: '0 20px 40px rgba(38,33,25,0.18)',
                 width: '100%', maxWidth: 500, overflow: 'hidden',
                 maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
-                border: '1px solid #e5e7eb',
+                border: '1px solid var(--kt-border)',
               }}
             >
               {/* Clean Modal Header */}
               <div style={{
-                background: '#1b4332',
+                background: 'var(--kt-chalkboard)',
                 padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                borderBottom: '2px solid var(--kt-manila-border)',
               }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'var(--kt-font-mono)' }}>
                     Session {s.day} · {s.date || 'Scheduled'}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', marginTop: 2 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#FBF7EC', marginTop: 2, fontFamily: 'var(--kt-font-heading)' }}>
                     Session Actions & Content
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedSession(null)}
-                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 4, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FBF7EC' }}
                 >
                   <X size={15} />
                 </button>
@@ -817,23 +822,23 @@ export default function OutputPage() {
                 {s.objective && <InfoRow label="Session Objective" value={s.objective} />}
               </div>
 
-              <div style={{ height: 1, background: '#f3f4f6', margin: '0 20px' }} />
+              <div style={{ height: 1, background: 'var(--kt-border)', margin: '0 20px' }} />
 
               {/* Action Buttons */}
               <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: 9 }}>
                 <button
                   onClick={() => handleGoToCOT(selectedSession)}
                   style={{
-                    width: '100%', background: '#1b4332', color: '#fff',
-                    border: 'none', borderRadius: 8, padding: '11px 16px',
+                    width: '100%', background: 'var(--kt-chalkboard)', color: '#ffffff',
+                    border: '1px solid var(--kt-chalkboard)', borderRadius: 'var(--kt-radius-md)', padding: '11px 16px',
                     fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#2d6a4f'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#1b4332'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--kt-chalkboard-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--kt-chalkboard)'}
                 >
-                  <Sparkles size={14} /> Continue to COT 4As Lesson Plan →
+                  <Sparkles size={14} color="var(--kt-manila)" /> Continue to COT 4As Lesson Plan →
                 </button>
 
                 <button
@@ -841,39 +846,38 @@ export default function OutputPage() {
                   disabled={pptLoading}
                   style={{
                     width: '100%',
-                    background: pptLoading ? '#6b7280' : '#1e3a8a',
-                    color: '#fff',
-                    border: 'none', borderRadius: 8, padding: '11px 16px',
+                    background: pptLoading ? 'var(--kt-muted)' : 'var(--kt-chalkboard)',
+                    color: '#ffffff',
+                    border: '1px solid var(--kt-chalkboard)', borderRadius: 'var(--kt-radius-md)', padding: '11px 16px',
                     fontSize: 13, fontWeight: 600,
                     cursor: pptLoading ? 'not-allowed' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = '#1d4ed8'; }}
-                  onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = '#1e3a8a'; }}
+                  onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = 'var(--kt-chalkboard-hover)'; }}
+                  onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = 'var(--kt-chalkboard)'; }}
                 >
                   {pptLoading
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
-                    : <><Presentation size={14} /> Generate Presentation {!freeMode && <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '2px 5px', fontWeight: 700 }}>3 tokens</span>}</>
-                  }
+                    : <><Presentation size={14} color="var(--kt-manila)" /> Presentation Deck (PPTX) {!freeMode && <span style={{ fontSize: 11, opacity: 0.8, color: 'var(--kt-manila)' }}>· 3 tokens</span>}</>}
                 </button>
 
                 <button
-                  onClick={() => { setSelGameType('matching'); setGameCount(10); setGameModal('pick'); }}
+                  onClick={() => { setGameResult(null); setGameModal('pick'); }}
                   style={{
                     width: '100%',
-                    background: '#f3f4f6',
-                    color: '#1f2937',
-                    border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 16px',
+                    background: 'var(--kt-manila)',
+                    color: 'var(--kt-text-primary)',
+                    border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)', padding: '10px 16px',
                     fontSize: 13, fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#e5e7eb'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#f3f4f6'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#dac797'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--kt-manila)'}
                 >
-                  <Gamepad2 size={14} /> Generate Games / Worksheets {!freeMode && <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>(0.5 token)</span>}
+                  <Gamepad2 size={14} /> Interactive Game Worksheet {!freeMode && <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontWeight: 600 }}>(0.5 token)</span>}
                 </button>
               </div>
             </div>

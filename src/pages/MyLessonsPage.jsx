@@ -15,30 +15,30 @@ import {
 // ── Type config ───────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
   ilaw: {
-    label: 'ILAW',
-    badgeBg: '#dbeafe', badgeColor: '#1e3a8a',
-    headerBg: 'rgba(29,78,216,0.06)', headerBorder: 'rgba(29,78,216,0.18)',
-    accentColor: '#1d4ed8',
+    label: 'ILAW Plan',
+    badgeBg: 'var(--kt-manila)', badgeColor: 'var(--kt-text-primary)',
+    headerBg: 'var(--kt-card-2)', headerBorder: 'var(--kt-border)',
+    accentColor: 'var(--kt-chalkboard)',
     Icon: BookOpen,
-    iconBg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
+    iconBg: 'var(--kt-manila)',
     footer: (l) => `${l.sessions} session${l.sessions !== 1 ? 's' : ''}`,
   },
   dll: {
-    label: 'DLL',
-    badgeBg: '#dcfce7', badgeColor: '#14532d',
-    headerBg: 'rgba(22,163,74,0.06)', headerBorder: 'rgba(22,163,74,0.18)',
-    accentColor: '#16a34a',
+    label: 'Daily Lesson Log',
+    badgeBg: 'var(--kt-card-2)', badgeColor: 'var(--kt-text-primary)',
+    headerBg: 'var(--kt-card-2)', headerBorder: 'var(--kt-border)',
+    accentColor: 'var(--kt-chalkboard)',
     Icon: CalendarDays,
-    iconBg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+    iconBg: 'var(--kt-card-2)',
     footer: () => 'Mon – Fri',
   },
   cot: {
-    label: 'COT',
-    badgeBg: '#fef3c7', badgeColor: '#92400e',
-    headerBg: 'rgba(217,119,6,0.06)', headerBorder: 'rgba(217,119,6,0.18)',
-    accentColor: '#d97706',
+    label: 'COT 4As Plan',
+    badgeBg: 'var(--kt-manila)', badgeColor: 'var(--kt-text-primary)',
+    headerBg: 'var(--kt-card-2)', headerBorder: 'var(--kt-border)',
+    accentColor: 'var(--kt-chalkboard)',
     Icon: ShieldCheck,
-    iconBg: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+    iconBg: 'var(--kt-manila)',
     footer: () => '4As · PIVOT 4A',
   },
 };
@@ -225,33 +225,34 @@ function TermColumn({ term, groups, onAction, loadingId }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Term header */}
       <div style={{
-        background: 'linear-gradient(135deg, #0d2218, #1a3d2b, #2d6a4f)',
-        borderRadius: 12, padding: '14px 16px',
+        background: 'var(--kt-chalkboard)',
+        borderRadius: 'var(--kt-radius-md)', padding: '14px 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        boxShadow: '0 4px 12px rgba(13,34,24,0.12)',
+        border: '1px solid var(--kt-manila-border)',
+        boxShadow: '0 2px 8px rgba(31,58,46,0.12)',
       }}>
         <div>
-          <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+          <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
             MATATAG
           </p>
-          <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
+          <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>
             {term.label}
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#52b788', lineHeight: 1 }}>{total}</p>
-          <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>plan{total !== 1 ? 's' : ''}</p>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--kt-manila)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{total}</p>
+          <p style={{ margin: 0, fontSize: 9.5, color: 'rgba(251,247,236,0.7)', fontWeight: 600, fontFamily: 'var(--kt-font-mono)' }}>plan{total !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
       {/* Categories */}
       {total === 0 ? (
         <div style={{
-          background: 'var(--kt-surface)', borderRadius: 10,
-          border: '2px dashed rgba(45,106,79,0.13)',
+          background: 'var(--kt-card-2)', borderRadius: 'var(--kt-radius-md)',
+          border: '1px dashed var(--kt-border)',
           padding: '28px 14px', textAlign: 'center',
         }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)', opacity: 0.55 }}>No plans for {term.label}</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>No plans for {term.label}</p>
         </div>
       ) : (
         <div>

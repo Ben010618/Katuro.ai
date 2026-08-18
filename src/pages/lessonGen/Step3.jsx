@@ -233,13 +233,13 @@ export default function Step3() {
 
       {/* Phase badge + heading */}
       <div style={{ marginBottom: 24 }}>
-        <span style={{ background: 'rgba(232,163,32,0.12)', color: '#e8a320', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Phase 3 — Generate
+        <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
+          Step 3 · Review & Generate
         </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+        <h2 style={{ margin: '10px 0 6px', fontSize: 24, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>
           Ready to generate your ILAW Lesson Plan
         </h2>
-        <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
           Review your session setup and competency, then click Generate. kaTuro builds your complete {n}-session ILAW document.
         </p>
       </div>
@@ -247,39 +247,38 @@ export default function Step3() {
       {/* Review Summary Cards */}
       <div className="kt-grid-2" style={{ gap: 14, marginBottom: 16 }}>
 
-        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', border: '1px solid var(--kt-border)', padding: '16px 18px', boxShadow: 'var(--kt-shadow-sm)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11.5, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
             Session Details
           </p>
-          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>
             {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber}
           </p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11.5, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
             Teaching days: {days.slice(0, 4).map(d => formatDayShort(d)).join(' · ')}
             {days.length > 4 ? ` +${days.length - 4}` : ''}
           </p>
-          <div style={{ background: '#d8f3dc', borderRadius: 8, padding: '5px 10px', display: 'inline-block' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#1a3d2b', fontFamily: '"DM Mono", monospace' }}>
+          <div style={{ background: 'var(--kt-manila)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 8px', display: 'inline-block' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-mono)' }}>
               {n} session{n !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
 
-        <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '16px 18px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+        <div style={{ background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', border: '1px solid var(--kt-border)', padding: '16px 18px', boxShadow: 'var(--kt-shadow-sm)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11.5, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
             Competency
           </p>
-          <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-primary)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {store.competencyText || 'No competency entered'}
           </p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-            Lesson: <strong>{store.lessonName || 'Untitled'}</strong>
+          <p style={{ margin: '0 0 8px', fontSize: 11.5, color: 'var(--kt-text-secondary)' }}>
+            Lesson: <strong style={{ color: 'var(--kt-text-primary)' }}>{store.lessonName || 'Untitled'}</strong>
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {sessions.map(s => {
-              const clr = BLOOMS_COLORS[bloomsBaseOf(s.bloomsLevel)] || '#888';
               return (
-                <span key={s.day} style={{ background: `${clr}18`, color: clr, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>
+                <span key={s.day} style={{ background: 'var(--kt-card-2)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-sm)', padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
                   {s.bloomsLevel}
                 </span>
               );
@@ -289,10 +288,10 @@ export default function Step3() {
       </div>
 
       {/* Declaration of AI Use */}
-      <div style={{ background: 'var(--kt-card)', borderRadius: 14, border: '1px solid var(--kt-border)', padding: '18px 20px', marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 5, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+      <div style={{ background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)', border: '1px solid var(--kt-border)', padding: '18px 20px', marginBottom: 16, boxShadow: 'var(--kt-shadow-sm)' }}>
+        <label style={{ display: 'block', marginBottom: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
           Declaration of AI use{' '}
-          <span style={{ fontSize: 11, color: '#4a6357', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(DepEd DO 3, 2026)</span>
+          <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(DepEd DO 16, s. 2026)</span>
         </label>
         <textarea
           rows={4}
@@ -304,61 +303,61 @@ export default function Step3() {
       </div>
 
       {/* Generate CTA Card */}
-      <div style={{ background: 'linear-gradient(135deg, #0d2218 0%, #1a3d2b 50%, #2d6a4f 100%)', borderRadius: 16, padding: '40px 32px', textAlign: 'center', marginBottom: 8 }}>
+      <div style={{ background: 'var(--kt-chalkboard)', borderRadius: 'var(--kt-radius-md)', border: '1px solid var(--kt-manila-border)', padding: '36px 28px', textAlign: 'center', marginBottom: 8, boxShadow: '0 4px 16px rgba(31,58,46,0.2)' }}>
 
         {!generating ? (
           <>
             {genError && (
               <div style={{
-                background: 'rgba(224,92,92,0.15)', border: '1px solid rgba(224,92,92,0.4)',
-                borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+                background: 'var(--kt-danger-tint)', border: '1px solid rgba(162,59,46,0.4)',
+                borderRadius: 'var(--kt-radius-md)', padding: '12px 16px', marginBottom: 20,
                 display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left',
               }}>
-                <AlertCircle size={15} color="rgba(224,92,92,0.8)" style={{ flexShrink: 0, marginTop: 1 }} />
-                <p style={{ margin: 0, fontSize: 13, color: 'rgba(224,92,92,0.9)', fontWeight: 600, lineHeight: 1.65 }}>
+                <AlertCircle size={15} color="var(--kt-danger)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-danger)', fontWeight: 600, lineHeight: 1.65 }}>
                   {genError}
                 </p>
               </div>
             )}
 
-            <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 600, color: '#fff' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>
               Ready to generate your ILAW lesson plan?
             </h3>
-            <p style={{ margin: '0 0 24px', fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65 }}>
+            <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--kt-manila)', lineHeight: 1.6, maxWidth: 520, marginInline: 'auto' }}>
               kaTuro AI will write your complete{' '}
-              <strong style={{ color: '#52b788' }}>{n}-session</strong> ILAW document —
+              <strong style={{ color: '#ffffff' }}>{n}-session</strong> ILAW document —
               Pre-Lesson, Flow, Learning Resources, Integration, Formative Assessment,
               Extended Learning, and Reflection Prompts.
             </p>
             <button
               onClick={handleGenerate}
               style={{
-                width: '100%', background: '#fff', color: '#1a3d2b',
-                border: 'none', borderRadius: 10, padding: '14px 32px',
-                fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                width: '100%', maxWidth: 360, margin: '0 auto', background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+                border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)', padding: '13px 28px',
+                fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'background 0.15s',
+                transition: 'background 0.15s, transform 0.15s',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#d8f3dc'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+              onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              Generate Now <ArrowRight size={18} />
+              Generate Now <ArrowRight size={17} />
             </button>
           </>
         ) : (
           <>
-            <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 20 }}>
+            <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 20, maxWidth: 440, marginInline: 'auto' }}>
               <div style={{
                 height: '100%', width: `${progress}%`, borderRadius: 100,
-                background: 'linear-gradient(90deg, #52b788, #40916c)',
+                background: 'var(--kt-manila)',
                 transition: 'width 0.5s ease',
               }} />
             </div>
-            <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600, minHeight: 28, color: isDone ? '#52b788' : '#fff', transition: 'color 0.2s' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600, minHeight: 28, color: isDone ? 'var(--kt-manila)' : '#FBF7EC', transition: 'color 0.2s', fontFamily: 'var(--kt-font-heading)' }}>
               {statusMsg}
             </p>
-            <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: '"DM Mono", monospace' }}>
+            <p style={{ margin: 0, fontSize: 11, color: 'rgba(251,247,236,0.65)', fontFamily: 'var(--kt-font-mono)' }}>
               {progress}% complete — please wait…
             </p>
           </>

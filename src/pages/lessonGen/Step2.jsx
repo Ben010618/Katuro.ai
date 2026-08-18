@@ -258,13 +258,13 @@ export default function Step2() {
 
         {/* ── Phase badge + heading ─────────────────────────────────────────── */}
         <div style={{ marginBottom: 28 }}>
-          <span style={{ background: '#ede9fe', color: '#7c3aed', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
-            Phase 2 — Competency
+          <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
+            Step 2 · Competency Unpacking
           </span>
-          <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+          <h2 style={{ margin: '10px 0 6px', fontSize: 24, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>
             What will you teach this week?
           </h2>
-          <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 600 }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.6, maxWidth: 600 }}>
             Add each learning competency from your MATATAG Curriculum Guide and assign how many days
             each needs. kaTuro AI will unpack them across your{' '}
             <strong style={{ color: 'var(--kt-text-primary)' }}>{n > 0 ? n : '—'}</strong>{' '}
@@ -274,11 +274,11 @@ export default function Step2() {
 
         {/* ── Main card ────────────────────────────────────────────────────── */}
         <div style={{
-          background: 'var(--kt-card)', borderRadius: 14,
-          border: '1px solid var(--kt-border)', borderTop: '3px solid #1a3d2b',
-          padding: '24px', marginBottom: 20,
+          background: 'var(--kt-card)', borderRadius: 'var(--kt-radius-md)',
+          border: '1px solid var(--kt-border)', borderTop: '3px solid var(--kt-chalkboard)',
+          padding: '24px', marginBottom: 20, boxShadow: 'var(--kt-shadow-sm)',
         }}>
-          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 11.5, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
             MATATAG Curriculum Guide Reference
           </p>
           <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--kt-text-secondary)' }}>

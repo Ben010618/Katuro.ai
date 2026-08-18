@@ -241,20 +241,22 @@ export default function CotOutputPage() {
 
       {/* Top header */}
       <div style={{
-        background: 'linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)',
-        borderRadius: 16, padding: '24px 28px', marginBottom: 24,
+        background: 'var(--kt-chalkboard)',
+        borderRadius: 'var(--kt-radius-md)', padding: '24px 28px', marginBottom: 24,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+        border: '1px solid var(--kt-manila-border)',
+        boxShadow: '0 4px 16px rgba(31,58,46,0.15)',
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ background: 'rgba(196,181,253,0.2)', color: '#c4b5fd', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>
+            <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--kt-font-mono)' }}>
               PPST-aligned · COT-optimized · 4As Framework
             </span>
           </div>
-          <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#FBF7EC', lineHeight: 1.2, fontFamily: 'var(--kt-font-heading)' }}>
             {store.topic || 'Lesson Plan'}
           </h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-manila)' }}>
             {store.subject} · {store.grade} · {store.quarter}
             {store.teacherName && ` · ${store.teacherName}`}
           </p>
@@ -266,40 +268,41 @@ export default function CotOutputPage() {
             title="Save as Word document — required for DepEd submission"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: '#fff', color: '#4c1d95',
-              border: 'none', borderRadius: 10,
-              padding: '10px 20px', cursor: exporting ? 'not-allowed' : 'pointer',
-              fontSize: 13, fontWeight: 700,
-              opacity: exporting ? 0.7 : 1,
+              background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)',
+              padding: '10px 18px', fontSize: 13, fontWeight: 700,
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              boxShadow: '0 1px 2px rgba(38,33,25,0.05)',
             }}
           >
-            <FileDown size={15} />
-            {exporting ? 'Exporting…' : 'Download Word'}
+            {exporting
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Exporting…</>
+              : <><FileDown size={14} /> Download DOCX</>
+            }
           </button>
+
           <button
             onClick={handleGenerateQuiz}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(196,181,253,0.2)', color: '#c4b5fd',
-              border: '1px solid rgba(196,181,253,0.3)', borderRadius: 10,
-              padding: '10px 16px', cursor: 'pointer',
-              fontSize: 13, fontWeight: 600,
+              background: 'var(--kt-card-2)', color: 'var(--kt-text-primary)',
+              border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)',
+              padding: '10px 16px', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer',
             }}
           >
-            <Sparkles size={15} />
-            Generate Quiz
+            <Sparkles size={14} color="var(--kt-chalkboard)" /> Create Quiz
           </button>
           <button
-            onClick={() => { store.reset(); navigate('/lesson-gen'); }}
+            onClick={() => { store.reset(); navigate('/cot-gen'); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)',
-              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)',
+              border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '10px 14px', cursor: 'pointer', fontSize: 13,
             }}
           >
-            <RotateCcw size={14} />
-            New
+            <RotateCcw size={14} /> New
           </button>
         </div>
       </div>
