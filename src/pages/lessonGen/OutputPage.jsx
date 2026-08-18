@@ -8,11 +8,21 @@ import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan, saveIl
 import { trackEvent } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
-import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2 } from 'lucide-react';
+import { ArrowLeft, Download, Pencil, ClipboardList, Loader2, Sparkles, X, Presentation, Printer, Gamepad2, FileDown, Share2, CheckCircle2 } from 'lucide-react';
 import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFillBlanks } from '../../services/gamificationAI';
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
+
+// ── Defensive Sanitization Loop for Clean Output ──────────────────────────────
+function sanitizeLessonTitle(name, fallbackTopic, subject) {
+  if (!name || typeof name !== 'string') return fallbackTopic || subject || 'Lesson Plan';
+  const trimmed = name.trim();
+  if (/paste the content standards|curriculum guide|optional but improves|e\.g\.|demonstrates understanding of/i.test(trimmed)) {
+    return fallbackTopic || subject || 'Lesson Plan';
+  }
+  return trimmed;
+}
 
 const baseTd = {
   padding: '10px 12px',
@@ -62,11 +72,11 @@ function PerSession({ sessions, get, amber, minHeight }) {
 function SectionBanner({ n, title, desc }) {
   return (
     <tr>
-      <td colSpan={n + 1} style={{ ...baseTd, background: '#e5e7eb', padding: '12px 16px' }}>
+      <td colSpan={n + 1} style={{ ...baseTd, background: '#f3f4f6', padding: '12px 16px', borderTop: '2px solid #e5e7eb' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             <tr>
-              <td style={{ width: '22%', fontWeight: 800, fontStyle: 'italic', fontSize: 20, fontFamily: 'Georgia, serif', verticalAlign: 'top', paddingRight: 16 }}>
+              <td style={{ width: '22%', fontWeight: 800, fontStyle: 'italic', fontSize: 18, fontFamily: 'Georgia, serif', verticalAlign: 'top', paddingRight: 16, color: '#1f2937' }}>
                 {title}
               </td>
               <td style={{ fontStyle: 'italic', fontSize: 12, color: '#4b5563', lineHeight: 1.65, verticalAlign: 'top' }}>
@@ -141,10 +151,10 @@ function InfoRow({ label, value }) {
   if (!value) return null;
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 3 }}>
         {label}
       </div>
-      <div style={{ fontSize: 13, color: '#0d2218', lineHeight: 1.6 }}>{value}</div>
+      <div style={{ fontSize: 13, color: '#111827', lineHeight: 1.5, fontWeight: 500 }}>{value}</div>
     </div>
   );
 }
@@ -176,6 +186,13 @@ export default function OutputPage() {
   const [gameDownloading,  setGameDownloading] = useState(false);
   const [retryingSave,     setRetryingSave]    = useState(false);
 
+  // Sanitized lesson title guard
+  const displayLessonTitle = sanitizeLessonTitle(
+    store.lessonName,
+    sessions[0]?.keyContentFocus || store.content || store.competencyText,
+    store.subject
+  );
+
   async function handleRetrySave() {
     if (!user?.uid) return;
     setRetryingSave(true);
@@ -185,7 +202,7 @@ export default function OutputPage() {
         gradeLevel:         store.gradeLevel,
         term:               store.term,
         weekNumber:         store.weekNumber,
-        lessonName:         store.lessonName,
+        lessonName:         displayLessonTitle,
         competencyText:     store.competencyText,
         content:            store.content            || '',
         contentStandards:   store.contentStandards   || '',
@@ -206,11 +223,12 @@ export default function OutputPage() {
     }
   }
 
-  function handleGoToCOT() {
-    if (selectedSession === null) return;
-    const s = sessions[selectedSession];
+  function handleGoToCOT(targetIndex = null) {
+    const idx = targetIndex !== null ? targetIndex : selectedSession;
+    if (idx === null || !sessions[idx]) return;
+    const s = sessions[idx];
     const sessionMelc = s.competencyText || store.competencyText || '';
-    const topic = s.keyContentFocus || store.content || '';
+    const topic = s.keyContentFocus || store.content || displayLessonTitle;
     const rawRes = s.resources;
     const materials = typeof rawRes === 'string' && rawRes.trim()
       ? rawRes
@@ -233,16 +251,16 @@ export default function OutputPage() {
     navigate('/cot-gen/step-2');
   }
 
-  async function handleGeneratePresentation() {
-    if (selectedSession === null || pptLoading) return;
-    const s = sessions[selectedSession];
+  async function handleGeneratePresentation(targetSessionIndex = null) {
+    const sIdx = targetSessionIndex !== null ? targetSessionIndex : (selectedSession !== null ? selectedSession : 0);
+    if (pptLoading || !sessions[sIdx]) return;
+    const s = sessions[sIdx];
     const sessionMelc = s.competencyText || store.competencyText || '';
-    const topic = s.keyContentFocus || store.content || '';
-    const title = store.lessonName || topic || store.subject || 'Lesson';
+    const topic = s.keyContentFocus || store.content || displayLessonTitle;
+    const title = displayLessonTitle;
 
     setPptLoading(true);
     try {
-      // Tokens are deducted server-side inside expandSlides — don't double-charge here.
       setPptPhase('Generating pedagogical slide outline…');
       const { outline } = await generateOutline({
         subject:    store.subject    || '',
@@ -260,7 +278,7 @@ export default function OutputPage() {
         topic:      topic || title,
         slides:     outline,
         style:      'Academic',
-        onProgress: (pct) => setPptPhase(`Writing slide content & generating visuals… (${pct}%)`),
+        onProgress: (pct) => setPptPhase(`Writing slide content & visuals… (${pct}%)`),
       });
 
       setPptPhase('Building enhanced PPTX…');
@@ -279,7 +297,7 @@ export default function OutputPage() {
       addToast(freeMode ? `Presentation downloaded!${engineBadge}` : `Presentation downloaded! (3 tokens used)${engineBadge}`, 'success');
       setSelectedSession(null);
     } catch (err) {
-      addToast(err.message || 'Presentation generation failed.', 'error');
+      addToast(err.message || 'Presentation generation failed. Please try again.', 'error');
       console.error('PPT error:', err);
     } finally {
       setPptLoading(false);
@@ -294,9 +312,9 @@ export default function OutputPage() {
       type: 'ilaw',
       subject: store.subject || '',
       gradeLevel: store.gradeLevel || '',
-      lessonName: store.lessonName || store.content || '',
+      lessonName: displayLessonTitle,
       competencyText: s.competencyText || store.competencyText || '',
-      topic: s.keyContentFocus || store.content || '',
+      topic: s.keyContentFocus || store.content || displayLessonTitle,
       sessions: [s],
     };
     setGameLoading(true);
@@ -355,8 +373,8 @@ export default function OutputPage() {
       type: 'ilaw',
       subject: store.subject || '',
       gradeLevel: store.gradeLevel || '',
-      lessonName: s?.keyContentFocus || store.lessonName || store.content || '',
-      topic: s?.keyContentFocus || store.content || '',
+      lessonName: s?.keyContentFocus || displayLessonTitle,
+      topic: s?.keyContentFocus || store.content || displayLessonTitle,
     };
     setGameDownloading(true);
     try {
@@ -420,48 +438,72 @@ export default function OutputPage() {
         }
         .ilaw-session-hdr {
           cursor: pointer;
-          transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+          transition: all 0.15s ease;
           user-select: none;
         }
         .ilaw-session-hdr:hover {
-          background: #00c974 !important;
-          color: #fff !important;
-          box-shadow: inset 0 0 0 2px rgba(0,201,116,0.6), 0 0 16px rgba(0,201,116,0.45) !important;
+          background: #e5f7ed !important;
+          color: #065f46 !important;
         }
-        .ilaw-session-hdr:hover .session-date-sub {
-          color: rgba(255,255,255,0.75) !important;
+        .action-btn-clean {
+          transition: all 0.15s ease;
+        }
+        .action-btn-clean:hover {
+          transform: translateY(-1px);
         }
       `}</style>
 
       <AIOutputGuard feature="ilaw" inputContext={{ subject: store.subject, gradeLevel: store.gradeLevel }} />
 
-      {/* Action bar */}
+      {/* ── Professional SaaS Action Toolbar ────────────────────────────── */}
       <div className="no-print" style={{
         position: 'sticky', top: 0, zIndex: 40,
-        background: '#fff', borderBottom: '1px solid rgba(45,106,79,0.12)',
-        padding: '10px 20px', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', gap: 10,
+        background: '#ffffff', borderBottom: '1px solid #e5e7eb',
+        padding: '10px 24px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', gap: 12,
         margin: '-24px -24px 0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
       }}>
+        {/* Left: Navigation */}
         <button
           onClick={() => navigate('/my-lessons')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: '#1a3d2b' }}
+          className="action-btn-clean"
+          style={{
+            background: 'transparent', border: '1px solid transparent',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 13, fontWeight: 600, color: '#374151',
+            padding: '7px 12px', borderRadius: 8,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >
           <ArrowLeft size={14} /> My Lessons
         </button>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+        {/* Right: Cohesive Action Toolbar */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Primary Action: Download DOCX */}
           <button
-            className="btn-primary"
-            title="Save as Word document — required for DepEd submission"
-            style={{ fontSize: 12, padding: '9px 18px', fontWeight: 700 }}
+            className="action-btn-clean"
+            title="Download Word Document formatted to official DepEd standards"
             disabled={docxLoading}
+            style={{
+              background: '#1b4332', color: '#ffffff',
+              border: '1px solid #1b4332', borderRadius: 8,
+              padding: '8px 16px', fontSize: 12.5, fontWeight: 600,
+              cursor: docxLoading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+            }}
+            onMouseEnter={e => { if (!docxLoading) e.currentTarget.style.background = '#2d6a4f'; }}
+            onMouseLeave={e => { if (!docxLoading) e.currentTarget.style.background = '#1b4332'; }}
             onClick={async () => {
               setDocxLoading(true);
               try {
                 const { downloadIlawDocx } = await import('../../services/docxExport');
                 await downloadIlawDocx({
                   lessonMeta: {
-                    lessonName:         store.lessonName,
+                    lessonName:         displayLessonTitle,
                     subject:            store.subject,
                     gradeLevel:         store.gradeLevel,
                     term:               store.term,
@@ -485,24 +527,98 @@ export default function OutputPage() {
           >
             {docxLoading
               ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Exporting…</>
-              : <><Download size={13} /> Download DOCX</>}
+              : <><Download size={14} /> Download DOCX</>}
           </button>
-          <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => window.print()}>
-            <Printer size={13} /> Print / PDF
-          </button>
-          <button className="btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => navigate('/lesson-gen/step-3')}>
-            <Pencil size={13} /> Edit Plan
-          </button>
+
+          {/* Presentation PPTX Action */}
           <button
-            className="btn-outline"
+            className="action-btn-clean"
+            title="Generate structured PowerPoint presentation deck"
+            disabled={pptLoading}
+            style={{
+              background: '#1e3a8a', color: '#ffffff',
+              border: '1px solid #1e3a8a', borderRadius: 8,
+              padding: '8px 15px', fontSize: 12.5, fontWeight: 600,
+              cursor: pptLoading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+            }}
+            onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = '#1d4ed8'; }}
+            onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = '#1e3a8a'; }}
+            onClick={() => handleGeneratePresentation(0)}
+          >
+            {pptLoading
+              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
+              : <><Presentation size={14} /> Presentation</>}
+          </button>
+
+          {/* Quiz Builder Action */}
+          <button
+            className="action-btn-clean"
+            style={{
+              background: '#d97706', color: '#ffffff',
+              border: '1px solid #d97706', borderRadius: 8,
+              padding: '8px 14px', fontSize: 12.5, fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#b45309'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#d97706'; }}
+            onClick={() => navigate('/quiz-builder')}
+          >
+            <ClipboardList size={14} /> Create Quiz
+          </button>
+
+          {/* Neutral Secondary Actions */}
+          <button
+            className="action-btn-clean"
+            style={{
+              background: '#ffffff', color: '#374151',
+              border: '1px solid #d1d5db', borderRadius: 8,
+              padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+            onClick={() => window.print()}
+          >
+            <Printer size={14} color="#4b5563" /> Print / PDF
+          </button>
+
+          <button
+            className="action-btn-clean"
+            style={{
+              background: '#ffffff', color: '#374151',
+              border: '1px solid #d1d5db', borderRadius: 8,
+              padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+            onClick={() => navigate('/lesson-gen/step-3')}
+          >
+            <Pencil size={14} color="#4b5563" /> Edit Plan
+          </button>
+
+          <button
+            className="action-btn-clean"
             disabled={sharing || N === 0}
-            style={{ fontSize: 12, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 5, opacity: sharing ? 0.7 : 1 }}
+            style={{
+              background: '#ffffff', color: '#374151',
+              border: '1px solid #d1d5db', borderRadius: 8,
+              padding: '8px 13px', fontSize: 12.5, fontWeight: 500,
+              cursor: sharing ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              opacity: sharing ? 0.7 : 1,
+            }}
+            onMouseEnter={e => { if (!sharing) e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseLeave={e => { if (!sharing) e.currentTarget.style.background = '#ffffff'; }}
             onClick={async () => {
               if (shareUrl) { return; }
               setSharing(true);
               try {
                 const firstSession = sessions[0];
-                const preview = { session_1_topic: firstSession?.keyContentFocus || store.content || '' };
+                const preview = { session_1_topic: firstSession?.keyContentFocus || store.content || displayLessonTitle };
                 const { shareId } = await createSharedPlan({
                   planType: 'ilaw',
                   ownerName: teacherProfile?.displayName || teacherProfile?.name || user?.displayName || '',
@@ -523,97 +639,75 @@ export default function OutputPage() {
               }
             }}
           >
-            {sharing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={12} />}
+            {sharing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Share2 size={14} color="#4b5563" />}
             {sharing ? 'Creating…' : 'Share'}
-          </button>
-          <button
-            style={{
-              background: '#e8a320', color: '#fff', border: 'none', borderRadius: 10,
-              padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit',
-            }}
-            onClick={() => navigate('/quiz-builder')}
-          >
-            <ClipboardList size={13} /> Create Quiz
           </button>
         </div>
       </div>
 
-      {/* Not-saved-to-cloud banner -- stays up until the retry succeeds, unlike
-          the toast shown at generation time which disappears in a few seconds.
-          This is the plan's only safety net: it never made it to Firestore,
-          so it won't show up in My Lessons until this succeeds. */}
+      {/* Cloud Save Recovery Alert */}
       {store.saveStatus === 'failed' && (
         <div className="no-print" style={{
           maxWidth: 1100, margin: '14px auto 0',
-          background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.35)',
-          borderRadius: 10, padding: '10px 16px',
+          background: '#fffbeb', border: '1px solid #fde68a',
+          borderRadius: 8, padding: '10px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 12.5, color: '#92400e', fontWeight: 500 }}>
-            ⚠ Not saved to the cloud yet — this plan only exists on this device right now. Download it now to be safe, and retry saving when you can.
+          <span style={{ fontSize: 13, color: '#92400e', fontWeight: 500 }}>
+            ⚠ Notice: This plan is stored locally on this device. Retry cloud sync to save permanently to My Lessons.
           </span>
           <button
             onClick={handleRetrySave}
             disabled={retryingSave}
             style={{
-              background: '#d97706', color: '#fff', border: 'none', borderRadius: 8,
-              padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: '#d97706', color: '#fff', border: 'none', borderRadius: 6,
+              padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
             }}
           >
             {retryingSave
-              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Retrying…</>
-              : 'Retry saving to cloud'}
+              ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
+              : 'Sync to Cloud'}
           </button>
         </div>
       )}
 
-      {/* Hint banner */}
-      <div className="no-print" style={{
-        maxWidth: 1100, margin: '14px auto 0',
-        background: 'linear-gradient(90deg, rgba(0,201,116,0.08) 0%, rgba(26,61,43,0.06) 100%)',
-        border: '1px solid rgba(0,201,116,0.25)',
-        borderRadius: 10, padding: '9px 16px',
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <Sparkles size={14} color="#00c974" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: '#1a3d2b', fontWeight: 500 }}>
-          Click any <strong>Session</strong> header to generate a <strong>COT 4As Lesson Plan</strong> for that session.
-        </span>
-      </div>
+      {/* Clean Document Wrapper */}
+      <div className="ilaw-page-wrap" style={{ maxWidth: 1100, margin: '16px auto 0', padding: '0 0 48px' }}>
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{ fontSize: 12.5, color: '#4b5563', margin: 0, fontWeight: 500 }}>
+            {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} session{N !== 1 ? 's' : ''}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669', fontWeight: 600 }}>
+            <CheckCircle2 size={14} /> Ready for Submission & Review
+          </div>
+        </div>
 
-      {/* Document wrapper */}
-      <div className="ilaw-page-wrap" style={{ maxWidth: 1100, margin: '12px auto 0', padding: '0 0 48px' }}>
-        <p className="no-print" style={{ fontSize: 12, color: '#4a6357', marginBottom: 8 }}>
-          ILAW Lesson Plan · {store.subject} {store.gradeLevel} · {store.term} · {store.weekNumber} · {N} session{N !== 1 ? 's' : ''}
-        </p>
-
-        <div className="ilaw-wrap" style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(45,106,79,0.12)', overflow: 'hidden' }}>
+        <div className="ilaw-wrap" style={{ background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="ilaw-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
               <tbody>
                 <tr>
-                  <td colSpan={N + 1} style={{ ...baseTd, background: '#1a3d2b', color: '#fff', textAlign: 'center', fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', padding: '10px 16px' }}>
+                  <td colSpan={N + 1} style={{ ...baseTd, background: '#1b4332', color: '#ffffff', textAlign: 'center', fontWeight: 700, fontSize: 13, letterSpacing: '0.04em', padding: '12px 16px' }}>
                     ILAW LESSON PLAN · SY 2026–2027 · DepEd Order No. 16, s. 2026
                   </td>
                 </tr>
-                <tr><Label>Name of Lesson</Label><Merged n={N}>{store.lessonName || '—'}</Merged></tr>
+                <tr><Label>Name of Lesson</Label><Merged n={N} style={{ fontWeight: 600, color: '#111827' }}>{displayLessonTitle}</Merged></tr>
                 <tr><Label>Learning Area/s</Label><Merged n={N}>{store.subject || '—'}</Merged></tr>
                 <tr><Label>Designed by Teacher/s</Label><Merged n={N}>{teacherName}</Merged></tr>
                 <tr><Label>Designed for which Grade Level and Section</Label><Merged n={N}>{gradeSection}</Merged></tr>
 
-                <tr style={{ background: '#f3f4f6' }}>
-                  <td style={{ ...labelTd, background: '#f3f4f6' }}>No. of Sessions</td>
+                <tr style={{ background: '#f9fafb' }}>
+                  <td style={{ ...labelTd, background: '#f9fafb' }}>No. of Sessions</td>
                   {sessions.map((s, i) => (
                     <td
                       key={i}
                       className="ilaw-session-hdr"
                       onClick={() => setSelectedSession(i)}
-                      style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: '#f3f4f6' }}
+                      title="Click to view session details or generate COT 4As / PPT"
+                      style={{ ...baseTd, textAlign: 'center', fontWeight: 700, background: '#f9fafb' }}
                     >
-                      <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                        <Sparkles size={12} />
+                      <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#1b4332' }}>
                         Session {s.day}
                       </div>
                       <div className="session-date-sub" style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>{s.date}</div>
@@ -668,107 +762,99 @@ export default function OutputPage() {
           </div>
         </div>
 
-      {/* Session → COT modal */}
+      {/* Clean Session Details & Pedagogy Modal */}
       {selectedSession !== null && (() => {
         const s = sessions[selectedSession];
         const sessionMelc = s.competencyText || store.competencyText || '';
-        const topic = s.keyContentFocus || store.content || '';
+        const topic = s.keyContentFocus || store.content || displayLessonTitle;
         return (
           <div
             onClick={() => setSelectedSession(null)}
             style={{
               position: 'fixed', inset: 0, zIndex: 200,
-              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-              padding: '72px 24px 24px',
+              background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(3px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '24px',
             }}
           >
             <div
               onClick={e => e.stopPropagation()}
               style={{
-                background: '#fff', borderRadius: 18,
-                boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
-                width: '100%', maxWidth: 520, overflow: 'hidden',
-                maxHeight: 'calc(100vh - 96px)', overflowY: 'auto',
+                background: '#ffffff', borderRadius: 12,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+                width: '100%', maxWidth: 500, overflow: 'hidden',
+                maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
+                border: '1px solid #e5e7eb',
               }}
             >
-              {/* Modal header */}
+              {/* Clean Modal Header */}
               <div style={{
-                background: 'linear-gradient(135deg, #1a3d2b 0%, #2d6a4f 100%)',
-                padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: '#1b4332',
+                padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <Sparkles size={15} color="#00c974" />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#00c974', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
-                      Session {s.day}
-                    </span>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    Session {s.day} · {s.date || 'Scheduled'}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 4 }}>
-                    Generate COT 4As Lesson Plan
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', marginTop: 2 }}>
+                    Session Actions & Content
                   </div>
-                  {s.date && (
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{s.date}</div>
-                  )}
                 </div>
                 <button
                   onClick={() => setSelectedSession(null)}
-                  style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
 
-              {/* Preview */}
-              <div style={{ padding: '18px 20px 10px' }}>
-                <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  Session Preview
-                </p>
-                <InfoRow label="Subject / Grade" value={`${store.subject || ''} · ${store.gradeLevel || ''}`} />
-                <InfoRow label="Bloom's Level" value={s.bloomsLevel} />
-                {topic && <InfoRow label="Content Topic" value={topic} />}
-                {sessionMelc && <InfoRow label="MELC / Competency" value={sessionMelc} />}
-                {s.objective && <InfoRow label="Learning Objective" value={s.objective} />}
+              {/* Preview Info */}
+              <div style={{ padding: '16px 20px 12px' }}>
+                <InfoRow label="Subject & Grade" value={`${store.subject || ''} · ${store.gradeLevel || ''}`} />
+                <InfoRow label="Bloom's Taxonomy Level" value={s.bloomsLevel} />
+                {topic && <InfoRow label="Specific Topic" value={topic} />}
+                {sessionMelc && <InfoRow label="MELC Competency" value={sessionMelc} />}
+                {s.objective && <InfoRow label="Session Objective" value={s.objective} />}
               </div>
 
               <div style={{ height: 1, background: '#f3f4f6', margin: '0 20px' }} />
 
-              {/* Action buttons */}
-              <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Action Buttons */}
+              <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: 9 }}>
                 <button
-                  onClick={handleGoToCOT}
+                  onClick={() => handleGoToCOT(selectedSession)}
                   style={{
-                    width: '100%', background: '#1a3d2b', color: '#fff',
-                    border: 'none', borderRadius: 10, padding: '13px 20px',
-                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    width: '100%', background: '#1b4332', color: '#fff',
+                    border: 'none', borderRadius: 8, padding: '11px 16px',
+                    fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = '#2d6a4f'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#1a3d2b'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#1b4332'}
                 >
-                  <Sparkles size={15} />
-                  Continue to COT Indicators →
+                  <Sparkles size={14} /> Continue to COT 4As Lesson Plan →
                 </button>
 
                 <button
-                  onClick={handleGeneratePresentation}
+                  onClick={() => handleGeneratePresentation(selectedSession)}
                   disabled={pptLoading}
                   style={{
                     width: '100%',
-                    background: pptLoading ? '#374151' : '#e8a320',
+                    background: pptLoading ? '#6b7280' : '#1e3a8a',
                     color: '#fff',
-                    border: 'none', borderRadius: 10, padding: '11px 20px',
+                    border: 'none', borderRadius: 8, padding: '11px 16px',
                     fontSize: 13, fontWeight: 600,
                     cursor: pptLoading ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
-                    opacity: pptLoading ? 0.85 : 1,
                   }}
+                  onMouseEnter={e => { if (!pptLoading) e.currentTarget.style.background = '#1d4ed8'; }}
+                  onMouseLeave={e => { if (!pptLoading) e.currentTarget.style.background = '#1e3a8a'; }}
                 >
                   {pptLoading
-                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Generating…'}</>
-                    : <><Presentation size={14} /> Generate Presentation {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>3 tokens</span>}</>
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
+                    : <><Presentation size={14} /> Generate Presentation {!freeMode && <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '2px 5px', fontWeight: 700 }}>3 tokens</span>}</>
                   }
                 </button>
 
@@ -776,18 +862,18 @@ export default function OutputPage() {
                   onClick={() => { setSelGameType('matching'); setGameCount(10); setGameModal('pick'); }}
                   style={{
                     width: '100%',
-                    background: '#1d4ed8',
-                    color: '#fff',
-                    border: 'none', borderRadius: 10, padding: '11px 20px',
+                    background: '#f3f4f6',
+                    color: '#1f2937',
+                    border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 16px',
                     fontSize: 13, fontWeight: 600,
                     cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#1e40af'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#1d4ed8'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#e5e7eb'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#f3f4f6'}
                 >
-                  <Gamepad2 size={14} /> Generate Games {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
+                  <Gamepad2 size={14} /> Generate Games / Worksheets {!freeMode && <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>(0.5 token)</span>}
                 </button>
               </div>
             </div>
@@ -795,153 +881,153 @@ export default function OutputPage() {
         );
       })()}
 
-        {/* Game picker / result modal */}
-        {gameModal && (
+      {/* Game Modal */}
+      {gameModal && (
+        <div
+          onClick={() => { if (gameModal !== 'loading') setGameModal(null); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
           <div
-            onClick={() => { if (gameModal !== 'loading') setGameModal(null); }}
-            style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 12, boxShadow: '0 20px 40px rgba(0,0,0,0.2)', width: '100%', maxWidth: gameModal === 'result' ? 720 : 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', border: '1px solid #e5e7eb' }}
           >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{ background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.28)', width: '100%', maxWidth: gameModal === 'result' ? 720 : 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-            >
-              {/* Header */}
-              <div style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)', padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Gamepad2 size={16} color="#93c5fd" />
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-                    {gameModal === 'pick' ? 'Choose Game Type' : gameModal === 'loading' ? 'Generating Game…' : 'Game Worksheet'}
-                  </span>
-                </div>
-                {gameModal !== 'loading' && (
-                  <button
-                    onClick={() => setGameModal(null)}
-                    style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
-                  >
-                    <X size={16} />
-                  </button>
-                )}
+            {/* Header */}
+            <div style={{ background: '#1e3a8a', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Gamepad2 size={15} color="#93c5fd" />
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                  {gameModal === 'pick' ? 'Select Worksheet Game Type' : gameModal === 'loading' ? 'Generating Game Worksheet…' : 'Classroom Game Worksheet'}
+                </span>
               </div>
-
-              {/* Pick step */}
-              {gameModal === 'pick' && (
-                <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                  <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate.{!freeMode && ' Costs 0.5 token.'}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
-                    {GAME_TYPES.map(gt => (
-                      <button
-                        key={gt.id}
-                        onClick={() => { setSelGameType(gt.id); setGameCount(gt.defaultCount); }}
-                        style={{
-                          background: selGameType === gt.id ? gt.bg : '#f9fafb',
-                          border: `2px solid ${selGameType === gt.id ? gt.color : '#e5e7eb'}`,
-                          borderRadius: 10, padding: '11px 13px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.12s',
-                        }}
-                      >
-                        <div style={{ fontSize: 13, fontWeight: 700, color: selGameType === gt.id ? gt.color : '#1f2937' }}>{gt.label}</div>
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{gt.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Number of items:</label>
-                    <input
-                      type="number" min={5} max={30} value={gameCount}
-                      onChange={e => setGameCount(e.target.value === '' ? '' : Number(e.target.value))}
-                      onBlur={e => setGameCount(Math.max(5, Math.min(30, Number(e.target.value) || 5)))}
-                      style={{ width: 68, border: '1.5px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit', textAlign: 'center', outline: 'none' }}
-                    />
-                  </div>
-                  <button
-                    onClick={handleGenerateGame}
-                    disabled={gameLoading}
-                    style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                  >
-                    <Gamepad2 size={15} /> Generate Game {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
-                  </button>
-                </div>
-              )}
-
-              {/* Loading step */}
-              {gameModal === 'loading' && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 20px', gap: 14 }}>
-                  <Loader2 size={38} color="#1d4ed8" style={{ animation: 'spin 1s linear infinite' }} />
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>AI is generating your game…</p>
-                  <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>This may take a few seconds</p>
-                </div>
-              )}
-
-              {/* Result step */}
-              {gameModal === 'result' && gameResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 20px', display: 'flex', gap: 8, borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
-                    <button
-                      onClick={() => setGameModal('pick')}
-                      style={{ background: '#f3f4f6', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}
-                    >
-                      ← New Game
-                    </button>
-                    <button
-                      onClick={handlePrintGame}
-                      style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <Printer size={13} /> Print / Save
-                    </button>
-                    <button
-                      onClick={handleDownloadGame}
-                      disabled={gameDownloading}
-                      style={{ background: gameDownloading ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 600, cursor: gameDownloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <FileDown size={13} /> {gameDownloading ? 'Downloading…' : 'Download DOCX'}
-                    </button>
-                  </div>
-                  <div id="game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
-                    <GameWorksheetDisplay
-                      data={gameResult}
-                      lesson={{ subject: store.subject || '', gradeLevel: store.gradeLevel || '', lessonName: store.lessonName || store.content || '' }}
-                      session={selectedSession !== null ? sessions[selectedSession] : null}
-                    />
-                  </div>
-                </div>
+              {gameModal !== 'loading' && (
+                <button
+                  onClick={() => setGameModal(null)}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+                >
+                  <X size={15} />
+                </button>
               )}
             </div>
-          </div>
-        )}
 
-        {/* Signature block */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
-          <div>
-            <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4a6357' }}>Prepared by:</p>
-            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-              {teacherName}
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
-              {teacherProfile?.designation || teacherProfile?.position || 'Teacher'}
-            </p>
-            {teacherProfile?.school && (
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#4a6357', fontStyle: 'italic' }}>
-                {teacherProfile.school}
-              </p>
+            {/* Pick step */}
+            {gameModal === 'pick' && (
+              <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+                <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#4b5563' }}>Select a classroom activity format and question count.{!freeMode && ' (0.5 token)'}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                  {GAME_TYPES.map(gt => (
+                    <button
+                      key={gt.id}
+                      onClick={() => { setSelGameType(gt.id); setGameCount(gt.defaultCount); }}
+                      style={{
+                        background: selGameType === gt.id ? '#eff6ff' : '#f9fafb',
+                        border: `1.5px solid ${selGameType === gt.id ? '#2563eb' : '#e5e7eb'}`,
+                        borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.12s',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selGameType === gt.id ? '#1d4ed8' : '#1f2937' }}>{gt.label}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{gt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Item Count:</label>
+                  <input
+                    type="number" min={5} max={30} value={gameCount}
+                    onChange={e => setGameCount(e.target.value === '' ? '' : Number(e.target.value))}
+                    onBlur={e => setGameCount(Math.max(5, Math.min(30, Number(e.target.value) || 5)))}
+                    style={{ width: 68, border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit', textAlign: 'center', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  onClick={handleGenerateGame}
+                  disabled={gameLoading}
+                  style={{ width: '100%', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 20px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+                >
+                  <Gamepad2 size={14} /> Generate Worksheet {!freeMode && <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '2px 5px', fontWeight: 700 }}>0.5 token</span>}
+                </button>
+              </div>
+            )}
+
+            {/* Loading step */}
+            {gameModal === 'loading' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 20px', gap: 12 }}>
+                <Loader2 size={32} color="#1e3a8a" style={{ animation: 'spin 1s linear infinite' }} />
+                <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#1e3a8a' }}>Formatting classroom game worksheet…</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Please wait a moment</p>
+              </div>
+            )}
+
+            {/* Result step */}
+            {gameModal === 'result' && gameResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 18px', display: 'flex', gap: 8, borderBottom: '1px solid #e5e7eb', flexShrink: 0, background: '#f9fafb' }}>
+                  <button
+                    onClick={() => setGameModal('pick')}
+                    style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}
+                  >
+                    ← New Game
+                  </button>
+                  <button
+                    onClick={handlePrintGame}
+                    style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5, color: '#1f2937' }}
+                  >
+                    <Printer size={13} /> Print / PDF
+                  </button>
+                  <button
+                    onClick={handleDownloadGame}
+                    disabled={gameDownloading}
+                    style={{ background: '#1b4332', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: gameDownloading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <FileDown size={13} /> {gameDownloading ? 'Downloading…' : 'Download DOCX'}
+                  </button>
+                </div>
+                <div id="game-worksheet-content" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
+                  <GameWorksheetDisplay
+                    data={gameResult}
+                    lesson={{ subject: store.subject || '', gradeLevel: store.gradeLevel || '', lessonName: displayLessonTitle }}
+                    session={selectedSession !== null ? sessions[selectedSession] : null}
+                  />
+                </div>
+              </div>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4a6357' }}>Checked by:</p>
-            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-              {teacherProfile?.supervisorName
-                ? teacherProfile.supervisorName.toUpperCase()
-                : '(School Head / Supervisor)'}
+        </div>
+      )}
+
+      {/* Signature block */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
+        <div>
+          <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4b5563' }}>Prepared by:</p>
+          <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#111827', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            {teacherName}
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>
+            {teacherProfile?.designation || teacherProfile?.position || 'Teacher'}
+          </p>
+          {teacherProfile?.school && (
+            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
+              {teacherProfile.school}
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>
-              {teacherProfile?.supervisorPosition || 'Master Teacher'}
-            </p>
-          </div>
+          )}
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4b5563' }}>Checked by:</p>
+          <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#111827', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            {teacherProfile?.supervisorName
+              ? teacherProfile.supervisorName.toUpperCase()
+              : '(School Head / Supervisor)'}
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>
+            {teacherProfile?.supervisorPosition || 'Master Teacher'}
+          </p>
         </div>
       </div>
+    </div>
 
       {shareUrl && (
         <ShareModal
           url={shareUrl}
-          title={store.lessonName || store.content || 'Lesson Plan'}
+          title={displayLessonTitle}
           subject={store.subject ? `kaTuro AI — ${store.subject} Lesson Plan` : 'kaTuro AI Lesson Plan'}
           onClose={() => setShareUrl(null)}
         />

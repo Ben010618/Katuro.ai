@@ -190,9 +190,15 @@ export default function Step2() {
 
       // Persist to store — combine texts for Step 3 context
       const combinedText = competencies.map(c => c.text.trim()).join('; ');
+      const rawTitle = lessonName.trim();
+      const isPlaceholder = /paste the content standards|curriculum guide|optional but improves|e\.g\.|demonstrates understanding of/i.test(rawTitle);
+      const cleanTitle = (isPlaceholder || !rawTitle)
+        ? (content.trim() || competencies[0]?.text?.trim()?.slice(0, 60) || 'Lesson Plan')
+        : rawTitle;
+
       store.setCompetencies([...competencies]);
       store.setCompetencyText(combinedText);
-      store.setLessonName(lessonName.trim());
+      store.setLessonName(cleanTitle);
       store.setUnpackedSessions(merged);
       store.setStep2({ content, contentStandards, learningContext });
 
