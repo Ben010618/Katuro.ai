@@ -1,0 +1,16 @@
+﻿{
+  "indexes": [
+    {
+      "collectionGroup": "lessonPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",      "order": "ASCENDING" },
+        { "fieldPath": "subject",     "order": "ASCENDING" },
+        { "fieldPath": "gradeLevel",  "order": "ASCENDING" },
+        { "fieldPath": "term",        "order": "ASCENDING" },
+        { "fieldPath": "weekNumber",  "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -100,19 +100,34 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
     initRef.current = true;
 
     (async () => {
-      if (store.sessionId) {
-        const existing = await getTestSession(user.uid, store.sessionId);
-        if (existing) {
-          store.loadSession(existing);
-          setReady(true);
-          return;
+      try {
+        if (store.sessionId) {
+          const existing = await getTestSession(user.uid, store.sessionId);
+          if (existing) {
+            store.loadSession(existing);
+            setReady(true);
+            return;
+          }
         }
+        const id = await createTestSession(user.uid, {});
+        store.setField('sessionId', id);
+        setReady(true);
+      } catch (err) {
+        // Bug 2 fix: always unblock the UI — a network/Firestore error should
+        // never leave the user permanently stuck on the loading spinner.
+        // The Zustand store still has the previous session data (persisted to
+        // localStorage) so the wizard is usable offline; the toast explains why
+        // the cloud sync didn't work.
+        console.error('TestBuilder session init failed:', err);
+        setReady(true);
+        addToast(
+          'Could not sync with cloud — your session is local. Refresh if this persists.',
+          'warning',
+        );
       }
-      const id = await createTestSession(user.uid, {});
-      store.setField('sessionId', id);
-      setReady(true);
     })();
-  }, [user?.uid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]); // addToast and store are stable; mount-only effect (guarded by initRef)
 
   // ── Autosave (debounced 500ms) ────────────────────────────────────────────
   useDebouncedEffect(() => {

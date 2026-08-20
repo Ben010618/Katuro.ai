@@ -352,6 +352,41 @@ export async function saveIlawPlan(uid, planData) {
 }
 
 /**
+ * Upsert an in-progress ILAW draft.
+ * Creates a new draft doc on first call; updates the same doc on subsequent
+ * calls (keyed by status:'draft' + subject + gradeLevel + term + weekNumber).
+ * Prevents duplicate draft docs for the same lesson session.
+ * Returns the Firestore document ID.
+ */
+export async function saveIlawDraft(uid, draftData) {
+  // Look for an existing draft with the same session key to avoid duplicates
+  const { subject, gradeLevel, term, weekNumber } = draftData;
+  const q = query(
+    lessonPlansRef(uid),
+    where("status", "==", "draft"),
+    where("subject", "==", subject || ""),
+    where("gradeLevel", "==", gradeLevel || ""),
+    where("term", "==", term || ""),
+    where("weekNumber", "==", weekNumber || ""),
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    // Update the existing draft
+    const existingRef = snap.docs[0].ref;
+    await updateDoc(existingRef, { ...draftData, status: "draft", updatedAt: serverTimestamp() });
+    return snap.docs[0].id;
+  }
+  // Create a new draft
+  const ref = await addDoc(lessonPlansRef(uid), {
+    ...draftData,
+    status: "draft",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/**
  * Fetch a single ILAW plan by ID.
  */
 export async function getIlawPlan(uid, planId) {
@@ -753,7 +788,10 @@ export async function deductTokens(uid, action, cost = TOKEN_COST) {
     const data    = snap.data();
     const balance = data.tokenBalance ?? 0;
     if (balance < cost) {
-      window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
+      // Guard: window is not defined in Node/test environments (e.g. Vitest without jsdom)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
+      }
       throw new Error("Not enough tokens. Ask your administrator to add tokens.");
     }
     tx.update(ref, { tokenBalance: balance - cost, updatedAt: serverTimestamp() });

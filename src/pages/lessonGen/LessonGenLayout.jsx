@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 import { trackEvent } from '../../services/usageTracker';
-import { Check, Lock, Pencil } from 'lucide-react';
+import { saveIlawDraft } from '../../services/db';
+import { Check, Lock, Pencil, Save } from 'lucide-react';
 
 const STEPS = [
   { path: '/lesson-gen/step-1', label: 'Session Setup' },
@@ -21,7 +23,9 @@ export default function LessonGenLayout() {
   const loc       = useLocation();
   const store     = useLessonGenStore();
   const { user }  = useAuth();
+  const { addToast } = useToast();
 
+  // 'idle' | 'saving' | 'saved' | 'error'
   const [saveState, setSaveState] = useState('idle');
 
   const currentIdx = STEPS.findIndex(s => loc.pathname === s.path);
@@ -44,6 +48,13 @@ export default function LessonGenLayout() {
       if (store.selectedDays.length === 0) n++;
       return n;
     }
+    // Bug 3 fix: Step 2 also has required fields — unpackedSessions AND lessonName
+    if (idx === 1) {
+      let n = 0;
+      if (!store.unpackedSessions?.length) n++;
+      if (!store.lessonName?.trim()) n++;
+      return n;
+    }
     return 0;
   }
 
@@ -53,11 +64,41 @@ export default function LessonGenLayout() {
     return false;
   }
 
+  // Bug 1 fix: actually save the draft to Firestore (status: 'draft').
+  // Falls back gracefully — localStorage draft (Zustand persist) is still
+  // intact so no data is lost even if the cloud save fails.
   async function handleSaveDraft() {
+    if (!user?.uid) return;
+    // Only save if there's something worth saving (at minimum a subject)
+    if (!store.subject) {
+      addToast('Nothing to save yet — fill in Step 1 first.', 'info');
+      return;
+    }
     setSaveState('saving');
-    await new Promise(r => setTimeout(r, 700));
-    setSaveState('saved');
-    setTimeout(() => setSaveState('idle'), 3000);
+    try {
+      await saveIlawDraft(user.uid, {
+        subject:          store.subject,
+        gradeLevel:       store.gradeLevel,
+        term:             store.term,
+        weekNumber:       store.weekNumber,
+        selectedDays:     store.selectedDays,
+        competencies:     store.competencies,
+        competencyText:   store.competencyText,
+        content:          store.content,
+        contentStandards: store.contentStandards,
+        learningContext:  store.learningContext,
+        lessonName:       store.lessonName,
+        unpackedSessions: store.unpackedSessions,
+      });
+      setSaveState('saved');
+      addToast('Draft saved to cloud ✓', 'success');
+    } catch (err) {
+      console.error('Draft save failed:', err);
+      setSaveState('error');
+      addToast('Cloud save failed — your draft is still saved on this device.', 'warning');
+    } finally {
+      setTimeout(() => setSaveState('idle'), 3000);
+    }
   }
 
   async function handleContinue() { navigate(NEXT_PATHS[currentIdx]); }
@@ -167,12 +208,25 @@ export default function LessonGenLayout() {
           )}
           <button
             onClick={handleSaveDraft}
+            disabled={saveState === 'saving'}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, color: 'var(--kt-text-secondary)', fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'none', border: 'none',
+              cursor: saveState === 'saving' ? 'default' : 'pointer',
+              fontSize: 12, fontWeight: 600,
+              color: saveState === 'saved'
+                ? 'var(--kt-success)'
+                : saveState === 'error'
+                  ? 'var(--kt-danger)'
+                  : 'var(--kt-text-secondary)',
+              transition: 'color 0.2s',
             }}
           >
-            Save draft
+            <Save size={12} />
+            {saveState === 'saving' ? 'Saving…'
+              : saveState === 'saved' ? 'Saved to cloud ✓'
+              : saveState === 'error' ? 'Save failed'
+              : 'Save draft'}
           </button>
         </div>
 
@@ -185,11 +239,30 @@ export default function LessonGenLayout() {
         {/* Right */}
         {currentIdx < 2 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {!isContinueEnabled() && missingCount(currentIdx) > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--kt-warning)', fontWeight: 600 }}>
-                ⚠ {missingCount(currentIdx)} required field{missingCount(currentIdx) > 1 ? 's' : ''} remaining
-              </span>
-            )}
+            {!isContinueEnabled() && (() => {
+              const missing = missingCount(currentIdx);
+              if (missing <= 0) return null;
+              // Step 2: give specific hints instead of a generic count
+              if (currentIdx === 1) {
+                const needsUnpack = !store.unpackedSessions?.length;
+                const needsName   = !store.lessonName?.trim();
+                const hint = needsUnpack && needsName
+                  ? 'Unpack competency and add a lesson name to continue'
+                  : needsUnpack
+                    ? 'Run Unpack first to continue'
+                    : 'Add a lesson name to continue';
+                return (
+                  <span style={{ fontSize: 11, color: 'var(--kt-warning)', fontWeight: 600 }}>
+                    ⚠ {hint}
+                  </span>
+                );
+              }
+              return (
+                <span style={{ fontSize: 11, color: 'var(--kt-warning)', fontWeight: 600 }}>
+                  ⚠ {missing} required field{missing > 1 ? 's' : ''} remaining
+                </span>
+              );
+            })()}
             <button
               onClick={handleContinue}
               disabled={!isContinueEnabled()}

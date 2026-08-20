@@ -3,7 +3,7 @@ import ktLogo from './assets/KT-Favicon.webp';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { useAuth } from './hooks/useAuth';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ensureTeacherProfile } from './services/db';
 import { auth } from './firebase';
@@ -124,12 +124,38 @@ function PendingApprovalScreen() {
 
 function ProtectedRoute({ children }) {
   const { user, loading, disabled, pendingApproval } = useAuth();
+  const { addToast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      ensureTeacherProfile(user.uid, user.email).catch(console.error);
-    }
-  }, [user]);
+    if (!user) return;
+    // Bug 4 fix: detect and surface profile-missing errors instead of silently
+    // swallowing them. The normal path (doc exists) always short-circuits
+    // inside ensureTeacherProfile and never throws. PERMISSION_DENIED only
+    // fires if the user doc is genuinely absent (e.g. the registerUser Cloud
+    // Function failed mid-way), which is rare but leaves the user in a broken
+    // state with no indication of what went wrong.
+    ensureTeacherProfile(user.uid, user.email).catch((err) => {
+      const isPermissionError =
+        err?.code === 'permission-denied' ||
+        err?.message?.toLowerCase().includes('permission');
+      if (isPermissionError) {
+        console.error(
+          '[kaTuro] Teacher profile missing or inaccessible for uid:', user.uid,
+          '\nThis usually means the registerUser Cloud Function did not complete.',
+          '\nError:', err,
+        );
+        addToast(
+          'Account setup incomplete — please sign out and register again, or contact your administrator.',
+          'error',
+          10000,
+        );
+      } else {
+        // Non-permission errors (network, quota) — log but don’t alarm the user
+        console.error('[kaTuro] ensureTeacherProfile error:', err);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // addToast is a stable context fn; intentionally excluded to prevent redundant profile checks
 
   useEffect(() => {
     // Only auto-sign-out users manually disabled by admin, not pending-approval users
