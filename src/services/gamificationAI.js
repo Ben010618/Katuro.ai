@@ -42,40 +42,46 @@ export async function genMatching(lesson, count = 10) {
   const data = await callGemini(
     `Generate ${count} term-definition pairs for a Filipino classroom Matching Type worksheet.\n${buildCtx(lesson)}\nReturn ONLY JSON: { "pairs": [{ "term": "...", "definition": "..." }] }`
   );
-  return data.pairs || [];
+  if (Array.isArray(data)) return data;
+  return data?.pairs || data?.items || [];
 }
 
 export async function genJumbled(lesson, count = 10) {
   const data = await callGemini(
     `Generate ${count} vocabulary words for a Jumbled Letters worksheet.\n${buildCtx(lesson)}\nRules: word = ALL CAPS single word, min 4 letters. clue = 1 sentence (don't say the word).\nReturn ONLY JSON: { "items": [{ "word": "PHOTOSYNTHESIS", "clue": "..." }] }`
   );
-  return data.items || [];
+  if (Array.isArray(data)) return data;
+  return data?.items || data?.words || [];
 }
 
 export async function genTrueFalse(lesson, count = 12) {
   const data = await callGemini(
     `Generate ${count} True/False statements for a Filipino classroom worksheet.\n${buildCtx(lesson)}\nMix ~50% true and ~50% false. Each = 1 clear sentence from lesson content.\nReturn ONLY JSON: { "items": [{ "statement": "...", "answer": true }] }`
   );
-  return data.items || [];
+  if (Array.isArray(data)) return data;
+  return data?.items || data?.statements || [];
 }
 
 export async function genCrossword(lesson, count = 12) {
   const data = await callGemini(
     `Generate ${count} word-clue pairs for a Crossword Puzzle.\n${buildCtx(lesson)}\nRules: word = single word ALL CAPS 3-14 letters. clue = concise definition. Mix short and long words.\nReturn ONLY JSON: { "pairs": [{ "word": "CHLOROPHYLL", "clue": "Green pigment in leaves" }] }`
   );
-  return data.pairs || [];
+  if (Array.isArray(data)) return data;
+  return data?.pairs || data?.items || [];
 }
 
 export async function genWordHunt(lesson, count = 15) {
   const data = await callGemini(
     `Generate ${count} vocabulary words for a Word Hunt puzzle.\n${buildCtx(lesson)}\nRules: single word ALL CAPS 3-12 letters, no hyphens. Include short definition.\nReturn ONLY JSON: { "words": [{ "word": "MITOSIS", "definition": "Cell division process" }] }`
   );
-  return data.words || [];
+  if (Array.isArray(data)) return data;
+  return data?.words || data?.items || [];
 }
 
 export async function genFillBlanks(lesson, count = 10) {
   const data = await callGemini(
     `Generate ${count} Fill-in-the-Blank items for a Filipino classroom worksheet.\n${buildCtx(lesson)}\nEach: 1 sentence with a key term replaced by _______. 4 choices (1 correct + 3 wrong). Vary blank position.\nReturn ONLY JSON: { "items": [{ "sentence": "Plants use _______ to make food.", "answer": "sunlight", "choices": ["sunlight","water","soil","air"] }] }`
   );
-  return data.items || [];
+  if (Array.isArray(data)) return data;
+  return data?.items || [];
 }

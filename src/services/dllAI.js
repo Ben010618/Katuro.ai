@@ -176,7 +176,7 @@ Return ONLY valid JSON (no markdown, no explanation):
   const objectives = {};
   for (let i = 0; i < DAYS.length; i++) {
     const day = DAYS[i];
-    const aiObj = raw.objectives?.[day] ?? '';
+    const aiObj = raw?.objectives?.[day] ?? '';
     if (aiObj.trim()) {
       objectives[day] = aiObj.trim();
     } else if (contentMap[i]) {
@@ -193,12 +193,12 @@ Return ONLY valid JSON (no markdown, no explanation):
   // Normalise procedure
   const procedure = {};
   for (const day of DAYS) {
-    const src = raw.procedure?.[day] || {};
+    const src = raw?.procedure?.[day] || {};
     procedure[day] = Object.fromEntries(STEPS.map(s => [s, src[s] || '']));
   }
 
   // Normalise resources
-  const r = raw.resources || {};
+  const r = raw?.resources || {};
   const resources = {
     teacherGuidePages:     r.teacherGuidePages     || '',
     learnersMaterialPages: r.learnersMaterialPages || '',
