@@ -152,8 +152,9 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
-    // If Cloud Function/Gemini is rate-limited or fails, swap to NVIDIA NIM fallback if available
+    // If Cloud Function/Gemini is rate-limited or fails, swap to NVIDIA NIM fallback or Direct Gemini
     if (!err?.details?.dailyLimit && err?.code !== 'functions/unauthenticated') {
+      // 1. Try NVIDIA NIM fallback
       try {
         const { getNvidiaConfig, callNvidiaChat } = await import('./nvidiaConfig');
         const nvidiaConfig = await getNvidiaConfig();
@@ -170,7 +171,37 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
           return { text, finishReason: 'STOP', engine: 'nvidia' };
         }
       } catch (nvidiaErr) {
-        console.warn('[callGeminiProxy] Client NVIDIA NIM fallback also failed:', nvidiaErr);
+        console.warn('[callGeminiProxy] Client NVIDIA NIM fallback failed:', nvidiaErr);
+      }
+
+      // 2. Try Client Direct Gemini API fallback
+      try {
+        const apiKey = await getGeminiKey();
+        if (apiKey) {
+          console.log(`[callGeminiProxy] Swapping to direct Gemini client fallback...`);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          const res = await geminiWithRetry(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents,
+              generationConfig: {
+                temperature: temperature ?? 0.5,
+                maxOutputTokens: maxTokens || 2048,
+                ...(responseMimeType ? { responseMimeType } : {}),
+              },
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const candidate = data.candidates?.[0];
+            const parts = candidate?.content?.parts ?? [];
+            const text = parts.map((p) => p.text ?? '').join('');
+            return { text, finishReason: candidate?.finishReason ?? null, engine: 'gemini_direct' };
+          }
+        }
+      } catch (directErr) {
+        console.warn('[callGeminiProxy] Direct Gemini client fallback failed:', directErr);
       }
     }
 
@@ -249,7 +280,7 @@ export async function getGeminiKeyStatus() {
 /** Quick validity test: send a tiny prompt to Gemini */
 export async function testGeminiKey(apiKey) {
   const trimmed = (apiKey || '').trim();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${trimmed}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${trimmed}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

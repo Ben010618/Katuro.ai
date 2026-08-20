@@ -18,7 +18,8 @@ const crypto                 = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_BACKUP_MODEL = 'gemini-1.5-flash';
 
 // Read API key from adminConfig/gemini in Firestore (set via Admin Dashboard)
 async function getGeminiKey() {
@@ -125,12 +126,12 @@ function langLabel(subject) {
   return isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
 }
 
-function geminiUrl(key) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+function geminiUrl(key, model = GEMINI_MODEL) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 }
 
-async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, _attempt = 0 } = {}) {
-  const res = await fetch(geminiUrl(key), {
+async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, model = GEMINI_MODEL, _attempt = 0 } = {}) {
+  const res = await fetch(geminiUrl(key, model), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -143,11 +144,17 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, _a
     }),
   });
 
+  // If 404 (model not found on API version), fall back to backup model
+  if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
+    console.warn(`[callGemini] Model ${model} returned 404, falling back to ${GEMINI_BACKUP_MODEL}`);
+    return callGemini(key, prompt, { temperature, maxTokens, model: GEMINI_BACKUP_MODEL, _attempt });
+  }
+
   // Retry on 429 (rate limit) or 503 (overloaded) with exponential backoff
   if ((res.status === 429 || res.status === 503) && _attempt < 4) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
     await new Promise(r => setTimeout(r, delay));
-    return callGemini(key, prompt, { temperature, maxTokens, _attempt: _attempt + 1 });
+    return callGemini(key, prompt, { temperature, maxTokens, model, _attempt: _attempt + 1 });
   }
 
   if (!res.ok) {
@@ -591,8 +598,8 @@ Return ONLY this JSON (no markdown, no explanation):
 // each feature stays exactly where it already was reviewed and tested.
 const MAX_TOKENS_CEILING = 20000; // hard ceiling regardless of what a client requests — COT's full PPST lesson plan needs up to 16384
 
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, _attempt = 0 } = {}) {
-  const res = await fetch(geminiUrl(key), {
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model = GEMINI_MODEL, _attempt = 0 } = {}) {
+  const res = await fetch(geminiUrl(key, model), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -606,10 +613,16 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     }),
   });
 
+  // If 404 (model not found on API version), fall back to backup model
+  if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
+    console.warn(`[callGeminiRaw] Model ${model} returned 404, falling back to ${GEMINI_BACKUP_MODEL}`);
+    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: GEMINI_BACKUP_MODEL, _attempt });
+  }
+
   if ((res.status === 429 || res.status === 503) && _attempt < 4) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
     await new Promise(r => setTimeout(r, delay));
-    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 });
+    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model, _attempt: _attempt + 1 });
   }
 
   if (!res.ok) {
