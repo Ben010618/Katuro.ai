@@ -45,26 +45,47 @@ async function getNvidiaConfigServer() {
   return null;
 }
 
-async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTokens = 2048, _attempt = 0 } = {}) {
+function extractPromptFromContents(contents) {
+  if (typeof contents === 'string') return contents;
+  if (!Array.isArray(contents)) return '';
+  return contents
+    .map((c) => {
+      if (typeof c === 'string') return c;
+      if (Array.isArray(c?.parts)) {
+        return c.parts.map((p) => (typeof p === 'string' ? p : p?.text || '')).filter(Boolean).join('\n');
+      }
+      if (c?.text) return c.text;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTokens = 2048, responseMimeType, _attempt = 0 } = {}) {
   const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const payload = {
+    model: nvidiaConfig.model || 'meta/llama-3.3-70b-instruct',
+    messages: [{ role: 'user', content: prompt }],
+    temperature,
+    max_tokens: maxTokens,
+  };
+  if (responseMimeType === 'application/json') {
+    payload.response_format = { type: 'json_object' };
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
     },
-    body: JSON.stringify({
-      model: nvidiaConfig.model || 'meta/llama-3.3-70b-instruct',
-      messages: [{ role: 'user', content: prompt }],
-      temperature,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if ((res.status === 429 || res.status === 503) && _attempt < 3) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500;
     await new Promise(r => setTimeout(r, delay));
-    return callNvidiaServer(nvidiaConfig, prompt, { temperature, maxTokens, _attempt: _attempt + 1 });
+    return callNvidiaServer(nvidiaConfig, prompt, { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 });
   }
 
   if (!res.ok) {
@@ -79,7 +100,8 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
   }
 
   const data = await res.json();
-  return data?.choices?.[0]?.message?.content ?? '';
+  const text = data?.choices?.[0]?.message?.content ?? '';
+  return text;
 }
 const CACHE_TTL_DAYS = 30;
 const EXPAND_TOKENS  = 3;
@@ -365,17 +387,21 @@ Return ONLY this JSON:
   ]
 }`;
 
-    if (nvidiaConfig) {
-      try {
-        text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
-      } catch (err) {
-        console.warn('NVIDIA NIM outline generation failed on server, falling back to Gemini:', err);
-        const key_ = await getGeminiKey();
-        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
-      }
-    } else {
+    try {
       const key_ = await getGeminiKey();
       text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+    } catch (geminiErr) {
+      console.warn('Gemini outline generation failed, checking NVIDIA fallback:', geminiErr.message);
+      if (nvidiaConfig?.apiKey) {
+        try {
+          text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
+        } catch (nvidiaErr) {
+          console.error('NVIDIA outline fallback also failed:', nvidiaErr.message);
+          throw geminiErr;
+        }
+      } else {
+        throw geminiErr;
+      }
     }
 
     const parsed = parseJSON(text, 'outline');
@@ -647,14 +673,39 @@ exports.generateAI = onCall(
       await checkAndIncrementDailyUsage(req.auth.uid, action);
     }
 
-    const key = await getGeminiKey();
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
 
-    return callGeminiRaw(key, contents, {
-      temperature: temperature ?? 0.5,
-      maxTokens: clampedMaxTokens,
-      responseMimeType,
-    });
+    try {
+      const key = await getGeminiKey();
+      return await callGeminiRaw(key, contents, {
+        temperature: temperature ?? 0.5,
+        maxTokens: clampedMaxTokens,
+        responseMimeType,
+      });
+    } catch (geminiErr) {
+      console.warn(`[generateAI] Gemini call failed for action "${action}". Checking NVIDIA fallback:`, geminiErr.message);
+      const nvidiaConfig = await getNvidiaConfigServer();
+      if (nvidiaConfig?.apiKey) {
+        try {
+          console.log(`[generateAI] Swapping to NVIDIA NIM API fallback (${nvidiaConfig.model || 'default'})...`);
+          const prompt = extractPromptFromContents(contents);
+          const nvidiaText = await callNvidiaServer(nvidiaConfig, prompt, {
+            temperature: temperature ?? 0.5,
+            maxTokens: clampedMaxTokens,
+            responseMimeType,
+          });
+          return {
+            text: nvidiaText,
+            finishReason: 'STOP',
+            engine: 'nvidia',
+          };
+        } catch (nvidiaErr) {
+          console.error(`[generateAI] NVIDIA fallback also failed:`, nvidiaErr.message);
+          throw geminiErr;
+        }
+      }
+      throw geminiErr;
+    }
   }
 );
 

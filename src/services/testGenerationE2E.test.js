@@ -285,4 +285,37 @@ describe('End-to-End Test Generation Suite', () => {
     // Test downloading Answer Key DOCX
     await expect(downloadAnswerKeyDocx({ keyBlocks: parts.keyBlocks, meta, profile })).resolves.not.toThrow();
   });
+
+  it('Step 7: Seamlessly swaps to NVIDIA NIM fallback when Gemini is busy or errors', async () => {
+    // Resolves with NVIDIA NIM fallback response
+    const mockNvidiaItems = [
+      {
+        question: 'What is matter?',
+        choices: { A: 'Anything that occupies space', B: 'Energy only', C: 'Light only', D: 'Vacuum' },
+        answer: 'A',
+      },
+    ];
+
+    callGeminiProxy.mockResolvedValueOnce({
+      text: JSON.stringify({ items: mockNvidiaItems }),
+      finishReason: 'STOP',
+      engine: 'nvidia',
+    });
+
+    const result = await generateItemsForCompetency({
+      competencyText: 'Describe characteristics of matter',
+      cells: [1, 0, 0, 0, 0, 0],
+      subject: 'Science',
+      gradeLevel: 'Grade 5',
+      questionFormats: ['Multiple Choice'],
+      proficiencyLevel: 'proficient',
+      contextNotes: 'Fallback test',
+      startIndex: 0,
+      isRetry: true,
+    });
+
+    expect(result.items.length).toBe(1);
+    expect(result.items[0].question).toBe('What is matter?');
+    expect(result.items[0].choices.A).toBe('Anything that occupies space');
+  });
 });

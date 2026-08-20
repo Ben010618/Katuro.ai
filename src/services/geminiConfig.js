@@ -125,6 +125,22 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  * true` specifically for the daily-limit case so a caller can skip retrying
  * something that won't clear up in the next few seconds.
  */
+function extractPrompt(contents) {
+  if (typeof contents === 'string') return contents;
+  if (!Array.isArray(contents)) return '';
+  return contents
+    .map((c) => {
+      if (typeof c === 'string') return c;
+      if (Array.isArray(c?.parts)) {
+        return c.parts.map((p) => (typeof p === 'string' ? p : p?.text || '')).filter(Boolean).join('\n');
+      }
+      if (c?.text) return c.text;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount }) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   // BUG-FIX: Raised from 150000 (150s) to 320000 (320s) so the client never
@@ -136,6 +152,28 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
+    // If Cloud Function/Gemini is rate-limited or fails, swap to NVIDIA NIM fallback if available
+    if (!err?.details?.dailyLimit && err?.code !== 'functions/unauthenticated') {
+      try {
+        const { getNvidiaConfig, callNvidiaChat } = await import('./nvidiaConfig');
+        const nvidiaConfig = await getNvidiaConfig();
+        if (nvidiaConfig?.apiKey) {
+          console.log(`[callGeminiProxy] Cloud Function error (${err.message || err.code}). Swapping to client NVIDIA NIM fallback...`);
+          const promptText = extractPrompt(contents);
+          const responseFormat = responseMimeType === 'application/json' ? { type: 'json_object' } : undefined;
+          const text = await callNvidiaChat({
+            messages: [{ role: 'user', content: promptText }],
+            temperature: temperature ?? 0.5,
+            maxTokens: maxTokens || 2048,
+            responseFormat,
+          });
+          return { text, finishReason: 'STOP', engine: 'nvidia' };
+        }
+      } catch (nvidiaErr) {
+        console.warn('[callGeminiProxy] Client NVIDIA NIM fallback also failed:', nvidiaErr);
+      }
+    }
+
     const code = err?.code || '';
     const rawMessage = err?.message || '';
     // A bare code-shaped message ("internal", "unavailable"...) means the
