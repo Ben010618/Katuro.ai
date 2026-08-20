@@ -182,7 +182,8 @@ const PROXY_LIMITS = {
   action_research_ai:  30,  // shared across all 6 AR generation phases (matches existing client limit)
   ar_problem_suggest:  60,  // live-as-you-type problem-statement suggestion in AR Phase 1 — cheap (512 tokens), debounced, but was previously calling Gemini directly from the client with no limit at all
   scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
-  protect_chat:        40,  // kaTuro Protect chat — admin-only for now, low volume
+  protect_chat:        40,  // kaTuro Protect chat + collabAIReply — shared 40/day limit
+  melc_validate:       50,  // validateMelcCode — one call per lesson-plan save, generous headroom
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 
@@ -292,9 +293,12 @@ exports.adminChangePassword = onCall(
       throw new HttpsError('invalid-argument', 'uid and password (min 6 chars) are required.');
     }
 
+    // Update Firebase Auth — the only safe place to store credentials.
+    // BUG-FIX: Do NOT write plaintext password to Firestore; Firebase Auth
+    // already stores it hashed. Writing it to Firestore exposes it to any
+    // client that can read the teacher doc (including the teacher themselves).
     await admin.auth().updateUser(uid, { password });
     await db.doc(`teachers/${uid}`).update({
-      password,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -605,7 +609,10 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
 }
 
 exports.generateAI = onCall(
-  { region: 'us-central1', timeoutSeconds: 120 },
+  // BUG-FIX: COT and Action Research plans need up to ~250s — raised from 120s
+  // to 300s so DEADLINE_EXCEEDED never interrupts a legitimate generation.
+  // 512MiB memory prevents OOM on large parallel slide expansions.
+  { region: 'us-central1', timeoutSeconds: 300, memory: '512MiB' },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
@@ -900,7 +907,9 @@ exports.adminDeleteShareComment = onCall(
 );
 
 // ── Admin: set any user's password directly via Admin SDK ─────────────────────
-exports.adminSetPassword = onCall(async (request) => {
+// BUG-FIX: Added { region: 'us-central1' } — previously missing, causing this
+// function to potentially deploy to a different region from everything else.
+exports.adminSetPassword = onCall({ region: 'us-central1' }, async (request) => {
   // Verify caller is an admin
   const callerUid = request.auth?.uid;
   if (!callerUid) throw new HttpsError('unauthenticated', 'Must be signed in.');
@@ -915,8 +924,13 @@ exports.adminSetPassword = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'targetUid and newPassword (min 6 chars) are required.');
   }
 
+  // BUG-FIX: Only update Firebase Auth — do NOT write plaintext password to
+  // Firestore. The teacher doc updatedAt is bumped so the admin can see when
+  // the password was last changed, without exposing the credential itself.
   await admin.auth().updateUser(targetUid, { password: newPassword });
-  await db.doc(`teachers/${targetUid}`).update({ password: newPassword, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  await db.doc(`teachers/${targetUid}`).update({
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
   return { success: true };
 });
@@ -939,11 +953,13 @@ exports.adminCreateUserFn = onCall(
     const tokens = Math.max(0, Number(initialTokens) || 0);
     const uid    = crypto.randomBytes(14).toString('hex');
 
-    // Write Firestore BEFORE creating Auth user (same ordering as registerUser)
+    // Write Firestore BEFORE creating Auth user (same ordering as registerUser).
+    // BUG-FIX: Removed plaintext `password` field — Firebase Auth already
+    // stores credentials securely; copying it to Firestore exposes it to any
+    // client that can read the teacher doc.
     await db.doc(`teachers/${uid}`).set({
       email:           email.trim().toLowerCase(),
       displayName:     email.trim().toLowerCase(),
-      password,
       tokenBalance:    tokens,
       isAdmin:         false,
       disabled:        false,
@@ -1200,6 +1216,11 @@ exports.collabAIReply = onCall(
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
 
+    // BUG-FIX: Add daily rate limiting. Without this, any authenticated user
+    // could spam @KaTuro mentions in a loop and exhaust the shared Gemini
+    // quota for all teachers. Reuses the protect_chat 40/day bucket.
+    await checkAndIncrementDailyUsage(uid, 'protect_chat');
+
     const { channelId, dmId, messageText } = req.data || {};
     if (!messageText) return { ok: true };
 
@@ -1259,6 +1280,9 @@ exports.validateMelcCode = onCall(
   { region: 'us-central1', maxInstances: 20 },
   async (req) => {
     if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+    // BUG-FIX: Add daily rate limiting. Previously unlimited — any auth user
+    // could call this in a loop and drain shared Gemini API quota.
+    await checkAndIncrementDailyUsage(req.auth.uid, 'melc_validate');
     const { subject, gradeLevel, quarter, melcCodes } = req.data || {};
     if (!melcCodes?.length || !subject) return { results: [] };
 

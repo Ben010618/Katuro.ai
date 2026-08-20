@@ -106,6 +106,17 @@ export default function StepReview() {
 
         allItems.push(...result.items);
         cursor = result.nextIndex;
+
+        // BUG-FIX: Pace sequential API calls to avoid Gemini's RPM (requests-per-
+        // minute) rate limit. Without this pause, firing 5–8 competency calls in rapid
+        // succession triggers 429 errors on rows 3–4 (root cause of the ~115s failures
+        // visible in Admin → Analytics → "Recent Generation Errors"). Skip the delay
+        // after the last row since there's nothing to pace after it.
+        const nonEmptyRowsRemaining = store.tos.rows.slice(i + 1).some(r => r.total > 0);
+        if (nonEmptyRowsRemaining) {
+          setGenPhase(`Competency ${i + 1} done — preparing next…`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
       }
 
       const { buildTestPaperParts } = await import('../../services/testBuilderDocx');

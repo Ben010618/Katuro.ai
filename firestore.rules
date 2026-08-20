@@ -70,8 +70,13 @@ service cloud.firestore {
     }
 
     // ── Usage analytics — any auth user logs their own events; admin reads all ──
+    // BUG-FIX: Added field-count cap (size() <= 10) to prevent any authenticated
+    // user from flooding the collection with arbitrarily large documents, which
+    // would pollute analytics charts and inflate Firestore costs. The largest
+    // valid event shape from usageTracker.js has at most 7 fields (uid, feature,
+    // ts, tool, success, durationMs, error), so 10 gives comfortable headroom.
     match /usageEvents/{docId} {
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.size() <= 10;
       allow read: if isAdmin();
     }
 

@@ -127,7 +127,11 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  */
 export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount }) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
-  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: 150000 });
+  // BUG-FIX: Raised from 150000 (150s) to 320000 (320s) so the client never
+  // times out before the server does. The server generateAI function was raised
+  // to 300s; this leaves a 20s buffer above that so teachers see the server's
+  // own error message rather than a generic client-side disconnect.
+  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: 320000 });
   try {
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
