@@ -27,6 +27,14 @@ describe('parseAIJson', () => {
     expect(result.items[1]).toEqual({ question: 'b', answer: '2' });
   });
 
+  it('parses raw JSON arrays without fences or object wrapper', () => {
+    expect(parseAIJson('[{"question": "What is x?", "answer": "1"}]')).toEqual([{ question: 'What is x?', answer: '1' }]);
+  });
+
+  it('repairs a trailing comma in a raw array', () => {
+    expect(parseAIJson('[\n{"question": "a"},\n]')).toEqual([{ question: 'a' }]);
+  });
+
   it('throws a clear error when no JSON is present at all', () => {
     expect(() => parseAIJson('Sorry, I cannot help with that.')).toThrow('AI returned no valid JSON');
   });

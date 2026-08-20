@@ -17,6 +17,7 @@ const INITIAL = {
   competencies:     defaultCompetencies(),
   cognitiveWeights: derivePreset('KS2'),
   tos:              EMPTY_TOS,
+  generatedParts:   null, // { testBlocks, keyBlocks }
   status:           'draft',
 };
 
@@ -29,6 +30,7 @@ export const useTestBuilderStore = create(
       setCompetencies:    (comps)    => set({ competencies: comps }),
       setCognitiveWeights:(weights)  => set({ cognitiveWeights: weights }),
       setTos:             (tos)      => set({ tos }),
+      setGeneratedParts:  (parts)    => set({ generatedParts: parts }),
 
       loadSession: (doc) => set({
         sessionId:        doc.id,
@@ -43,6 +45,7 @@ export const useTestBuilderStore = create(
         competencies:     doc.competencies?.length ? doc.competencies : defaultCompetencies(),
         cognitiveWeights: doc.cognitiveWeights || derivePreset('KS2'),
         tos:              doc.tos              || EMPTY_TOS,
+        generatedParts:   doc.generatedParts   || null,
         status:           doc.status           || 'draft',
       }),
 
@@ -63,6 +66,7 @@ export const useTestBuilderStore = create(
         competencies:     s.competencies,
         cognitiveWeights: s.cognitiveWeights,
         tos:              s.tos,
+        generatedParts:   s.generatedParts,
         status:           s.status,
       }),
     }

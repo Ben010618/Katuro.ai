@@ -59,6 +59,21 @@ const STEPS = [
   },
 ];
 
+function getSetupMissingFields(store) {
+  const missing = [];
+  if (!store.gradeLevel) missing.push('Grade level');
+  if (!store.subject?.trim()) missing.push('Subject');
+  if (isManualCeilingType(store.testType) && (!store.itemCeilingOverride || store.itemCeilingOverride < MANUAL_CEILING_MIN || store.itemCeilingOverride > MANUAL_CEILING_MAX)) {
+    missing.push('Item ceiling');
+  }
+  if (!store.terms?.length) missing.push('Term');
+  if (!store.questionFormats?.length) missing.push('Question format');
+  if (!store.competencies?.length || store.competencies.some((c) => !c.text?.trim())) {
+    missing.push('Competency descriptions');
+  }
+  return missing;
+}
+
 function pickSessionFields(store) {
   const keyStage = deriveKeyStage(store.gradeLevel);
   return {
@@ -77,6 +92,7 @@ function pickSessionFields(store) {
     cognitiveWeights: store.cognitiveWeights,
     hotsFloorPct: keyStage ? deriveHotsFloor(keyStage) : 0,
     tos:          store.tos,
+    generatedParts: store.generatedParts || null,
   };
 }
 
@@ -286,11 +302,23 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {!isValid && (
-              <span style={{ fontSize: 11, color: 'var(--kt-accent-amber)', fontWeight: 600 }}>
-                ⚠ Fill in required fields to continue
-              </span>
-            )}
+            {!isValid && (() => {
+              if (activeStep === 0) {
+                const missing = getSetupMissingFields(store);
+                if (missing.length > 0) {
+                  return (
+                    <span style={{ fontSize: 11, color: 'var(--kt-accent-amber)', fontWeight: 600 }}>
+                      ⚠ Required: {missing.join(', ')}
+                    </span>
+                  );
+                }
+              }
+              return (
+                <span style={{ fontSize: 11, color: 'var(--kt-accent-amber)', fontWeight: 600 }}>
+                  ⚠ Fill in required fields to continue
+                </span>
+              );
+            })()}
             <button
               onClick={handlePrimary}
               disabled={!isValid}

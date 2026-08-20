@@ -69,7 +69,7 @@ export default function StepSetup() {
         </h2>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
           Term Exams get a DepEd item ceiling automatically from grade level. Summative Tests (ST1/ST2) let you
-          choose the item count — 10 to 25 per the DepEd memo cap.
+          choose the item count — 10 to 30 per the DepEd memo cap.
         </p>
       </div>
 
@@ -108,7 +108,7 @@ export default function StepSetup() {
               value={store.itemCeilingOverride ?? ''}
               onChange={(e) => store.setField('itemCeilingOverride', e.target.value ? Number(e.target.value) : null)}
             >
-              <option value="">Select item count (10–25)...</option>
+              <option value="">Select item count (10–30)...</option>
               {manualCeilingOptions().map((n) => (
                 <option key={n} value={n}>{n} items</option>
               ))}

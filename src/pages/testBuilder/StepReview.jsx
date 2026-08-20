@@ -3,9 +3,10 @@ import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTeacherProfile, deductTokens, refundTokens } from '../../services/db';
+import { updateTestSession } from '../../services/testBuilderDb';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
-import { totalDays } from '../../utils/testBuilderCalc';
+import { totalDays, computeTOS } from '../../utils/testBuilderCalc';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
@@ -27,15 +28,24 @@ export default function StepReview() {
   const keyStage = deriveKeyStage(store.gradeLevel);
   const itemCeiling = resolveItemCeiling(keyStage, store.testType, store.itemCeilingOverride);
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
-  const hotsOk = store.tos.hotsPct >= hotsFloor;
-  const grandTotal = store.tos.columnTotals.reduce((a, b) => a + b, 0);
+
+  // Auto-heal TOS if it's empty or out-of-sync but competencies exist
+  useEffect(() => {
+    if ((!store.tos?.rows || store.tos.rows.length === 0) && store.competencies?.length > 0 && itemCeiling > 0) {
+      const computed = computeTOS(store.competencies, store.cognitiveWeights, itemCeiling);
+      store.setTos(computed);
+    }
+  }, [store.competencies, store.cognitiveWeights, itemCeiling]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const grandTotal = (store.tos?.columnTotals || []).reduce((a, b) => a + b, 0);
+  const hotsOk = (store.tos?.hotsPct || 0) >= hotsFloor;
 
   const [teacherProfile,  setTeacherProfile]  = useState(null);
   const [genLoading,      setGenLoading]      = useState(false);
   const [genPhase,        setGenPhase]        = useState('');
   const [genError,        setGenError]        = useState('');
-  const [generatedParts,  setGeneratedParts]  = useState(null); // { testBlocks, keyBlocks } — cached so both downloads agree
   const [downloadingKind, setDownloadingKind] = useState(null); // 'tos' | 'questions' | 'key' | null
+  const generatedParts = store.generatedParts; // { testBlocks, keyBlocks }
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -50,14 +60,14 @@ export default function StepReview() {
     itemCeiling,
   };
 
-  const canGenerateItems = store.status === 'tos_generated' && grandTotal > 0 && !genLoading;
-  const canDownloadTos   = store.status === 'tos_generated' && grandTotal > 0;
+  const canGenerateItems = grandTotal > 0 && !genLoading;
+  const canDownloadTos   = grandTotal > 0;
 
   async function handleGenerateItems() {
     if (!canGenerateItems || !user?.uid) return;
     setGenLoading(true);
     setGenError('');
-    setGeneratedParts(null);
+    store.setGeneratedParts(null);
     let elapsedMs;
     let tokensDeducted = false;
     try {
@@ -120,7 +130,15 @@ export default function StepReview() {
       }
 
       const { buildTestPaperParts } = await import('../../services/testBuilderDocx');
-      setGeneratedParts(buildTestPaperParts(allItems, deriveLanguage(store.subject)));
+      const parts = buildTestPaperParts(allItems, deriveLanguage(store.subject));
+      store.setGeneratedParts(parts);
+      if (user?.uid && store.sessionId) {
+        updateTestSession(user.uid, store.sessionId, {
+          generatedParts: parts,
+          status: 'tos_generated',
+        }).catch((e) => console.error('Failed to auto-save generated parts:', e));
+        store.setField('status', 'tos_generated');
+      }
       addToast(
         freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
         'success'
@@ -286,11 +304,9 @@ export default function StepReview() {
             <Sparkles size={20} color="#fff" />
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Items with AI</p>
+            <p style={{ margin: '0', fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Items with AI</p>
             <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
-              {store.status === 'tos_generated'
-                ? `AI writes items for exactly the counts in your TOS, using only your selected Question Format(s).${freeMode ? '' : ` (${GENERATE_ITEMS_COST} tokens)`}`
-                : 'Confirm and Save first to unlock item generation.'}
+              AI writes items for exactly the counts in your TOS, using only your selected Question Format(s).{freeMode ? '' : ` (${GENERATE_ITEMS_COST} tokens)`}
             </p>
           </div>
           <button

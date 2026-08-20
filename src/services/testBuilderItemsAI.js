@@ -117,15 +117,58 @@ Return ONLY JSON, no markdown fences, no explanation before or after, in exactly
 Include "choices" only for Multiple Choice slots and "matchDefinition" only for Matching Type slots. The items array must have exactly ${slots.length} entries, in the same order as the slot list.`;
 
   const result = await callGemini(prompt, undefined, isRetry);
-  const rawItems = result.items || [];
+  const rawItems = Array.isArray(result)
+    ? result
+    : (result?.items && Array.isArray(result.items) ? result.items : []);
+
+  if (rawItems.length === 0) {
+    throw new Error('AI returned an empty item list. Please try again.');
+  }
 
   // Zip our own deterministic cognitiveLevel/format onto each item by
   // position — never trust whatever (if anything) the AI echoed back.
-  const items = slots.map((slot, i) => ({
-    ...rawItems[i],
-    cognitiveLevel: slot.cognitiveLevel,
-    format: slot.format,
-  }));
+  // Also guarantee required properties per format so DOCX export never renders undefined.
+  const items = slots.map((slot, i) => {
+    const raw = rawItems[i] || {};
+    const question = (raw.question || '').trim() || `Item on ${competencyText} (${slot.cognitiveLevel})`;
+    let choices = raw.choices;
+    let matchDefinition = raw.matchDefinition;
+    let answer = (raw.answer ?? '').toString().trim();
+
+    if (slot.format === 'Multiple Choice') {
+      const srcChoices = choices && typeof choices === 'object' ? choices : {};
+      choices = {
+        A: String(srcChoices.A || 'Option A'),
+        B: String(srcChoices.B || 'Option B'),
+        C: String(srcChoices.C || 'Option C'),
+        D: String(srcChoices.D || 'Option D'),
+      };
+      if (!['A', 'B', 'C', 'D'].includes(answer.toUpperCase())) {
+        answer = 'A';
+      } else {
+        answer = answer.toUpperCase();
+      }
+    } else if (slot.format === 'True or False') {
+      if (!['TRUE', 'FALSE'].includes(answer.toUpperCase())) {
+        answer = 'TRUE';
+      } else {
+        answer = answer.toUpperCase();
+      }
+    } else if (slot.format === 'Matching Type') {
+      matchDefinition = (matchDefinition || '').trim() || question;
+    } else if (!answer) {
+      answer = 'Model answer / key points';
+    }
+
+    return {
+      question,
+      choices,
+      matchDefinition,
+      answer,
+      cognitiveLevel: slot.cognitiveLevel,
+      format: slot.format,
+    };
+  });
 
   return { items, nextIndex: startIndex + slots.length };
 }

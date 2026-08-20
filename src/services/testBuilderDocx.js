@@ -347,12 +347,16 @@ export function buildTestPaperParts(items, lang = 'en') {
 
 function download(doc, filename) {
   return Packer.toBlob(doc).then((blob) => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return blob;
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    return blob;
   });
 }
 

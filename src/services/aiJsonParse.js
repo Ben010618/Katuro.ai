@@ -61,9 +61,30 @@ function stripTrailingCommas(s) {
  * before giving up with a message that tells the caller what happened.
  */
 export function parseAIJson(text) {
-  const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/s);
-  if (!m) throw new Error('AI returned no valid JSON');
-  const raw = m[1] ?? m[0];
+  if (!text || typeof text !== 'string') throw new Error('AI returned no valid JSON');
+
+  // Fast path for raw JSON strings (common when responseMimeType: 'application/json' is used)
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Fall through to regex-based extraction & repair
+  }
+
+  const m = text.match(/```json\s*([\s\S]*?)```/) ||
+            text.match(/```\s*([\s\S]*?)```/) ||
+            text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/s);
+
+  if (!m) {
+    // Last ditch: try closeOpenJSON on trimmed text
+    try {
+      return JSON.parse(stripTrailingCommas(closeOpenJSON(trimmed)));
+    } catch {
+      throw new Error('AI returned no valid JSON');
+    }
+  }
+
+  const raw = (m[1] ?? m[0]).trim();
 
   try {
     return JSON.parse(raw);
