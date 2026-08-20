@@ -104,11 +104,15 @@ export default function StepReview() {
             console.warn(`generateItemsForCompetency (row ${i + 1}) attempt ${attempt + 1} failed:`, err);
             if (err.dailyLimit) break;
             if (attempt < 2) {
-              const wait = err.status === 429
+              const waitMs = err.status === 429
                 ? Math.min((err.retryAfter || 30) * 1000, 30_000)
                 : 5000 + attempt * 3000;
-              setGenPhase(`Due to high demand, competency ${i + 1} is slow — retrying in ${Math.round(wait / 1000)}s…`);
-              await new Promise(r => setTimeout(r, wait));
+              const waitSec = Math.round(waitMs / 1000);
+              for (let s = waitSec; s > 0; s--) {
+                setGenPhase(`Due to high demand, competency ${i + 1} is slow — retrying in ${s}s…`);
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              setGenPhase(`Retrying competency ${i + 1} of ${store.tos.rows.length}…`);
             }
           }
         }
