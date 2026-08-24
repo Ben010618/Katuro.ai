@@ -425,6 +425,88 @@ h1, h2, h3, .doc-heading, .editorial-heading {
 }
 .animate-fade-up { animation: fadeUp 0.25s ease forwards; }
 
+/* ── Download / export progress bar ───────────────────────────────────────────
+   Building a DOCX blocks the main thread (the docx packer is synchronous), so
+   a JS-driven bar would freeze at exactly the moment the user needs feedback.
+   Everything here animates transform/opacity ONLY, which the browser runs on
+   the compositor thread — it keeps moving smoothly while the main thread is
+   busy. Do not swap these for width/left animations.
+
+   The fill decelerates toward 92% and stops: we cannot know real progress for
+   local document assembly, so the bar never claims to be finished. The jump to
+   100% is applied inline by the component when the work genuinely completes. */
+@keyframes ktProgressFill {
+  0%   { transform: scaleX(0.03); }
+  6%   { transform: scaleX(0.26); }
+  18%  { transform: scaleX(0.45); }
+  38%  { transform: scaleX(0.62); }
+  62%  { transform: scaleX(0.76); }
+  100% { transform: scaleX(0.92); }
+}
+
+/* Moving highlight so the bar still reads as "alive" once the fill decelerates */
+@keyframes ktProgressSheen {
+  from { transform: translateX(-140%); }
+  to   { transform: translateX(320%); }
+}
+
+/* Phase captions are stacked and cross-faded by CSS rather than setState, for
+   the same main-thread reason as the bar above. */
+@keyframes ktPhaseStep {
+  0%   { opacity: 0; transform: translateY(4px); }
+  6%   { opacity: 1; transform: translateY(0); }
+  94%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes ktPhaseStepLast {
+  0%   { opacity: 0; transform: translateY(4px); }
+  6%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.kt-progress-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--kt-green-tint);
+  overflow: hidden;
+}
+.kt-progress-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--kt-green-primary), var(--kt-green-bright));
+  animation: ktProgressFill 18s cubic-bezier(0.15, 0.75, 0.2, 1) forwards;
+}
+.kt-progress-fill[data-done='true'] {
+  animation: none;
+  transform: scaleX(1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.kt-progress-sheen {
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: ktProgressSheen 1.5s ease-in-out infinite;
+}
+.kt-phase {
+  grid-area: 1 / 1;
+  animation: ktPhaseStep 4.5s ease both;
+}
+.kt-phase:last-child { animation-name: ktPhaseStepLast; }
+
+/* Respect users who have asked the OS to reduce motion: hold a steady
+   indeterminate bar instead of sweeping and cross-fading. */
+@media (prefers-reduced-motion: reduce) {
+  .kt-progress-fill  { animation: none; transform: scaleX(0.5); }
+  .kt-progress-sheen { animation: none; opacity: 0; }
+  .kt-phase          { animation: none; opacity: 0; }
+  .kt-phase:first-child { opacity: 1; }
+}
+
 /* ═══════════════════════════════════════════════════════════
    Print
 ═══════════════════════════════════════════════════════════ */

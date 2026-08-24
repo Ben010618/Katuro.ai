@@ -13,6 +13,7 @@ import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFi
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
+import DownloadProgress from '../../components/DownloadProgress';
 
 // ── Defensive Sanitization Loop for Clean Output ──────────────────────────────
 function sanitizeLessonTitle(name, fallbackTopic, subject) {
@@ -414,6 +415,7 @@ export default function OutputPage() {
 
   return (
     <>
+      <DownloadProgress active={docxLoading} label="ILAW Lesson Plan (DOCX)" />
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 1cm 1.5cm; }

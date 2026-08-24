@@ -12,6 +12,15 @@ import {
   ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
   FileText, KeyRound, Table2, Sparkles, Loader2, AlertCircle, X, Lock,
 } from 'lucide-react';
+import DownloadProgress from '../../components/DownloadProgress';
+
+// Names the file in the download overlay so a teacher exporting all three in a
+// row can tell which one is currently being built.
+const DOWNLOAD_LABELS = {
+  tos:       'Table of Specifications (DOCX)',
+  questions: 'Test Questions (DOCX)',
+  key:       'Answer Key (DOCX)',
+};
 
 const sectionLabel = {
   margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)',
@@ -183,6 +192,7 @@ export default function StepReview() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingBottom: 32 }}>
+      <DownloadProgress active={downloadingKind !== null} label={DOWNLOAD_LABELS[downloadingKind] ?? 'Test document (DOCX)'} />
 
       <div>
         <span style={{

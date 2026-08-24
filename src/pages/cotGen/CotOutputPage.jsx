@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import { retryAsync } from '../../utils/retry';
+import DownloadProgress from '../../components/DownloadProgress';
 
 const KRA_COLOR = {
   'KRA 1': { text: '#0369a1', bg: '#e0f2fe' },
@@ -236,6 +237,7 @@ export default function CotOutputPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <DownloadProgress active={exporting} label="Classroom Observation Tool (DOCX)" />
 
       <AIOutputGuard feature="cot" inputContext={{ subject: store.generatedPlan?.plan?.subject, grade: store.generatedPlan?.plan?.grade, melc: store.generatedPlan?.plan?.melc }} />
 

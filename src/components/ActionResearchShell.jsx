@@ -1,5 +1,6 @@
 import { ChevronRight, ArrowLeft, Download, Loader2, Sparkles, Check } from 'lucide-react';
 import ktLogo from '../assets/KT-Favicon.webp';
+import DownloadProgress from './DownloadProgress';
 
 const STEPS = [
   'BERA theme & problem',
@@ -58,6 +59,7 @@ export default function ActionResearchShell({
       fontFamily: 'var(--kt-font-ui, "Inter", sans-serif)',
       color: 'var(--kt-text-primary, #262119)',
     }}>
+      <DownloadProgress active={downloadLoading} label="Action Research (DOCX)" />
       <style>{CSS}</style>
 
       {/* ── Top Bar ── */}

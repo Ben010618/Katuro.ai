@@ -12,6 +12,7 @@ import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFi
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
+import DownloadProgress from '../../components/DownloadProgress';
 
 const DAY_KEYS  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -356,6 +357,7 @@ export default function DLLOutputPage() {
 
   return (
     <>
+      <DownloadProgress active={downloading} label="Daily Lesson Log (DOCX)" />
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .dll-day-hdr {
