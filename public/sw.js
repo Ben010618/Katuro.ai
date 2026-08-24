@@ -1,7 +1,6 @@
 // Bumped from katuro-v1 -- the old cache name never changed across deploys,
 // so activate()'s cleanup never actually purged anything. Bumping it here
-// forces every existing install (including any still registered from before
-// the Render -> GitHub Pages migration) to drop its old cache on next activate.
+// forces every existing install to drop its old cache on next activate.
 const CACHE = 'katuro-v2';
 
 self.addEventListener('install', e => {
