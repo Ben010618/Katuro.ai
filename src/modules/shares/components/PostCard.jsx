@@ -237,12 +237,19 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
         />
       )}
 
-      {/* Lightbox */}
+      {/* Theater Lightbox (Facebook & Instagram Style) */}
       {lightbox !== null && (
         <PhotoLightbox
+          post={post}
           urls={post.photoUrls}
           initialIndex={lightbox}
           caption={caption}
+          title={title}
+          uid={uid}
+          displayName={displayName}
+          initials={initials}
+          photoURL={photoURL}
+          isAdmin={isAdmin}
           onClose={() => setLightbox(null)}
         />
       )}
