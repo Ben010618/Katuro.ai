@@ -234,9 +234,12 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
       }).catch(() => {});
     }
 
+    const isDeadline = code === 'functions/deadline-exceeded';
     const message = isUnexplainedFailure
       ? 'Something went wrong on our end. We’ve been notified — please try again shortly.'
-      : (rawMessage || 'The AI service is unavailable right now. Please try again.');
+      : isDeadline
+        ? 'The request took too long to complete. Please try again (our backup engine is ready).'
+        : (rawMessage || 'The AI service is unavailable right now. Please try again.');
 
     const e = new Error(message);
     if (code === 'functions/resource-exhausted') {
@@ -244,6 +247,8 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
       if (err?.details?.dailyLimit) e.dailyLimit = true;
     } else if (code === 'functions/unauthenticated') {
       e.reason = 'unauthenticated';
+    } else if (isDeadline) {
+      e.status = 408;
     }
     throw e;
   }

@@ -101,6 +101,7 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
       'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000),
   });
 
   if ((res.status === 429 || res.status === 503) && _attempt < 3) {
@@ -675,14 +676,24 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     ...(supportsThinking(model) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     ...(responseMimeType ? { responseMimeType } : {}),
   };
-  const res = await fetch(geminiUrl(key, model), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents,
-      generationConfig: genConfig,
-    }),
-  });
+
+  // Enforce 20s per-call timeout so slow Gemini responses fail fast and switch to NVIDIA NIM immediately
+  const fetchTimeout = maxTokens > 8000 ? 60000 : 20000;
+  let res;
+  try {
+    res = await fetch(geminiUrl(key, model), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: genConfig,
+      }),
+      signal: AbortSignal.timeout(fetchTimeout),
+    });
+  } catch (err) {
+    console.warn(`[callGeminiRaw] Fetch failed or timed out (${err.name || err.message}) for model ${model}`);
+    throw new HttpsError('deadline-exceeded', `Gemini request timed out after ${Math.round(fetchTimeout / 1000)}s.`);
+  }
 
   // If 404 (model not found on API version), fall back to backup model
   if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
@@ -690,8 +701,9 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: GEMINI_BACKUP_MODEL, _attempt });
   }
 
-  if ((res.status === 429 || res.status === 503) && _attempt < 4) {
-    const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
+  // Quick 1-attempt retry on rate limit before falling back to NVIDIA NIM
+  if ((res.status === 429 || res.status === 503) && _attempt < 1) {
+    const delay = 1500 + Math.random() * 500;
     await new Promise(r => setTimeout(r, delay));
     return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model, _attempt: _attempt + 1 });
   }
