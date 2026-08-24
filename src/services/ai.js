@@ -74,9 +74,7 @@ export async function generateQuizAI(context, numQ, numChoices, customPrompt = "
     ? `\nKey Concepts: ${trunc(keyPoints, 5)}\nDefinitions: ${defs.slice(0, 4).map((d) => `${d.term}: ${String(d.definition).slice(0, 100)}`).join("; ")}\nTasks: ${trunc(tasks, 4)}`
     : "";
 
-  const text = await call(
-    'quiz_gen',
-    `Create a ${numQ}-item multiple choice quiz.
+  const prompt = `Create a ${numQ}-item multiple choice quiz.
 Subject: ${context.subject} | Topic: ${String(context.topic).slice(0, 150)} | Grade: ${context.gradeLevel}
 Objectives: ${trunc(context.objectives, 4)}
 Competencies: ${trunc(context.competencies, 4)}${planSection}
@@ -85,11 +83,37 @@ ${customPrompt ? `Teacher instructions: ${String(customPrompt).slice(0, 300)}` :
 Rules: vary difficulty (recall, comprehension, application), clear language, one unambiguous correct answer per item.
 
 Return ONLY JSON (no markdown fences):
-{"questions":[{"num":1,"text":"...","choices":{${choiceShape}},"answer":"A","competency":"..."}]}`,
-    { temperature: 0.75, maxOutputTokens: 4096, json: true, isRetry }
-  );
-  return parseAIJson(text);
+{"questions":[{"num":1,"text":"...","choices":{${choiceShape}},"answer":"A","competency":"..."}]}`;
+
+  // FIX: Internal retry loop — shields against transient 429s during morning peak hours
+  // (multiple teachers generating exams simultaneously). Retries up to 2 times with
+  // exponential wait before surfacing the error to the UI. isRetry flag on retries
+  // prevents daily-limit double-counting (each Generate click = 1 unit, not 3).
+  let lastErr;
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 3000));
+    try {
+      const text = await call(
+        'quiz_gen',
+        prompt,
+        { temperature: 0.75, maxOutputTokens: 4096, json: true, isRetry: attempt > 0 || !!isRetry }
+      );
+      return parseAIJson(text);
+    } catch (err) {
+      lastErr = err;
+      // Daily limit or auth errors won't clear up by retrying — surface immediately
+      if (err.dailyLimit || err.reason === 'unauthenticated') throw err;
+      // Only retry on transient rate-limit / network errors
+      if (attempt < 2 && (err.status === 429 || err.reason === 'rate_limited' || err.reason === 'network_error')) {
+        console.warn(`[generateQuizAI] Attempt ${attempt + 1} failed (${err.reason ?? err.status}), retrying…`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
+
 
 /**
  * Unpack a MATATAG learning competency across N teaching days using Bloom's Taxonomy.

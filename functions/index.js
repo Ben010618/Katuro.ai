@@ -18,8 +18,28 @@ const crypto                 = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL        = 'gemini-2.0-flash';
 const GEMINI_BACKUP_MODEL = 'gemini-1.5-flash';
+
+// ── Model capability matrix ───────────────────────────────────────────────────
+// thinkingConfig (thinkingBudget) is ONLY supported by gemini-2.5-flash and
+// gemini-2.5-pro. Sending it to any other model causes HTTP 400 "Unknown field"
+// errors that break ALL AI generation. Add new models here only after verifying
+// the capability in the Gemini API documentation.
+const THINKING_CAPABLE_MODELS = new Set([
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-2.5-pro-preview',
+]);
+
+function supportsThinking(model) {
+  return THINKING_CAPABLE_MODELS.has(model || GEMINI_MODEL);
+}
+
+// Startup validation — logs the active model at cold-start so any accidental
+// model change is immediately visible in Cloud Logging without reproducing an error.
+console.info(`[kaTuro] AI model: ${GEMINI_MODEL} | Backup: ${GEMINI_BACKUP_MODEL} | Thinking capable: ${supportsThinking(GEMINI_MODEL)}`);
 
 // Read API key from adminConfig/gemini in Firestore (set via Admin Dashboard)
 async function getGeminiKey() {
@@ -131,16 +151,19 @@ function geminiUrl(key, model = GEMINI_MODEL) {
 }
 
 async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, model = GEMINI_MODEL, _attempt = 0 } = {}) {
+  // PREVENTIVE: Only add thinkingConfig for models that support it.
+  // gemini-2.0-flash (the current GEMINI_MODEL) does NOT — sending it causes 400.
+  const genConfig = {
+    temperature,
+    maxOutputTokens: maxTokens,
+    ...(supportsThinking(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+  };
   const res = await fetch(geminiUrl(key, model), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
+      generationConfig: genConfig,
     }),
   });
 
@@ -160,11 +183,15 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const isRateLimit = res.status === 429;
+    // Log 400 errors with full detail — these are almost always a model/param mismatch
+    if (res.status === 400) {
+      console.error(`[callGemini] 400 Bad Request for model ${model}:`, JSON.stringify(err?.error));
+    }
     throw new HttpsError(
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
         ? 'The AI service is busy right now. Please try again in a moment.'
-        : `Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`
+        : `Gemini ${res.status} (${model}): ${err?.error?.message ?? res.statusText}`
     );
   }
 
@@ -173,11 +200,43 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
   return parts.map(p => p.text ?? '').join('');
 }
 
+// FIX: Added trailing-comma strip and truncation repair — mirrors the client's parseAIJson
+// multi-layer repair chain. The old single-parse was causing hard failures from Gemini's
+// most common output quirk (trailing comma before } or ]) on DLL, outline, and slide generation.
+function stripTrailingCommas(s) {
+  return s.replace(/,(\s*[}\]])/g, '$1');
+}
 function parseJSON(text, label) {
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new HttpsError('internal', `AI returned no JSON for ${label}`);
-  try   { return JSON.parse(m[0]); }
-  catch { throw new HttpsError('internal', `AI returned malformed JSON for ${label}`); }
+  const m = text.match(/```json\s*([\s\S]*?)```/) ||
+            text.match(/```\s*([\s\S]*?)```/)     ||
+            text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/s);
+  const raw = m ? (m[1] ?? m[0]).trim() : text.trim();
+  if (!raw) throw new HttpsError('internal', `AI returned no JSON for ${label}`);
+  // Layer 1: direct parse
+  try { return JSON.parse(raw); } catch {}
+  // Layer 2: trailing-comma strip (most common Gemini quirk)
+  try { return JSON.parse(stripTrailingCommas(raw)); } catch {}
+  // Layer 3: strip + dangling-quote / bracket close
+  try {
+    let s = raw.replace(/,(\s*[}\]])/g, '$1').trimEnd();
+    // Close any dangling quote
+    const qCount = (s.match(/(?<!\\)"/g) || []).length;
+    if (qCount % 2 !== 0) s += '"';
+    // Close unclosed brackets/braces
+    const stack = [];
+    let inStr = false, esc = false;
+    for (const c of s) {
+      if (esc)                    { esc = false; continue; }
+      if (c === '\\' && inStr)   { esc = true;  continue; }
+      if (c === '"')              { inStr = !inStr; continue; }
+      if (inStr)                  continue;
+      if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+      else if ((c === '}' || c === ']') && stack.length) stack.pop();
+    }
+    s += stack.reverse().join('');
+    return JSON.parse(s);
+  } catch {}
+  throw new HttpsError('internal', `AI returned malformed JSON for ${label}. Please try again.`);
 }
 
 function cacheKey(obj) {
@@ -200,10 +259,14 @@ const DAILY_LIMITS = {
 // quiz_gen/gamification_gen above so those features have exactly one limit.
 const PROXY_LIMITS = {
   ilaw_unpack:         20,  // unpackCompetency — one call per lesson plan
-  ilaw_session:        60,  // generateIlawSession — one call per session, several per plan
+  // FIX: Raised from 60 → 120. A 5-day ILAW plan = 5 calls; teachers regenerate
+  // multiple times. 60/day was causing "daily limit" blocks by mid-morning in active schools.
+  ilaw_session:        120, // generateIlawSession — one call per session, several per plan
   quiz_title:         100,  // suggestQuizTitle — tiny, cheap, near-free
-  quiz_gen:            10,
-  cot_gen:              8,
+  // FIX: Raised from 10 → 20. Morning testing sessions (whole class = many retries) hit 10 fast.
+  quiz_gen:            20,
+  // FIX: Raised from 8 → 15. Observation week requires drafts + revisions.
+  cot_gen:             15,
   dll_gen:             10,
   gamification_gen:    10,  // shared across all 6 worksheet generators
   test_builder_blooms: 30,  // suggestCognitiveWeights
@@ -437,8 +500,11 @@ Return ONLY this JSON:
 
 // ── expandSlides ─────────────────────────────────────────────────────────────
 // Costs 3 tokens. Parallel-expands all slides marked expand: true.
+// FIX: Raised timeout 180s→300s and memory 512MiB→1GiB.
+// 14 slides × ~1.2s each = ~17s minimum, but under Gemini load spikes can reach
+// 250s+. The old 180s cap caused deadline-exceeded errors for large slide sets.
 exports.expandSlides = onCall(
-  { region: 'us-central1', timeoutSeconds: 180, memory: '512MiB' },
+  { region: 'us-central1', timeoutSeconds: 300, memory: '1GiB' },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
@@ -599,17 +665,22 @@ Return ONLY this JSON (no markdown, no explanation):
 const MAX_TOKENS_CEILING = 20000; // hard ceiling regardless of what a client requests — COT's full PPST lesson plan needs up to 16384
 
 async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model = GEMINI_MODEL, _attempt = 0 } = {}) {
+  // PREVENTIVE: Only add thinkingConfig for models that support it.
+  // gemini-2.0-flash (current GEMINI_MODEL) does NOT — sending it causes HTTP 400.
+  // Also: thinkingConfig is incompatible with responseMimeType=application/json on
+  // most models — omit it entirely when a JSON response is requested.
+  const genConfig = {
+    temperature,
+    maxOutputTokens: maxTokens,
+    ...(supportsThinking(model) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    ...(responseMimeType ? { responseMimeType } : {}),
+  };
   const res = await fetch(geminiUrl(key, model), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents,
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
-        thinkingConfig: { thinkingBudget: 0 },
-        ...(responseMimeType ? { responseMimeType } : {}),
-      },
+      generationConfig: genConfig,
     }),
   });
 
@@ -628,11 +699,15 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const isRateLimit = res.status === 429;
+    // Log 400 errors in detail — almost always a model/param mismatch (e.g. thinkingConfig on unsupported model)
+    if (res.status === 400) {
+      console.error(`[callGeminiRaw] 400 Bad Request for model ${model}:`, JSON.stringify(err?.error));
+    }
     throw new HttpsError(
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
         ? 'The AI service is busy right now. Please try again in a moment.'
-        : `Gemini ${res.status}: ${err?.error?.message ?? res.statusText}`
+        : `Gemini ${res.status} (${model}): ${err?.error?.message ?? res.statusText}`
     );
   }
 
@@ -702,9 +777,13 @@ exports.generateAI = onCall(
         try {
           console.log(`[generateAI] Swapping to NVIDIA NIM API fallback (${nvidiaConfig.model || 'default'})...`);
           const prompt = extractPromptFromContents(contents);
+          // FIX: Cap NVIDIA tokens at 4096 — NIM's practical limit for structured JSON output.
+          // COT requests 16384 but sending that to NVIDIA causes silent truncation → malformed JSON.
+          // 4096 covers the essential structure of any generator (DLL, ILAW session, quiz, COT).
+          const nvidiaTokens = Math.min(clampedMaxTokens, 4096);
           const nvidiaText = await callNvidiaServer(nvidiaConfig, prompt, {
             temperature: temperature ?? 0.5,
-            maxTokens: clampedMaxTokens,
+            maxTokens: nvidiaTokens,
             responseMimeType,
           });
           return {

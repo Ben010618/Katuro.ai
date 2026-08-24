@@ -59,6 +59,15 @@ async function callPresentationFn(name, data, timeout) {
     if (isUnexplainedFailure) {
       throw new Error('Something went wrong on our end. We’ve been notified — please try again shortly.', { cause: err });
     }
+    // FIX: Provide a clear, actionable message for deadline-exceeded errors.
+    // The old behaviour threw the raw Firebase error which shows as "deadline-exceeded"
+    // with no guidance. Teachers reported PPT generation as "not working" because of this.
+    if (code === 'functions/deadline-exceeded') {
+      throw new Error(
+        'Slide generation took too long. Try reducing the number of slides to 10 or fewer, or try again in a moment.',
+        { cause: err }
+      );
+    }
     throw err;
   }
 }

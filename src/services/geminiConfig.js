@@ -162,10 +162,15 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
           console.log(`[callGeminiProxy] Cloud Function error (${err.message || err.code}). Swapping to client NVIDIA NIM fallback...`);
           const promptText = extractPrompt(contents);
           const responseFormat = responseMimeType === 'application/json' ? { type: 'json_object' } : undefined;
+          // FIX: Cap NVIDIA tokens at 4096 — NVIDIA NIM's practical limit for structured JSON
+          // output. The caller may request up to 16384 (COT), but sending that to NIM causes
+          // silent truncation → malformed JSON. 4096 is the safe ceiling that still covers
+          // DLL, ILAW sessions, quiz generation, and COT's essential structure.
+          const nvidiaMaxTokens = Math.min(maxTokens || 4096, 4096);
           const text = await callNvidiaChat({
             messages: [{ role: 'user', content: promptText }],
             temperature: temperature ?? 0.5,
-            maxTokens: maxTokens || 2048,
+            maxTokens: nvidiaMaxTokens,
             responseFormat,
           });
           return { text, finishReason: 'STOP', engine: 'nvidia' };

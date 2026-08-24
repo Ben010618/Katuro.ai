@@ -110,14 +110,20 @@ export default function Step3() {
     };
 
     const results = await runConcurrentSettled(sessions, 1, async (s, i) => {
-      // Small cooldown between sessions to avoid Gemini rate limits
-      if (i > 0) await new Promise(r => setTimeout(r, 1200));
+      // FIX: Increased cooldown 1200ms → 2500ms to prevent 429 cascade on sessions 2-5.
+      // The old 1.2s gap was too short for Gemini's sustained-rate-limit window, causing
+      // 'AI service is busy' errors reported on the second part of ILAW generation.
+      if (i > 0) await new Promise(r => setTimeout(r, 2500));
 
       setStatusMsg(`Generating Session ${s.day} of ${n} — ${bloomsBaseOf(s.bloomsLevel)} level…`);
       setProgress(Math.round(5 + (i / n) * 75));
 
       let lastErr = null;
       for (let attempt = 0; attempt < 3; attempt++) {
+        // FIX: Add base wait before retries so we don't hammer the API during an active
+        // rate-limit window. The existing backoff below only fires on confirmed 429s;
+        // this catches other transient errors too (empty response, invalid JSON).
+        if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 3000));
         try {
           const result = await generateIlawSession(s, context, { isRetry: attempt > 0 });
           if (activeGenRef.current !== genId) return null;
