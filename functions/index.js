@@ -18,8 +18,100 @@ const crypto                 = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 
-const GEMINI_MODEL        = 'gemini-2.0-flash';
-const GEMINI_BACKUP_MODEL = 'gemini-1.5-flash';
+// ── Model resolution ─────────────────────────────────────────────────────────
+// BUG-FIX (2026-08-24): the model name used to be two hardcoded constants,
+// 'gemini-2.0-flash' with 'gemini-1.5-flash' as backup. Google retired BOTH,
+// so every generator 404'd — and the "backup" was just as dead as the primary,
+// because a hardcoded fallback rots on exactly the same schedule as what it is
+// backing up. Instead of swapping in another name that will age out the same
+// way, ask the API which models actually exist and pick the best one.
+//
+// Order of authority:
+//   1. adminConfig/gemini.model  — explicit pin, for when an admin needs a
+//      specific model (set from Admin -> API Settings, no redeploy needed)
+//   2. ListModels                — newest usable flash model the key can reach
+//   3. STATIC_FALLBACK_MODELS    — only if ListModels itself is unreachable
+const STATIC_FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const MODEL_CACHE_TTL = 60 * 60 * 1000; // 1h per instance
+
+let _modelCache = { name: null, at: 0 };
+
+function invalidateModelCache() {
+  _modelCache = { name: null, at: 0 };
+}
+
+// 'gemini-2.5-flash' -> {major:2, minor:5, lite:false}; null if not a flash model.
+function scoreFlashModel(id) {
+  const m = /^gemini-(\d+)(?:\.(\d+))?-flash(-lite)?$/.exec(id);
+  if (!m) return null;
+  return { major: Number(m[1]), minor: Number(m[2] || 0), lite: !!m[3] };
+}
+
+async function listGeminiModels(key) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=200`,
+    { signal: AbortSignal.timeout(15000) }
+  );
+  if (!res.ok) throw new Error(`ListModels ${res.status}`);
+  const data = await res.json();
+  return (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name).replace('models/', ''))
+    // Preview/experimental builds get withdrawn without notice, and the
+    // specialised variants can't serve general text generation.
+    .filter(id => !/(preview|-exp|experimental|tts|image|audio|live|embedding|vision|learnlm)/i.test(id));
+}
+
+/**
+ * Resolve the model to use, preferring the newest non-lite flash model the key
+ * can actually reach. `exclude` skips models already known to be dead this
+ * request (a 404 on the resolved model re-resolves rather than giving up).
+ */
+async function resolveGeminiModel(key, exclude = []) {
+  if (!exclude.length && _modelCache.name && Date.now() - _modelCache.at < MODEL_CACHE_TTL) {
+    return _modelCache.name;
+  }
+
+  // 1. Explicit admin pin always wins.
+  try {
+    const pinned = (await db.doc('adminConfig/gemini').get()).data()?.model;
+    if (pinned && !exclude.includes(pinned)) {
+      _modelCache = { name: pinned, at: Date.now() };
+      return pinned;
+    }
+  } catch {
+    // Firestore unreachable — fall through to discovery.
+  }
+
+  // 2. Ask the API what exists.
+  try {
+    const available = (await listGeminiModels(key)).filter(id => !exclude.includes(id));
+    const flash = available
+      .map(id => ({ id, s: scoreFlashModel(id) }))
+      .filter(x => x.s)
+      .sort((a, b) =>
+        b.s.major - a.s.major ||
+        b.s.minor - a.s.minor ||
+        (a.s.lite ? 1 : 0) - (b.s.lite ? 1 : 0)   // full flash before -lite
+      );
+    const picked = flash[0]?.id
+      || available.find(id => /^gemini-[\d.]+-pro$/.test(id))
+      || available[0];
+    if (picked) {
+      console.info(`[resolveGeminiModel] Using ${picked} (${available.length} models available${exclude.length ? `, excluded: ${exclude.join(', ')}` : ''})`);
+      _modelCache = { name: picked, at: Date.now() };
+      return picked;
+    }
+    console.error('[resolveGeminiModel] ListModels returned no usable model!');
+  } catch (err) {
+    console.warn(`[resolveGeminiModel] Discovery failed (${err.message}) — using static fallback list.`);
+  }
+
+  // 3. Last resort.
+  const fallback = STATIC_FALLBACK_MODELS.find(m => !exclude.includes(m)) || STATIC_FALLBACK_MODELS[0];
+  _modelCache = { name: fallback, at: Date.now() };
+  return fallback;
+}
 
 // ── Model capability matrix ───────────────────────────────────────────────────
 // thinkingConfig (thinkingBudget) is ONLY supported by gemini-2.5-flash and
@@ -33,13 +125,16 @@ const THINKING_CAPABLE_MODELS = new Set([
   'gemini-2.5-pro-preview',
 ]);
 
+// Fails closed on purpose: an unknown or newer model simply doesn't get
+// thinkingConfig, which is always a VALID request. Guessing the other way
+// would send an unsupported field and 400 the whole generation.
 function supportsThinking(model) {
-  return THINKING_CAPABLE_MODELS.has(model || GEMINI_MODEL);
+  return THINKING_CAPABLE_MODELS.has(model);
 }
 
 // Startup validation — logs the active model at cold-start so any accidental
 // model change is immediately visible in Cloud Logging without reproducing an error.
-console.info(`[kaTuro] AI model: ${GEMINI_MODEL} | Backup: ${GEMINI_BACKUP_MODEL} | Thinking capable: ${supportsThinking(GEMINI_MODEL)}`);
+console.info('[kaTuro] AI model: resolved per-request from ListModels (admin pin: adminConfig/gemini.model)');
 
 // Read API key from adminConfig/gemini in Firestore (set via Admin Dashboard)
 async function getGeminiKey() {
@@ -159,19 +254,21 @@ function langLabel(subject) {
   return isTagalog(subject) ? 'Filipino/Tagalog' : 'English';
 }
 
-function geminiUrl(key, model = GEMINI_MODEL) {
+// model is always resolved by the caller now — no hardcoded default to rot.
+function geminiUrl(key, model) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 }
 
-async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, model = GEMINI_MODEL, _attempt = 0 } = {}) {
-  // PREVENTIVE: Only add thinkingConfig for models that support it.
-  // gemini-2.0-flash (the current GEMINI_MODEL) does NOT — sending it causes 400.
+async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, model, _attempt = 0, _tried = [] } = {}) {
+  const activeModel = model || await resolveGeminiModel(key, _tried);
+  // PREVENTIVE: Only add thinkingConfig for models that support it — sending it
+  // to a model that doesn't causes a 400 that breaks the whole generation.
   const genConfig = {
     temperature,
     maxOutputTokens: maxTokens,
-    ...(supportsThinking(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    ...(supportsThinking(activeModel) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
   };
-  const res = await fetch(geminiUrl(key, model), {
+  const res = await fetch(geminiUrl(key, activeModel), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -180,17 +277,22 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
     }),
   });
 
-  // If 404 (model not found on API version), fall back to backup model
-  if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
-    console.warn(`[callGemini] Model ${model} returned 404, falling back to ${GEMINI_BACKUP_MODEL}`);
-    return callGemini(key, prompt, { temperature, maxTokens, model: GEMINI_BACKUP_MODEL, _attempt });
+  // 404 = this model was retired. Drop it, re-resolve against the live model
+  // list, and try the next best — never fall through to another hardcoded name.
+  if (res.status === 404) {
+    const tried = [..._tried, activeModel];
+    invalidateModelCache();
+    if (tried.length < 3) {
+      console.warn(`[callGemini] Model ${activeModel} returned 404 — re-resolving (tried: ${tried.join(', ')})`);
+      return callGemini(key, prompt, { temperature, maxTokens, _attempt, _tried: tried });
+    }
   }
 
   // Retry on 429 (rate limit) or 503 (overloaded) with exponential backoff
   if ((res.status === 429 || res.status === 503) && _attempt < 4) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
     await new Promise(r => setTimeout(r, delay));
-    return callGemini(key, prompt, { temperature, maxTokens, model, _attempt: _attempt + 1 });
+    return callGemini(key, prompt, { temperature, maxTokens, model: activeModel, _attempt: _attempt + 1, _tried });
   }
 
   if (!res.ok) {
@@ -198,13 +300,13 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
     const isRateLimit = res.status === 429;
     // Log 400 errors with full detail — these are almost always a model/param mismatch
     if (res.status === 400) {
-      console.error(`[callGemini] 400 Bad Request for model ${model}:`, JSON.stringify(err?.error));
+      console.error(`[callGemini] 400 Bad Request for model ${activeModel}:`, JSON.stringify(err?.error));
     }
     throw new HttpsError(
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
         ? 'The AI service is busy right now. Please try again in a moment.'
-        : `Gemini ${res.status} (${model}): ${err?.error?.message ?? res.statusText}`
+        : `Gemini ${res.status} (${activeModel}): ${err?.error?.message ?? res.statusText}`
     );
   }
 
@@ -689,15 +791,16 @@ function geminiBudgetMs(maxTokens) {
   return Math.min(GEMINI_MAX_BUDGET_MS, Math.max(GEMINI_MIN_BUDGET_MS, scaled));
 }
 
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model = GEMINI_MODEL, _attempt = 0, deadlineAt } = {}) {
-  // PREVENTIVE: Only add thinkingConfig for models that support it.
-  // gemini-2.0-flash (current GEMINI_MODEL) does NOT — sending it causes HTTP 400.
-  // Also: thinkingConfig is incompatible with responseMimeType=application/json on
-  // most models — omit it entirely when a JSON response is requested.
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model, _attempt = 0, deadlineAt, _tried = [] } = {}) {
+  const activeModel = model || await resolveGeminiModel(key, _tried);
+  // PREVENTIVE: Only add thinkingConfig for models that support it — sending it
+  // to a model that doesn't causes HTTP 400. Also: thinkingConfig is
+  // incompatible with responseMimeType=application/json on most models — omit
+  // it entirely when a JSON response is requested.
   const genConfig = {
     temperature,
     maxOutputTokens: maxTokens,
-    ...(supportsThinking(model) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    ...(supportsThinking(activeModel) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     ...(responseMimeType ? { responseMimeType } : {}),
   };
 
@@ -719,7 +822,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
 
   let res;
   try {
-    res = await fetch(geminiUrl(key, model), {
+    res = await fetch(geminiUrl(key, activeModel), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -733,7 +836,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     // is genuinely "took too long", and the client surfaces different copy for
     // each. Both still fall through to the NVIDIA fallback in generateAI.
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-    console.warn(`[callGeminiRaw] Fetch ${timedOut ? 'timed out' : 'failed'} (${err?.name || err?.message}) for model ${model} after ${Math.round(remainingMs / 1000)}s budget`);
+    console.warn(`[callGeminiRaw] Fetch ${timedOut ? 'timed out' : 'failed'} (${err?.name || err?.message}) for model ${activeModel} after ${Math.round(remainingMs / 1000)}s budget`);
     throw new HttpsError(
       timedOut ? 'deadline-exceeded' : 'unavailable',
       timedOut
@@ -742,10 +845,17 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     );
   }
 
-  // If 404 (model not found on API version), fall back to backup model
-  if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
-    console.warn(`[callGeminiRaw] Model ${model} returned 404, falling back to ${GEMINI_BACKUP_MODEL}`);
-    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: GEMINI_BACKUP_MODEL, _attempt, deadlineAt: budgetEndsAt });
+  // 404 = this model was retired out from under us. Drop it, re-resolve against
+  // the live model list, and try the next best. Never fall through to another
+  // hardcoded name — that is exactly what failed on 2026-08-24, when the
+  // primary AND its "backup" had both been retired.
+  if (res.status === 404) {
+    const tried = [..._tried, activeModel];
+    invalidateModelCache();
+    if (tried.length < 3) {
+      console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 — re-resolving (tried: ${tried.join(', ')})`);
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt, deadlineAt: budgetEndsAt, _tried: tried });
+    }
   }
 
   // Retry transient rate limits / overload with exponential backoff, but only
@@ -756,7 +866,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
     if (budgetEndsAt - Date.now() > delay + 5000) {
       await new Promise(r => setTimeout(r, delay));
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model, _attempt: _attempt + 1, deadlineAt: budgetEndsAt });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, _tried });
     }
   }
 
@@ -765,13 +875,13 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     const isRateLimit = res.status === 429;
     // Log 400 errors in detail — almost always a model/param mismatch (e.g. thinkingConfig on unsupported model)
     if (res.status === 400) {
-      console.error(`[callGeminiRaw] 400 Bad Request for model ${model}:`, JSON.stringify(err?.error));
+      console.error(`[callGeminiRaw] 400 Bad Request for model ${activeModel}:`, JSON.stringify(err?.error));
     }
     throw new HttpsError(
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
         ? 'The AI service is busy right now. Please try again in a moment.'
-        : `Gemini ${res.status} (${model}): ${err?.error?.message ?? res.statusText}`
+        : `Gemini ${res.status} (${activeModel}): ${err?.error?.message ?? res.statusText}`
     );
   }
 
