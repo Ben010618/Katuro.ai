@@ -8,6 +8,7 @@ import { trackEvent, trackGeneration, startTimer } from '../../services/usageTra
 import { generateDLLProcedure } from '../../services/dllAI';
 import { retryAsync } from '../../utils/retry';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
+import { useSmoothProgress } from '../../hooks/useSmoothProgress';
 
 const MAX_DAYS = 5;
 
@@ -237,6 +238,9 @@ export default function DLLStep2() {
   const [genError,   setGenError]   = useState('');
   const [statusMsg,  setStatusMsg]  = useState('');
   const [elapsedSec, setElapsedSec] = useState(0);
+  // A DLL is one opaque AI call with no milestones to report, so the bar is
+  // driven purely by elapsed time against a ~70s expectation.
+  const shownProgress = useSmoothProgress({ active: generating, estimateSec: 70 });
 
   useEffect(() => {
     if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step2' });
@@ -486,10 +490,24 @@ export default function DLLStep2() {
               </>
             )}
           </button>
-          {generating && statusMsg && (
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#4f46e5', textAlign: 'right', maxWidth: 300 }}>
-              {statusMsg}
-            </p>
+          {generating && (
+            <div style={{ width: '100%', maxWidth: 300 }}>
+              <div style={{ height: 6, background: 'var(--kt-green-tint)', borderRadius: 100, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${shownProgress}%`, borderRadius: 100,
+                  background: 'linear-gradient(90deg, var(--kt-green-primary), var(--kt-green-bright))',
+                  transition: 'width 0.25s linear',
+                }} />
+              </div>
+              {statusMsg && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, fontWeight: 600, color: '#4f46e5', textAlign: 'right' }}>
+                  {statusMsg}
+                </p>
+              )}
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', textAlign: 'right' }}>
+                {shownProgress}% · {elapsedSec}s elapsed
+              </p>
+            </div>
           )}
         </div>
       </div>

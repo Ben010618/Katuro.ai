@@ -8,6 +8,7 @@ import { saveIlawPlan, deductTokens, refundTokens } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle } from 'lucide-react';
+import { useSmoothProgress } from '../../hooks/useSmoothProgress';
 
 function formatDayShort(iso) {
   if (!iso || iso.startsWith('Day')) return iso;
@@ -59,6 +60,10 @@ export default function Step3() {
 
   const sessions = store.unpackedSessions || [];
   const n        = sessions.length;
+
+  // Progress only advances at session boundaries, so it froze for the 30-60s
+  // each session takes. Creep between them; ~45s per session is the estimate.
+  const shownProgress = useSmoothProgress({ active: generating, value: progress, estimateSec: 45 * Math.max(1, sessions.length) });
   const days     = store.selectedDays || [];
 
   useEffect(() => {
@@ -355,7 +360,7 @@ export default function Step3() {
           <>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 20, maxWidth: 440, marginInline: 'auto' }}>
               <div style={{
-                height: '100%', width: `${progress}%`, borderRadius: 100,
+                height: '100%', width: `${shownProgress}%`, borderRadius: 100,
                 background: 'var(--kt-manila)',
                 transition: 'width 0.5s ease',
               }} />
@@ -364,7 +369,7 @@ export default function Step3() {
               {statusMsg}
             </p>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(251,247,236,0.65)', fontFamily: 'var(--kt-font-mono)' }}>
-              {progress}% complete — please wait…
+              {shownProgress}% complete — please wait…
             </p>
           </>
         )}

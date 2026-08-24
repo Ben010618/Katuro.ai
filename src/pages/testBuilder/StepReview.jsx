@@ -13,6 +13,7 @@ import {
   FileText, KeyRound, Table2, Sparkles, Loader2, AlertCircle, X, Lock,
 } from 'lucide-react';
 import DownloadProgress from '../../components/DownloadProgress';
+import { useSmoothProgress } from '../../hooks/useSmoothProgress';
 
 // Names the file in the download overlay so a teacher exporting all three in a
 // row can tell which one is currently being built.
@@ -52,6 +53,8 @@ export default function StepReview() {
   const [teacherProfile,  setTeacherProfile]  = useState(null);
   const [genLoading,      setGenLoading]      = useState(false);
   const [genPhase,        setGenPhase]        = useState('');
+  // One AI call per TOS row, so the wait scales with how many rows there are.
+  const shownProgress = useSmoothProgress({ active: genLoading, estimateSec: 40 * Math.max(1, store.tos?.rows?.length || 1) });
   const [genError,        setGenError]        = useState('');
   const [downloadingKind, setDownloadingKind] = useState(null); // 'tos' | 'questions' | 'key' | null
   const generatedParts = store.generatedParts; // { testBlocks, keyBlocks }
@@ -342,6 +345,20 @@ export default function StepReview() {
                 : <><Lock size={14} /> Locked</>}
           </button>
         </div>
+
+        {genLoading && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderRadius: 100, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${shownProgress}%`, borderRadius: 100,
+                background: '#fff', transition: 'width 0.25s linear',
+              }} />
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+              {shownProgress}% — {genPhase || 'Generating test items…'}
+            </p>
+          </div>
+        )}
 
         {/* Three independent downloads */}
         <div className="kt-grid-3" style={{ gap: 10 }}>

@@ -8,6 +8,7 @@ import { deductTokens, refundTokens, saveCotPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useSmoothProgress } from '../../hooks/useSmoothProgress';
 
 const KRA_COLOR = {
   'KRA 1': '#0369a1',
@@ -26,6 +27,9 @@ export default function CotStep3() {
   const [generating, setGenerating] = useState(false);
   const [progress,   setProgress]   = useState(0);
   const [statusMsg,  setStatusMsg]  = useState('');
+  // COT reports 5 -> 15 -> 85, so the raw bar sat frozen at 15% for the whole
+  // AI call. This keeps it creeping between those milestones.
+  const shownProgress = useSmoothProgress({ active: generating, value: progress, estimateSec: 150 });
   const [genError,   setGenError]   = useState(null);
   const activeRef    = useRef(0);
 
@@ -282,7 +286,7 @@ export default function CotStep3() {
           <>
             <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 20 }}>
               <div style={{
-                height: '100%', width: `${progress}%`, borderRadius: 100,
+                height: '100%', width: `${shownProgress}%`, borderRadius: 100,
                 background: 'linear-gradient(90deg, #c4b5fd, #a78bfa)',
                 transition: 'width 0.5s ease',
               }} />
@@ -295,7 +299,7 @@ export default function CotStep3() {
               {statusMsg}
             </p>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: '"DM Mono", monospace' }}>
-              {progress}% complete — please wait…
+              {shownProgress}% complete — please wait…
             </p>
           </>
         )}
