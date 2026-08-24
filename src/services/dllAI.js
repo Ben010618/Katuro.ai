@@ -34,8 +34,8 @@ async function callGemini(prompt, isRetry) {
   const { text } = await callGeminiProxy({
     action: 'dll_gen',
     contents: [{ parts: [{ text: prompt }] }],
-    temperature: 0.7,
-    maxTokens: 8192,
+    temperature: 0.6,
+    maxTokens: 4096,
     responseMimeType: 'application/json',
     isRetry,
   });
@@ -118,34 +118,36 @@ ${dayContext}
 
 Language: Write ALL content in ${lang} only.
 
-TASK 1 — LEARNING OBJECTIVES (one per day)
-CRITICAL: You MUST write a unique, non-empty learning objective for EVERY day that has content — even when multiple days share the same MELC. Differentiate each day's objective by focusing on that day's specific Content topic.
-- Start with a Bloom's Taxonomy action verb appropriate to the lesson stage (e.g., identify, describe, explain, compare, analyze, evaluate)
-- Be specific to THAT DAY'S Content topic (not just the MELC)
-- Keep it achievable in one 60-minute period (one verb, one concept)
-- Write in complete sentence form: "The learners will be able to [verb] [specific content]…"
-- Only write an empty string "" if the day is explicitly marked "(No class)"
+CRITICAL INSTRUCTION: Be concise, clear, and actionable. Each procedure step (A–J) must be exactly 1 to 2 sentences of direct instructional activity. Do NOT output long paragraphs or fluff.
+
+TASK 1 — LEARNING OBJECTIVES (one sentence per day)
+Write a unique, non-empty learning objective for EVERY day that has content:
+- Action verb from Bloom's Taxonomy (e.g., identify, describe, explain, compare, analyze)
+- Specific to THAT DAY'S Content topic
+- Achievable in one 60-minute period
+- Format: "The learners will be able to [verb] [specific content]…"
+- Use "" only if explicitly marked "(No class)"
 
 TASK 2 — PROCEDURE STEPS (A–J per day)
-For each day that has a class, generate all 10 DepEd DLL procedure steps:
+For each day that has class, generate concise, practical steps:
 ${stepDescriptions}
 
 Rules for procedure:
-- Write as a teacher filling in the DLL (instructional activities, not meta-descriptions)
-- Be specific to that day's Content topic and MELC
-- Step I = concrete formative assessment task
-- Step J = brief homework or enrichment task
+- Write 1–2 practical sentences per step (what the teacher and learners do)
+- Specific to that day's Content topic and MELC
+- Step I = quick formative assessment question/task
+- Step J = short homework/enrichment task
 - If a day is "(No class)" use empty strings for all its steps
 
-TASK 3 — LEARNING RESOURCES (Section III of the DLL)
-Based on the subject, grade level, and MELC above, suggest realistic DepEd-aligned learning resources:
-- teacherGuidePages: Specific page range from the official DepEd Teacher's Guide for this subject and grade (e.g., "pp. 45–52")
-- learnersMaterialPages: Page range from the DepEd Learner's Materials / LM (e.g., "pp. 38–44")
-- textbookPages: Additional textbook reference with unit/chapter and pages (e.g., "Unit 2 Chapter 3, pp. 78–85")
-- lrmdsPortal: Name of a specific material available on the DepEd LRMDS portal (e.g., "Grade 8 Science – Module 4: Chemical Reactions, DepEd Learning Portal")
-- otherResources: Supplementary materials — be specific (e.g., "Chart of the periodic table; video: 'Evidence of Chemical Change' via YouTube; activity sheets")
+TASK 3 — LEARNING RESOURCES (Section III)
+Suggest concise, realistic DepEd-aligned learning resources:
+- teacherGuidePages: e.g., "pp. 45–52"
+- learnersMaterialPages: e.g., "pp. 38–44"
+- textbookPages: e.g., "Unit 2 Chapter 3, pp. 78–85"
+- lrmdsPortal: e.g., "Grade 8 Science Module 4, DepEd Learning Portal"
+- otherResources: e.g., "Chart, video clips, activity sheets"
 
-Return ONLY valid JSON (no markdown, no explanation):
+Return ONLY valid JSON (no markdown wrapper, no extra text):
 {
   "objectives": {
     "monday":    "objective text or empty string",

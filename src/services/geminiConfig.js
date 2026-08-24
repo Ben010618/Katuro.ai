@@ -141,13 +141,14 @@ function extractPrompt(contents) {
     .join('\n\n');
 }
 
-export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount }) {
+export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs }) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
-  // BUG-FIX: Raised from 150000 (150s) to 320000 (320s) so the client never
-  // times out before the server does. The server generateAI function was raised
-  // to 300s; this leaves a 20s buffer above that so teachers see the server's
-  // own error message rather than a generic client-side disconnect.
-  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: 320000 });
+  // Action-aware timeout: Heavy generation actions (COT, AR, Slide expansion) can take up to 300s,
+  // while standard generators (DLL, Quiz, Gamification, ILAW sessions) timeout in 50s so fast
+  // fallbacks (NVIDIA NIM / Direct Gemini) kick in promptly rather than hanging teachers' browsers.
+  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides';
+  const effectiveTimeout = timeoutMs || (isHeavy ? 300000 : 50000);
+  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: effectiveTimeout });
   try {
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };

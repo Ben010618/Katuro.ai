@@ -236,10 +236,30 @@ export default function DLLStep2() {
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
   const [statusMsg,  setStatusMsg]  = useState('');
+  const [elapsedSec, setElapsedSec] = useState(0);
 
   useEffect(() => {
     if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step2' });
   }, [user?.uid]);
+
+  // Live timer & progressive status messages during generation
+  useEffect(() => {
+    if (!generating) {
+      setElapsedSec(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setElapsedSec(s => {
+        const next = s + 1;
+        if (next === 2) setStatusMsg('Connecting to curriculum AI engine…');
+        else if (next === 6) setStatusMsg('Formulating per-day objectives & 10 procedure steps…');
+        else if (next === 14) setStatusMsg('Assembling complete DepEd lesson structure…');
+        else if (next === 22) setStatusMsg('Finalizing formatting and DepEd resources…');
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [generating]);
 
   const melcList    = store.melcList;
   const contentList = store.contentList;
@@ -257,7 +277,7 @@ export default function DLLStep2() {
     if (!canGenerate || generating) return;
     setGenerating(true);
     setGenError('');
-    setStatusMsg('');
+    setStatusMsg('Preparing lesson parameters…');
     let elapsedMs = null;
     let tokensDeducted = false;
     try {
@@ -267,7 +287,7 @@ export default function DLLStep2() {
 
       let result;
       let lastErr;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           result = await generateDLLProcedure({
             subject:              store.subject,
@@ -284,17 +304,14 @@ export default function DLLStep2() {
           lastErr = err;
           console.warn(`generateDLLProcedure attempt ${attempt + 1} failed:`, err);
           if (err.dailyLimit) break; // won't clear up by retrying — surface immediately
-          if (attempt < 2) {
-            const wait = err.status === 429
-              ? Math.min((err.retryAfter || 30) * 1000, 30_000)
-              : 6000 + attempt * 3000;
-            setStatusMsg(`Due to high demand, generation may be slow — retrying in ${Math.round(wait / 1000)}s…`);
+          if (attempt < 1) {
+            const wait = err.status === 429 ? 5000 : 2500;
+            setStatusMsg(`Re-connecting with backup engine (attempt 2)…`);
             await new Promise(r => setTimeout(r, wait));
-            setStatusMsg('Retrying…');
           }
         }
       }
-      if (!result) throw lastErr || new Error('Generation failed. Try again.');
+      if (!result) throw lastErr || new Error('Generation failed. Please try again.');
 
       const { objectives, procedure, resources } = result;
 
@@ -307,10 +324,6 @@ export default function DLLStep2() {
       store.setField('melc', combinedMelc);
 
       try {
-        // Retried with backoff -- a dropped hotspot connection right after
-        // generation is the #1 cause of DLLs that "disappear": the plan
-        // never reaches Firestore, so it never shows up in My Lessons
-        // later, even though generation itself succeeded.
         const id = await retryAsync(() => saveDLLPlan(user.uid, {
           subject:              store.subject,
           gradeLevel:           store.gradeLevel,
@@ -338,9 +351,7 @@ export default function DLLStep2() {
       trackEvent(user.uid, 'dll_generated', { subject: store.subject, grade: store.gradeLevel });
       trackGeneration(user.uid, 'dll', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setGenError(err.message || 'Generation failed. Try again.');
-      // Only refund if the charge actually went through — a failure from
-      // deductTokens itself (e.g. insufficient balance) took nothing.
+      setGenError(err.message || 'Generation failed. Please try again.');
       if (tokensDeducted) {
         refundTokens(user.uid, 'dll', 3).catch(e => console.error('Token refund failed:', e));
       }
@@ -349,6 +360,7 @@ export default function DLLStep2() {
       }
     } finally {
       setGenerating(false);
+      setStatusMsg('');
     }
   }
 
@@ -464,7 +476,7 @@ export default function DLLStep2() {
             {generating ? (
               <>
                 <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                Generating…
+                Generating… ({elapsedSec}s)
               </>
             ) : (
               <>
@@ -475,7 +487,9 @@ export default function DLLStep2() {
             )}
           </button>
           {generating && statusMsg && (
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)', textAlign: 'right', maxWidth: 260 }}>{statusMsg}</p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#4f46e5', textAlign: 'right', maxWidth: 300 }}>
+              {statusMsg}
+            </p>
           )}
         </div>
       </div>
