@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { isHTMLCaption, sanitizeHTML, renderPlainCaption } from '../utils/captionUtils';
 
 /**
  * Full-screen photo lightbox with keyboard and dot navigation.
  */
 export function PhotoLightbox({ urls, initialIndex, caption, onClose }) {
   const [idx, setIdx] = useState(initialIndex ?? 0);
+
+  const captionIsHTML = useMemo(() => isHTMLCaption(caption || ''), [caption]);
+  const safeHTML      = useMemo(() => (captionIsHTML ? sanitizeHTML(caption) : ''), [captionIsHTML, caption]);
 
   const prev = useCallback(() => setIdx(i => (i - 1 + urls.length) % urls.length), [urls.length]);
   const next = useCallback(() => setIdx(i => (i + 1) % urls.length), [urls.length]);
@@ -76,7 +80,11 @@ export function PhotoLightbox({ urls, initialIndex, caption, onClose }) {
 
       {caption && (
         <div className="sh-lightbox-caption" onClick={e => e.stopPropagation()}>
-          {caption}
+          {captionIsHTML ? (
+            <div className="sh-lightbox-caption-rich" dangerouslySetInnerHTML={{ __html: safeHTML }} />
+          ) : (
+            renderPlainCaption(caption)
+          )}
         </div>
       )}
     </div>

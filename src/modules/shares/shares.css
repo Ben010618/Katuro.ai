@@ -652,11 +652,86 @@
 .sh-lightbox-dot.active { background: var(--kt-manila, #E4D5AC); }
 
 .sh-lightbox-caption {
-  position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
-  background: rgba(31,58,46,0.85);
-  border: 1px solid var(--kt-manila-border);
-  color: #FBF7EC; padding: 8px 18px; border-radius: var(--sh-radius-sm);
-  font-size: 13px; max-width: 500px; text-align: center;
+  position: fixed;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(31, 58, 46, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--kt-manila-border, rgba(228, 213, 172, 0.4));
+  color: #FBF7EC;
+  padding: 12px 18px;
+  border-radius: var(--sh-radius-sm, 6px);
+  font-size: 13.5px;
+  max-width: 620px;
+  width: calc(100% - 40px);
+  max-height: 240px;
+  overflow-y: auto;
+  text-align: left;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.sh-lightbox-caption::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sh-lightbox-caption::-webkit-scrollbar-thumb {
+  background: rgba(228, 213, 172, 0.4);
+  border-radius: 4px;
+}
+
+.sh-lightbox-caption-rich h1,
+.sh-lightbox-caption-rich h2,
+.sh-lightbox-caption-rich h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  line-height: 1.35;
+}
+
+.sh-lightbox-caption-rich p {
+  margin: 0 0 6px 0;
+  line-height: 1.5;
+  color: #FBF7EC;
+  font-size: 13px;
+}
+
+.sh-lightbox-caption-rich p:last-child {
+  margin-bottom: 0;
+}
+
+.sh-lightbox-caption-rich strong,
+.sh-lightbox-caption-rich b {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sh-lightbox-caption-rich em,
+.sh-lightbox-caption-rich i {
+  font-style: italic;
+}
+
+.sh-lightbox-caption-rich u {
+  text-decoration: underline;
+}
+
+.sh-lightbox-caption-rich ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.sh-lightbox-caption-rich li {
+  margin-bottom: 3px;
+}
+
+.sh-lightbox-caption a,
+.sh-lightbox-caption-rich a {
+  color: var(--kt-manila, #E4D5AC);
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 /* ── PostComposer ────────────────────────────────────────────────── */
