@@ -94,18 +94,30 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
     payload.response_format = { type: 'json_object' };
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(30000),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      // 40s per attempt, at most 2 attempts (~82s worst case) — this fallback
+      // runs AFTER Gemini has already spent up to 180s, and the whole function
+      // must still return inside its 300s timeout.
+      signal: AbortSignal.timeout(40000),
+    });
+  } catch (err) {
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    throw new HttpsError(
+      timedOut ? 'deadline-exceeded' : 'unavailable',
+      timedOut ? 'NVIDIA NIM did not respond in time.' : `Could not reach NVIDIA NIM: ${err?.message || 'network error'}`
+    );
+  }
 
-  if ((res.status === 429 || res.status === 503) && _attempt < 3) {
-    const delay = (2 ** _attempt) * 1000 + Math.random() * 500;
+  if ((res.status === 429 || res.status === 503) && _attempt < 1) {
+    const delay = 1500 + Math.random() * 500;
     await new Promise(r => setTimeout(r, delay));
     return callNvidiaServer(nvidiaConfig, prompt, { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 });
   }
@@ -665,7 +677,19 @@ Return ONLY this JSON (no markdown, no explanation):
 // each feature stays exactly where it already was reviewed and tested.
 const MAX_TOKENS_CEILING = 20000; // hard ceiling regardless of what a client requests — COT's full PPST lesson plan needs up to 16384
 
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model = GEMINI_MODEL, _attempt = 0 } = {}) {
+// Time budget for a whole Gemini call, derived from how much text was asked
+// for. generateContent is non-streaming, so wall time tracks output length:
+// ~10ms/token at flash speeds, plus ~30s of headroom for connection + TTFT.
+// Capped at 180s so the NVIDIA fallback below still fits inside generateAI's
+// 300s function timeout (worst case: 180s Gemini + ~82s NVIDIA + overhead).
+const GEMINI_MIN_BUDGET_MS = 45000;
+const GEMINI_MAX_BUDGET_MS = 180000;
+function geminiBudgetMs(maxTokens) {
+  const scaled = 30000 + (Number(maxTokens) || 2048) * 10;
+  return Math.min(GEMINI_MAX_BUDGET_MS, Math.max(GEMINI_MIN_BUDGET_MS, scaled));
+}
+
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model = GEMINI_MODEL, _attempt = 0, deadlineAt } = {}) {
   // PREVENTIVE: Only add thinkingConfig for models that support it.
   // gemini-2.0-flash (current GEMINI_MODEL) does NOT — sending it causes HTTP 400.
   // Also: thinkingConfig is incompatible with responseMimeType=application/json on
@@ -677,8 +701,22 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     ...(responseMimeType ? { responseMimeType } : {}),
   };
 
-  // Enforce 20s per-call timeout so slow Gemini responses fail fast and switch to NVIDIA NIM immediately
-  const fetchTimeout = maxTokens > 8000 ? 60000 : 20000;
+  // BUG-FIX: a flat 20s abort (60s above 8k tokens) aborted essentially every
+  // real generation — Gemini's non-streaming generateContent only returns once
+  // the WHOLE response is written, so wall time scales with maxOutputTokens
+  // (~10ms/token at flash speeds). A 4096-token DLL/ILAW/test-item payload
+  // needs 40-70s and a 16384-token COT plan needs 2-3 minutes; both were being
+  // killed mid-write and reported as deadline-exceeded, which is why COT, DLL,
+  // ILAW and Test Builder all stopped producing output. The budget is now
+  // derived from the requested size, and it is a budget for the WHOLE call
+  // (retries included) so backup attempts can never overrun the function's own
+  // 300s ceiling and leave no room for the NVIDIA fallback below.
+  const budgetEndsAt = deadlineAt ?? Date.now() + geminiBudgetMs(maxTokens);
+  const remainingMs  = budgetEndsAt - Date.now();
+  if (remainingMs <= 2000) {
+    throw new HttpsError('deadline-exceeded', 'Gemini did not respond within the time budget for this request.');
+  }
+
   let res;
   try {
     res = await fetch(geminiUrl(key, model), {
@@ -688,24 +726,38 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
         contents,
         generationConfig: genConfig,
       }),
-      signal: AbortSignal.timeout(fetchTimeout),
+      signal: AbortSignal.timeout(remainingMs),
     });
   } catch (err) {
-    console.warn(`[callGeminiRaw] Fetch failed or timed out (${err.name || err.message}) for model ${model}`);
-    throw new HttpsError('deadline-exceeded', `Gemini request timed out after ${Math.round(fetchTimeout / 1000)}s.`);
+    // A timeout and a dropped connection need different codes: only the former
+    // is genuinely "took too long", and the client surfaces different copy for
+    // each. Both still fall through to the NVIDIA fallback in generateAI.
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    console.warn(`[callGeminiRaw] Fetch ${timedOut ? 'timed out' : 'failed'} (${err?.name || err?.message}) for model ${model} after ${Math.round(remainingMs / 1000)}s budget`);
+    throw new HttpsError(
+      timedOut ? 'deadline-exceeded' : 'unavailable',
+      timedOut
+        ? `Gemini did not finish within ${Math.round(remainingMs / 1000)}s.`
+        : `Could not reach Gemini: ${err?.message || 'network error'}`
+    );
   }
 
   // If 404 (model not found on API version), fall back to backup model
   if (res.status === 404 && model !== GEMINI_BACKUP_MODEL) {
     console.warn(`[callGeminiRaw] Model ${model} returned 404, falling back to ${GEMINI_BACKUP_MODEL}`);
-    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: GEMINI_BACKUP_MODEL, _attempt });
+    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: GEMINI_BACKUP_MODEL, _attempt, deadlineAt: budgetEndsAt });
   }
 
-  // Quick 1-attempt retry on rate limit before falling back to NVIDIA NIM
-  if ((res.status === 429 || res.status === 503) && _attempt < 1) {
-    const delay = 1500 + Math.random() * 500;
-    await new Promise(r => setTimeout(r, delay));
-    return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model, _attempt: _attempt + 1 });
+  // Retry transient rate limits / overload with exponential backoff, but only
+  // while the shared budget still has room for another full attempt — a single
+  // 1.5s retry (the previous behaviour) gave up long before Gemini's per-minute
+  // window had actually reopened.
+  if ((res.status === 429 || res.status === 503) && _attempt < 3) {
+    const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
+    if (budgetEndsAt - Date.now() > delay + 5000) {
+      await new Promise(r => setTimeout(r, delay));
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model, _attempt: _attempt + 1, deadlineAt: budgetEndsAt });
+    }
   }
 
   if (!res.ok) {
@@ -789,10 +841,12 @@ exports.generateAI = onCall(
         try {
           console.log(`[generateAI] Swapping to NVIDIA NIM API fallback (${nvidiaConfig.model || 'default'})...`);
           const prompt = extractPromptFromContents(contents);
-          // FIX: Cap NVIDIA tokens at 4096 — NIM's practical limit for structured JSON output.
-          // COT requests 16384 but sending that to NVIDIA causes silent truncation → malformed JSON.
-          // 4096 covers the essential structure of any generator (DLL, ILAW session, quiz, COT).
-          const nvidiaTokens = Math.min(clampedMaxTokens, 4096);
+          // BUG-FIX: the old 4096 cap GUARANTEED a truncated (and therefore
+          // unparseable) response for COT, which asks for 16384 — the fallback
+          // could never produce a usable plan. Llama 3.3 70B on NIM handles far
+          // more than 4096 output tokens; 12288 keeps a sane ceiling while
+          // leaving COT's full PPST structure room to finish.
+          const nvidiaTokens = Math.min(clampedMaxTokens, 12288);
           const nvidiaText = await callNvidiaServer(nvidiaConfig, prompt, {
             temperature: temperature ?? 0.5,
             maxTokens: nvidiaTokens,

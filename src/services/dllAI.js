@@ -35,7 +35,10 @@ async function callGemini(prompt, isRetry) {
     action: 'dll_gen',
     contents: [{ parts: [{ text: prompt }] }],
     temperature: 0.6,
-    maxTokens: 4096,
+    // 5 days x 10 procedure steps (A-J) + 5 objectives + the resources block is
+    // ~2.5-3.5k tokens of JSON on its own; 4096 left no margin, so a slightly
+    // wordier week hit MAX_TOKENS and came back as truncated, unparseable JSON.
+    maxTokens: 8192,
     responseMimeType: 'application/json',
     isRetry,
   });

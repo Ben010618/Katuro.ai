@@ -65,6 +65,14 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
   try {
     res = await fetch(url, opts);
   } catch {
+    // An aborted request must not be retried: `opts.signal` is a one-shot
+    // AbortSignal, so every retry would reuse the already-aborted signal and
+    // reject instantly, burning the full backoff ladder for nothing.
+    if (opts?.signal?.aborted) {
+      const err = new Error('The AI request took too long and was stopped. Please try again.');
+      err.reason = 'timeout';
+      throw err;
+    }
     // fetch() itself throws (TypeError: Failed to fetch) on network failures —
     // offline, DNS hiccup, dropped connection, CORS — rather than resolving
     // with a bad status. These are almost always transient, so retry them
@@ -143,18 +151,35 @@ function extractPrompt(contents) {
 
 export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs }) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
-  // Action-aware timeout: Heavy generation actions (COT, AR, Slide expansion) can take up to 300s,
-  // while standard generators (DLL, Quiz, Gamification, ILAW sessions) timeout in 50s so fast
-  // fallbacks (NVIDIA NIM / Direct Gemini) kick in promptly rather than hanging teachers' browsers.
+  // BUG-FIX: the client used to give up after 50s on every non-COT action.
+  // That is SHORTER than the time the server legitimately needs to write a
+  // 3-4k-token DLL / ILAW session / test-item payload, so the callable aborted
+  // a generation that was still running fine and reported deadline-exceeded —
+  // one half of why DLL, ILAW and Test Builder stopped working. The client
+  // budget must always outlast the server's own budget for the same request
+  // (see geminiBudgetMs in functions/index.js) plus its NVIDIA fallback.
   const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides';
-  const effectiveTimeout = timeoutMs || (isHeavy ? 300000 : 50000);
+  const serverBudgetMs = Math.min(180000, Math.max(45000, 30000 + (Number(maxTokens) || 2048) * 10));
+  const effectiveTimeout = timeoutMs
+    ?? (isHeavy ? 300000 : Math.min(300000, serverBudgetMs + 100000));
   const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: effectiveTimeout });
   try {
     const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
   } catch (err) {
-    // If Cloud Function/Gemini is rate-limited or fails, swap to NVIDIA NIM fallback or Direct Gemini
-    if (!err?.details?.dailyLimit && err?.code !== 'functions/unauthenticated') {
+    // Only a transient backend failure is worth re-trying through a client-side
+    // engine. A bad request, a missing key, a daily limit or a signed-out user
+    // will fail exactly the same way twice, and running the fallbacks anyway
+    // replaced the real, actionable message with a generic one.
+    const TRANSIENT = new Set([
+      'functions/internal',
+      'functions/unavailable',
+      'functions/deadline-exceeded',
+      'functions/aborted',
+      'functions/cancelled',
+      'functions/resource-exhausted',
+    ]);
+    if (!err?.details?.dailyLimit && TRANSIENT.has(err?.code)) {
       // 1. Try NVIDIA NIM fallback
       try {
         const { getNvidiaConfig, callNvidiaChat } = await import('./nvidiaConfig');
@@ -163,11 +188,10 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
           console.log(`[callGeminiProxy] Cloud Function error (${err.message || err.code}). Swapping to client NVIDIA NIM fallback...`);
           const promptText = extractPrompt(contents);
           const responseFormat = responseMimeType === 'application/json' ? { type: 'json_object' } : undefined;
-          // FIX: Cap NVIDIA tokens at 4096 — NVIDIA NIM's practical limit for structured JSON
-          // output. The caller may request up to 16384 (COT), but sending that to NIM causes
-          // silent truncation → malformed JSON. 4096 is the safe ceiling that still covers
-          // DLL, ILAW sessions, quiz generation, and COT's essential structure.
-          const nvidiaMaxTokens = Math.min(maxTokens || 4096, 4096);
+          // BUG-FIX: a 4096 cap silently truncated every COT plan (which asks
+          // for 16384) into unparseable JSON, so this fallback could never
+          // actually rescue a COT generation. Matches the server-side cap.
+          const nvidiaMaxTokens = Math.min(maxTokens || 4096, 12288);
           const text = await callNvidiaChat({
             messages: [{ role: 'user', content: promptText }],
             temperature: temperature ?? 0.5,
@@ -197,6 +221,9 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
                 ...(responseMimeType ? { responseMimeType } : {}),
               },
             }),
+            // This last-resort fetch had no timeout at all — a stalled
+            // connection here left the Generate button spinning forever.
+            signal: AbortSignal.timeout(serverBudgetMs),
           });
           if (res.ok) {
             const data = await res.json();
