@@ -31,13 +31,41 @@ const db = admin.firestore();
 //      specific model (set from Admin -> API Settings, no redeploy needed)
 //   2. ListModels                — newest usable flash model the key can reach
 //   3. STATIC_FALLBACK_MODELS    — only if ListModels itself is unreachable
-const STATIC_FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+// Verified working against the live API on 2026-08-25. Only consulted when
+// ListModels itself is unreachable — never as a silent default, since this is
+// the exact kind of list that rots.
+const STATIC_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-lite-latest'];
 const MODEL_CACHE_TTL = 60 * 60 * 1000; // 1h per instance
 
 let _modelCache = { name: null, at: 0 };
 
+// ListModels is NOT proof a model is usable. Two distinct failures were seen
+// on 2026-08-25, both from models the API happily listed:
+//   404 - 'gemini-2.5-flash is no longer available to new users' (retired)
+//   503 - 'gemini-3.7-flash is experiencing high demand'         (congested)
+// The newest model is often the most congested, so ranking purely by version
+// would keep steering every request into the one model that cannot serve it.
+// A model that fails this way is benched, and resolution skips it until the
+// cooldown expires — 24h for a retirement, 10min for a capacity blip.
+const RETIRED_COOLDOWN_MS   = 24 * 60 * 60 * 1000;
+const CONGESTED_COOLDOWN_MS = 10 * 60 * 1000;
+const _benched = new Map(); // model -> benched-until timestamp
+
 function invalidateModelCache() {
   _modelCache = { name: null, at: 0 };
+}
+
+function benchModel(model, ms) {
+  _benched.set(model, Date.now() + ms);
+  invalidateModelCache();
+  console.warn(`[benchModel] ${model} benched for ${Math.round(ms / 60000)}min`);
+}
+
+function isBenched(model) {
+  const until = _benched.get(model);
+  if (!until) return false;
+  if (Date.now() > until) { _benched.delete(model); return false; }
+  return true;
 }
 
 // 'gemini-2.5-flash' -> {major:2, minor:5, lite:false}; null if not a flash model.
@@ -68,6 +96,8 @@ async function listGeminiModels(key) {
  * request (a 404 on the resolved model re-resolves rather than giving up).
  */
 async function resolveGeminiModel(key, exclude = []) {
+  const skip = id => exclude.includes(id) || isBenched(id);
+
   if (!exclude.length && _modelCache.name && Date.now() - _modelCache.at < MODEL_CACHE_TTL) {
     return _modelCache.name;
   }
@@ -75,7 +105,7 @@ async function resolveGeminiModel(key, exclude = []) {
   // 1. Explicit admin pin always wins.
   try {
     const pinned = (await db.doc('adminConfig/gemini').get()).data()?.model;
-    if (pinned && !exclude.includes(pinned)) {
+    if (pinned && !skip(pinned)) {
       _modelCache = { name: pinned, at: Date.now() };
       return pinned;
     }
@@ -85,7 +115,7 @@ async function resolveGeminiModel(key, exclude = []) {
 
   // 2. Ask the API what exists.
   try {
-    const available = (await listGeminiModels(key)).filter(id => !exclude.includes(id));
+    const available = (await listGeminiModels(key)).filter(id => !skip(id));
     const flash = available
       .map(id => ({ id, s: scoreFlashModel(id) }))
       .filter(x => x.s)
@@ -95,10 +125,12 @@ async function resolveGeminiModel(key, exclude = []) {
         (a.s.lite ? 1 : 0) - (b.s.lite ? 1 : 0)   // full flash before -lite
       );
     const picked = flash[0]?.id
+      || available.find(id => /^gemini-flash(-lite)?-latest$/.test(id))
       || available.find(id => /^gemini-[\d.]+-pro$/.test(id))
       || available[0];
     if (picked) {
-      console.info(`[resolveGeminiModel] Using ${picked} (${available.length} models available${exclude.length ? `, excluded: ${exclude.join(', ')}` : ''})`);
+      const benched = [..._benched.keys()].filter(isBenched);
+      console.info(`[resolveGeminiModel] Using ${picked} (${available.length} usable${exclude.length ? `, excluded: ${exclude.join(', ')}` : ''}${benched.length ? `, benched: ${benched.join(', ')}` : ''})`);
       _modelCache = { name: picked, at: Date.now() };
       return picked;
     }
@@ -108,7 +140,7 @@ async function resolveGeminiModel(key, exclude = []) {
   }
 
   // 3. Last resort.
-  const fallback = STATIC_FALLBACK_MODELS.find(m => !exclude.includes(m)) || STATIC_FALLBACK_MODELS[0];
+  const fallback = STATIC_FALLBACK_MODELS.find(m => !skip(m)) || STATIC_FALLBACK_MODELS[0];
   _modelCache = { name: fallback, at: Date.now() };
   return fallback;
 }
@@ -281,15 +313,26 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
   // list, and try the next best — never fall through to another hardcoded name.
   if (res.status === 404) {
     const tried = [..._tried, activeModel];
-    invalidateModelCache();
-    if (tried.length < 3) {
-      console.warn(`[callGemini] Model ${activeModel} returned 404 — re-resolving (tried: ${tried.join(', ')})`);
+    benchModel(activeModel, RETIRED_COOLDOWN_MS);
+    if (tried.length < 4) {
+      console.warn(`[callGemini] Model ${activeModel} returned 404 (retired) — re-resolving (tried: ${tried.join(', ')})`);
       return callGemini(key, prompt, { temperature, maxTokens, _attempt, _tried: tried });
     }
   }
 
+  // 503 = this model has no capacity; bench it and switch rather than retrying
+  // into the same wall. See the matching comment in callGeminiRaw.
+  if (res.status === 503) {
+    const tried = [..._tried, activeModel];
+    benchModel(activeModel, CONGESTED_COOLDOWN_MS);
+    if (tried.length < 4) {
+      console.warn(`[callGemini] Model ${activeModel} is congested (503) — switching model (tried: ${tried.join(', ')})`);
+      return callGemini(key, prompt, { temperature, maxTokens, _attempt: 0, _tried: tried });
+    }
+  }
+
   // Retry on 429 (rate limit) or 503 (overloaded) with exponential backoff
-  if ((res.status === 429 || res.status === 503) && _attempt < 4) {
+  if (res.status === 429 && _attempt < 4) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s, 8s + jitter
     await new Promise(r => setTimeout(r, delay));
     return callGemini(key, prompt, { temperature, maxTokens, model: activeModel, _attempt: _attempt + 1, _tried });
@@ -851,10 +894,27 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   // primary AND its "backup" had both been retired.
   if (res.status === 404) {
     const tried = [..._tried, activeModel];
-    invalidateModelCache();
-    if (tried.length < 3) {
-      console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 — re-resolving (tried: ${tried.join(', ')})`);
+    benchModel(activeModel, RETIRED_COOLDOWN_MS);
+    if (tried.length < 4) {
+      console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 (retired) — re-resolving (tried: ${tried.join(', ')})`);
       return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt, deadlineAt: budgetEndsAt, _tried: tried });
+    }
+  }
+
+  // 503 means THIS MODEL has no capacity — retrying it just burns the budget
+  // (gemini-3.7-flash sat for 35s before 503ing). One quick retry in case it is
+  // a blip, then bench it and move to the next-best model. 429 is handled
+  // separately below: that is the key's quota, and switching model won't help.
+  if (res.status === 503) {
+    if (_attempt < 1 && budgetEndsAt - Date.now() > 8000) {
+      await new Promise(r => setTimeout(r, 1500));
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, _tried });
+    }
+    const tried = [..._tried, activeModel];
+    benchModel(activeModel, CONGESTED_COOLDOWN_MS);
+    if (tried.length < 4) {
+      console.warn(`[callGeminiRaw] Model ${activeModel} is congested (503) — switching model (tried: ${tried.join(', ')})`);
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, deadlineAt: budgetEndsAt, _tried: tried });
     }
   }
 
@@ -862,7 +922,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   // while the shared budget still has room for another full attempt — a single
   // 1.5s retry (the previous behaviour) gave up long before Gemini's per-minute
   // window had actually reopened.
-  if ((res.status === 429 || res.status === 503) && _attempt < 3) {
+  if (res.status === 429 && _attempt < 3) {
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
     if (budgetEndsAt - Date.now() > delay + 5000) {
       await new Promise(r => setTimeout(r, delay));
