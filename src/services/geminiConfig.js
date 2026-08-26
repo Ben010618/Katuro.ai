@@ -299,6 +299,52 @@ export async function saveGeminiKey(apiKey, adminUid) {
   invalidateKeyCache();
 }
 
+/**
+ * Admin-only: list the models this key can reach, for the model-pin dropdown.
+ *
+ * Caveat worth knowing when reading the result: appearing here does NOT mean a
+ * model can serve real work. gemini-3.7-flash was listed, answered a trivial
+ * ping in 1.6s, and still returned 503 on every production-sized generation for
+ * three days running. The server's resolver benches models that fail in use;
+ * this list is only what the API advertises.
+ */
+export async function listAvailableGeminiModels() {
+  const key = await getGeminiKey();
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=200`,
+    { signal: AbortSignal.timeout(15000) }
+  );
+  if (!res.ok) throw new Error(`Could not list models (HTTP ${res.status}).`);
+  const data = await res.json();
+  return (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name).replace('models/', ''))
+    .filter(id => !/(preview|-exp|experimental|tts|image|audio|live|embedding|vision|learnlm)/i.test(id))
+    .sort();
+}
+
+/**
+ * Admin-only: pin generation to a specific model, or pass '' to go back to
+ * automatic resolution. The server reads this before consulting ListModels.
+ */
+export async function saveGeminiModelPin(model, adminUid) {
+  await setDoc(CONFIG_REF, {
+    model:     (model || '').trim(),
+    updatedAt: new Date(),
+    updatedBy: adminUid ?? null,
+  }, { merge: true });
+}
+
+/** Admin-only: read the current pin ('' when automatic). */
+export async function getGeminiModelPin() {
+  try {
+    const snap = await getDoc(CONFIG_REF);
+    return snap.exists() ? (snap.data().model || '') : '';
+  } catch {
+    return '';
+  }
+}
+
 /** Admin-only: read display info (never exposes the full key) */
 export async function getGeminiKeyStatus() {
   try {

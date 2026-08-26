@@ -30,7 +30,7 @@ import {
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
   Cpu, Sparkles, ExternalLink, Megaphone,
 } from 'lucide-react';
-import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
+import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey, listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin } from '../services/geminiConfig';
 import {
   saveNvidiaConfig, getNvidiaKeyStatus, testNvidiaKey,
   POPULAR_TEXT_MODELS, POPULAR_IMAGE_MODELS,
@@ -1645,6 +1645,10 @@ function ApiKeySection({ adminUid }) {
   const [nvidiaTestResult, setNvidiaTestResult] = useState(null);
   const [nvidiaTestMsg, setNvidiaTestMsg]     = useState('');
   const [nvidiaErr, setNvidiaErr]             = useState('');
+  const [modelPin, setModelPin]               = useState('');
+  const [modelList, setModelList]             = useState([]);
+  const [savingPin, setSavingPin]             = useState(false);
+  const [pinMsg, setPinMsg]                   = useState('');
 
   useEffect(() => {
     getGeminiKeyStatus().then(setGeminiStatus).catch(() => setGeminiStatus({ hasKey: false }));
@@ -1653,7 +1657,22 @@ function ApiKeySection({ adminUid }) {
       if (status?.model) setNvidiaTextModel(status.model);
       if (status?.imageModel) setNvidiaImgModel(status.imageModel);
     }).catch(() => setNvidiaStatus({ hasKey: false }));
+    getGeminiModelPin().then(setModelPin).catch(() => setModelPin(''));
+    listAvailableGeminiModels().then(setModelList).catch(() => setModelList([]));
   }, []);
+
+  async function handleSavePin(next) {
+    setSavingPin(true); setPinMsg('');
+    try {
+      await saveGeminiModelPin(next, adminUid);
+      setModelPin(next);
+      setPinMsg(next ? `Pinned to ${next}.` : 'Back to automatic model selection.');
+    } catch (e) {
+      setPinMsg(e.message || 'Could not save the model pin.');
+    } finally {
+      setSavingPin(false);
+    }
+  }
 
   // Gemini handlers
   async function handleSaveGemini() {
@@ -1947,6 +1966,52 @@ function ApiKeySection({ adminUid }) {
       {/* ── Tab 2: Gemini Engine (Core Lesson & Curriculum Generator) ── */}
       {activeEngineTab === 'gemini' && (
         <div style={{ background: 'var(--kt-surface)', borderRadius: 12, padding: 18, border: '1px solid rgba(109,40,217,0.25)' }}>
+          {/* Model pin — Google retires models without notice, and a listed
+              model is not necessarily one that can serve real work, so the
+              server auto-resolves by default and this is the manual override. */}
+          <div style={{ background: '#faf5ff', border: '1px solid rgba(109,40,217,0.2)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6d28d9' }}>
+              Generation model
+            </p>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--kt-text-secondary)', lineHeight: 1.55 }}>
+              Automatic picks the newest working model and sidelines any that start failing.
+              Pin one only to override that — a listed model is not always able to serve real
+              generations.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select
+                value={modelPin}
+                onChange={e => handleSavePin(e.target.value)}
+                disabled={savingPin}
+                style={{
+                  flex: '1 1 240px', minWidth: 200,
+                  border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8,
+                  background: '#fff', padding: '9px 11px', fontSize: 14, fontFamily: 'inherit',
+                  cursor: savingPin ? 'wait' : 'pointer',
+                }}
+              >
+                <option value="">Automatic (recommended)</option>
+                {modelList.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              {modelPin && (
+                <button
+                  type="button"
+                  onClick={() => handleSavePin('')}
+                  disabled={savingPin}
+                  style={{
+                    background: '#ede9fe', color: '#6d28d9', border: 'none', borderRadius: 8,
+                    padding: '9px 14px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                    cursor: savingPin ? 'wait' : 'pointer',
+                  }}
+                >
+                  Reset to automatic
+                </button>
+              )}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: modelPin ? '#6d28d9' : 'var(--kt-text-secondary)' }}>
+              {pinMsg || (modelPin ? `Pinned to ${modelPin}.` : 'Currently automatic.')}
+            </p>
+          </div>
           {/* Card Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
