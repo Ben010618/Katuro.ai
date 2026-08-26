@@ -1137,7 +1137,17 @@ function AnalyticsSection({ teachers = [] }) {
     saveAs(blob, `katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
+  // Guards against out-of-order responses: switching the range quickly (or
+  // hammering Refresh) leaves several queries in flight, and a slower earlier
+  // one could otherwise land last and overwrite the newer data — leaving the
+  // chart showing 90 days while the button reads 7. Only the most recent
+  // request is allowed to apply its result or clear the spinner; a superseded
+  // one returns without touching state, because the request that replaced it
+  // still owns the loading flag.
+  const latestLoad = useRef(0);
+
   async function load(days) {
+    const reqId = ++latestLoad.current;
     setLoading(true);
     try {
       const cutoff = Timestamp.fromMillis(Date.now() - days * 86400000);
@@ -1148,10 +1158,13 @@ function AnalyticsSection({ teachers = [] }) {
           orderBy('ts', 'asc'),
         )
       );
+      if (reqId !== latestLoad.current) return;
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch {
       // Non-fatal: the empty-state below already covers 'no data'.
-    } finally { setLoading(false); }
+    } finally {
+      if (reqId === latestLoad.current) setLoading(false);
+    }
   }
 
   // Deliberate suppression, not an oversight: this is the standard "fetch when

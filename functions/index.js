@@ -297,7 +297,7 @@ async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, mo
   // to a model that doesn't causes a 400 that breaks the whole generation.
   const genConfig = {
     temperature,
-    maxOutputTokens: maxTokens,
+    maxOutputTokens: withThinkingHeadroom(maxTokens),
     ...(supportsThinking(activeModel) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
   };
   const res = await fetch(geminiUrl(key, activeModel), {
@@ -822,11 +822,36 @@ Return ONLY this JSON (no markdown, no explanation):
 // each feature stays exactly where it already was reviewed and tested.
 const MAX_TOKENS_CEILING = 20000; // hard ceiling regardless of what a client requests — COT's full PPST lesson plan needs up to 16384
 
+// ── Thinking-token headroom ──────────────────────────────────────────────────
+// Gemini 3.x models emit internal "thinking" tokens that count against
+// maxOutputTokens, and on these models thinking CANNOT be turned off —
+// thinkingConfig:{thinkingBudget:0} returns HTTP 400 on gemini-3.6-flash.
+//
+// Every budget in this file was sized for gemini-2.0-flash, which did not
+// think, so they now describe the total rather than the answer. Measured on
+// 2026-08-26 with gemini-3.6-flash: a 14-slide PPT outline spent 1509 thinking
+// tokens of a 2048 budget, leaving 535 for the answer — MAX_TOKENS, truncated
+// JSON, zero slides. A DLL spent 2187.
+//
+// Rather than re-tune every call site (and the budgets clients send us, which
+// this file cannot reach), thinking gets its own allowance on top of whatever
+// the caller asked for, so a caller's number still means "room for the answer".
+const THINKING_HEADROOM_TOKENS = 2600;
+const HARD_MAX_OUTPUT_TOKENS   = 24000;
+
+function withThinkingHeadroom(maxTokens) {
+  return Math.min(HARD_MAX_OUTPUT_TOKENS, (Number(maxTokens) || 2048) + THINKING_HEADROOM_TOKENS);
+}
+
 // Time budget for a whole Gemini call, derived from how much text was asked
 // for. generateContent is non-streaming, so wall time tracks output length:
 // ~10ms/token at flash speeds, plus ~30s of headroom for connection + TTFT.
 // Capped at 180s so the NVIDIA fallback below still fits inside generateAI's
 // 300s function timeout (worst case: 180s Gemini + ~82s NVIDIA + overhead).
+// Hard ceiling for ALL Gemini attempts in one request, including model
+// switches. 200s leaves room for the NVIDIA fallback (~82s worst case) inside
+// generateAI's 300s function timeout.
+const OVERALL_GEMINI_MS    = 200000;
 const GEMINI_MIN_BUDGET_MS = 45000;
 const GEMINI_MAX_BUDGET_MS = 180000;
 function geminiBudgetMs(maxTokens) {
@@ -834,15 +859,16 @@ function geminiBudgetMs(maxTokens) {
   return Math.min(GEMINI_MAX_BUDGET_MS, Math.max(GEMINI_MIN_BUDGET_MS, scaled));
 }
 
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model, _attempt = 0, deadlineAt, _tried = [] } = {}) {
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model, _attempt = 0, deadlineAt, overallDeadlineAt, _tried = [] } = {}) {
   const activeModel = model || await resolveGeminiModel(key, _tried);
   // PREVENTIVE: Only add thinkingConfig for models that support it — sending it
   // to a model that doesn't causes HTTP 400. Also: thinkingConfig is
   // incompatible with responseMimeType=application/json on most models — omit
   // it entirely when a JSON response is requested.
+  const effectiveMaxTokens = withThinkingHeadroom(maxTokens);
   const genConfig = {
     temperature,
-    maxOutputTokens: maxTokens,
+    maxOutputTokens: effectiveMaxTokens,
     ...(supportsThinking(activeModel) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     ...(responseMimeType ? { responseMimeType } : {}),
   };
@@ -857,8 +883,18 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   // derived from the requested size, and it is a budget for the WHOLE call
   // (retries included) so backup attempts can never overrun the function's own
   // 300s ceiling and leave no room for the NVIDIA fallback below.
-  const budgetEndsAt = deadlineAt ?? Date.now() + geminiBudgetMs(maxTokens);
-  const remainingMs  = budgetEndsAt - Date.now();
+  // BUG-FIX: these were one and the same, so time burned on a model that turned
+  // out to be dead was charged to its replacement. Observed in production on
+  // 2026-08-26: gemini-3.7-flash sat for 35s before returning 503, the switch
+  // to gemini-3.6-flash inherited the exhausted budget, and the request failed
+  // with "did not respond within the time budget" without the healthy model
+  // ever being called. A replacement model must start with a full budget.
+  //   budgetEndsAt  — this model's own allowance, fresh on every model switch
+  //   overallEndsAt — hard ceiling for the whole call, so switching can never
+  //                   run past the function timeout and starve the NVIDIA fallback
+  const overallEndsAt = overallDeadlineAt ?? Date.now() + OVERALL_GEMINI_MS;
+  const budgetEndsAt  = deadlineAt ?? Date.now() + geminiBudgetMs(effectiveMaxTokens);
+  const remainingMs   = Math.min(budgetEndsAt, overallEndsAt) - Date.now();
   if (remainingMs <= 2000) {
     throw new HttpsError('deadline-exceeded', 'Gemini did not respond within the time budget for this request.');
   }
@@ -897,7 +933,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     benchModel(activeModel, RETIRED_COOLDOWN_MS);
     if (tried.length < 4) {
       console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 (retired) — re-resolving (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt, deadlineAt: budgetEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt, overallDeadlineAt: overallEndsAt, _tried: tried });
     }
   }
 
@@ -906,15 +942,15 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   // a blip, then bench it and move to the next-best model. 429 is handled
   // separately below: that is the key's quota, and switching model won't help.
   if (res.status === 503) {
-    if (_attempt < 1 && budgetEndsAt - Date.now() > 8000) {
-      await new Promise(r => setTimeout(r, 1500));
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, _tried });
-    }
+    // No same-model retry here on purpose. A congested model takes its time
+    // saying so — gemini-3.7-flash measured 35.7s before returning 503 — so a
+    // retry burns another 35s of budget to be told the same thing, while a
+    // healthy model is sitting right there in the list. Bench it and move on.
     const tried = [..._tried, activeModel];
     benchModel(activeModel, CONGESTED_COOLDOWN_MS);
     if (tried.length < 4) {
       console.warn(`[callGeminiRaw] Model ${activeModel} is congested (503) — switching model (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, deadlineAt: budgetEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
     }
   }
 
@@ -926,7 +962,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
     if (budgetEndsAt - Date.now() > delay + 5000) {
       await new Promise(r => setTimeout(r, delay));
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, _tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, overallDeadlineAt: overallEndsAt, _tried });
     }
   }
 

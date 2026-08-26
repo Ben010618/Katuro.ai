@@ -200,7 +200,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
     "reviewOfPastLesson": "..."
   },
   "activity": {
-    "title": "Learning Task #1. \"...\" (...Edition)",
+    "title": "Learning Task #1. "..." (...Edition)",
     "duration": "10 minutes",
     "objective": "...",
     "materials": ["...", "...", "..."],
@@ -214,7 +214,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
     ]
   },
   "analysis": {
-    "title": "ANALYSIS: \"...\" (...minutes)",
+    "title": "ANALYSIS: "..." (...minutes)",
     "duration": "15 minutes",
     "objective": "...",
     "materials": ["...", "..."],
@@ -268,7 +268,7 @@ OUTPUT FORMAT — RETURN ONLY THIS JSON. NO MARKDOWN. NO BACKTICKS. NO TEXT BEFO
       "indicatorNum": "1",
       "description": "Applied knowledge of content within and across curriculum teaching areas",
       "objectiveLabel": "Objective No. 1 — PPST 1.1.2 Applied Knowledge of Content",
-      "mov": "Learning Objectives, Analysis Activity: \\\"...\\\", Abstraction Section",
+      "mov": "Learning Objectives, Analysis Activity: \\"...\\", Abstraction Section",
       "annotation": "..."
     }
   ]
