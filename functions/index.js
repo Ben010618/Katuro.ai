@@ -980,15 +980,39 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     }
   }
 
-  // Retry transient rate limits / overload with exponential backoff, but only
-  // while the shared budget still has room for another full attempt — a single
-  // 1.5s retry (the previous behaviour) gave up long before Gemini's per-minute
-  // window had actually reopened.
-  if (res.status === 429 && _attempt < 3) {
-    const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
-    if (budgetEndsAt - Date.now() > delay + 5000) {
-      await new Promise(r => setTimeout(r, delay));
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, overallDeadlineAt: overallEndsAt, _tried });
+  // Not all 429s mean the same thing, and the difference decides whether
+  // waiting can possibly help:
+  //   GenerateRequestsPerDayPerProjectPerModel — the DAILY cap for THIS model
+  //     is spent. Backing off is useless (it resets tomorrow), but the cap is
+  //     per-model, so another model may well have quota left. Bench and switch.
+  //   anything else (per-minute bursts, project-wide) — genuinely transient,
+  //     so back off and retry the same model.
+  // Observed 2026-08-26: gemini-3.6-flash returned the per-day variant while
+  // gemini-3.7-flash was serving normally, so the old blanket "429 means the
+  // key's quota, switching won't help" was wrong and would have failed a
+  // request that a sibling model could have answered.
+  if (res.status === 429) {
+    const body    = await res.clone().json().catch(() => ({}));
+    const quotaId = (body?.error?.details ?? [])
+      .flatMap(d => d?.violations ?? [])
+      .map(v => v?.quotaId ?? '')
+      .join(',');
+    const perModelDailyCap = /PerDay.*PerModel|PerModel.*PerDay/i.test(quotaId);
+
+    if (perModelDailyCap) {
+      const tried = [..._tried, activeModel];
+      // Until the daily window rolls over; capped by MAX_COOLDOWN_MS.
+      benchModel(activeModel, MAX_COOLDOWN_MS);
+      if (tried.length < 4) {
+        console.warn(`[callGeminiRaw] ${activeModel} hit its per-day quota (${quotaId}) — switching model (tried: ${tried.join(', ')})`);
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+      }
+    } else if (_attempt < 3) {
+      const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
+      if (budgetEndsAt - Date.now() > delay + 5000) {
+        await new Promise(r => setTimeout(r, delay));
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, overallDeadlineAt: overallEndsAt, _tried });
+      }
     }
   }
 
