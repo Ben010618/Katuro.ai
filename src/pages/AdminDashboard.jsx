@@ -6,7 +6,7 @@ import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
   getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
-  adminChangePassword, adminSendPasswordReset, adminDeleteUser,
+  adminChangePassword, adminDeleteUser,
   subscribeAdminNotifications, markAllNotificationsRead,
   adminSetFreeMode, subscribeFreeModeStatus, adminEqualizeTokens,
 } from '../services/db';
@@ -28,7 +28,7 @@ import {
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
-  Cpu, Sparkles, Image as ImageIcon, ExternalLink, Megaphone,
+  Cpu, Sparkles, ExternalLink, Megaphone,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import {
@@ -330,6 +330,31 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
 }
 
 // ── User Details modal ───────────────────────────────────────────────────────
+// Declared at module scope on purpose: nested inside UserDetailsModal this was
+// a new component type on every render, so React remounted all seven rows each
+// time instead of updating them.
+// `now` is passed in rather than read from the clock inside, so rendering stays
+// pure — calling Date.now() during render makes output depend on when React
+// happens to render, which is exactly what it may do more than once.
+function timeAgo(ts, now) {
+  if (!ts) return '';
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const diff = Math.floor((now - date.getTime()) / 1000);
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function Row({ label, value }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
+      <span style={{ ...labelStyle, marginBottom: 0, width: 120, flexShrink: 0, lineHeight: '1.4' }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{value || '—'}</span>
+    </div>
+  );
+}
+
 function UserDetailsModal({ teacher: t, onClose }) {
   const statusLabel = t.pendingApproval ? 'Pending Approval' : t.disabled ? 'Disabled' : 'Active';
   const statusColor = t.pendingApproval ? '#d97706' : t.disabled ? '#c0392b' : '#1a3d2b';
@@ -339,15 +364,6 @@ function UserDetailsModal({ teacher: t, onClose }) {
     ? (t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt))
         .toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' })
     : '—';
-
-  function Row({ label, value }) {
-    return (
-      <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(45,106,79,0.08)' }}>
-        <span style={{ ...labelStyle, marginBottom: 0, width: 120, flexShrink: 0, lineHeight: '1.4' }}>{label}</span>
-        <span style={{ fontSize: 13, color: 'var(--kt-text-primary)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{value || '—'}</span>
-      </div>
-    );
-  }
 
   return (
     <div style={{
@@ -1133,10 +1149,16 @@ function AnalyticsSection({ teachers = [] }) {
         )
       );
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (_) {}
-    finally { setLoading(false); }
+    } catch {
+      // Non-fatal: the empty-state below already covers 'no data'.
+    } finally { setLoading(false); }
   }
 
+  // Deliberate suppression, not an oversight: this is the standard "fetch when
+  // the input changes" effect, and the loading flag has to be raised before the
+  // await or the spinner never appears. The rule is guarding against cascading
+  // renders; the one extra pass here is the intended behaviour.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(range); }, [range]);
 
   // Admin accounts are excluded from analytics entirely — their logins,
@@ -2043,7 +2065,7 @@ function ApiKeySection({ adminUid }) {
 }
 
 // ── Free Mode control section ─────────────────────────────────────────────────
-function FreeModeSection({ adminUid }) {
+function FreeModeSection() {
   const [freeMode, setFreeMode] = useState(false);
   const [note,     setNote]     = useState('');
   const [saving,   setSaving]   = useState(false);
@@ -2207,8 +2229,9 @@ function AIErrorSection() {
         query(collection(db, 'aiErrorReports'), orderBy('createdAt', 'desc'), limit(30))
       );
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (_e) {}
-    finally { setLoading(false); }
+    } catch {
+      // Non-fatal: the empty-state below already covers 'no reports'.
+    } finally { setLoading(false); }
   }
 
   async function markResolved(id) {
@@ -2287,8 +2310,16 @@ function AIErrorSection() {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const { dark, toggle } = useTheme();
+
+  // Ticks once a minute so relative timestamps stay current while the panel is
+  // open; previously they were frozen at whenever the last render happened.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const [activeTab,      setActiveTab]       = useState('users');
   const [teachers,       setTeachers]       = useState([]);
@@ -2353,16 +2384,6 @@ export default function AdminDashboard() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }
 
-  function timeAgo(ts) {
-    if (!ts) return '';
-    const date = ts.toDate ? ts.toDate() : new Date(ts);
-    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (diff < 60)   return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-  }
-
   const fetchTeachers = useCallback(async () => {
     setLoadingList(true); setListErr('');
     try {
@@ -2376,6 +2397,11 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  // Deliberate suppression, not an oversight: this is the standard "fetch when
+  // the input changes" effect, and the loading flag has to be raised before the
+  // await or the spinner never appears. The rule is guarding against cascading
+  // renders; the one extra pass here is the intended behaviour.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchTeachers(); }, [fetchTeachers]);
 
   // Activity color-coding — Green: used kaTuro in the last 7 days. Orange:
@@ -2630,7 +2656,7 @@ export default function AdminDashboard() {
                           </span>
                         )}
                         <span style={{ fontSize: 9, color: '#9bb8a5', display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
-                          <Clock size={8} />{timeAgo(n.createdAt)}
+                          <Clock size={8} />{timeAgo(n.createdAt, now)}
                         </span>
                       </div>
                     </div>
@@ -2729,7 +2755,7 @@ export default function AdminDashboard() {
         <ApiKeySection adminUid={user?.uid} />
 
         {/* Free Mode control */}
-        <FreeModeSection adminUid={user?.uid} />
+        <FreeModeSection />
 
         {/* Token Equalizer */}
         <TokenEqualizerSection adminUid={user?.uid} teacherCount={teachers.length} />
