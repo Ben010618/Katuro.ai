@@ -49,16 +49,42 @@ let _modelCache = { name: null, at: 0 };
 // cooldown expires — 24h for a retirement, 10min for a capacity blip.
 const RETIRED_COOLDOWN_MS   = 24 * 60 * 60 * 1000;
 const CONGESTED_COOLDOWN_MS = 10 * 60 * 1000;
-const _benched = new Map(); // model -> benched-until timestamp
+const MAX_COOLDOWN_MS       = 6 * 60 * 60 * 1000;
+const _benched = new Map();     // model -> benched-until timestamp
+const _benchStrikes = new Map(); // model -> consecutive bench count
 
 function invalidateModelCache() {
   _modelCache = { name: null, at: 0 };
 }
 
-function benchModel(model, ms) {
+/**
+ * Bench a model. A repeat offender is benched for longer each time.
+ *
+ * A flat cooldown re-probes a persistently bad model forever: gemini-3.7-flash
+ * answered a trivial ping in 1.6s but returned 503 on every real generation
+ * workload across 2026-08-25 and 08-26, so a fixed 10min bench meant one
+ * unlucky teacher every 10 minutes paid ~19-35s discovering that again.
+ * Doubling per strike drops a genuinely broken model out of rotation while
+ * still letting a briefly-congested one back in quickly.
+ *
+ * Strike counts live in instance memory, so a cold start forgives them — which
+ * is the right bias: better to occasionally re-probe a recovered model than to
+ * permanently exile one on stale evidence.
+ */
+function benchModel(model, baseMs) {
+  const strikes = (_benchStrikes.get(model) ?? 0) + 1;
+  _benchStrikes.set(model, strikes);
+  const ms = Math.min(MAX_COOLDOWN_MS, baseMs * (2 ** (strikes - 1)));
   _benched.set(model, Date.now() + ms);
   invalidateModelCache();
-  console.warn(`[benchModel] ${model} benched for ${Math.round(ms / 60000)}min`);
+  console.warn(`[benchModel] ${model} benched for ${Math.round(ms / 60000)}min (strike ${strikes})`);
+}
+
+/** A model that served a request successfully has earned its record back. */
+function clearBenchStrikes(model) {
+  if (_benchStrikes.delete(model)) {
+    console.info(`[benchModel] ${model} succeeded — strike count reset`);
+  }
 }
 
 function isBenched(model) {
@@ -981,6 +1007,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     );
   }
 
+  clearBenchStrikes(activeModel);
   const data      = await res.json();
   const candidate = data.candidates?.[0];
   const parts     = candidate?.content?.parts ?? [];
