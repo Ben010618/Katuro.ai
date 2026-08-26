@@ -13,6 +13,7 @@ import {
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
+import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
 import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
 import { db } from '../firebase';
 import {
@@ -27,7 +28,7 @@ import {
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
-  Cpu, Sparkles, Image as ImageIcon, ExternalLink,
+  Cpu, Sparkles, Image as ImageIcon, ExternalLink, Megaphone,
 } from 'lucide-react';
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey } from '../services/geminiConfig';
 import {
@@ -2660,6 +2661,7 @@ export default function AdminDashboard() {
             { id: 'analytics',  label: 'Analytics',        Icon: BarChart2 },
             { id: 'feedback',    label: 'Feedback Inbox',   Icon: MessageSquare, badge: unreadFeedback },
             { id: 'featureReq',  label: 'Feature Requests', Icon: Lightbulb },
+            { id: 'announce',    label: 'Announcement',     Icon: Megaphone },
             { id: 'inactivity',  label: 'Inactivity',       Icon: UserX },
           ].map(({ id, label, Icon, badge }) => (
             <button
@@ -2716,6 +2718,8 @@ export default function AdminDashboard() {
         {activeTab === 'feedback' && <FeedbackArchive />}
 
         {activeTab === 'featureReq' && <FeatureRequestAdmin />}
+
+        {activeTab === 'announce' && <AnnouncementAdmin />}
 
         {activeTab === 'inactivity' && <InactiveUsersSection />}
 
