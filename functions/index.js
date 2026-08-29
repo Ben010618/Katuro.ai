@@ -1023,11 +1023,29 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     if (res.status === 400) {
       console.error(`[callGeminiRaw] 400 Bad Request for model ${activeModel}:`, JSON.stringify(err?.error));
     }
+
+    // Reaching here on a 429 means the switch loop above already tried every
+    // model it could and they were ALL rate-limited. Telling the teacher to
+    // "try again in a moment" is then actively wrong when the cause is the
+    // per-day cap: the window reopens at midnight Pacific, not in a moment, and
+    // each retry burns more of their in-app daily allowance for nothing. This
+    // was the message behind the five 186-314s Test Builder failures on
+    // 2026-08-25/26. Say which kind it is, and hand the caller Google's own
+    // retry delay instead of making it guess.
+    const details    = err?.error?.details ?? [];
+    const quotaId    = details.flatMap(d => d?.violations ?? []).map(v => v?.quotaId ?? '').join(',');
+    const exhausted  = /PerDay/i.test(quotaId);
+    const retryInfo  = details.find(d => String(d?.['@type'] ?? '').includes('RetryInfo'));
+    const retryAfter = Number(String(retryInfo?.retryDelay ?? '').replace('s', '')) || null;
+
     throw new HttpsError(
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
-        ? 'The AI service is busy right now. Please try again in a moment.'
-        : `Gemini ${res.status} (${activeModel}): ${err?.error?.message ?? res.statusText}`
+        ? (exhausted
+            ? "Today's AI quota for this account is used up. It resets at midnight (Pacific). Your work so far has been kept."
+            : 'The AI service is busy right now. Please try again in a moment.')
+        : `Gemini ${res.status} (${activeModel}): ${err?.error?.message ?? res.statusText}`,
+      isRateLimit ? { quotaExhausted: exhausted, retryAfter } : undefined
     );
   }
 

@@ -272,6 +272,14 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     if (code === 'functions/resource-exhausted') {
       e.status = 429;
       if (err?.details?.dailyLimit) e.dailyLimit = true;
+      // Google's per-day cap: retrying cannot clear it before midnight, so
+      // callers must stop rather than burn attempts (and the user's in-app
+      // daily allowance) on something that can only fail.
+      if (err?.details?.quotaExhausted) e.quotaExhausted = true;
+      // Google's own retry delay, when it gave one. Callers previously read
+      // e.retryAfter and nothing ever set it, so every backoff silently fell
+      // back to a hardcoded 30s.
+      if (err?.details?.retryAfter) e.retryAfter = err.details.retryAfter;
     } else if (code === 'functions/unauthenticated') {
       e.reason = 'unauthenticated';
     } else if (isDeadline) {

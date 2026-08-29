@@ -89,6 +89,7 @@ export default function StepReview() {
       elapsedMs = startTimer();
 
       const allItems = [];
+      const failedRows = [];
       let cursor = 0;
       for (let i = 0; i < store.tos.rows.length; i++) {
         const row = store.tos.rows[i];
@@ -114,7 +115,10 @@ export default function StepReview() {
           } catch (err) {
             lastErr = err;
             console.warn(`generateItemsForCompetency (row ${i + 1}) attempt ${attempt + 1} failed:`, err);
-            if (err.dailyLimit) break;
+            // Neither of these can clear up by retrying: dailyLimit is our own
+            // in-app cap, quotaExhausted is Google's per-day cap (resets at
+            // midnight). Retrying just burns time and allowance.
+            if (err.dailyLimit || err.quotaExhausted) break;
             if (attempt < 2) {
               const waitMs = err.status === 429
                 ? Math.min((err.retryAfter || 30) * 1000, 30_000)
@@ -128,7 +132,20 @@ export default function StepReview() {
             }
           }
         }
-        if (!result) throw lastErr || new Error('Item generation failed. Please try again.');
+        // BUG-FIX: this used to `throw lastErr`, discarding every competency
+        // that had already generated. A test with 8 competencies that failed on
+        // row 6 threw away 5 successful rows — 20+ completed AI calls and the
+        // teacher's quota with them — and left them nothing to show for a
+        // 3-5 minute wait. Record the failure and keep going; whatever was
+        // generated is still a usable partial test the teacher can top up.
+        if (!result) {
+          failedRows.push({ index: i + 1, label: row.label, err: lastErr });
+          // A spent daily quota will fail every remaining competency too, so
+          // stop rather than walk the rest of the list to collect more of the
+          // same error.
+          if (lastErr?.quotaExhausted || lastErr?.dailyLimit) break;
+          continue;
+        }
 
         allItems.push(...result.items);
         cursor = result.nextIndex;
@@ -145,6 +162,11 @@ export default function StepReview() {
         }
       }
 
+      // Nothing at all came back — surface the real cause rather than a blank test.
+      if (allItems.length === 0) {
+        throw failedRows[0]?.err || new Error('Item generation failed. Please try again.');
+      }
+
       const { buildTestPaperParts } = await import('../../services/testBuilderDocx');
       const parts = buildTestPaperParts(allItems, deriveLanguage(store.subject));
       store.setGeneratedParts(parts);
@@ -154,6 +176,21 @@ export default function StepReview() {
           status: 'tos_generated',
         }).catch((e) => console.error('Failed to auto-save generated parts:', e));
         store.setField('status', 'tos_generated');
+      }
+
+      // Partial success is still success — the teacher keeps the items that did
+      // generate, and is told exactly which competencies to regenerate rather
+      // than being made to rerun the whole test.
+      if (failedRows.length > 0) {
+        const names = failedRows.map(f => `#${f.index} ${f.label}`).join(', ');
+        const why   = failedRows[0]?.err?.quotaExhausted
+          ? " Today's AI quota is used up — it resets at midnight."
+          : '';
+        setGenError(
+          `Generated ${allItems.length} item${allItems.length === 1 ? '' : 's'}, but ` +
+          `${failedRows.length} competenc${failedRows.length === 1 ? 'y' : 'ies'} could not be written (${names}).` +
+          `${why} Your completed items are saved — regenerate to fill the gaps.`
+        );
       }
       addToast(
         freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
