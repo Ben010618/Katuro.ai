@@ -685,22 +685,38 @@ Return ONLY this JSON:
   ]
 }`;
 
+    // PPT runs on NVIDIA first, Gemini second — the reverse of every other
+    // generator.
+    //
+    // The binding constraint is Gemini's per-model PER-DAY cap, which the whole
+    // app shares; NVIDIA's free tier is a per-minute allowance (40 RPM) that
+    // kaTuro comes nowhere near. So every outline served by NVIDIA is one more
+    // COT/DLL/ILAW/Test generation that Gemini can still serve later that day.
+    // expandSlides has always worked this way; generateOutline was the odd one
+    // out, spending the scarce quota on the workload with the least need of it.
+    //
+    // Gemini remains the fallback, so a bad NVIDIA day degrades to the previous
+    // behaviour rather than failing.
+    let outlineEngine = 'gemini';
     try {
-      const key_ = await getGeminiKey();
-      text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
-    } catch (geminiErr) {
-      console.warn('Gemini outline generation failed, checking NVIDIA fallback:', geminiErr.message);
       if (nvidiaConfig?.apiKey) {
-        try {
-          text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
-        } catch (nvidiaErr) {
-          console.error('NVIDIA outline fallback also failed:', nvidiaErr.message);
-          throw geminiErr;
-        }
+        outlineEngine = 'nvidia';
+        text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
       } else {
-        throw geminiErr;
+        const key_ = await getGeminiKey();
+        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+      }
+    } catch (primaryErr) {
+      if (outlineEngine === 'nvidia') {
+        console.warn('[generateOutline] NVIDIA failed, falling back to Gemini:', primaryErr.message);
+        const key_ = await getGeminiKey();
+        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+        outlineEngine = 'gemini';
+      } else {
+        throw primaryErr;
       }
     }
+    console.info(`[generateOutline] served by ${outlineEngine}`);
 
     const parsed = parseJSON(text, 'outline');
 
