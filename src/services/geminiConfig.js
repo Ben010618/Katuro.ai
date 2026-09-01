@@ -209,7 +209,16 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
         const apiKey = await getGeminiKey();
         if (apiKey) {
           console.log(`[callGeminiProxy] Swapping to direct Gemini client fallback...`);
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          let models = [];
+          try {
+            models = await candidateModels(apiKey);
+          } catch (listErr) {
+            throw new Error('Could not determine a usable Gemini model for the direct fallback.', { cause: listErr });
+          }
+          const model = models[0];
+          // cause is the original callable failure that sent us down the fallback path.
+          if (!model) throw new Error('No usable Gemini model available for this key.', { cause: err });
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           const res = await geminiWithRetry(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -287,6 +296,35 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     }
     throw e;
   }
+}
+
+/**
+ * Pick a model this key can actually use, newest flash first.
+ *
+ * Never hardcode a model name here. Both call sites below used to pin
+ * gemini-2.0-flash; Google retired it, which silently killed the direct-Gemini
+ * fallback AND made the admin "Test" button report a perfectly valid key as
+ * broken ("models/gemini-2.0-flash is no longer available").
+ */
+async function candidateModels(apiKey) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=200`,
+    { signal: AbortSignal.timeout(15000) }
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status} — the key may be invalid.`);
+  const data = await res.json();
+  const rank = (id) => {
+    const m = /^gemini-(\d+)(?:\.(\d+))?-flash(-lite)?$/.exec(id);
+    return m ? { major: +m[1], minor: +(m[2] || 0), lite: !!m[3] } : null;
+  };
+  return (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name).replace('models/', ''))
+    .filter(id => !/(preview|-exp|experimental|tts|image|audio|live|embedding|vision|learnlm)/i.test(id))
+    .map(id => ({ id, r: rank(id) }))
+    .filter(x => x.r)
+    .sort((a, b) => b.r.major - a.r.major || b.r.minor - a.r.minor || (a.r.lite ? 1 : 0) - (b.r.lite ? 1 : 0))
+    .map(x => x.id);
 }
 
 /** Admin-only: save a new key to Firestore */
@@ -372,18 +410,36 @@ export async function getGeminiKeyStatus() {
 /** Quick validity test: send a tiny prompt to Gemini */
 export async function testGeminiKey(apiKey) {
   const trimmed = (apiKey || '').trim();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${trimmed}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: 'Reply with exactly: OK' }] }],
-      generationConfig: { maxOutputTokens: 8, temperature: 0 },
-    }),
-  });
-  if (!res.ok) {
+  if (!trimmed) throw new Error('API key is required.');
+
+  // Walk the key's own catalogue rather than pinning one model. A single model
+  // can be temporarily congested (gemini-3.7-flash returns 503 under load), and
+  // that says nothing about whether the KEY is good — which is the only thing
+  // this button is meant to answer. Pass if any model accepts the key.
+  const models = await candidateModels(trimmed);
+  if (models.length === 0) throw new Error('This key cannot reach any Gemini generation model.');
+
+  let lastErr = 'unknown error';
+  for (const model of models.slice(0, 4)) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${trimmed}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Reply with exactly: OK' }] }],
+          // Generous because 3.x models spend part of the budget "thinking";
+          // 8 tokens was never enough to get an answer back.
+          generationConfig: { maxOutputTokens: 2610, temperature: 0 },
+        }),
+      }
+    );
+    if (res.ok) return { ok: true, model };
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? `HTTP ${res.status} — key may be invalid or quota exceeded.`);
+    lastErr = err?.error?.message ?? `HTTP ${res.status}`;
+    // 503 means that model is busy, not that the key is bad — try the next one.
+    // Anything else (401/403/400) is about the key, so stop and report it.
+    if (res.status !== 503) throw new Error(lastErr);
   }
-  return true;
+  throw new Error(`Every model is busy right now, so the key could not be confirmed. Last response: ${lastErr}`);
 }
