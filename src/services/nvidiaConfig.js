@@ -2,7 +2,7 @@
  * NVIDIA NIM API Configuration & Client Service
  *
  * Used specifically for PPT Lesson Presentation Generation:
- * - Content Outline & Expansion (meta/llama-3.3-70b-instruct, etc.)
+ * - Content Outline & Expansion (nvidia/llama-3.1-nemotron-70b-instruct, etc.)
  * - Classroom Visual & Diagram Image Generation (stabilityai/stable-diffusion-xl, etc.)
  * - Enhanced Pedagogical Slide Design
  *
@@ -16,15 +16,43 @@ import { db } from '../firebase';
 const CONFIG_REF = doc(db, 'adminConfig', 'nvidia');
 const CACHE_TTL  = 5 * 60 * 1000; // 5 minutes
 
-export const DEFAULT_NVIDIA_TEXT_MODEL  = 'meta/llama-3.3-70b-instruct';
+// NVIDIA retires NIM models without notice. meta/llama-3.3-70b-instruct was the
+// default here and had been returning 410 Gone — the fallback engine was dead
+// for weeks, and every "NVIDIA key is broken" symptom was actually this.
+// Verified live on 2026-09-01.
+export const DEFAULT_NVIDIA_TEXT_MODEL  = 'nvidia/llama-3.1-nemotron-70b-instruct';
 export const DEFAULT_NVIDIA_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl';
 
+// Fallback list only — the admin dropdown prefers listAvailableNvidiaModels()
+// below, which reads NVIDIA's live catalogue. Three of the four entries that
+// used to be here (llama-3.3-70b, deepseek-r1, mixtral-8x22b) had been retired,
+// so the dropdown was mostly offering models that could not work.
 export const POPULAR_TEXT_MODELS = [
-  { id: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct (Recommended - Fast & Comprehensive)' },
-  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'NVIDIA Nemotron 70B (High Reasoning Quality)' },
-  { id: 'deepseek-ai/deepseek-r1', label: 'DeepSeek R1 (Deep Pedagogical Reasoning)' },
-  { id: 'mistralai/mixtral-8x22b-instruct-v0.1', label: 'Mixtral 8x22B Instruct (Balanced & Creative)' },
+  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'NVIDIA Nemotron 70B (Recommended - High Reasoning Quality)' },
+  { id: 'mistralai/mistral-large-2-instruct', label: 'Mistral Large 2 (Balanced & Creative)' },
+  { id: 'deepseek-ai/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash (Fast)' },
+  { id: 'nvidia/llama-3.1-nemotron-51b-instruct', label: 'NVIDIA Nemotron 51B (Lighter)' },
 ];
+
+/**
+ * NVIDIA's live model catalogue. The endpoint needs no API key, so the admin
+ * dropdown can always show what actually exists rather than a list baked in at
+ * release time and quietly rotting.
+ */
+export async function listAvailableNvidiaModels() {
+  const res = await fetch('https://integrate.api.nvidia.com/v1/models', {
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Could not list NVIDIA models (HTTP ${res.status}).`);
+  const data = await res.json();
+  return (data.data || [])
+    .map(m => m.id)
+    // Keep general-purpose chat models; drop the specialised ones that cannot
+    // serve a lesson-generation prompt.
+    .filter(id => /instruct|nemotron|mistral-large|deepseek-v4/i.test(id))
+    .filter(id => !/vision|embed|guard|safety|topic|retriev|coder|codestral|rerank|ocr|parse|reward|translate/i.test(id))
+    .sort();
+}
 
 export const POPULAR_IMAGE_MODELS = [
   { id: 'stabilityai/stable-diffusion-xl', label: 'Stable Diffusion XL (High-Resolution Educational Visuals)' },

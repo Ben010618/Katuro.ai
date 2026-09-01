@@ -254,7 +254,7 @@ async function getNvidiaConfigServer() {
     if (snap.exists && snap.data()?.apiKey) {
       return {
         apiKey: snap.data().apiKey,
-        model:  snap.data().model || 'meta/llama-3.3-70b-instruct',
+        model:  snap.data().model || 'nvidia/llama-3.1-nemotron-70b-instruct',
       };
     }
   } catch {
@@ -282,7 +282,7 @@ function extractPromptFromContents(contents) {
 async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTokens = 2048, responseMimeType, _attempt = 0 } = {}) {
   const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
   const payload = {
-    model: nvidiaConfig.model || 'meta/llama-3.3-70b-instruct',
+    model: nvidiaConfig.model || 'nvidia/llama-3.1-nemotron-70b-instruct',
     messages: [{ role: 'user', content: prompt }],
     temperature,
     max_tokens: maxTokens,

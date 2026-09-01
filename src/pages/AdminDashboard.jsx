@@ -33,7 +33,7 @@ import {
 import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey, listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin } from '../services/geminiConfig';
 import {
   saveNvidiaConfig, getNvidiaKeyStatus, testNvidiaKey,
-  POPULAR_TEXT_MODELS, POPULAR_IMAGE_MODELS,
+  POPULAR_TEXT_MODELS, POPULAR_IMAGE_MODELS, listAvailableNvidiaModels,
 } from '../services/nvidiaConfig';
 import { saveAs } from 'file-saver';
 
@@ -1637,7 +1637,7 @@ function ApiKeySection({ adminUid }) {
   // NVIDIA State
   const [nvidiaKeyInput, setNvidiaKeyInput]   = useState('');
   const [showNvidiaKey, setShowNvidiaKey]     = useState(false);
-  const [nvidiaTextModel, setNvidiaTextModel] = useState('meta/llama-3.3-70b-instruct');
+  const [nvidiaTextModel, setNvidiaTextModel] = useState('nvidia/llama-3.1-nemotron-70b-instruct');
   const [nvidiaImgModel, setNvidiaImgModel]   = useState('stabilityai/stable-diffusion-xl');
   const [nvidiaStatus, setNvidiaStatus]       = useState(null);
   const [savingNvidia, setSavingNvidia]       = useState(false);
@@ -1645,6 +1645,7 @@ function ApiKeySection({ adminUid }) {
   const [nvidiaTestResult, setNvidiaTestResult] = useState(null);
   const [nvidiaTestMsg, setNvidiaTestMsg]     = useState('');
   const [nvidiaErr, setNvidiaErr]             = useState('');
+  const [nvidiaModelList, setNvidiaModelList] = useState([]);
   const [modelPin, setModelPin]               = useState('');
   const [modelList, setModelList]             = useState([]);
   const [savingPin, setSavingPin]             = useState(false);
@@ -1657,6 +1658,9 @@ function ApiKeySection({ adminUid }) {
       if (status?.model) setNvidiaTextModel(status.model);
       if (status?.imageModel) setNvidiaImgModel(status.imageModel);
     }).catch(() => setNvidiaStatus({ hasKey: false }));
+    // NVIDIA's catalogue needs no key, so always show what actually exists —
+    // the baked-in list had three retired models in it.
+    listAvailableNvidiaModels().then(setNvidiaModelList).catch(() => setNvidiaModelList([]));
     getGeminiModelPin().then(setModelPin).catch(() => setModelPin(''));
     listAvailableGeminiModels().then(setModelList).catch(() => setModelList([]));
   }, []);
@@ -1876,9 +1880,11 @@ function ApiKeySection({ adminUid }) {
                 onChange={e => setNvidiaTextModel(e.target.value)}
                 style={{ ...inputStyle, cursor: 'pointer' }}
               >
-                {POPULAR_TEXT_MODELS.map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
+                {nvidiaModelList.length > 0
+                  ? nvidiaModelList.map(id => <option key={id} value={id}>{id}</option>)
+                  : POPULAR_TEXT_MODELS.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
               </select>
             </div>
 

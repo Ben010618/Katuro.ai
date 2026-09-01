@@ -20,7 +20,7 @@ vi.mock('./geminiConfig', () => ({
 vi.mock('./nvidiaConfig', () => ({
   getNvidiaConfig: vi.fn().mockResolvedValue({
     apiKey: 'test-nvidia-key',
-    model: 'meta/llama-3.3-70b-instruct',
+    model: 'nvidia/llama-3.1-nemotron-70b-instruct',
     imageModel: 'stabilityai/stable-diffusion-xl',
   }),
   callNvidiaChat: vi.fn().mockResolvedValue(
