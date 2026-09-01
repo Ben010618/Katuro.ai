@@ -71,19 +71,62 @@ function invalidateModelCache() {
  * is the right bias: better to occasionally re-probe a recovered model than to
  * permanently exile one on stale evidence.
  */
+// Bench windows are mirrored to Firestore. Cloud Run cycles instances
+// constantly, and an in-memory-only bench means every fresh instance
+// re-discovers the same broken model at full price — gemini-3.7-flash was
+// taking 148s to admit it was congested, so each cold start burned ~100s of a
+// teacher's wait before switching. Sharing the window means one instance pays
+// that once and the rest skip straight to a model that works.
+//
+// Only the window is shared, not the strike count: strikes stay per-instance so
+// a cold start still forgives them, which keeps the bias toward re-probing a
+// recovered model rather than exiling one on stale evidence.
+const MODEL_HEALTH_DOC = 'adminConfig/modelHealth';
+const HEALTH_TTL_MS    = 60000;
+let _healthLoadedAt    = 0;
+
+async function loadSharedBench() {
+  if (Date.now() - _healthLoadedAt < HEALTH_TTL_MS) return;
+  _healthLoadedAt = Date.now();
+  try {
+    const snap = await db.doc(MODEL_HEALTH_DOC).get();
+    const data = snap.exists ? (snap.data()?.benched ?? {}) : {};
+    for (const [model, until] of Object.entries(data)) {
+      const ts = Number(until) || 0;
+      // Keep whichever window runs longer — a local strike may be harsher than
+      // what another instance recorded.
+      if (ts > (_benched.get(model) ?? 0)) _benched.set(model, ts);
+    }
+  } catch {
+    // A health-doc read failure must never block generation.
+  }
+}
+
 function benchModel(model, baseMs) {
   const strikes = (_benchStrikes.get(model) ?? 0) + 1;
   _benchStrikes.set(model, strikes);
-  const ms = Math.min(MAX_COOLDOWN_MS, baseMs * (2 ** (strikes - 1)));
-  _benched.set(model, Date.now() + ms);
+  const ms    = Math.min(MAX_COOLDOWN_MS, baseMs * (2 ** (strikes - 1)));
+  const until = Date.now() + ms;
+  _benched.set(model, until);
   invalidateModelCache();
   console.warn(`[benchModel] ${model} benched for ${Math.round(ms / 60000)}min (strike ${strikes})`);
+  // Fire-and-forget: sharing the bench is an optimisation, not a correctness
+  // requirement, so a write failure must not fail the generation.
+  db.doc(MODEL_HEALTH_DOC)
+    .set({ benched: { [model]: until }, updatedAt: new Date() }, { merge: true })
+    .catch(() => {});
 }
 
 /** A model that served a request successfully has earned its record back. */
 function clearBenchStrikes(model) {
   if (_benchStrikes.delete(model)) {
     console.info(`[benchModel] ${model} succeeded — strike count reset`);
+    // Clear the shared window too, so other instances stop skipping a model
+    // that has demonstrably recovered.
+    _benched.delete(model);
+    db.doc(MODEL_HEALTH_DOC)
+      .set({ benched: { [model]: 0 }, updatedAt: new Date() }, { merge: true })
+      .catch(() => {});
   }
 }
 
@@ -122,6 +165,7 @@ async function listGeminiModels(key) {
  * request (a 404 on the resolved model re-resolves rather than giving up).
  */
 async function resolveGeminiModel(key, exclude = []) {
+  await loadSharedBench();
   const skip = id => exclude.includes(id) || isBenched(id);
 
   if (!exclude.length && _modelCache.name && Date.now() - _modelCache.at < MODEL_CACHE_TTL) {
@@ -919,7 +963,12 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   //   overallEndsAt — hard ceiling for the whole call, so switching can never
   //                   run past the function timeout and starve the NVIDIA fallback
   const overallEndsAt = overallDeadlineAt ?? Date.now() + OVERALL_GEMINI_MS;
-  const budgetEndsAt  = deadlineAt ?? Date.now() + geminiBudgetMs(effectiveMaxTokens);
+  // Cap any one model at half the remaining overall budget (floor 45s) so a
+  // stall always leaves room to try a healthy model. COT asks for 180s of a
+  // 200s overall, which previously let a single stalled model consume nearly
+  // everything and leave its replacement ~20s — not enough to generate.
+  const perModelCapMs = Math.max(45000, Math.floor((overallEndsAt - Date.now()) * 0.5));
+  const budgetEndsAt  = deadlineAt ?? Date.now() + Math.min(geminiBudgetMs(effectiveMaxTokens), perModelCapMs);
   const remainingMs   = Math.min(budgetEndsAt, overallEndsAt) - Date.now();
   if (remainingMs <= 2000) {
     throw new HttpsError('deadline-exceeded', 'Gemini did not respond within the time budget for this request.');
@@ -937,11 +986,27 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
       signal: AbortSignal.timeout(remainingMs),
     });
   } catch (err) {
-    // A timeout and a dropped connection need different codes: only the former
-    // is genuinely "took too long", and the client surfaces different copy for
-    // each. Both still fall through to the NVIDIA fallback in generateAI.
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
     console.warn(`[callGeminiRaw] Fetch ${timedOut ? 'timed out' : 'failed'} (${err?.name || err?.message}) for model ${activeModel} after ${Math.round(remainingMs / 1000)}s budget`);
+
+    // BUG-FIX (2026-09-01): a model that STALLS used to get neither a bench nor
+    // a model switch — it threw straight past the healthy models to the NVIDIA
+    // fallback, which is itself dead (410 Gone), so the teacher just saw a
+    // failure. This is what broke DLL/COT/ILAW/TEST generation:
+    //   [generateAI] dll_gen ... Gemini did not finish within 138s
+    //   [generateAI] NVIDIA fallback also failed: NVIDIA NIM 410: Gone
+    // A stall is at least as strong a signal of a bad model as a 503 (which we
+    // already bench and switch on), so treat the two the same. gemini-3.7-flash
+    // was taking 148s to admit it was congested.
+    if (timedOut) {
+      const tried = [..._tried, activeModel];
+      benchModel(activeModel, CONGESTED_COOLDOWN_MS);
+      if (tried.length < 4 && overallEndsAt - Date.now() > 20000) {
+        console.warn(`[callGeminiRaw] ${activeModel} stalled — switching model (tried: ${tried.join(', ')})`);
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+      }
+    }
+
     throw new HttpsError(
       timedOut ? 'deadline-exceeded' : 'unavailable',
       timedOut
