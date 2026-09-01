@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import DownloadProgress from '../../components/DownloadProgress';
 import { useSmoothProgress } from '../../hooks/useSmoothProgress';
+import { runConcurrentSettled, AI_CONCURRENCY } from '../../utils/runConcurrent';
 
 // Names the file in the download overlay so a teacher exporting all three in a
 // row can tell which one is currently being built.
@@ -88,19 +89,38 @@ export default function StepReview() {
       tokensDeducted = true;
       elapsedMs = startTimer();
 
-      const allItems = [];
-      const failedRows = [];
-      let cursor = 0;
-      for (let i = 0; i < store.tos.rows.length; i++) {
-        const row = store.tos.rows[i];
-        if (row.total === 0) continue;
+      // Each competency is one independent AI call. They used to run strictly
+      // one after another with a 3s gap between, so an 8-competency test was
+      // 8 sequential calls — several minutes of waiting. The only thing that
+      // forced that order was `cursor`, the running item count threaded from
+      // row to row to keep the question-format round-robin continuous.
+      //
+      // That cursor is fully predictable: buildItemSlots emits exactly
+      // sum(cells) slots, so each row's start index is the cumulative total of
+      // the rows before it. Precomputing them makes the rows independent and
+      // produces byte-identical format assignment to the sequential version.
+      const rows = store.tos.rows
+        .map((row, i) => ({ row, displayIndex: i + 1 }))
+        .filter(({ row }) => row.total !== 0);
 
-        let result;
+      let running = 0;
+      for (const entry of rows) {
+        entry.startIndex = running;
+        running += (entry.row.cells || []).reduce((a, b) => a + b, 0);
+      }
+
+      const failedRows = [];
+      let completed = 0;
+
+      const settled = await runConcurrentSettled(rows, AI_CONCURRENCY, async ({ row, displayIndex, startIndex }, i) => {
+        // Small stagger so a wave doesn't arrive as one burst.
+        if (i > 0) await new Promise(r => setTimeout(r, (i % AI_CONCURRENCY) * 350));
+
         let lastErr;
         for (let attempt = 0; attempt < 3; attempt++) {
-          setGenPhase(`Writing items for competency ${i + 1} of ${store.tos.rows.length}…`);
+          setGenPhase(`Writing items — ${completed} of ${rows.length} competencies done…`);
           try {
-            result = await generateItemsForCompetency({
+            const result = await generateItemsForCompetency({
               competencyText: row.label,
               cells: row.cells,
               subject: store.subject,
@@ -108,59 +128,36 @@ export default function StepReview() {
               questionFormats: store.questionFormats,
               proficiencyLevel: store.proficiencyLevel,
               contextNotes: store.contextNotes,
-              startIndex: cursor,
+              startIndex,
               isRetry: attempt > 0,
             });
-            break;
+            completed++;
+            setGenPhase(`Writing items — ${completed} of ${rows.length} competencies done…`);
+            return result.items;
           } catch (err) {
             lastErr = err;
-            console.warn(`generateItemsForCompetency (row ${i + 1}) attempt ${attempt + 1} failed:`, err);
-            // Neither of these can clear up by retrying: dailyLimit is our own
-            // in-app cap, quotaExhausted is Google's per-day cap (resets at
-            // midnight). Retrying just burns time and allowance.
+            console.warn(`generateItemsForCompetency (row ${displayIndex}) attempt ${attempt + 1} failed:`, err);
+            // Neither can clear by retrying: dailyLimit is our own in-app cap,
+            // quotaExhausted is Google's per-day cap (resets at midnight).
             if (err.dailyLimit || err.quotaExhausted) break;
             if (attempt < 2) {
               const waitMs = err.status === 429
                 ? Math.min((err.retryAfter || 30) * 1000, 30_000)
                 : 5000 + attempt * 3000;
-              const waitSec = Math.round(waitMs / 1000);
-              for (let s = waitSec; s > 0; s--) {
-                setGenPhase(`Due to high demand, competency ${i + 1} is slow — retrying in ${s}s…`);
-                await new Promise(r => setTimeout(r, 1000));
-              }
-              setGenPhase(`Retrying competency ${i + 1} of ${store.tos.rows.length}…`);
+              await new Promise(r => setTimeout(r, waitMs));
             }
           }
         }
-        // BUG-FIX: this used to `throw lastErr`, discarding every competency
-        // that had already generated. A test with 8 competencies that failed on
-        // row 6 threw away 5 successful rows — 20+ completed AI calls and the
-        // teacher's quota with them — and left them nothing to show for a
-        // 3-5 minute wait. Record the failure and keep going; whatever was
-        // generated is still a usable partial test the teacher can top up.
-        if (!result) {
-          failedRows.push({ index: i + 1, label: row.label, err: lastErr });
-          // A spent daily quota will fail every remaining competency too, so
-          // stop rather than walk the rest of the list to collect more of the
-          // same error.
-          if (lastErr?.quotaExhausted || lastErr?.dailyLimit) break;
-          continue;
-        }
+        throw Object.assign(lastErr || new Error('Item generation failed.'), { _row: { index: displayIndex, label: row.label } });
+      });
 
-        allItems.push(...result.items);
-        cursor = result.nextIndex;
-
-        // BUG-FIX: Pace sequential API calls to avoid Gemini's RPM (requests-per-
-        // minute) rate limit. Without this pause, firing 5–8 competency calls in rapid
-        // succession triggers 429 errors on rows 3–4 (root cause of the ~115s failures
-        // visible in Admin → Analytics → "Recent Generation Errors"). Skip the delay
-        // after the last row since there's nothing to pace after it.
-        const nonEmptyRowsRemaining = store.tos.rows.slice(i + 1).some(r => r.total > 0);
-        if (nonEmptyRowsRemaining) {
-          setGenPhase(`Competency ${i + 1} done — preparing next…`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-      }
+      // Reassemble in TOS order — the pool finishes out of order, but item
+      // numbering must follow the table of specifications, not completion time.
+      const allItems = [];
+      settled.forEach((r, i) => {
+        if (r.status === 'fulfilled') allItems.push(...r.value);
+        else failedRows.push({ index: rows[i].displayIndex, label: rows[i].row.label, err: r.reason });
+      });
 
       // Nothing at all came back — surface the real cause rather than a blank test.
       if (allItems.length === 0) {

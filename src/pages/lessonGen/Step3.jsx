@@ -9,6 +9,7 @@ import { trackEvent, trackGeneration, startTimer } from '../../services/usageTra
 import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 import { useSmoothProgress } from '../../hooks/useSmoothProgress';
+import { runConcurrentSettled, AI_CONCURRENCY } from '../../utils/runConcurrent';
 
 function formatDayShort(iso) {
   if (!iso || iso.startsWith('Day')) return iso;
@@ -29,20 +30,6 @@ const BLOOMS_COLORS = {
 const VALID_BLOOMS = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
 function bloomsBaseOf(level) {
   return VALID_BLOOMS.find(l => level.startsWith(l)) ?? level.split(/\s*[-—–]\s*/)[0].trim();
-}
-
-async function runConcurrentSettled(items, concurrency, fn) {
-  const results = new Array(items.length);
-  const queue   = [...items.entries()];
-  async function worker() {
-    while (queue.length > 0) {
-      const [i, item] = queue.shift();
-      try        { results[i] = { status: 'fulfilled', value: await fn(item, i) }; }
-      catch (err){ results[i] = { status: 'rejected',  reason: err }; }
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
 }
 
 export default function Step3() {
@@ -114,11 +101,15 @@ export default function Step3() {
       allSessions:      sessions,
     };
 
-    const results = await runConcurrentSettled(sessions, 1, async (s, i) => {
-      // FIX: Increased cooldown 1200ms → 2500ms to prevent 429 cascade on sessions 2-5.
-      // The old 1.2s gap was too short for Gemini's sustained-rate-limit window, causing
-      // 'AI service is busy' errors reported on the second part of ILAW generation.
-      if (i > 0) await new Promise(r => setTimeout(r, 2500));
+    // Sessions are independent — each is one self-contained AI call — so they
+    // run as a small pool instead of strictly one after another. A 5-session
+    // plan was 5 sequential calls plus a 2.5s gap between each; now it is two
+    // waves of three.
+    const results = await runConcurrentSettled(sessions, AI_CONCURRENCY, async (s, i) => {
+      // A short stagger so the pool's first wave doesn't arrive as one burst;
+      // the 429 handling (back off on per-minute, switch model on per-day) is
+      // what actually protects us now, so this no longer needs to be seconds.
+      if (i > 0) await new Promise(r => setTimeout(r, (i % AI_CONCURRENCY) * 350));
 
       setStatusMsg(`Generating Session ${s.day} of ${n} — ${bloomsBaseOf(s.bloomsLevel)} level…`);
       setProgress(Math.round(5 + (i / n) * 75));
