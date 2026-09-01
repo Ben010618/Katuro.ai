@@ -133,9 +133,30 @@ export async function getNvidiaKey() {
 /**
  * Admin-only: Save NVIDIA configuration to Firestore.
  */
+/**
+ * API keys travel in an HTTP header, which can only carry ByteString
+ * (U+0000-U+00FF). A key pasted with a stray decorative character therefore
+ * fails at fetch() time with a message that names a character code and nothing
+ * else — on 2026-09-01 a saved NVIDIA key carried a lightning-bolt emoji at
+ * position 43 and every PPT generation died on it. Reject it at save time,
+ * where we can actually say what is wrong.
+ */
+export function assertHeaderSafeKey(key, label = 'API key') {
+  const bad = [...key].find(ch => ch.codePointAt(0) > 255);
+  if (bad) {
+    throw new Error(
+      `This ${label} contains an invalid character (${bad}). Copy the key again as plain text — it should contain only letters, numbers and punctuation.`
+    );
+  }
+  if (/\s/.test(key)) {
+    throw new Error(`This ${label} contains a space or line break. Copy just the key itself.`);
+  }
+}
+
 export async function saveNvidiaConfig({ apiKey, model, imageModel }, adminUid) {
   const trimmed = (apiKey || '').trim();
   if (!trimmed) throw new Error('NVIDIA API key cannot be empty.');
+  assertHeaderSafeKey(trimmed, 'NVIDIA API key');
 
   const preview = trimmed.startsWith('nvapi-')
     ? 'nvapi-' + '•'.repeat(16) + trimmed.slice(-4)
@@ -193,6 +214,7 @@ export async function getNvidiaKeyStatus() {
 export async function testNvidiaKey(apiKey, model = DEFAULT_NVIDIA_TEXT_MODEL) {
   const trimmed = (apiKey || '').trim();
   if (!trimmed) throw new Error('API key is required.');
+  assertHeaderSafeKey(trimmed, 'NVIDIA API key');
 
   const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
   const res = await fetch(url, {

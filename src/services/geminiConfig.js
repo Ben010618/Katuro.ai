@@ -12,6 +12,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import app, { db, auth } from '../firebase';
 import { reportAIError } from './db';
+import { assertHeaderSafeKey } from './nvidiaConfig';
 
 const CONFIG_REF  = doc(db, 'adminConfig', 'gemini');
 const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
@@ -331,6 +332,7 @@ async function candidateModels(apiKey) {
 export async function saveGeminiKey(apiKey, adminUid) {
   const trimmed = (apiKey || '').trim();
   if (!trimmed) throw new Error('API key cannot be empty.');
+  assertHeaderSafeKey(trimmed, 'Gemini API key');
 
   const preview = trimmed.slice(0, 8) + '•'.repeat(16) + trimmed.slice(-4);
 
@@ -411,6 +413,7 @@ export async function getGeminiKeyStatus() {
 export async function testGeminiKey(apiKey) {
   const trimmed = (apiKey || '').trim();
   if (!trimmed) throw new Error('API key is required.');
+  assertHeaderSafeKey(trimmed, 'Gemini API key');
 
   // Walk the key's own catalogue rather than pinning one model. A single model
   // can be temporarily congested (gemini-3.7-flash returns 503 under load), and

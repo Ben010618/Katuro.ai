@@ -248,13 +248,15 @@ async function getGeminiKey() {
 }
 
 // Read NVIDIA API key from adminConfig/nvidia in Firestore
+const NVIDIA_DEFAULT_MODEL = 'nvidia/llama-3.1-nemotron-70b-instruct';
+
 async function getNvidiaConfigServer() {
   try {
     const snap = await db.doc('adminConfig/nvidia').get();
     if (snap.exists && snap.data()?.apiKey) {
       return {
         apiKey: snap.data().apiKey,
-        model:  snap.data().model || 'nvidia/llama-3.1-nemotron-70b-instruct',
+        model:  snap.data().model || NVIDIA_DEFAULT_MODEL,
       };
     }
   } catch {
@@ -281,8 +283,28 @@ function extractPromptFromContents(contents) {
 
 async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTokens = 2048, responseMimeType, _attempt = 0 } = {}) {
   const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
+
+  // An HTTP header can only carry ByteString (U+0000-U+00FF). A key pasted with
+  // a stray decorative character makes fetch() throw before the request is even
+  // sent, with a message that names a character code and nothing else:
+  //   "Cannot convert argument to a ByteString because the character at index
+  //    50 has a value of 9889 which is greater than 255"
+  // 9889 is U+26A1 (a lightning-bolt emoji) picked up in a copy-paste. Catch it
+  // here and say plainly what is wrong, instead of surfacing that to a teacher
+  // as a failed lesson generation.
+  const apiKey = String(nvidiaConfig?.apiKey ?? '').trim();
+  if (!apiKey) {
+    throw new HttpsError('failed-precondition', 'NVIDIA API key is not configured.');
+  }
+  const badChar = [...apiKey].find(ch => ch.codePointAt(0) > 255);
+  if (badChar) {
+    throw new HttpsError(
+      'failed-precondition',
+      `The saved NVIDIA API key contains an invalid character (${badChar}). Re-copy the key in Admin → API Settings — it should be plain text starting with "nvapi-".`
+    );
+  }
   const payload = {
-    model: nvidiaConfig.model || 'nvidia/llama-3.1-nemotron-70b-instruct',
+    model: nvidiaConfig.model || NVIDIA_DEFAULT_MODEL,
     messages: [{ role: 'user', content: prompt }],
     temperature,
     max_tokens: maxTokens,
@@ -297,7 +319,7 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${nvidiaConfig.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
       // 40s per attempt, at most 2 attempts (~82s worst case) — this fallback
@@ -319,6 +341,20 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
     return callNvidiaServer(nvidiaConfig, prompt, { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 });
   }
 
+  // 404/410 means the SAVED model was retired by NVIDIA. adminConfig/nvidia
+  // .model overrides the code default, so updating the default in a release
+  // does not rescue an instance whose stored model has since died — which is
+  // exactly how meta/llama-3.3-70b-instruct kept being used long after it began
+  // returning 410 Gone. Retry once on the current default rather than failing.
+  if ((res.status === 404 || res.status === 410) && payload.model !== NVIDIA_DEFAULT_MODEL && _attempt < 2) {
+    console.warn(`[callNvidiaServer] Saved model ${payload.model} is retired (${res.status}) — retrying on ${NVIDIA_DEFAULT_MODEL}`);
+    return callNvidiaServer(
+      { ...nvidiaConfig, apiKey, model: NVIDIA_DEFAULT_MODEL },
+      prompt,
+      { temperature, maxTokens, responseMimeType, _attempt: _attempt + 1 }
+    );
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const isRateLimit = res.status === 429;
@@ -326,7 +362,7 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
       isRateLimit ? 'resource-exhausted' : 'internal',
       isRateLimit
         ? 'The NVIDIA AI service is busy right now. Please try again in a moment.'
-        : `NVIDIA NIM ${res.status}: ${err?.error?.message ?? res.statusText}`
+        : `NVIDIA NIM ${res.status} (${payload.model}): ${err?.error?.message ?? res.statusText}`
     );
   }
 
