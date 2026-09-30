@@ -209,16 +209,16 @@ export default function App() {
           {/* Admin — standalone, no AppShell */}
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
-          {/* Protected shell */}
+          {/* KaTuroDesk — Standalone Desktop Workspace (Zero website sidebar/tabs) */}
+          <Route path="/desk" element={<ProtectedRoute><KaTuroDeskPage /></ProtectedRoute>} />
+
+          {/* Protected shell (KaTuro Online Portal) */}
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="shares/*" element={<SharesLayout />} />
 
             {/* kaTuro Protect — chat + intake open to all teachers; case data
                 stays admin-only, enforced inside the page itself + Firestore rules */}
             <Route path="protect" element={<KaturoProtectPage />} />
-
-            {/* KaTuro Desk — 3-Panel Autonomous Workspace */}
-            <Route path="desk" element={<KaTuroDeskPage />} />
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />

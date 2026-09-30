@@ -35,7 +35,7 @@ export default function KaTuroDeskPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] w-full overflow-hidden bg-gray-100 font-sans">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
       {/* Top Studio Bar */}
       <div className="h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none">
         <div className="flex items-center gap-2">

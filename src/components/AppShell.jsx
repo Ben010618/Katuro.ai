@@ -22,11 +22,10 @@ import {
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
   Settings, Camera, Loader2, Images, Lightbulb,
-  Users, Laptop,
+  Users,
 } from 'lucide-react';
 
 const MAIN_NAV = [
-  { to: '/desk',                    label: 'KaTuro Desk',          Icon: Laptop, isNew: true },
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
   { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, highlight: 'red' },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
