@@ -115,30 +115,6 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        <button
-          onClick={() => {
-            if (onFacultyOpen) onFacultyOpen();
-            if (onClose) onClose();
-          }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 9,
-            padding: '8px 10px', borderRadius: 6,
-            background: 'rgba(52, 211, 153, 0.15)',
-            border: '1px solid rgba(52, 211, 153, 0.35)',
-            color: '#a7f3d0',
-            fontWeight: 700, fontSize: 13,
-            marginBottom: 6, cursor: 'pointer',
-            width: '100%', textAlign: 'left',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <Users size={16} color="#34d399" />
-          My AI Faculty
-          <span style={{ marginLeft: 'auto', fontSize: 10, background: '#34d399', color: '#064e3b', padding: '1px 6px', borderRadius: 100, fontWeight: 800 }}>
-            5
-          </span>
-        </button>
-
         {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => highlight ? {
@@ -267,39 +243,124 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
           </div>
         </button>
 
-        {/* Gear — roll-up dropdown */}
+        {/* Settings & Preferences — Professional Roll-up Dropdown */}
         <div ref={gearRef} style={{ position: 'relative' }}>
           {gearOpen && (
             <div style={{
-              position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
-              background: '#16251E',
-              borderRadius: 6, boxShadow: '0 -6px 24px rgba(0,0,0,0.35)',
-              border: '1px solid rgba(220,208,174,0.22)', padding: 6, zIndex: 50,
+              position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+              background: '#14231B',
+              borderRadius: 8, boxShadow: '0 -8px 28px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(220,208,174,0.22)', padding: '6px', zIndex: 50,
+              display: 'flex', flexDirection: 'column', gap: 3,
             }}>
-              <button onClick={() => { toggle(); setGearOpen(false); }}
-                style={{ ...btn, color: '#FBF7EC' }}
+              <div style={{
+                fontSize: 10, fontWeight: 700, color: '#DCD0AE',
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+                padding: '4px 8px 6px', borderBottom: '1px solid rgba(220,208,174,0.12)',
+              }}>
+                Preferences
+              </div>
+
+              {/* Option 1: AI Faculty & Avatars Customization */}
+              <button
+                onClick={() => {
+                  setGearOpen(false);
+                  if (onFacultyOpen) onFacultyOpen();
+                  if (onClose) onClose();
+                }}
+                style={{
+                  ...btn,
+                  color: '#FBF7EC',
+                  background: 'rgba(52, 211, 153, 0.1)',
+                  border: '1px solid rgba(52, 211, 153, 0.25)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px', borderRadius: 6,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.1)'; }}
+              >
+                <Users size={14} color="#34d399" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, textAlign: 'left', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#FBF7EC' }}>AI Faculty Room</div>
+                  <div style={{ fontSize: 9.5, color: '#A7F3D0' }}>Names & Avatars</div>
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 800, background: '#34d399', color: '#064e3b', padding: '1px 5px', borderRadius: 100 }}>
+                  5
+                </span>
+              </button>
+
+              {/* Option 2: Dark / Light Mode */}
+              <button
+                onClick={() => { toggle(); setGearOpen(false); }}
+                style={{ ...btn, color: '#FBF7EC', padding: '7px 10px' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(228,213,172,0.12)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
-                {dark ? <Sun size={13} /> : <Moon size={13} />}
-                {dark ? 'Light Mode' : 'Dark Mode'}
+                {dark ? <Sun size={13} color="#FBBF24" /> : <Moon size={13} color="#93C5FD" />}
+                <span style={{ fontSize: 12 }}>{dark ? 'Light Mode' : 'Dark Mode'}</span>
               </button>
-              <button onClick={handleLogout}
-                style={{ ...btn, color: '#c0392b' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
+
+              <div style={{ height: 1, background: 'rgba(220,208,174,0.12)', margin: '2px 0' }} />
+
+              {/* Option 3: Sign Out */}
+              <button
+                onClick={handleLogout}
+                style={{ ...btn, color: '#f87171', padding: '7px 10px' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.12)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
-                <LogOut size={13} /> Sign Out
+                <LogOut size={13} />
+                <span style={{ fontSize: 12 }}>Sign Out</span>
               </button>
             </div>
           )}
-          <button onClick={() => setGearOpen(v => !v)}
-            style={{ ...btn, color: 'var(--kt-text-secondary)', background: gearOpen ? (dark ? 'rgba(82,183,136,0.1)' : '#f0faf4') : 'transparent' }}
-            onMouseEnter={e => { if (!gearOpen) e.currentTarget.style.background = dark ? 'rgba(82,183,136,0.1)' : '#f5faf7'; }}
-            onMouseLeave={e => { if (!gearOpen) e.currentTarget.style.background = 'transparent'; }}
+
+          {/* Professional Settings Trigger Button */}
+          <button
+            onClick={() => setGearOpen(v => !v)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 10px',
+              borderRadius: 6,
+              border: gearOpen ? '1px solid #C9B583' : '1px solid rgba(220,208,174,0.18)',
+              background: gearOpen ? 'rgba(228,213,172,0.14)' : 'rgba(0,0,0,0.18)',
+              color: '#FBF7EC',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              if (!gearOpen) {
+                e.currentTarget.style.background = 'rgba(228,213,172,0.1)';
+                e.currentTarget.style.borderColor = 'rgba(220,208,174,0.3)';
+              }
+            }}
+            onMouseLeave={e => {
+              if (!gearOpen) {
+                e.currentTarget.style.background = 'rgba(0,0,0,0.18)';
+                e.currentTarget.style.borderColor = 'rgba(220,208,174,0.18)';
+              }
+            }}
           >
-            <Settings size={13} />
-            <ChevronDown size={11} style={{ marginLeft: 'auto', transform: gearOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            <Settings size={14} color="#DCD0AE" style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, textAlign: 'left', fontSize: 12, color: '#FBF7EC', fontWeight: 600 }}>
+              Settings & Preferences
+            </span>
+            <ChevronDown
+              size={12}
+              color="#DCD0AE"
+              style={{
+                marginLeft: 'auto',
+                transform: gearOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.2s',
+                flexShrink: 0,
+              }}
+            />
           </button>
         </div>
       </div>
