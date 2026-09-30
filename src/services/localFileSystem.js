@@ -12,6 +12,31 @@ export const isFileSystemAccessSupported = typeof window !== 'undefined' && 'sho
  * Returns { handle, name, files }
  */
 export async function pickLocalDirectory() {
+  // If running in Native KaTuroDesk Desktop App (Electron)
+  if (typeof window !== 'undefined' && window.katuroDeskApi) {
+    const res = await window.katuroDeskApi.selectFolder();
+    if (!res || res.canceled) return null;
+    return {
+      handle: {
+        isElectron: true,
+        path: res.path,
+        saveVirtualFile: async (filename, content) => {
+          const fullPath = `${res.path}/${filename}`;
+          await window.katuroDeskApi.writeFile(fullPath, content);
+          return { success: true, name: filename, path: fullPath };
+        },
+        createVirtualDirectory: async (dirName) => {
+          const fullPath = `${res.path}/${dirName}`;
+          await window.katuroDeskApi.createDirectory(fullPath);
+          return { success: true, name: dirName, path: fullPath };
+        },
+      },
+      name: res.name,
+      isVirtual: false,
+      files: res.files || [],
+    };
+  }
+
   if (!isFileSystemAccessSupported) {
     return createVirtualWorkspace('My DepEd Classroom Files (Cloud/Virtual)');
   }
