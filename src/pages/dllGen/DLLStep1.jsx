@@ -4,6 +4,7 @@ import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { trackEvent } from '../../services/usageTracker';
 import { ArrowRight } from 'lucide-react';
+import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const SUBJECTS = [
   'Science', 'Mathematics', 'English', 'Filipino',
@@ -49,6 +50,7 @@ export default function DLLStep1() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <CoTeacherBanner agentId="dll" />
 
       {/* Heading */}
       <div style={{ marginBottom: 28 }}>

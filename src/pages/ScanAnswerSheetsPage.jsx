@@ -9,6 +9,7 @@ import { gradeScan } from '../utils/scanGrading';
 import { trackEvent } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
 import SendToGradebookModal from '../components/SendToGradebookModal';
+import CoTeacherBanner from '../components/CoTeacherBanner';
 import {
   Camera, Loader2, CheckCircle, AlertCircle, ArrowLeft,
   Trash2, ImageOff, ScanLine, X, Send,
@@ -275,6 +276,7 @@ export default function ScanAnswerSheetsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900, margin: '0 auto' }}>
+      <CoTeacherBanner agentId="grader" />
 
       {/* Header */}
       <div>

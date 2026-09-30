@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCotStore } from '../../store/cotStore';
 import { useAuth } from '../../hooks/useAuth';
+import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const GRADES = [
   'Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6',
@@ -49,6 +50,7 @@ export default function CotStep1() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <CoTeacherBanner agentId="dll" />
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>

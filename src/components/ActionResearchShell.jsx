@@ -1,6 +1,7 @@
 import { ChevronRight, ArrowLeft, Download, Loader2, Sparkles, Check } from 'lucide-react';
 import ktLogo from '../assets/KT-Favicon.webp';
 import DownloadProgress from './DownloadProgress';
+import CoTeacherBanner from './CoTeacherBanner';
 
 const STEPS = [
   'BERA theme & problem',
@@ -196,6 +197,7 @@ export default function ActionResearchShell({
       {/* ── Scrollable Content Area ── */}
       <div className="ar-shell-content">
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
+          <CoTeacherBanner agentId="research" />
           {children}
         </div>
       </div>

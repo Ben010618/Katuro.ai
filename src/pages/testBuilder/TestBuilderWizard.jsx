@@ -13,6 +13,7 @@ import StepSetup from './StepSetup';
 import StepBlooms from './StepBlooms';
 import StepTOS from './StepTOS';
 import StepReview from './StepReview';
+import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 // ── Step registry ──────────────────────────────────────────────────────────
 // Adding a step later = append an entry here. The shell below never branches
@@ -286,6 +287,7 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
       {/* ── Active step panel ─────────────────────────────────────────────── */}
       <div key={activeStep} className="animate-fade-up" style={{ flex: 1, padding: '28px 24px 0' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <CoTeacherBanner agentId="tos" />
           <ActiveComponent />
         </div>
       </div>

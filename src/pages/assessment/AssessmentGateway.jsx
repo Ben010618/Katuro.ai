@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ClipboardList, ClipboardCheck, ArrowRight, CheckCircle2, Sparkles, ScanLine, FileSpreadsheet } from 'lucide-react';
+import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const TYPES = [
   {
@@ -44,6 +45,7 @@ export default function AssessmentGateway() {
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 40 }}>
+      <CoTeacherBanner agentId="tos" />
 
       {/* ── Page Header ── */}
       <div style={{ marginBottom: 32 }}>

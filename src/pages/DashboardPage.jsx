@@ -10,6 +10,7 @@ import img3 from '../assets/3.webp';
 import img4 from '../assets/4.webp';
 import DailyMotivationalPopup from '../components/DailyMotivationalPopup';
 import SharesReminderPopup from '../components/SharesReminderPopup';
+import FacultyDashboardWidget from '../components/FacultyDashboardWidget';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -333,6 +334,9 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ── AI Co-Teacher Faculty Team Hub ─────────────────────────────────── */}
+      <FacultyDashboardWidget />
 
       {/* ── Classroom spotlight ──────────────────────────────────────────────── */}
       <div style={{

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useAuth } from '../../hooks/useAuth';
 import { BookOpen, CalendarDays, ArrowRight, RotateCcw, Award, CheckCircle2, Sparkles } from 'lucide-react';
+import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const TYPES = [
   {
@@ -74,6 +75,7 @@ export default function LessonGenGateway() {
 
   return (
     <div style={{ maxWidth: 1060, margin: '0 auto', paddingBottom: 40 }}>
+      <CoTeacherBanner agentId="dll" />
 
       {/* ── Page Header ── */}
       <div style={{ marginBottom: 32 }}>
