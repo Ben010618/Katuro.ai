@@ -50,24 +50,12 @@ export default function CotStep1() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <CoTeacherBanner agentId="dll" />
-
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <span style={{
-          background: 'rgba(124,58,237,0.1)', color: '#7c3aed',
-          borderRadius: 20, padding: '4px 12px',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        }}>
-          Step 1 — Lesson Information
-        </span>
-        <h2 style={{ margin: '10px 0 4px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
-          Tell kaTuro about your lesson
-        </h2>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65 }}>
-          Fill in the details below. Objectives are optional — the AI will generate them using Bloom's Taxonomy if left blank.
-        </p>
-      </div>
+      <CoTeacherBanner
+        agentId="dll"
+        badge="COT-RPMS Lesson Plan"
+        title="Tell kaTuro about your lesson"
+        description="Fill in the details below. Objectives are optional — the AI will generate them using Bloom's Taxonomy if left blank."
+      />
 
       {/* Two-column form */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

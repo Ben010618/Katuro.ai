@@ -75,24 +75,12 @@ export default function LessonGenGateway() {
 
   return (
     <div style={{ maxWidth: 1060, margin: '0 auto', paddingBottom: 40 }}>
-      <CoTeacherBanner agentId="dll" />
-
-      {/* ── Page Header ── */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', borderRadius: 4, padding: '4px 10px', marginBottom: 12 }}>
-          <Sparkles size={13} color="var(--kt-chalkboard, #1F3A2E)" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontFamily: 'var(--kt-font-mono, monospace)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            KAGAMITAN SA PAGTUTURO · AI LESSON GENERATOR
-          </span>
-        </div>
-
-        <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)', lineHeight: 1.2 }}>
-          Anong uri ng aralin ang iyong ihahanda?
-        </h1>
-        <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}>
-          Pumili ng format na angkop sa iyong pangangailangan — para sa araw-araw na klase, lingguhang submission, o pormal na observation.
-        </p>
-      </div>
+      <CoTeacherBanner
+        agentId="dll"
+        badge="Lesson Plan Studio · Kagamitan sa Pagtuturo"
+        title="Anong uri ng aralin ang iyong ihahanda?"
+        description="Pumili ng format na angkop sa iyong pangangailangan — para sa araw-araw na klase, lingguhang submission, o pormal na observation."
+      />
 
       {/* ── Document Dossier Cards Grid (3 Columns) ── */}
       <div style={{

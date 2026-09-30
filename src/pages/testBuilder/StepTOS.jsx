@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { computeTOS } from '../../utils/testBuilderCalc';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, resolveItemCeiling } from '../../config/testBuilderConfig';
-import { Table2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const cellStyle = {
   padding: '10px 8px', textAlign: 'center', fontSize: 13,
@@ -34,23 +34,6 @@ export default function StepTOS() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingBottom: 32 }}>
-
-      <div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'var(--kt-green-tint)', color: 'var(--kt-green-dark)',
-          borderRadius: 20, padding: '4px 12px',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        }}>
-          <Table2 size={12} /> Table of Specifications
-        </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-          Auto-generated TOS
-        </h2>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
-          Items are distributed across competencies by instructional days, then across cognitive levels by your Bloom's weights.
-        </p>
-      </div>
 
       {/* Summary strip */}
       <div style={{ display: 'flex', gap: 10 }}>

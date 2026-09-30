@@ -8,7 +8,7 @@ import { suggestCognitiveWeights } from '../../services/testBuilderAI';
 import { deductTokens, refundTokens } from '../../services/db';
 import { AI_ENABLED } from '../../services/ai';
 import {
-  Brain, TrendingUp, CheckCircle2, AlertTriangle,
+  TrendingUp, CheckCircle2, AlertTriangle,
   Sparkles, Loader2, AlertCircle, X, Check, Scale,
 } from 'lucide-react';
 
@@ -114,23 +114,6 @@ export default function StepBlooms() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingBottom: 32 }}>
-
-      <div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'var(--kt-green-tint)', color: 'var(--kt-green-dark)',
-          borderRadius: 20, padding: '4px 12px',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        }}>
-          <Brain size={12} /> Bloom's Taxonomy
-        </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-          Cognitive level distribution
-        </h2>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
-          Adjust how items are weighted across the six cognitive levels. The sliders always rebalance to sum to 100%.
-        </p>
-      </div>
 
       {/* Total + HOTS badges */}
       <div style={{ display: 'flex', gap: 10 }}>

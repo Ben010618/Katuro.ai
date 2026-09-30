@@ -9,7 +9,7 @@ import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_
 import { totalDays, computeTOS } from '../../utils/testBuilderCalc';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import {
-  ClipboardCheck, CheckCircle2, AlertTriangle, BadgeCheck,
+  CheckCircle2, AlertTriangle, BadgeCheck,
   FileText, KeyRound, Table2, Sparkles, Loader2, AlertCircle, X, Lock,
 } from 'lucide-react';
 import DownloadProgress from '../../components/DownloadProgress';
@@ -231,22 +231,7 @@ export default function StepReview() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingBottom: 32 }}>
       <DownloadProgress active={downloadingKind !== null} label={DOWNLOAD_LABELS[downloadingKind] ?? 'Test document (DOCX)'} />
 
-      <div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'var(--kt-green-tint)', color: 'var(--kt-green-dark)',
-          borderRadius: 20, padding: '4px 12px',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        }}>
-          <ClipboardCheck size={12} /> Review
-        </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
-          Review before confirming
-        </h2>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 560 }}>
-          Everything below is traceable back to what you entered — nothing here is a black box.
-        </p>
-      </div>
+      {/* Overview card */}
 
       {/* Overview card */}
       <div className="card card-accent">

@@ -276,31 +276,27 @@ export default function ScanAnswerSheetsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900, margin: '0 auto' }}>
-      <CoTeacherBanner agentId="grader" />
-
-      {/* Header */}
       <div>
         <button
           onClick={() => navigate('/quiz-builder')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', fontSize: 12, marginBottom: 10, padding: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', fontSize: 12, marginBottom: 12, padding: 0 }}
         >
           <ArrowLeft size={13} /> Back to Quiz Builder
         </button>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Scan Answer Sheets</h1>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--kt-text-secondary)' }}>
-              {quiz.title} · {quiz.numQuestions}Q · {scans.length} scanned
-              {scans.length > 0 ? ` · ${confirmedCount} confirmed` : ''}
-            </p>
-          </div>
-          {confirmedCount > 0 && (
-            <button className="btn-primary" onClick={() => setShowGradebookModal(true)} style={{ fontSize: 13 }}>
-              <Send size={14} /> Send to Gradebook
-            </button>
-          )}
-        </div>
       </div>
+
+      <CoTeacherBanner
+        agentId="grader"
+        badge="Instant Paper Checker"
+        title="Scan Answer Sheets"
+        description={`${quiz.title} · ${quiz.numQuestions} Questions · ${scans.length} scanned${scans.length > 0 ? ` · ${confirmedCount} confirmed` : ''}`}
+        tip="Position bubble sheets steadily within camera view for rapid optical recognition."
+        actions={confirmedCount > 0 ? (
+          <button className="btn-primary" onClick={() => setShowGradebookModal(true)} style={{ fontSize: 13 }}>
+            <Send size={14} /> Send to Gradebook
+          </button>
+        ) : null}
+      />
 
       {showGradebookModal && (
         <SendToGradebookModal

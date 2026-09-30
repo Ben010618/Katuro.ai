@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useFacultyStore, AVATAR_PRESETS } from '../store/facultyStore';
+import { useFacultyStore, AVATAR_PRESETS, AVATAR_CATEGORIES } from '../store/facultyStore';
 import { useAuth } from '../hooks/useAuth';
 import {
   X,
@@ -21,6 +21,7 @@ export default function FacultyCustomizerModal({ isOpen, onClose }) {
   const [editingAvatar, setEditingAvatar] = useState('');
   const [editingTone, setEditingTone] = useState('');
   const [customSeed, setCustomSeed] = useState('');
+  const [avatarCategory, setAvatarCategory] = useState('all');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   if (!isOpen) return null;
@@ -337,7 +338,7 @@ export default function FacultyCustomizerModal({ isOpen, onClose }) {
                   }}
                 >
                   <Palette size={14} color="#059669" />
-                  Select Avatar Look:
+                  Select Avatar Profile ({AVATAR_PRESETS.length} Choices):
                 </label>
                 <button
                   type="button"
@@ -361,48 +362,117 @@ export default function FacultyCustomizerModal({ isOpen, onClose }) {
                 </button>
               </div>
 
+              {/* Category Filter Pills */}
+              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '8px' }}>
+                {AVATAR_CATEGORIES.map((cat) => {
+                  const isActive = avatarCategory === cat.id;
+                  const count = cat.id === 'all'
+                    ? AVATAR_PRESETS.length
+                    : AVATAR_PRESETS.filter((p) => p.category === cat.id).length;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setAvatarCategory(cat.id)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '100px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        border: isActive ? '1px solid #059669' : '1px solid #e2e8f0',
+                        background: isActive ? '#059669' : '#f8fafc',
+                        color: isActive ? '#ffffff' : '#475569',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {cat.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* Presets Grid */}
               <div
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(6, 1fr)',
                   gap: '8px',
-                  maxHeight: '130px',
+                  maxHeight: '170px',
                   overflowY: 'auto',
-                  padding: '4px',
-                  border: '1px solid #f1f5f9',
-                  borderRadius: '10px',
+                  padding: '8px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
                   background: '#f8fafc',
                 }}
               >
-                {AVATAR_PRESETS.map((preset) => {
-                  const isSelected = editingAvatar === preset.url;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => setEditingAvatar(preset.url)}
-                      title={preset.label}
-                      style={{
-                        padding: '4px',
-                        borderRadius: '10px',
-                        border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
-                        background: isSelected ? '#ecfdf5' : '#ffffff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '2px',
-                      }}
-                    >
-                      <img
-                        src={preset.url}
-                        alt={preset.label}
-                        style={{ width: '36px', height: '36px', borderRadius: '50%' }}
-                      />
-                    </button>
-                  );
-                })}
+                {AVATAR_PRESETS
+                  .filter((p) => avatarCategory === 'all' || p.category === avatarCategory)
+                  .map((preset) => {
+                    const isSelected = editingAvatar === preset.url;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setEditingAvatar(preset.url)}
+                        title={preset.label}
+                        style={{
+                          padding: '6px 4px',
+                          borderRadius: '10px',
+                          border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
+                          background: isSelected ? '#ecfdf5' : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '3px',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 0 10px rgba(5, 150, 105, 0.25)' : 'none',
+                        }}
+                      >
+                        <img
+                          src={preset.url}
+                          alt={preset.label}
+                          style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 600,
+                            color: isSelected ? '#065f46' : '#64748b',
+                            textAlign: 'center',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '72px',
+                          }}
+                        >
+                          {preset.label.split('(')[0].trim()}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* Custom Image / Seed Input */}
+              <div style={{ marginTop: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Or paste any custom image link (URL) or avatar SVG..."
+                  value={editingAvatar}
+                  onChange={(e) => setEditingAvatar(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '11px',
+                    color: '#334155',
+                    outline: 'none',
+                    background: '#ffffff',
+                  }}
+                />
               </div>
             </div>
 

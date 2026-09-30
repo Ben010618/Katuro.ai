@@ -197,7 +197,13 @@ export default function ActionResearchShell({
       {/* ── Scrollable Content Area ── */}
       <div className="ar-shell-content">
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
-          <CoTeacherBanner agentId="research" />
+          <CoTeacherBanner
+            agentId="research"
+            badge={`Action Research · Phase ${phase}: ${STEPS[phase - 1] || 'Research Studio'}`}
+            title="Classroom Action Research (CAR) Advisor"
+            description="Official research methodology aligned with the DepEd Basic Education Research Agenda (BERA) for BERF and Master Teacher promotion."
+            tip="I will guide you through evidence-based interventions tailored for Philippine public school contexts."
+          />
           {children}
         </div>
       </div>

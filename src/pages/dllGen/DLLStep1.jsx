@@ -50,24 +50,12 @@ export default function DLLStep1() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <CoTeacherBanner agentId="dll" />
-
-      {/* Heading */}
-      <div style={{ marginBottom: 28 }}>
-        <span style={{
-          background: '#ede9fe', color: '#4f46e5',
-          borderRadius: 20, padding: '4px 12px',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        }}>
-          Daily Lesson Log
-        </span>
-        <h2 style={{ margin: '10px 0 6px', fontSize: 22, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
-          Set up your Daily Lesson Log
-        </h2>
-        <p style={{ margin: 0, fontSize: 15, color: 'var(--kt-text-secondary)', lineHeight: 1.65, maxWidth: 520 }}>
-          Enter your class details. This information will appear in the DLL header.
-        </p>
-      </div>
+      <CoTeacherBanner
+        agentId="dll"
+        badge="Daily Lesson Log"
+        title="Set up your Daily Lesson Log"
+        description="Enter your class details. This information will appear in the DLL header."
+      />
 
       {/* Two-column layout */}
       <div className="kt-grid-2" style={{ gap: 20, alignItems: 'start' }}>

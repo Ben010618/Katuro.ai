@@ -21,6 +21,10 @@ import CoTeacherBanner from '../../components/CoTeacherBanner';
 const STEPS = [
   {
     id: 'setup', label: 'Setup', component: StepSetup,
+    headerBadge: 'Test Builder · Setup',
+    headerTitle: 'Set up your test',
+    headerDesc: 'Term Exams get a DepEd item ceiling automatically from grade level. Summative Tests (ST1/ST2) let you choose the item count — 10 to 30 per the DepEd memo cap.',
+    headerTip: 'Ensure your competency instructional days fit within the 45-day budget!',
     isValid: (s) => !!(
       s.gradeLevel && s.subject?.trim() && s.testType && s.terms?.length > 0 &&
       s.questionFormats?.length > 0 &&
@@ -32,18 +36,30 @@ const STEPS = [
   },
   {
     id: 'blooms', label: "Bloom's levels", component: StepBlooms,
+    headerBadge: "Test Builder · Bloom's Taxonomy",
+    headerTitle: 'Cognitive level distribution',
+    headerDesc: "Adjust the balance of cognitive levels. Higher-Order Thinking Skills (HOTS) must meet DepEd standards.",
+    headerTip: 'DepEd guidelines recommend at least 30% HOTS for Key Stages 3 & 4.',
     isValid: () => true,
     primaryLabel: () => 'Continue to TOS →',
     onPrimary: ({ goNext }) => goNext(),
   },
   {
     id: 'tos', label: 'TOS', component: StepTOS,
+    headerBadge: 'Test Builder · Table of Specifications',
+    headerTitle: 'Auto-generated TOS',
+    headerDesc: "Items are distributed across competencies by instructional days, then across cognitive levels by your Bloom's weights.",
+    headerTip: 'Every test question is mapped directly to a competency and cognitive domain.',
     isValid: () => true,
     primaryLabel: () => 'Continue to Review →',
     onPrimary: ({ goNext }) => goNext(),
   },
   {
     id: 'review', label: 'Review', component: StepReview,
+    headerBadge: 'Test Builder · Review & Export',
+    headerTitle: 'Review before confirming',
+    headerDesc: 'Everything below is traceable back to what you entered — ready for Word (.docx) export with Answer Key.',
+    headerTip: 'Confirm your specifications before generating the final Word (.docx) exam.',
     isValid: () => true,
     primaryLabel: () => 'Confirm and Save',
     onPrimary: async ({ store, uid, sessionId, onSessionFinalized, addToast }) => {
@@ -287,7 +303,13 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
       {/* ── Active step panel ─────────────────────────────────────────────── */}
       <div key={activeStep} className="animate-fade-up" style={{ flex: 1, padding: '28px 24px 0' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <CoTeacherBanner agentId="tos" />
+          <CoTeacherBanner
+            agentId="tos"
+            badge={step.headerBadge}
+            title={step.headerTitle}
+            description={step.headerDesc}
+            tip={step.headerTip}
+          />
           <ActiveComponent />
         </div>
       </div>
