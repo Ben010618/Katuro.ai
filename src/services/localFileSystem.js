@@ -121,7 +121,7 @@ export async function writeFileToDirectory(dirHandle, filename, content, mimeTyp
 }
 
 /**
- * Reads text content from a file handle.
+ * Reads text content from a file handle or virtual file object.
  */
 export async function readFileText(fileHandle) {
   if (!fileHandle) return '';
@@ -133,6 +133,76 @@ export async function readFileText(fileHandle) {
     console.error('Error reading file text:', err);
     return '';
   }
+}
+
+/**
+ * Creates a new directory inside the workspace directory handle.
+ */
+export async function createDirectoryInWorkspace(dirHandle, folderName) {
+  if (!dirHandle) throw new Error('No directory selected');
+
+  const cleanName = folderName.replace(/^\/+|\/+$/g, '');
+  if (dirHandle.isVirtual) {
+    return dirHandle.createVirtualDirectory(cleanName);
+  }
+
+  try {
+    const parts = cleanName.split('/');
+    let current = dirHandle;
+    for (const part of parts) {
+      current = await current.getDirectoryHandle(part, { create: true });
+    }
+    return {
+      success: true,
+      name: parts[parts.length - 1],
+      path: cleanName,
+      handle: current,
+    };
+  } catch (err) {
+    console.error(`Error creating directory ${cleanName}:`, err);
+    throw err;
+  }
+}
+
+/**
+ * Recursively flattens a file/directory tree into a list of file items.
+ */
+export function flattenFileTree(entries = []) {
+  const result = [];
+  function traverse(list) {
+    for (const item of list) {
+      if (item.kind === 'file') {
+        result.push(item);
+      }
+      if (item.children && Array.isArray(item.children)) {
+        traverse(item.children);
+      }
+    }
+  }
+  traverse(entries);
+  return result;
+}
+
+/**
+ * Finds files matching one or more search queries/filenames.
+ */
+export function findFilesByNames(entries = [], names = []) {
+  const allFiles = flattenFileTree(entries);
+  return allFiles.filter((f) =>
+    names.some((n) => f.name.toLowerCase().includes(n.toLowerCase().trim()))
+  );
+}
+
+/**
+ * Reads content from a file object (virtual or native handle).
+ */
+export async function readWorkspaceFileContent(fileObj) {
+  if (!fileObj) return '';
+  if (fileObj.content) return fileObj.content;
+  if (fileObj.handle) {
+    return await readFileText(fileObj.handle);
+  }
+  return '';
 }
 
 /**
@@ -153,6 +223,7 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
           size: 24500,
           lastModified: Date.now() - 86400000 * 4,
           extension: 'docx',
+          content: '### WEEK 1: INTRODUCTION TO CELL THEORY\nCompetency: [S7LT-IIa-1] Identify the parts of a compound microscope and their functions.\nObjectives: Explain the cell theory, recognize Robert Hooke and Anton van Leeuwenhoek, identify plant and animal cell differences.\nDay 1-5 Detailed procedures on slide mounting and cellular exploration.',
         },
         {
           name: 'Week 2 - Microscope Parts.docx',
@@ -161,6 +232,7 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
           size: 28900,
           lastModified: Date.now() - 86400000 * 2,
           extension: 'docx',
+          content: '### WEEK 2: THE COMPOUND MICROSCOPE\nCompetency: [S7LT-IIa-2] Focus specimens using low and high power objectives.\nProcedures: Eyepiece magnification calculation, mechanical stage operation, iris diaphragm adjustment.',
         },
       ],
     },
@@ -176,6 +248,7 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
           size: 38200,
           lastModified: Date.now() - 86400000 * 10,
           extension: 'docx',
+          content: '### QUARTER 1 SUMMATIVE TEST 1 (CELL BIOLOGY)\nTotal Items: 30\nTable of Specifications:\n- Remembering (60%): 18 items\n- Understanding (20%): 6 items\n- Analyzing (20%): 6 items\nItem Analysis Note: 14 learners struggled with calculating total magnification and distinguishing plant vs animal cell vacuoles.',
         },
       ],
     },
@@ -191,6 +264,7 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
           size: 154000,
           lastModified: Date.now() - 86400000 * 3,
           extension: 'pptx',
+          content: 'Slide 1: Biological Organization Title\nSlide 2: Atoms to Organisms\nSlide 3: Cells, Tissues, Organs, Organ Systems.',
         },
       ],
     },
@@ -201,6 +275,7 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
       size: 18400,
       lastModified: Date.now() - 86400000 * 14,
       extension: 'xlsx',
+      content: 'Grade 7 Section Sampaguita - 45 Learners.\nStruggling Learners requiring remediation:\n1. Alcantara, John (Score: 12/30)\n2. Bautista, Maria (Score: 14/30)\n3. Cruz, Kevin (Score: 11/30)\n4. Dalisay, Andrea (Score: 13/30)\n5. Esteban, Paolo (Score: 10/30)',
     },
   ];
 
@@ -210,16 +285,52 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
     handle: {
       isVirtual: true,
       saveVirtualFile: (filename, content) => {
-        virtualStorage.push({
-          name: filename.split('/').pop(),
+        const parts = filename.split('/');
+        const fileNameOnly = parts[parts.length - 1];
+
+        const newFileItem = {
+          name: fileNameOnly,
           path: filename,
           kind: 'file',
           size: typeof content === 'string' ? content.length : 32000,
           lastModified: Date.now(),
-          extension: filename.split('.').pop().toLowerCase(),
+          extension: fileNameOnly.split('.').pop().toLowerCase(),
           content: typeof content === 'string' ? content : 'Binary content saved',
-        });
-        return { success: true, name: filename, path: filename };
+        };
+
+        if (parts.length > 1) {
+          const folderName = parts[0];
+          let folder = virtualStorage.find((i) => i.name === folderName && i.kind === 'directory');
+          if (!folder) {
+            folder = {
+              name: folderName,
+              path: folderName,
+              kind: 'directory',
+              children: [],
+            };
+            virtualStorage.unshift(folder);
+          }
+          folder.children = folder.children.filter((f) => f.name !== fileNameOnly);
+          folder.children.push(newFileItem);
+        } else {
+          const idx = virtualStorage.findIndex((f) => f.name === fileNameOnly);
+          if (idx !== -1) virtualStorage.splice(idx, 1);
+          virtualStorage.push(newFileItem);
+        }
+
+        return { success: true, name: fileNameOnly, path: filename };
+      },
+      createVirtualDirectory: (folderName) => {
+        const existing = virtualStorage.find((i) => i.name === folderName && i.kind === 'directory');
+        if (!existing) {
+          virtualStorage.unshift({
+            name: folderName,
+            path: folderName,
+            kind: 'directory',
+            children: [],
+          });
+        }
+        return { success: true, name: folderName, path: folderName };
       },
     },
     files: virtualStorage,

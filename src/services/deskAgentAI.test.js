@@ -138,4 +138,22 @@ describe('KaTuroDesk Autonomous Co-Teacher Orchestration', () => {
     expect(result.steps.length).toBeGreaterThan(0);
     expect(result.steps.every((s) => s.status === 'done')).toBe(true);
   });
+
+  it('reads multiple referenced documents and creates a designated subfolder', async () => {
+    const ws = createVirtualWorkspace('Grade 7 Science');
+    const result = await runDeskAgentTurn({
+      prompt: "Study 'Week 1 - Cell Theory.docx' and 'Q1_Summative_Test_1_with_TOS.docx', create a folder named 'Remediation_Week1', and inside it generate a differentiated remedial worksheet",
+      agentId: 'dll',
+      workspace: ws,
+      user: { uid: 'user-123' },
+      tokenBalance: 10,
+      freeMode: false,
+    });
+
+    expect(result.createdFolder).toBe('Remediation_Week1');
+    expect(result.createdFilePath).toContain('Remediation_Week1');
+    expect(result.steps.some((s) => s.text.includes('Read & extracted') || s.text.includes('Reading & synthesizing'))).toBe(true);
+    expect(result.steps.some((s) => s.text.includes('Remediation_Week1'))).toBe(true);
+    expect(result.content).toContain('Remediation_Week1');
+  });
 });

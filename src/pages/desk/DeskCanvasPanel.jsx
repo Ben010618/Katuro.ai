@@ -13,10 +13,11 @@ import {
   ChevronRight,
   Maximize2,
   Sparkles,
+  PanelRightClose,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 
-export default function DeskCanvasPanel() {
+export default function DeskCanvasPanel({ onCollapse }) {
   const { activeArtifact, saveCurrentArtifactToDisk, workspace } = useDeskStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState('');
@@ -62,20 +63,35 @@ export default function DeskCanvasPanel() {
   // If no artifact is loaded yet
   if (!activeArtifact) {
     return (
-      <aside className="w-96 lg:w-[480px] xl:w-[540px] flex-shrink-0 flex flex-col h-full bg-[#f1f5f3] border-l border-gray-200 select-none">
+      <aside className="w-80 lg:w-96 xl:w-[460px] flex-shrink-0 flex flex-col h-full bg-[#f1f5f3] border-l border-gray-200 select-none">
+        <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+            <Sparkles size={12} className="text-emerald-600" />
+            Document Canvas
+          </span>
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              title="Minimize Canvas"
+              className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition"
+            >
+              <PanelRightClose size={13} />
+            </button>
+          )}
+        </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100/60 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-4 shadow-sm">
-            <FileText size={32} />
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100/60 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-3 shadow-xs">
+            <FileText size={28} />
           </div>
-          <h2 className="text-sm font-bold text-gray-800 mb-1">
+          <h2 className="text-xs font-bold text-gray-800 mb-1">
             DepEd Document Studio
           </h2>
-          <p className="text-xs text-gray-500 max-w-xs leading-relaxed mb-6">
-            Ask your Co-Teacher in the center panel to generate a Lesson Plan, Daily Lesson Log, Quiz, or TOS matrix to view the live printed paper layout here.
+          <p className="text-[11px] text-gray-500 max-w-xs leading-relaxed mb-5">
+            Ask your Co-Teacher to generate a lesson plan, quiz, or remedial worksheet to view the live layout here.
           </p>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-gray-200 text-[11px] font-medium text-emerald-800 shadow-2xs">
-            <Sparkles size={12} className="text-emerald-600" />
-            Standard DepEd Long Bond Paper (8.5" × 13")
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-gray-200 text-[10.5px] font-medium text-emerald-800 shadow-2xs">
+            <Sparkles size={11} className="text-emerald-600" />
+            DepEd Long Bond Paper (8.5" × 13")
           </div>
         </div>
       </aside>
@@ -85,7 +101,7 @@ export default function DeskCanvasPanel() {
   const isSlideType = activeArtifact.type === 'slides';
 
   return (
-    <aside className="w-96 lg:w-[500px] xl:w-[580px] flex-shrink-0 flex flex-col h-full bg-[#e8ecea] border-l border-gray-300">
+    <aside className="w-80 lg:w-96 xl:w-[460px] flex-shrink-0 flex flex-col h-full bg-[#e8ecea] border-l border-gray-300">
       {/* Print Stylesheet */}
       <style>{`
         @media print {
@@ -109,17 +125,17 @@ export default function DeskCanvasPanel() {
       `}</style>
 
       {/* Canvas Action Bar */}
-      <div className="p-3 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10">
+      <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10">
         <div className="min-w-0 mr-2">
           <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
               {activeArtifact.type.toUpperCase()}
             </span>
             <h2 className="text-xs font-bold text-gray-900 truncate" title={activeArtifact.title}>
               {activeArtifact.title}
             </h2>
           </div>
-          <p className="text-[10px] text-gray-500 truncate">
+          <p className="text-[9.5px] text-gray-500 truncate">
             {activeArtifact.subtitle || 'DepEd MATATAG Verified Layout'}
           </p>
         </div>
@@ -131,22 +147,22 @@ export default function DeskCanvasPanel() {
             title={isEditing ? 'View Rendered Layout' : 'Edit Text Content'}
             className="p-1.5 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 rounded border border-gray-200 transition text-xs flex items-center gap-1"
           >
-            {isEditing ? <Eye size={13} /> : <Edit3 size={13} />}
+            {isEditing ? <Eye size={12} /> : <Edit3 size={12} />}
           </button>
 
           <button
             onClick={handleSaveToFolder}
             disabled={isSaving}
             title={`Direct Save to "${workspace?.name || 'Classroom Folder'}"`}
-            className={`px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs ${
+            className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition shadow-2xs ${
               saveSuccess
                 ? 'bg-emerald-600 text-white'
                 : 'bg-emerald-700 hover:bg-emerald-800 text-white'
             }`}
           >
-            {saveSuccess ? <Check size={13} /> : <Save size={13} />}
+            {saveSuccess ? <Check size={12} /> : <Save size={12} />}
             <span className="hidden sm:inline">
-              {saveSuccess ? 'Saved to Folder!' : 'Save to Folder'}
+              {saveSuccess ? 'Saved!' : 'Save'}
             </span>
           </button>
 
@@ -155,7 +171,7 @@ export default function DeskCanvasPanel() {
             title="Download Document"
             className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded border border-gray-200 transition"
           >
-            <Download size={14} />
+            <Download size={13} />
           </button>
 
           <button
@@ -163,8 +179,18 @@ export default function DeskCanvasPanel() {
             title="Print Official DepEd Layout"
             className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded border border-gray-200 transition"
           >
-            <Printer size={14} />
+            <Printer size={13} />
           </button>
+
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              title="Minimize Canvas (give full room to Chat)"
+              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded border border-gray-200 transition ml-0.5"
+            >
+              <PanelRightClose size={13} />
+            </button>
+          )}
         </div>
       </div>
 
