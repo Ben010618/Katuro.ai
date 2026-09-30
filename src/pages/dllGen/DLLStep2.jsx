@@ -9,6 +9,7 @@ import { generateDLLProcedure } from '../../services/dllAI';
 import { retryAsync } from '../../utils/retry';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
 import { useSmoothProgress } from '../../hooks/useSmoothProgress';
+import DepEdCurriculumPickerModal from '../../components/DepEdCurriculumPickerModal';
 
 const MAX_DAYS = 5;
 
@@ -238,9 +239,26 @@ export default function DLLStep2() {
   const [genError,   setGenError]   = useState('');
   const [statusMsg,  setStatusMsg]  = useState('');
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [curriculumModalOpen, setCurriculumModalOpen] = useState(false);
   // A DLL is one opaque AI call with no milestones to report, so the bar is
   // driven purely by elapsed time against a ~70s expectation.
   const shownProgress = useSmoothProgress({ active: generating, estimateSec: 70 });
+
+  function handleSelectCurriculumForDLL(selectedList) {
+    if (!selectedList || selectedList.length === 0) return;
+    const newMelcs = selectedList.map(item => ({
+      text: item.text,
+      days: item.days,
+    }));
+    store.setMelcList(newMelcs);
+
+    const newContents = selectedList.map(item => ({
+      text: item.domain || item.rawText || item.text,
+      days: item.days,
+    }));
+    store.setContentList(newContents);
+    addToast('Official DepEd competencies and topics loaded!', 'success');
+  }
 
   useEffect(() => {
     if (user?.uid) trackEvent(user.uid, 'dllgen_step_viewed', { step: 'step2' });
@@ -414,6 +432,34 @@ export default function DLLStep2() {
         ))}
       </div>
 
+      {/* 1-Click DepEd Auto-Load Trigger */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => setCurriculumModalOpen(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 14px',
+            borderRadius: 100,
+            border: '1px solid #10b981',
+            background: '#ecfdf5',
+            color: '#065f46',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#d1fae5'}
+          onMouseLeave={e => e.currentTarget.style.background = '#ecfdf5'}
+        >
+          <Sparkles size={13} color="#059669" />
+          <span>1-Click DepEd MATATAG Auto-Load</span>
+        </button>
+      </div>
+
       {/* MELC BOW section */}
       <BowSection
         label="Learning Competency / MELC *"
@@ -511,6 +557,16 @@ export default function DLLStep2() {
           )}
         </div>
       </div>
+
+      <DepEdCurriculumPickerModal
+        isOpen={curriculumModalOpen}
+        onClose={() => setCurriculumModalOpen(false)}
+        onSelectCompetencies={handleSelectCurriculumForDLL}
+        defaultSubject={store.subject || 'Science'}
+        defaultGrade={store.gradeLevel || 'Grade 7'}
+        defaultQuarter={store.term || 'Quarter 1'}
+        targetTotalDays={5}
+      />
     </div>
   );
 }

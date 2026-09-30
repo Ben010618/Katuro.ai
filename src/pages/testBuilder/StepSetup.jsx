@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import {
   GRADE_LEVELS, SUBJECTS, TERMS, TEST_TYPES, DAY_LIMIT, QUESTION_FORMATS, PROFICIENCY_LEVELS,
@@ -5,7 +6,8 @@ import {
   isManualCeilingType, manualCeilingOptions,
 } from '../../config/testBuilderConfig';
 import { clampCompetencyDays, totalDays } from '../../utils/testBuilderCalc';
-import { Trash2, Plus, FileQuestion } from 'lucide-react';
+import { Trash2, Plus, FileQuestion, Sparkles } from 'lucide-react';
+import DepEdCurriculumPickerModal from '../../components/DepEdCurriculumPickerModal';
 
 const labelStyle = {
   display: 'block', marginBottom: 6,
@@ -15,6 +17,7 @@ const labelStyle = {
 
 export default function StepSetup() {
   const store = useTestBuilderStore();
+  const [curriculumModalOpen, setCurriculumModalOpen] = useState(false);
   const keyStage = deriveKeyStage(store.gradeLevel);
   const manualCeiling = isManualCeilingType(store.testType);
   const itemCeiling = manualCeiling
@@ -214,8 +217,33 @@ export default function StepSetup() {
 
       {/* Competencies */}
       <div className="card card-accent">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>Competencies / MELCs</label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Competencies / MELCs</label>
+            <button
+              type="button"
+              onClick={() => setCurriculumModalOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 100,
+                border: '1px solid #10b981',
+                background: '#ecfdf5',
+                color: '#065f46',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#d1fae5')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#ecfdf5')}
+            >
+              <Sparkles size={11} color="#059669" />
+              1-Click DepEd MATATAG Auto-Load
+            </button>
+          </div>
           <span style={{
             fontSize: 11, fontWeight: 700, fontFamily: '"DM Mono", monospace',
             color: atLimit ? 'var(--kt-accent-amber)' : 'var(--kt-text-secondary)',
@@ -287,6 +315,23 @@ export default function StepSetup() {
           </p>
         )}
       </div>
+
+      <DepEdCurriculumPickerModal
+        isOpen={curriculumModalOpen}
+        onClose={() => setCurriculumModalOpen(false)}
+        onSelectCompetencies={(selected) => {
+          const formatted = selected.map((item) => ({
+            id: item.id || `comp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            text: item.text,
+            days: item.days || 5,
+          }));
+          store.setCompetencies(formatted);
+        }}
+        defaultSubject={store.subject || 'Science'}
+        defaultGrade={store.gradeLevel || 'Grade 7'}
+        defaultQuarter={store.terms?.[0] || 'Quarter 1'}
+        targetTotalDays={DAY_LIMIT}
+      />
     </div>
   );
 }

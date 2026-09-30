@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCotStore } from '../../store/cotStore';
 import { useAuth } from '../../hooks/useAuth';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
+import { Sparkles } from 'lucide-react';
+import DepEdCurriculumPickerModal from '../../components/DepEdCurriculumPickerModal';
 
 const GRADES = [
   'Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6',
@@ -26,6 +28,16 @@ export default function CotStep1() {
   const navigate = useNavigate();
   const store    = useCotStore();
   const { user } = useAuth();
+  const [curriculumModalOpen, setCurriculumModalOpen] = useState(false);
+
+  function handleSelectCurriculumForCOT(selectedList) {
+    if (!selectedList || selectedList.length === 0) return;
+    const item = selectedList[0];
+    store.setStep1({
+      melc: item.text,
+      topic: item.domain || store.topic,
+    });
+  }
 
   // Pre-fill teacher name & school from auth profile if empty
   useEffect(() => {
@@ -127,11 +139,35 @@ export default function CotStep1() {
         </Field>
 
         {/* MELC */}
-        <Field
-          label="MELC Competency"
-          required
-          hint="Paste the full MELC code and description from the DepEd curriculum guide."
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#4a4060', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              MELC Competency <span style={{ color: '#7c3aed', marginLeft: 2 }}>*</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setCurriculumModalOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 100,
+                border: '1px solid #7c3aed',
+                background: '#f5f3ff',
+                color: '#6d28d9',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#ede9fe')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#f5f3ff')}
+            >
+              <Sparkles size={11} color="#7c3aed" />
+              1-Click DepEd MATATAG Auto-Load
+            </button>
+          </div>
           <textarea
             {...inp}
             rows={3}
@@ -140,7 +176,10 @@ export default function CotStep1() {
             placeholder="e.g. Investigate the relationship between the volume and temperature at constant pressure of a gas (S10LT-IIIg-40)"
             style={{ ...inp.style, resize: 'vertical', lineHeight: 1.65 }}
           />
-        </Field>
+          <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>
+            Paste the full MELC code or click the 1-Click Auto-Load button to pull directly from official DepEd guides.
+          </p>
+        </div>
 
         {/* Materials */}
         <Field label="Available Materials" hint="List materials the class has access to. Separate with commas.">
@@ -183,6 +222,16 @@ export default function CotStep1() {
 
         <div style={{ height: 24 }} />
       </div>
+
+      <DepEdCurriculumPickerModal
+        isOpen={curriculumModalOpen}
+        onClose={() => setCurriculumModalOpen(false)}
+        onSelectCompetencies={handleSelectCurriculumForCOT}
+        defaultSubject={store.subject || 'Science'}
+        defaultGrade={store.grade || 'Grade 7'}
+        defaultQuarter={store.quarter || 'Quarter 1'}
+        singleSelect={true}
+      />
     </div>
   );
 }
