@@ -60,6 +60,7 @@ const SharedPlanPage          = lazy(() => import('./pages/SharedPlanPage'));
 const SharesLayout            = lazy(() => import('./modules/shares/index'));
 const FeatureRequestBoard     = lazy(() => import('./features/feedback/FeatureRequestBoard'));
 const KaturoProtectPage       = lazy(() => import('./features/katuroProtect'));
+const KaTuroDeskPage          = lazy(() => import('./pages/desk/KaTuroDeskPage'));
 
 function LoadingScreen() {
   return (
@@ -215,6 +216,9 @@ export default function App() {
             {/* kaTuro Protect — chat + intake open to all teachers; case data
                 stays admin-only, enforced inside the page itself + Firestore rules */}
             <Route path="protect" element={<KaturoProtectPage />} />
+
+            {/* KaTuro Desk — 3-Panel Autonomous Workspace */}
+            <Route path="desk" element={<KaTuroDeskPage />} />
 
             <Route path="dashboard"      element={<DashboardPage />} />
             <Route path="my-lessons"     element={<MyLessonsPage />} />
