@@ -13,6 +13,7 @@ import { Clock, LogOut as LogOutIcon } from 'lucide-react';
 // Pages — LoginPage stays eager (near-universal first paint); everything
 // behind auth is lazy so a teacher only downloads the module(s) they visit.
 import LoginPage from './pages/LoginPage';
+const LandingPage      = lazy(() => import('./pages/LandingPage'));
 const DashboardPage    = lazy(() => import('./pages/DashboardPage'));
 const MyLessonsPage    = lazy(() => import('./pages/MyLessonsPage'));
 const QuizBuilderPage         = lazy(() => import('./pages/QuizBuilderPage'));
@@ -185,6 +186,13 @@ function PublicRoute({ children }) {
   return children;
 }
 
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (user) return <Navigate to="/shares" replace />;
+  return <LandingPage />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -192,17 +200,16 @@ export default function App() {
       <BrowserRouter>
         <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          {/* Public */}
+          {/* Public Landing & Login */}
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
 
           {/* Admin — standalone, no AppShell */}
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
           {/* Protected shell */}
-          <Route path="/" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/shares" replace />} />
-
-            {/* kaTuro Shares — teacher community feed, the app's new landing page */}
+          <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="shares/*" element={<SharesLayout />} />
 
             {/* kaTuro Protect — chat + intake open to all teachers; case data

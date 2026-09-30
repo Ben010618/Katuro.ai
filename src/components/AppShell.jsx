@@ -13,6 +13,7 @@ import ktLogo from '../assets/KT-Favicon.webp';
 import TokenBundleModal from './TokenBundleModal';
 import FloatingSuggestButton from '../features/feedback/FloatingSuggestButton';
 import InactivityAnnouncementModal from './InactivityAnnouncementModal';
+import FacultyCustomizerModal from './FacultyCustomizerModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
@@ -21,6 +22,7 @@ import {
   ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
   Settings, Camera, Loader2, Images, Lightbulb,
+  Users,
 } from 'lucide-react';
 
 const MAIN_NAV = [
@@ -54,7 +56,7 @@ const TITLES = {
 };
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
-function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, onProfileOpen }) {
+function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, onProfileOpen, onFacultyOpen }) {
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -113,6 +115,30 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+        <button
+          onClick={() => {
+            if (onFacultyOpen) onFacultyOpen();
+            if (onClose) onClose();
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 9,
+            padding: '8px 10px', borderRadius: 6,
+            background: 'rgba(52, 211, 153, 0.15)',
+            border: '1px solid rgba(52, 211, 153, 0.35)',
+            color: '#a7f3d0',
+            fontWeight: 700, fontSize: 13,
+            marginBottom: 6, cursor: 'pointer',
+            width: '100%', textAlign: 'left',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Users size={16} color="#34d399" />
+          My AI Faculty
+          <span style={{ marginLeft: 'auto', fontSize: 10, background: '#34d399', color: '#064e3b', padding: '1px 6px', borderRadius: 100, fontWeight: 800 }}>
+            5
+          </span>
+        </button>
+
         {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => highlight ? {
@@ -292,6 +318,7 @@ export default function AppShell() {
   const [showBundle,     setShowBundle]     = useState(false);
   const [profileData,    setProfileData]    = useState(null); // lifted out of sidebar
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [facultyOpen,    setFacultyOpen]    = useState(false);
   const shownOnLogin = useRef(false);
   const photoRef     = useRef(null);
 
@@ -376,6 +403,7 @@ export default function AppShell() {
             user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
             freeMode={freeMode} dark={dark} toggle={toggle}
             onProfileOpen={setProfileData}
+            onFacultyOpen={() => setFacultyOpen(true)}
           />
         </div>
 
@@ -388,6 +416,7 @@ export default function AppShell() {
                 user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
                 freeMode={freeMode} dark={dark} toggle={toggle}
                 onProfileOpen={setProfileData}
+                onFacultyOpen={() => setFacultyOpen(true)}
                 onClose={() => setMobileOpen(false)}
               />
             </div>
@@ -508,6 +537,9 @@ export default function AppShell() {
           </div>
         </div>
       )}
+
+      {/* Faculty Customizer Modal */}
+      <FacultyCustomizerModal isOpen={facultyOpen} onClose={() => setFacultyOpen(false)} />
     </>
   );
 }
