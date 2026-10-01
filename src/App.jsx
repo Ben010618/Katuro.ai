@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import ktLogo from './assets/KT-Favicon.webp';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { useAuth } from './hooks/useAuth';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -194,7 +194,46 @@ function RootRoute() {
   return <LandingPage />;
 }
 
+function DesktopAppShell() {
+  const { user, loading, disabled, pendingApproval } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    ensureTeacherProfile(user.uid, user.email).catch((err) => {
+      console.error('[kaTuro] Teacher profile check in desktop:', err);
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (disabled && !pendingApproval && user) {
+      signOut(auth);
+    }
+  }, [disabled, pendingApproval, user]);
+
+  if (loading) return <LoadingScreen />;
+  if (disabled && !pendingApproval && user) return null;
+  if (!user) return <LoginPage />;
+  if (pendingApproval) return <PendingApprovalScreen />;
+  return <KaTuroDeskPage />;
+}
+
 export default function App() {
+  const isDesktopApp = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
+
+  if (isDesktopApp) {
+    return (
+      <ThemeProvider>
+        <ToastProvider>
+          <HashRouter>
+            <Suspense fallback={<LoadingScreen />}>
+              <DesktopAppShell />
+            </Suspense>
+          </HashRouter>
+        </ToastProvider>
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider>
     <ToastProvider>

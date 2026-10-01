@@ -52,13 +52,17 @@
     "appId": "ai.katuro.desk",
     "productName": "KaTuroDesk",
     "directories": {
-      "output": "dist-electron"
+      "output": "C:/Users/USER/KaTuroDesk-Dist"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
       "package.json"
     ],
+    "extraMetadata": {
+      "main": "electron/main.cjs",
+      "dependencies": {}
+    },
     "asar": true,
     "npmRebuild": false,
     "nodeGypRebuild": false,

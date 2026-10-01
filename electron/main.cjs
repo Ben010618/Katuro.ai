@@ -63,14 +63,45 @@ function createWindow() {
   // Remove default menu bar for clean app feel
   mainWindow.setMenuBarVisibility(false);
 
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  const consoleLogFile = path.join(app.getPath('userData'), 'desk-console.log');
+  try {
+    fs.writeFileSync(consoleLogFile, `--- KaTuroDesk Started: ${new Date().toISOString()} ---\n`);
+  } catch (e) {}
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    try {
+      fs.appendFileSync(consoleLogFile, `[Level ${level}] ${message} (${sourceId}:${line})\n`);
+    } catch (e) {}
+  });
+
+  mainWindow.webContents.on('did-finish-load', async () => {
+    const statusFile = path.join(app.getPath('userData'), 'desk-status.json');
+    try {
+      // Allow React to mount
+      await new Promise(r => setTimeout(r, 600));
+      const probe = await mainWindow.webContents.executeJavaScript(`({
+        hasKaturoDeskApi: typeof window.katuroDeskApi !== 'undefined',
+        hasRoot: Boolean(document.getElementById('root')),
+        rootChildCount: document.getElementById('root')?.children?.length || 0,
+        htmlPreview: document.getElementById('root')?.innerText?.slice(0, 150) || ''
+      })`);
+      fs.writeFileSync(statusFile, JSON.stringify({
+        loaded: true,
+        probe,
+        timestamp: new Date().toISOString()
+      }, null, 2));
+    } catch (e) {
+      fs.writeFileSync(statusFile, JSON.stringify({ error: e.message }, null, 2));
+    }
+  });
+
+  const distHtml = path.join(__dirname, '../dist/index.html');
+  const isDev = process.env.KATURO_DESK_DEV === '1';
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173/desk');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
-      hash: 'desk',
-    });
+    mainWindow.loadFile(distHtml);
   }
 }
 
