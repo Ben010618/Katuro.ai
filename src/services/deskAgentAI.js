@@ -185,7 +185,7 @@ Format output cleanly in Markdown with bold headers and tables.`;
     try {
       setStep('s4', 'Calling KaTuro AI Cloud Gateway...', 'running');
       const rawResult = await callGeminiProxy({
-        action: 'dll_gen',
+        action: 'desk_agent_run',
         contents: [{ parts: [{ text: `${systemInstruction}\n\n${userPrompt}` }] }],
         temperature: 0.5,
         maxTokens: 4096,

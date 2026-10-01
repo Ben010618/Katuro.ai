@@ -19,9 +19,36 @@ const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
 
 let _key       = null;
 let _fetchedAt = 0;
+let _deskKey   = null;
+let _deskFetchedAt = 0;
 
-export async function getGeminiKey() {
-  // In-memory cache
+export async function getGeminiKey(isDesk = false) {
+  if (isDesk) {
+    if (_deskKey && Date.now() - _deskFetchedAt < CACHE_TTL) return _deskKey;
+    try {
+      const snap = await getDoc(CONFIG_REF);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.deskApiKey) {
+          _deskKey = data.deskApiKey;
+          _deskFetchedAt = Date.now();
+          return _deskKey;
+        }
+        if (data?.apiKey) {
+          _deskKey = data.apiKey;
+          _deskFetchedAt = Date.now();
+          return _deskKey;
+        }
+      }
+    } catch {
+      // offline / rules error
+    }
+    const envDeskKey = import.meta.env.VITE_KATURO_DESK_GEMINI_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+    if (envDeskKey) return envDeskKey;
+    throw new Error('KaTuroDesk Gemini API key is not configured.');
+  }
+
+  // In-memory cache for Web key
   if (_key && Date.now() - _fetchedAt < CACHE_TTL) return _key;
 
   // Try Firestore (admin-managed key, works in production)
@@ -50,8 +77,10 @@ export async function getGeminiKey() {
 }
 
 export function invalidateKeyCache() {
-  _key       = null;
-  _fetchedAt = 0;
+  _key           = null;
+  _fetchedAt     = 0;
+  _deskKey       = null;
+  _deskFetchedAt = 0;
 }
 
 /**
@@ -159,7 +188,7 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
   // one half of why DLL, ILAW and Test Builder stopped working. The client
   // budget must always outlast the server's own budget for the same request
   // (see geminiBudgetMs in functions/index.js) plus its NVIDIA fallback.
-  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides';
+  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides' || action === 'desk_agent_run';
   const serverBudgetMs = Math.min(180000, Math.max(45000, 30000 + (Number(maxTokens) || 2048) * 10));
   const effectiveTimeout = timeoutMs
     ?? (isHeavy ? 300000 : Math.min(300000, serverBudgetMs + 100000));
@@ -207,7 +236,8 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
 
       // 2. Try Client Direct Gemini API fallback
       try {
-        const apiKey = await getGeminiKey();
+        const isDesk = action === 'desk_agent_run';
+        const apiKey = await getGeminiKey(isDesk);
         if (apiKey) {
           console.log(`[callGeminiProxy] Swapping to direct Gemini client fallback...`);
           let models = [];
@@ -328,7 +358,7 @@ async function candidateModels(apiKey) {
     .map(x => x.id);
 }
 
-/** Admin-only: save a new key to Firestore */
+/** Admin-only: save a new Web Gemini key to Firestore */
 export async function saveGeminiKey(apiKey, adminUid) {
   const trimmed = (apiKey || '').trim();
   if (!trimmed) throw new Error('API key cannot be empty.');
@@ -342,7 +372,26 @@ export async function saveGeminiKey(apiKey, adminUid) {
     hasKey:    true,
     updatedAt: new Date(),
     updatedBy: adminUid,
-  });
+  }, { merge: true });
+
+  invalidateKeyCache();
+}
+
+/** Admin-only: save a dedicated KaTuroDesk Gemini key to Firestore */
+export async function saveDeskGeminiKey(apiKey, adminUid) {
+  const trimmed = (apiKey || '').trim();
+  if (!trimmed) throw new Error('KaTuroDesk API key cannot be empty.');
+  assertHeaderSafeKey(trimmed, 'KaTuroDesk Gemini API key');
+
+  const deskPreview = trimmed.slice(0, 8) + '•'.repeat(16) + trimmed.slice(-4);
+
+  await setDoc(CONFIG_REF, {
+    deskApiKey:    trimmed,
+    deskPreview,
+    hasDeskKey:    true,
+    deskUpdatedAt: new Date(),
+    deskUpdatedBy: adminUid,
+  }, { merge: true });
 
   invalidateKeyCache();
 }
@@ -393,7 +442,7 @@ export async function getGeminiModelPin() {
   }
 }
 
-/** Admin-only: read display info (never exposes the full key) */
+/** Admin-only: read Web display info (never exposes the full key) */
 export async function getGeminiKeyStatus() {
   try {
     const snap = await getDoc(CONFIG_REF);
@@ -403,6 +452,23 @@ export async function getGeminiKeyStatus() {
       hasKey:    true,
       preview:   d.preview   || '••••••••••••••••••••••••••••',
       updatedAt: d.updatedAt ?? null,
+    };
+  } catch {
+    return { hasKey: false, error: true };
+  }
+}
+
+/** Admin-only: read KaTuroDesk display info (never exposes the full key) */
+export async function getDeskGeminiKeyStatus() {
+  try {
+    const snap = await getDoc(CONFIG_REF);
+    if (!snap.exists()) return { hasKey: false };
+    const d = snap.data();
+    if (!d.deskApiKey && !d.hasDeskKey) return { hasKey: false };
+    return {
+      hasKey:    true,
+      preview:   d.deskPreview || '••••••••••••••••••••••••••••',
+      updatedAt: d.deskUpdatedAt ?? null,
     };
   } catch {
     return { hasKey: false, error: true };

@@ -13,8 +13,6 @@ import {
   AlertCircle,
   ExternalLink,
   PanelLeftOpen,
-  Key,
-  X,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
@@ -41,13 +39,6 @@ export default function DeskAgentChatPanel({
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [expandedSteps, setExpandedSteps] = useState({});
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(() => {
-    return typeof window !== 'undefined' ? (localStorage.getItem('katuro_desk_gemini_key') || '') : '';
-  });
-  const [hasApiKey, setHasApiKey] = useState(() => {
-    return typeof window !== 'undefined' ? Boolean(localStorage.getItem('katuro_desk_gemini_key') || import.meta.env.VITE_GEMINI_API_KEY) : false;
-  });
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -199,19 +190,6 @@ export default function DeskAgentChatPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsApiKeyModalOpen(true)}
-            title="Configure Google Gemini API Key for direct or local sandbox use"
-            className={`px-2 py-1 rounded-md text-xs font-medium transition flex items-center gap-1.5 border ${
-              hasApiKey
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
-            }`}
-          >
-            <Key size={13} className={hasApiKey ? 'text-emerald-600' : 'text-gray-400'} />
-            <span className="hidden sm:inline">{hasApiKey ? 'Gemini API Connected' : 'Add API Key'}</span>
-          </button>
-
           <button
             onClick={clearConversation}
             title="Clear Chat History"
@@ -388,86 +366,6 @@ export default function DeskAgentChatPanel({
         </div>
       </div>
 
-      {/* API Key Modal */}
-      {isApiKeyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-gray-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <Key size={16} />
-                </div>
-                <h3 className="text-sm font-bold text-gray-900">Google Gemini API Key</h3>
-              </div>
-              <button
-                onClick={() => setIsApiKeyModalOpen(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-md"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-              Paste your personal Google Gemini API key to enable live AI generation directly on your computer. If blank, KaTuroDesk automatically uses the cloud token gateway or the smart local DepEd engine.
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 font-mono"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                {apiKeyInput ? (
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('katuro_desk_gemini_key');
-                      setApiKeyInput('');
-                      setHasApiKey(false);
-                      setIsApiKeyModalOpen(false);
-                    }}
-                    className="text-xs text-rose-600 hover:underline"
-                  >
-                    Remove Key
-                  </button>
-                ) : <span />}
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsApiKeyModalOpen(false)}
-                    className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (apiKeyInput.trim()) {
-                        localStorage.setItem('katuro_desk_gemini_key', apiKeyInput.trim());
-                        setHasApiKey(true);
-                      } else {
-                        localStorage.removeItem('katuro_desk_gemini_key');
-                        setHasApiKey(false);
-                      }
-                      setIsApiKeyModalOpen(false);
-                    }}
-                    className="px-3 py-1.5 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg shadow-xs transition"
-                  >
-                    Save & Connect
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

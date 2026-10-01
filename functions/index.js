@@ -239,12 +239,20 @@ function supportsThinking(model) {
 console.info('[kaTuro] AI model: resolved per-request from ListModels (admin pin: adminConfig/gemini.model)');
 
 // Read API key from adminConfig/gemini in Firestore (set via Admin Dashboard)
-async function getGeminiKey() {
+// Supports dedicated deskApiKey for KaTuroDesk to isolate quotas from KaTuro Web
+async function getGeminiKey(isDesk = false) {
   const snap = await db.doc('adminConfig/gemini').get();
-  if (!snap.exists || !snap.data()?.apiKey) {
+  if (!snap.exists) {
     throw new HttpsError('failed-precondition', 'Gemini API key not configured. Set it in the Admin Dashboard → API Settings.');
   }
-  return snap.data().apiKey;
+  const data = snap.data() || {};
+  if (isDesk && data.deskApiKey) {
+    return data.deskApiKey;
+  }
+  if (!data.apiKey) {
+    throw new HttpsError('failed-precondition', 'Gemini API key not configured. Set it in the Admin Dashboard → API Settings.');
+  }
+  return data.apiKey;
 }
 
 // Read NVIDIA API key from adminConfig/nvidia in Firestore
@@ -540,6 +548,7 @@ const PROXY_LIMITS = {
   scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
   protect_chat:        40,  // kaTuro Protect chat + collabAIReply — shared 40/day limit
   melc_validate:       50,  // validateMelcCode — one call per lesson-plan save, generous headroom
+  desk_agent_run:      50,  // KaTuroDesk Co-Teacher Assistant operations
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 
@@ -1220,7 +1229,8 @@ exports.generateAI = onCall(
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
 
     try {
-      const key = await getGeminiKey();
+      const isDesk = action === 'desk_agent_run';
+      const key = await getGeminiKey(isDesk);
       return await callGeminiRaw(key, contents, {
         temperature: temperature ?? 0.5,
         maxTokens: clampedMaxTokens,

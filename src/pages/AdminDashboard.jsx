@@ -30,7 +30,11 @@ import {
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
   Cpu, Sparkles, ExternalLink, Megaphone,
 } from 'lucide-react';
-import { saveGeminiKey, getGeminiKeyStatus, testGeminiKey, listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin } from '../services/geminiConfig';
+import {
+  saveGeminiKey, getGeminiKeyStatus, testGeminiKey,
+  saveDeskGeminiKey, getDeskGeminiKeyStatus,
+  listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin
+} from '../services/geminiConfig';
 import {
   saveNvidiaConfig, getNvidiaKeyStatus, testNvidiaKey,
   POPULAR_TEXT_MODELS, POPULAR_IMAGE_MODELS, listAvailableNvidiaModels,
@@ -1634,6 +1638,16 @@ function ApiKeySection({ adminUid }) {
   const [geminiTestMsg, setGeminiTestMsg]   = useState('');
   const [geminiErr, setGeminiErr]           = useState('');
 
+  // KaTuroDesk Dedicated Key State
+  const [deskKeyInput, setDeskKeyInput]     = useState('');
+  const [showDeskKey, setShowDeskKey]       = useState(false);
+  const [deskStatus, setDeskStatus]         = useState(null);
+  const [savingDesk, setSavingDesk]         = useState(false);
+  const [testingDesk, setTestingDesk]       = useState(false);
+  const [deskTestResult, setDeskTestResult] = useState(null);
+  const [deskTestMsg, setDeskTestMsg]       = useState('');
+  const [deskErr, setDeskErr]               = useState('');
+
   // NVIDIA State
   const [nvidiaKeyInput, setNvidiaKeyInput]   = useState('');
   const [showNvidiaKey, setShowNvidiaKey]     = useState(false);
@@ -1653,6 +1667,7 @@ function ApiKeySection({ adminUid }) {
 
   useEffect(() => {
     getGeminiKeyStatus().then(setGeminiStatus).catch(() => setGeminiStatus({ hasKey: false }));
+    getDeskGeminiKeyStatus().then(setDeskStatus).catch(() => setDeskStatus({ hasKey: false }));
     getNvidiaKeyStatus().then(status => {
       setNvidiaStatus(status);
       if (status?.model) setNvidiaTextModel(status.model);
@@ -1707,6 +1722,38 @@ function ApiKeySection({ adminUid }) {
       setGeminiTestMsg(e.message);
     } finally {
       setTestingGemini(false);
+    }
+  }
+
+  // KaTuroDesk Dedicated Key handlers
+  async function handleSaveDeskGemini() {
+    setDeskErr(''); setDeskTestResult(null);
+    setSavingDesk(true);
+    try {
+      await saveDeskGeminiKey(deskKeyInput, adminUid);
+      setDeskKeyInput('');
+      const fresh = await getDeskGeminiKeyStatus();
+      setDeskStatus(fresh);
+    } catch (e) {
+      setDeskErr(e.message);
+    } finally {
+      setSavingDesk(false);
+    }
+  }
+
+  async function handleTestDeskGemini() {
+    if (!deskKeyInput.trim()) { setDeskErr('Enter a KaTuroDesk Gemini key to test first.'); return; }
+    setDeskErr(''); setDeskTestResult(null); setDeskTestMsg('');
+    setTestingDesk(true);
+    try {
+      await testGeminiKey(deskKeyInput.trim());
+      setDeskTestResult('ok');
+      setDeskTestMsg('KaTuroDesk Gemini Key is valid and responding correctly.');
+    } catch (e) {
+      setDeskTestResult('fail');
+      setDeskTestMsg(e.message);
+    } finally {
+      setTestingDesk(false);
     }
   }
 
@@ -2065,13 +2112,13 @@ function ApiKeySection({ adminUid }) {
           {/* Input row */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>{geminiStatus?.hasKey ? 'Replace Gemini API Key' : 'Set Gemini API Key'}</label>
+              <label style={labelStyle}>{geminiStatus?.hasKey ? 'Replace Gemini API Key (KaTuro AI Web)' : 'Set Gemini API Key (KaTuro AI Web)'}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showGeminiKey ? 'text' : 'password'}
                   value={geminiKeyInput}
                   onChange={e => { setGeminiKeyInput(e.target.value); setGeminiErr(''); setGeminiTestResult(null); }}
-                  placeholder="AIzaSy••••••••••••••••••••••••••••••"
+                  placeholder="AIzaSy... (Paste Gemini API Key for KaTuro AI Web)"
                   style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
                 />
                 <button
@@ -2141,6 +2188,121 @@ function ApiKeySection({ adminUid }) {
             >
               Google Cloud Console <ExternalLink size={11} />
             </a>
+          </div>
+
+          {/* ── KaTuroDesk Dedicated Gemini Key Card ── */}
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px dashed rgba(109,40,217,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#dcfce7', color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    KaTuroDesk Desktop Engine
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+                    Dedicated Co-Teacher Desktop Studio Key
+                  </span>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                  Dedicated Gemini API key assigned strictly to KaTuroDesk. Separates desktop traffic from the web version, eliminating rate-limiting bottlenecks so teachers enjoy fast, uninterrupted classroom analysis.
+                </p>
+              </div>
+
+              {/* Status indicator */}
+              <div>
+                {deskStatus === null ? (
+                  <Loader2 size={14} color="#15803d" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : deskStatus.hasKey ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#dcfce7', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(21,128,61,0.3)' }}>
+                    <CheckCircle2 size={13} color="#15803d" />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d' }}>Dedicated Key Active</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef3c7', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(217,119,6,0.3)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309' }}>Using Shared Web Key</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Current desk key preview */}
+            {deskStatus?.hasKey && (
+              <div style={{ background: 'var(--kt-card)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--kt-border)' }}>
+                <Key size={12} color="#15803d" />
+                <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'var(--kt-text-primary)', flex: 1 }}>{deskStatus.preview}</span>
+                {deskStatus.updatedAt && (
+                  <span style={{ fontSize: 10, color: 'var(--kt-text-secondary)' }}>Updated {formatUpdateDate(deskStatus.updatedAt)}</span>
+                )}
+              </div>
+            )}
+
+            {/* Input row */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>{deskStatus?.hasKey ? 'Replace Dedicated Key (KaTuroDesk Desktop App)' : 'Assign Dedicated Key (KaTuroDesk Desktop App)'}</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showDeskKey ? 'text' : 'password'}
+                    value={deskKeyInput}
+                    onChange={e => { setDeskKeyInput(e.target.value); setDeskErr(''); setDeskTestResult(null); }}
+                    placeholder="AIzaSy... (Paste Dedicated Gemini API Key for KaTuroDesk)"
+                    style={{ ...inputStyle, paddingRight: 38, fontFamily: '"DM Mono", monospace', fontSize: 13 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeskKey(v => !v)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
+                  >
+                    {showDeskKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleTestDeskGemini}
+                disabled={testingDesk || !deskKeyInput.trim()}
+                title="Test the key before saving"
+                style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (testingDesk || !deskKeyInput.trim()) ? 0.6 : 1 }}
+              >
+                {testingDesk ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FlaskConical size={13} />}
+                Test
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDeskGemini}
+                disabled={savingDesk || !deskKeyInput.trim()}
+                style={{ ...btnPrimary, background: '#15803d', whiteSpace: 'nowrap', opacity: (savingDesk || !deskKeyInput.trim()) ? 0.6 : 1 }}
+              >
+                {savingDesk ? (
+                  <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+                ) : (
+                  <><Key size={13} /> Save Desk Key</>
+                )}
+              </button>
+            </div>
+
+            {/* Test result */}
+            {deskTestResult && (
+              <div style={{
+                marginTop: 12, display: 'flex', gap: 7, alignItems: 'flex-start',
+                background: deskTestResult === 'ok' ? '#dcfce7' : 'rgba(224,92,92,0.08)',
+                border: `1px solid ${deskTestResult === 'ok' ? 'rgba(21,128,61,0.3)' : 'rgba(224,92,92,0.3)'}`,
+                borderRadius: 8, padding: '8px 12px',
+              }}>
+                {deskTestResult === 'ok'
+                  ? <CheckCircle2 size={14} color="#15803d" style={{ flexShrink: 0, marginTop: 1 }} />
+                  : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+                }
+                <p style={{ margin: 0, fontSize: 12, color: deskTestResult === 'ok' ? '#14532d' : '#c0392b' }}>{deskTestMsg}</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {deskErr && (
+              <div style={{ marginTop: 12, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
+                <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{deskErr}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
