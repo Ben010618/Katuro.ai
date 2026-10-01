@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
+import DeskFormattedText from './DeskFormattedText';
 
 export default function DeskAgentChatPanel({
   user,
@@ -276,9 +277,13 @@ export default function DeskAgentChatPanel({
                   )}
 
                   {/* Message Body */}
-                  <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">
-                    {msg.content}
-                  </div>
+                  {isAssistant ? (
+                    <DeskFormattedText text={msg.content} />
+                  ) : (
+                    <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">
+                      {msg.content}
+                    </div>
+                  )}
 
                   {/* Artifact Action Pills */}
                   {isAssistant && msg.artifacts && msg.artifacts.length > 0 && (

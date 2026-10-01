@@ -13,6 +13,7 @@ import {
   PanelRightClose,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
+import DeskFormattedText from './DeskFormattedText';
 
 export default function DeskCanvasPanel({ onCollapse }) {
   const { activeArtifact, saveCurrentArtifactToDisk, workspace } = useDeskStore();
@@ -289,9 +290,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
                 </div>
               </div>
 
-              <div className="whitespace-pre-wrap font-sans text-xs text-gray-800 leading-relaxed pt-2">
-                {artifactText}
-              </div>
+              <DeskFormattedText text={artifactText} className="pt-2 font-sans" />
             </div>
 
             {/* Official Footer / Sign-off */}

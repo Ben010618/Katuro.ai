@@ -172,7 +172,7 @@ Format output cleanly in Markdown with bold headers and tables.`;
 Answer the teacher's questions, execute their requests, provide pedagogical advice, or analyze their classroom files.
 Always be direct, warm, professional, encouraging, and accurate according to DepEd MATATAG guidelines and Philippine educational standards.
 Do NOT generate an unrequested Daily Lesson Log or formal template unless the teacher specifically requested one.
-Format your output cleanly in Markdown with bullet points, bold highlights, or tables where appropriate.`;
+Formatting Rules: Write with clean, highly readable text. Do not leave raw heading hashtags (like '###' or '##') or excessive asterisks ('**') or raw backticks. Use clean bullet points (•) and clear, professional spacing.`;
   }
 
   let userPrompt = `Teacher Request: "${prompt}"\nTarget Subject: ${subject} (${gradeLevel})`;
