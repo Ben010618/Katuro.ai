@@ -14,7 +14,6 @@ import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
-import FacultyCustomizerModal from '../../components/FacultyCustomizerModal';
 import { useDeskStore } from '../../store/deskStore';
 
 export default function KaTuroDeskPage() {
@@ -23,7 +22,6 @@ export default function KaTuroDeskPage() {
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [isFacultyModalOpen, setIsFacultyModalOpen] = useState(false);
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
@@ -75,7 +73,7 @@ export default function KaTuroDeskPage() {
               activeMobileTab === 'chat' ? 'bg-emerald-700 text-white' : 'text-gray-400'
             }`}
           >
-            Co-Teacher
+            Assistant
           </button>
           <button
             onClick={() => setActiveMobileTab('canvas')}
@@ -118,7 +116,6 @@ export default function KaTuroDeskPage() {
             <DeskFolderPanel
               user={user}
               tokenBalance={tokenBalance}
-              onOpenFacultyModal={() => setIsFacultyModalOpen(true)}
               onCollapse={() => setShowLeftPanel(false)}
             />
           </div>
@@ -189,7 +186,6 @@ export default function KaTuroDeskPage() {
               <DeskFolderPanel
                 user={user}
                 tokenBalance={tokenBalance}
-                onOpenFacultyModal={() => setIsFacultyModalOpen(true)}
               />
             </div>
           )}
@@ -210,12 +206,6 @@ export default function KaTuroDeskPage() {
           )}
         </div>
       </div>
-
-      {/* Faculty Avatar & Persona Customizer Modal */}
-      <FacultyCustomizerModal
-        isOpen={isFacultyModalOpen}
-        onClose={() => setIsFacultyModalOpen(false)}
-      />
     </div>
   );
 }

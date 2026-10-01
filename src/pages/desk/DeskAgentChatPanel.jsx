@@ -10,13 +10,11 @@ import {
   FileSpreadsheet,
   Presentation,
   Trash2,
-  Bot,
   AlertCircle,
   ExternalLink,
   PanelLeftOpen,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
-import { useFacultyStore } from '../../store/facultyStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
 
 export default function DeskAgentChatPanel({
@@ -33,16 +31,11 @@ export default function DeskAgentChatPanel({
     updateLastAssistantMessage,
     isGenerating,
     setIsGenerating,
-    activeAgentId,
-    setActiveAgent,
     workspace,
     activeFile,
     setActiveArtifact,
     clearConversation,
   } = useDeskStore();
-
-  const { faculty } = useFacultyStore();
-  const currentAgent = faculty[activeAgentId] || faculty.dll;
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [expandedSteps, setExpandedSteps] = useState({});
@@ -80,8 +73,8 @@ export default function DeskAgentChatPanel({
     addMessage({
       id: assistantMsgId,
       role: 'assistant',
-      agentId: activeAgentId,
-      content: 'Nagsisimulang maghanda ang iyong Co-Teacher...',
+      agentId: 'katuro_assistant',
+      content: 'Nagsisimulang magsuri at maghanda ang iyong KaTuro Assistant...',
       steps: [{ text: 'Initiating request...', status: 'running' }],
     });
 
@@ -90,7 +83,7 @@ export default function DeskAgentChatPanel({
     try {
       const result = await runDeskAgentTurn({
         prompt: textToSend.trim(),
-        agentId: activeAgentId,
+        agentId: 'katuro_assistant',
         workspace,
         activeFile,
         user,
@@ -143,19 +136,32 @@ export default function DeskAgentChatPanel({
 
   const QUICK_PROMPTS = [
     {
-      label: '📁 Multi-Doc Synthesis & Remediation Folder',
-      prompt: "Study 'Week 1 - Cell Theory.docx' and 'Q1_Summative_Test_1_with_TOS.docx', create a new folder named 'Remediation_Week1', and inside it generate a differentiated remedial worksheet for struggling learners.",
+      label: '📊 Quiz Item Analysis & LMC',
+      prompt: "Analyze our latest quiz scores. Identify the Least Mastered Competencies (LMC), calculate the mastery percentage, and generate the official DepEd Item Analysis remarks.",
     },
-    { label: '✨ Week 1 DLL (Science 7)', prompt: 'Create Week 1 Daily Lesson Log for Grade 7 Science Quarter 1 based on DepEd MATATAG standards.' },
-    { label: '📝 10-Item Formative Quiz', prompt: 'Generate a 10-item multiple choice formative assessment for Grade 7 Science with answer key.' },
-    { label: '📊 Table of Specifications (TOS)', prompt: 'Build a DepEd-standard Table of Specifications (TOS) matrix with 60% Easy, 30% Average, 10% Difficult distribution.' },
+    {
+      label: '🎯 Remediation & Re-test Slip',
+      prompt: "For the learners who scored below 75% on our recent assessment, create a 1-page Remedial Practice Slip and a 5-item Quick Re-test ready for 2-up printing.",
+    },
+    {
+      label: '📑 Encode to e-Class Record',
+      prompt: "Interpret these recent formative and summative scores and map them into the DepEd e-Class Record format (Written Works & Performance Tasks) with transmutation.",
+    },
+    {
+      label: '🚨 Check Attendance & SARDO',
+      prompt: "Review the attendance records in this folder. Flag any students with 3 or more consecutive absences and generate a DepEd Home Visitation Notice for them.",
+    },
+    {
+      label: '📁 Synthesize Docs into Subfolder',
+      prompt: "Study 'Week 1 - Cell Theory.docx' and 'Q1_Summative_Test_1_with_TOS.docx', create a new subfolder named 'Remediation_Week1', and generate the differentiated remedial package inside it.",
+    },
   ];
 
   return (
     <main className="flex-1 flex flex-col h-full bg-[#f8faf9] min-w-0">
-      {/* Co-Teacher Header & Persona Switcher */}
+      {/* KaTuro Teaching Assistant Header */}
       <header className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {!showLeftPanel && onToggleLeftPanel && (
             <button
               onClick={onToggleLeftPanel}
@@ -165,53 +171,32 @@ export default function DeskAgentChatPanel({
               <PanelLeftOpen size={16} />
             </button>
           )}
-          <div className="relative">
-            <img
-              src={currentAgent.avatar}
-              alt={currentAgent.customName || currentAgent.defaultName}
-              className="w-10 h-10 rounded-full border-2 border-emerald-500 shadow-sm object-cover bg-emerald-50"
-            />
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center shadow-xs">
+            <Sparkles size={18} className="text-emerald-200" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold text-gray-900">
-                {currentAgent.customName || currentAgent.defaultName}
+                KaTuro Teaching Assistant
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {currentAgent.role}
+                Co-Teacher Studio
               </span>
             </div>
-            <p className="text-[11px] text-gray-500 truncate max-w-sm">
-              {currentAgent.tagline || 'AI Co-Teacher ready to assist in your classroom folder'}
+            <p className="text-[11px] text-gray-500 truncate max-w-md">
+              Manipulate, analyze, encode & check classroom documents across your active folder
             </p>
           </div>
         </div>
 
-        {/* Persona quick buttons */}
         <div className="flex items-center gap-1.5">
-          <div className="hidden lg:flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-            {Object.values(faculty).slice(0, 4).map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setActiveAgent(f.id)}
-                className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${
-                  activeAgentId === f.id
-                    ? 'bg-white text-emerald-800 shadow-sm font-semibold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {f.customName || f.defaultName}
-              </button>
-            ))}
-          </div>
-
           <button
             onClick={clearConversation}
             title="Clear Chat History"
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition flex items-center gap-1 text-xs"
           >
-            <Trash2 size={15} />
+            <Trash2 size={14} />
+            <span className="hidden sm:inline">Clear Chat</span>
           </button>
         </div>
       </header>
@@ -221,7 +206,6 @@ export default function DeskAgentChatPanel({
         <div className="max-w-4xl mx-auto w-full space-y-4">
           {messages.map((msg) => {
             const isAssistant = msg.role === 'assistant';
-            const msgAgent = faculty[msg.agentId] || currentAgent;
             const isStepsOpen = expandedSteps[msg.id] ?? (isGenerating && isAssistant);
 
             return (
@@ -231,13 +215,11 @@ export default function DeskAgentChatPanel({
                   isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'
                 }`}
               >
-                {/* Avatar */}
+                {/* Assistant Badge vs User Avatar */}
                 {isAssistant ? (
-                  <img
-                    src={msgAgent.avatar}
-                    alt={msgAgent.customName || msgAgent.defaultName}
-                    className="w-8 h-8 rounded-full border border-emerald-300 shadow-xs flex-shrink-0 bg-emerald-50"
-                  />
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center flex-shrink-0 shadow-xs border border-emerald-600">
+                    <Sparkles size={14} className="text-emerald-200" />
+                  </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
                     {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'T'}
@@ -359,7 +341,7 @@ export default function DeskAgentChatPanel({
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Ask ${currentAgent.customName || currentAgent.defaultName} to create a lesson, quiz, or update a file... (Enter to send)`}
+              placeholder="Ask KaTuro Assistant to analyze quiz scores, create remediation slips, encode into e-Class Record, or synthesize docs... (Enter to send)"
               disabled={isGenerating}
               className="w-full bg-transparent text-gray-800 text-xs px-2 py-1 resize-none focus:outline-none placeholder-gray-400"
             />

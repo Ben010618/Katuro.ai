@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Plus,
   Folder,
-  Settings,
   PanelLeftClose,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
@@ -28,9 +27,8 @@ import {
   writeFileToDirectory,
   createDirectoryInWorkspace,
 } from '../../services/localFileSystem';
-import { useFacultyStore } from '../../store/facultyStore';
 
-export default function DeskFolderPanel({ user, tokenBalance = 0, onOpenFacultyModal, onCollapse }) {
+export default function DeskFolderPanel({ user, tokenBalance = 0, onCollapse }) {
   const { workspace, setWorkspace, refreshFiles, activeFile, setActiveFile } = useDeskStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
@@ -393,13 +391,6 @@ export default function DeskFolderPanel({ user, tokenBalance = 0, onOpenFacultyM
               </p>
             </div>
           </div>
-          <button
-            onClick={onOpenFacultyModal}
-            title="Customize Co-Teacher Avatars & Personas"
-            className="p-1 hover:bg-[#233529] text-[#9eb6a6] hover:text-white rounded transition"
-          >
-            <Settings size={13} />
-          </button>
         </div>
 
         {/* Token Balance & GCash Top-Up */}

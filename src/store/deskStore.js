@@ -9,9 +9,9 @@ import {
 const INITIAL_WELCOME_MESSAGE = {
   id: 'msg-welcome',
   role: 'assistant',
-  agentId: 'dll',
+  agentId: 'katuro_assistant',
   content:
-    'Kumusta! I am your AI Co-Teacher at **KaTuroDesk**.\n\nI can read, create, and organize DepEd lesson plans, quizzes, Table of Specifications, and PowerPoint slides directly in your classroom folder. Select a folder on the left or tell me what lesson you want to prepare today!',
+    'Kumusta Teacher! I am your **KaTuro Teaching Assistant**.\n\nI can manipulate, understand, analyze, encode, and check data across your active classroom folder. Select your DepEd folder on the left or ask me to run an Item Analysis, draft a Remediation Slip, encode grades into your e-Class Record, or synthesize documents into subfolders!',
   timestamp: Date.now(),
   steps: [
     { text: 'KaTuroDesk workspace initialized', status: 'done' },

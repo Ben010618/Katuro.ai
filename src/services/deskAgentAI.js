@@ -23,7 +23,7 @@ import {
 
 export async function runDeskAgentTurn({
   prompt,
-  agentId = 'dll',
+  agentId = 'katuro_assistant',
   workspace,
   activeFile,
   user,
@@ -143,9 +143,9 @@ export async function runDeskAgentTurn({
   // Step 4: Autonomous Generation via Gemini AI
   setStep('s4', 'Synthesizing data & formulating official DepEd structure...', 'running');
 
-  const systemInstruction = `You are a Master Teacher at the Philippine Department of Education.
-Active Persona ID: ${agentId}.
-Generate a comprehensive, DepEd-compliant Daily Lesson Log, Remedial Worksheet, or Assessment package.
+  const systemInstruction = `You are KaTuro Teaching Assistant, an autonomous DepEd co-teacher and administrative assistant embedded directly in the teacher's local classroom folder.
+Your primary role is to manipulate, analyze, understand, encode, and check classroom data (Item Analysis, Remediation Slips, e-Class Records, SF Attendance, DLLs, and assessments).
+Generate a comprehensive, DepEd-compliant document or data interpretation based on official Philippine standards.
 Strict rules:
 1. Target Competency: [${primaryComp.code}] ${primaryComp.text}
 2. Strictly follow DepEd structure: Objectives (Content & Performance Standards), Content, Learning Resources, Procedures (or Differentiated Activities).
