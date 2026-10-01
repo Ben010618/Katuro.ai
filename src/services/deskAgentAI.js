@@ -161,11 +161,12 @@ Format output cleanly in Markdown with bold headers and tables.`;
   let aiResponseText = '';
   try {
     const rawResult = await callGeminiProxy({
-      prompt: userPrompt,
-      systemInstruction,
+      action: 'dll_gen',
+      contents: [{ parts: [{ text: `${systemInstruction}\n\n${userPrompt}` }] }],
       temperature: 0.5,
+      maxTokens: 4096,
     });
-    aiResponseText = rawResult || 'Document generated successfully.';
+    aiResponseText = rawResult?.text || rawResult || 'Document generated successfully.';
   } catch (err) {
     console.warn('Gemini proxy error, using structured template fallback:', err);
     aiResponseText = `### OFFICIAL DEPED ${targetFolder ? 'DIFFERENTIATED REMEDIAL PACKAGE' : 'DAILY LESSON LOG (DLL)'}
