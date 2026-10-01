@@ -7,11 +7,8 @@ import {
   Eye,
   Check,
   FileText,
-  Presentation,
-  FileCheck,
   ChevronLeft,
   ChevronRight,
-  Maximize2,
   Sparkles,
   PanelRightClose,
 } from 'lucide-react';

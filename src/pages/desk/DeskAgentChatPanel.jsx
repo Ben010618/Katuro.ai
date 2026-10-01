@@ -69,7 +69,7 @@ export default function DeskAgentChatPanel({
     });
 
     // 2. Add Placeholder Assistant Message
-    const assistantMsgId = `msg-assistant-${Date.now()}`;
+    const assistantMsgId = `msg-assistant-${messages.length + 1}`;
     addMessage({
       id: assistantMsgId,
       role: 'assistant',

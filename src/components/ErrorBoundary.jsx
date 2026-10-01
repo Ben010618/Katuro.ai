@@ -5,10 +5,10 @@ import { auth } from '../firebase';
 import { reportAIError } from '../services/db';
 
 export default class ErrorBoundary extends Component {
-  state = { hasError: false };
+  state = { hasError: false, error: null };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, info) {
@@ -33,10 +33,18 @@ export default class ErrorBoundary extends Component {
           <h2 style={{ margin:'0 0 10px', fontSize:22, fontWeight:700, color:'#0d2218', fontFamily:'"Playfair Display", serif' }}>
             Something went wrong
           </h2>
-          <p style={{ margin:'0 0 24px', fontSize:14, color:'#4a6357', lineHeight:1.6 }}>
+          <p style={{ margin:'0 0 16px', fontSize:14, color:'#4a6357', lineHeight:1.6 }}>
             kaTuro ran into an unexpected error. This has been reported automatically.
             Try reloading the page — your work in Firestore is safe.
           </p>
+          {this.state.error?.message && (
+            <details style={{ margin: '0 0 20px', textAlign: 'left', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#64748b' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#c0392b' }}>Technical Details</summary>
+              <pre style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                {this.state.error.message}
+              </pre>
+            </details>
+          )}
           <button
             onClick={() => window.location.reload()}
             style={{

@@ -43,8 +43,6 @@ export default function DeskFolderPanel({ user, tokenBalance = 0, onCollapse }) 
     'Remediation_Week1': true,
   });
 
-  const { faculty } = useFacultyStore();
-
   const handleOpenFolder = async () => {
     setIsOpeningFolder(true);
     try {
