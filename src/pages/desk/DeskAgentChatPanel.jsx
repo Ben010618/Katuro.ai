@@ -1,25 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Send,
-  Sparkles,
-  CheckCircle2,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   FileText,
   FileSpreadsheet,
   Presentation,
   Trash2,
-  AlertCircle,
   ExternalLink,
   PanelLeftOpen,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
 import DeskFormattedText from './DeskFormattedText';
+import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
+import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
 
 export default function DeskAgentChatPanel({
   user,
+  profile,
+  photoURL,
   tokenBalance = 0,
   freeMode = false,
   onOpenCanvas,
@@ -39,8 +38,9 @@ export default function DeskAgentChatPanel({
   } = useDeskStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
-  const [expandedSteps, setExpandedSteps] = useState({});
   const messagesEndRef = useRef(null);
+
+  const teacherSalutationName = getTeacherSalutationName(profile, user);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,13 +49,6 @@ export default function DeskAgentChatPanel({
   useEffect(() => {
     scrollToBottom();
   }, [messages, isGenerating]);
-
-  const toggleSteps = (msgId) => {
-    setExpandedSteps((prev) => ({
-      ...prev,
-      [msgId]: !prev[msgId],
-    }));
-  };
 
   const handleSendPrompt = async (customText = null) => {
     const textToSend = customText || inputPrompt;
@@ -69,14 +62,14 @@ export default function DeskAgentChatPanel({
       content: textToSend.trim(),
     });
 
-    // 2. Add Placeholder Assistant Message
+    // 2. Add Placeholder Assistant Message with thinking state
     const assistantMsgId = `msg-assistant-${messages.length + 1}`;
     addMessage({
       id: assistantMsgId,
       role: 'assistant',
       agentId: 'katuro_assistant',
-      content: 'Nagsisimulang magsuri at maghanda ang iyong KaTuro Assistant...',
-      steps: [{ text: 'Initiating request...', status: 'running' }],
+      content: '',
+      isThinking: true,
     });
 
     setIsGenerating(true);
@@ -88,17 +81,15 @@ export default function DeskAgentChatPanel({
         workspace,
         activeFile,
         user,
+        profile,
         tokenBalance,
         freeMode,
-        onStepUpdate: (updatedSteps) => {
-          updateLastAssistantMessage({ steps: updatedSteps });
-        },
       });
 
       // Update assistant message with response and artifacts
       updateLastAssistantMessage({
         content: result.content,
-        steps: result.steps,
+        isThinking: false,
         artifacts: result.artifact ? [result.artifact] : [],
       });
 
@@ -112,7 +103,7 @@ export default function DeskAgentChatPanel({
       if (err.message === 'INSUFFICIENT_TOKENS') {
         updateLastAssistantMessage({
           content: '⚠️ Paumanhin Teacher, kinakailangan ng hindi bababa sa **2 tokens** upang maisagawa ang gawaing ito sa iyong classroom folder.\n\nPaki-click ang **Top-up / GCash** button sa kaliwa upang magpatuloy!',
-          steps: [{ text: 'Insufficient token balance', status: 'error' }],
+          isThinking: false,
         });
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
@@ -120,7 +111,7 @@ export default function DeskAgentChatPanel({
       } else {
         updateLastAssistantMessage({
           content: `⚠️ Naka-encounter ng error: ${err.message || 'Unknown network error'}. Subukan muling magpadala ng mensahe.`,
-          steps: [{ text: 'Execution halted with error', status: 'error' }],
+          isThinking: false,
         });
       }
     } finally {
@@ -172,9 +163,7 @@ export default function DeskAgentChatPanel({
               <PanelLeftOpen size={16} />
             </button>
           )}
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center shadow-xs">
-            <Sparkles size={18} className="text-emerald-200" />
-          </div>
+          <KaTuroAIAvatar size={36} />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold text-gray-900">
@@ -205,27 +194,26 @@ export default function DeskAgentChatPanel({
       {/* Conversation Messages */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
         <div className="max-w-4xl mx-auto w-full space-y-4">
-          {messages.map((msg) => {
+          {messages.map((msg, idx) => {
             const isAssistant = msg.role === 'assistant';
-            const isStepsOpen = expandedSteps[msg.id] ?? (isGenerating && isAssistant);
+            const showThinking =
+              isAssistant &&
+              (!msg.content || msg.isThinking || (isGenerating && idx === messages.length - 1 && !msg.content));
 
             return (
               <div
-                key={msg.id}
+                key={msg.id || idx}
                 className={`flex gap-3 max-w-3xl ${
                   isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'
                 }`}
               >
-                {/* Assistant Badge vs User Avatar */}
-                {isAssistant ? (
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center flex-shrink-0 shadow-xs border border-emerald-600">
-                    <Sparkles size={14} className="text-emerald-200" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                    {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'T'}
-                  </div>
-                )}
+                {/* Assistant Avatar vs User Avatar */}
+                <DeskAvatar
+                  role={msg.role}
+                  photoURL={photoURL || user?.photoURL}
+                  name={teacherSalutationName}
+                  size={32}
+                />
 
                 {/* Message Content Container */}
                 <div
@@ -235,49 +223,17 @@ export default function DeskAgentChatPanel({
                       : 'bg-[#2d6a4f] text-white border-emerald-800'
                   }`}
                 >
-                  {/* Antigravity Step Progression Card for Assistant */}
-                  {isAssistant && msg.steps && msg.steps.length > 0 && (
-                    <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50/80 overflow-hidden text-xs">
-                      <button
-                        onClick={() => toggleSteps(msg.id)}
-                        className="w-full px-3 py-2 flex items-center justify-between text-gray-600 hover:bg-gray-100/80 transition font-medium"
-                      >
-                        <div className="flex items-center gap-2">
-                          {isGenerating && msg.steps.some((s) => s.status === 'running') ? (
-                            <Loader2 size={13} className="animate-spin text-emerald-600" />
-                          ) : (
-                            <CheckCircle2 size={13} className="text-emerald-600" />
-                          )}
-                          <span>
-                            {msg.steps.filter((s) => s.status === 'done').length} of {msg.steps.length} steps completed
-                          </span>
-                        </div>
-                        {isStepsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </button>
-
-                      {isStepsOpen && (
-                        <div className="px-3 pb-2.5 pt-1 border-t border-gray-200/60 space-y-1.5">
-                          {msg.steps.map((step, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-[11px] text-gray-600">
-                              {step.status === 'done' ? (
-                                <CheckCircle2 size={12} className="text-emerald-600 flex-shrink-0" />
-                              ) : step.status === 'error' ? (
-                                <AlertCircle size={12} className="text-rose-500 flex-shrink-0" />
-                              ) : (
-                                <Loader2 size={12} className="animate-spin text-amber-500 flex-shrink-0" />
-                              )}
-                              <span className={step.status === 'running' ? 'font-medium text-gray-900' : ''}>
-                                {step.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Message Body */}
-                  {isAssistant ? (
+                  {showThinking ? (
+                    <div className="flex items-center gap-2 py-1 text-gray-500 text-xs">
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-[11px] text-gray-400 italic">...</span>
+                    </div>
+                  ) : isAssistant ? (
                     <DeskFormattedText text={msg.content} />
                   ) : (
                     <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">
@@ -321,9 +277,6 @@ export default function DeskAgentChatPanel({
       {/* Quick Prompt Pills */}
       <div className="px-4 py-2 border-t border-gray-100 bg-white/70 overflow-x-auto flex items-center gap-2">
         <div className="max-w-4xl mx-auto w-full flex items-center gap-2 overflow-x-auto py-0.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-gray-600 flex-shrink-0">
-            Suggested:
-          </span>
           {QUICK_PROMPTS.map((qp, idx) => (
             <button
               key={idx}
@@ -346,7 +299,7 @@ export default function DeskAgentChatPanel({
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask KaTuro Assistant to analyze quiz scores, create remediation slips, encode into e-Class Record, or synthesize docs... (Enter to send)"
+              placeholder="Message your Co-Teacher... (Press Enter to send)"
               disabled={isGenerating}
               className="w-full bg-transparent text-gray-800 text-xs px-2 py-1 resize-none focus:outline-none placeholder-gray-400"
             />

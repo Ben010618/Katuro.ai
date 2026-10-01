@@ -17,7 +17,7 @@ import DeskCanvasPanel from './DeskCanvasPanel';
 import { useDeskStore } from '../../store/deskStore';
 
 export default function KaTuroDeskPage() {
-  const { user, tokenBalance, freeMode } = useAuth();
+  const { user, profile, photoURL, tokenBalance, freeMode } = useAuth();
   const { workspace, activeArtifact } = useDeskStore();
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
@@ -136,6 +136,8 @@ export default function KaTuroDeskPage() {
         <div className="hidden md:flex flex-1 h-full min-w-0 transition-all duration-200">
           <DeskAgentChatPanel
             user={user}
+            profile={profile}
+            photoURL={photoURL}
             tokenBalance={tokenBalance}
             freeMode={freeMode}
             onOpenCanvas={() => setShowRightPanel(true)}
@@ -193,6 +195,8 @@ export default function KaTuroDeskPage() {
             <div className="w-full h-full">
               <DeskAgentChatPanel
                 user={user}
+                profile={profile}
+                photoURL={photoURL}
                 tokenBalance={tokenBalance}
                 freeMode={freeMode}
                 onOpenCanvas={() => setActiveMobileTab('canvas')}
