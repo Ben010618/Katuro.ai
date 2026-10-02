@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getTeacherProfile, updateTeacherProfile } from '../services/db';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { PLAN_LIMITS, planStatusText, manilaToday, SUBSCRIBE_CONTACT_URL } from '../services/plans';
 import { useToast } from '../context/ToastContext';
-import { Loader2, CheckCircle, User, CreditCard, Shield, Lock } from 'lucide-react';
+import { Loader2, User, CreditCard, Shield, Lock } from 'lucide-react';
 
 const TABS = [
   { label: 'Profile',      Icon: User },
-  { label: 'Subscription', Icon: CreditCard },
+  { label: 'Plan', Icon: CreditCard },
   { label: 'Account',      Icon: Shield },
 ];
 
@@ -26,8 +29,19 @@ function LabeledField({ label, children }) {
 
 export default function SettingsPage() {
   const { addToast }  = useToast();
-  const { user }      = useAuth();
-  const [tab, setTab] = useState(0);
+  const { user, plan } = useAuth();
+  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'plan' ? 1 : 0));
+  const [usageToday, setUsageToday] = useState(null);
+
+  // Today's AI usage (server-kept counters, read-only for teachers).
+  useEffect(() => {
+    if (tab !== 1 || !user?.uid) return undefined;
+    let cancelled = false;
+    getDoc(doc(db, 'teachers', user.uid, 'usage', manilaToday()))
+      .then((snap) => { if (!cancelled) setUsageToday(snap.data() || {}); })
+      .catch(() => { if (!cancelled) setUsageToday({}); });
+    return () => { cancelled = true; };
+  }, [tab, user?.uid]);
 
   const [profile, setProfile] = useState({
     name:    user?.displayName || '',
@@ -210,62 +224,61 @@ export default function SettingsPage() {
           {tab === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Subscription</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Your current plan and usage.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Your plan</h2>
+                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Plans are activated by the KaTuro admin. Free plans have lower daily AI limits; Subscriptions get the full limits.</p>
               </div>
 
               {/* Plan card */}
               <div style={{
-                background: 'linear-gradient(135deg, #f5faf7 0%, #d8f3dc 100%)',
+                background: plan.plan === 'subscription' ? 'linear-gradient(135deg, #1F3A2E 0%, #2d6a4f 100%)' : 'linear-gradient(135deg, #f5faf7 0%, #d8f3dc 100%)',
                 border: '1px solid rgba(45,106,79,0.2)', borderRadius: 14, padding: '20px 24px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
               }}>
                 <div>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Current Plan</p>
-                  <p style={{ margin: '4px 0 2px', fontSize: 22, fontWeight: 700, color: '#0d2218' }}>Free Plan</p>
-                  <p style={{ margin: 0, fontSize: 13, color: '#4a6357' }}>Limited to 3 AI generations per month</p>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: plan.plan === 'subscription' ? '#E4D5AC' : '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Current plan</p>
+                  <p style={{ margin: '4px 0 2px', fontSize: 22, fontWeight: 700, color: plan.plan === 'subscription' ? '#fff' : '#0d2218' }}>{plan.label}</p>
+                  <p style={{ margin: 0, fontSize: 13, color: plan.plan === 'subscription' ? '#d8f3dc' : '#4a6357' }}>
+                    {planStatusText(plan)}{plan.expiringSoon ? ` · ${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'} left` : ''}
+                  </p>
                 </div>
-                <button style={{
-                  background: '#2d6a4f', color: '#fff', border: 'none', borderRadius: 10,
-                  padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
-                  opacity: 0.5,
-                }} disabled>
-                  Upgrade (Coming Soon)
-                </button>
-              </div>
-
-              {/* Usage stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-                {[
-                  { label: 'AI Generations Used', used: 2, total: 3 },
-                  { label: 'Lesson Plans', used: 5, total: 10 },
-                  { label: 'Quiz Exports', used: 3, total: 5 },
-                ].map(({ label, used, total }) => (
-                  <div key={label} style={{
-                    background: '#f5faf7', borderRadius: 12, padding: '14px 16px',
-                    border: '1px solid rgba(45,106,79,0.12)',
+                {(plan.plan === 'free' || plan.expiringSoon) && (
+                  <a href={SUBSCRIBE_CONTACT_URL} target="_blank" rel="noreferrer" style={{
+                    background: plan.plan === 'subscription' ? '#E4D5AC' : '#2d6a4f', color: plan.plan === 'subscription' ? '#1F3A2E' : '#fff',
+                    borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, textDecoration: 'none',
                   }}>
-                    <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, height: 6, borderRadius: 100, background: 'rgba(45,106,79,0.12)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(used / total) * 100}%`, background: '#40916c', borderRadius: 100 }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', flexShrink: 0, fontFamily: '"DM Mono", monospace' }}>{used}/{total}</span>
-                    </div>
-                  </div>
-                ))}
+                    {plan.plan === 'free' ? 'Message KaTuro to subscribe' : 'Message KaTuro to renew'}
+                  </a>
+                )}
               </div>
 
-              <div style={{
-                background: '#f0f6ff', border: '1px solid rgba(37,99,235,0.2)',
-                borderRadius: 12, padding: '12px 16px',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <CheckCircle size={16} color="#3b82f6" />
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e40af' }}>
-                  Pro plan coming soon — unlimited AI generations, advanced analytics, and priority support.
-                </p>
+              {/* Daily limits, with today's usage */}
+              <div style={{ border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f5faf7', textAlign: 'left', color: '#4a6357' }}>
+                      <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px' }}>Daily limit</th>
+                      <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', background: plan.plan === 'free' ? '#d8f3dc' : undefined }}>Free</th>
+                      <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', background: plan.plan === 'subscription' ? '#d8f3dc' : undefined }}>Subscription</th>
+                      <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px' }}>Used today</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {PLAN_LIMITS.map((row) => {
+                      const used = usageToday?.[row.action] ?? 0;
+                      const limit = row[plan.plan];
+                      return (
+                        <tr key={row.action} style={{ borderTop: '1px solid rgba(45,106,79,0.1)' }}>
+                          <td style={{ padding: '9px 14px', color: '#0d2218' }}>{row.feature}</td>
+                          <td style={{ padding: '9px 14px', fontWeight: plan.plan === 'free' ? 700 : 400 }}>{row.free}</td>
+                          <td style={{ padding: '9px 14px', fontWeight: plan.plan === 'subscription' ? 700 : 400 }}>{row.subscription}</td>
+                          <td style={{ padding: '9px 14px', fontFamily: '"DM Mono", monospace', color: used >= limit ? '#c0392b' : '#2d6a4f' }}>{used}/{limit}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+              <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>Limits reset every midnight (Philippine time).</p>
             </div>
           )}
 

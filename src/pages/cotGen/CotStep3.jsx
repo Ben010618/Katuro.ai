@@ -4,7 +4,7 @@ import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateCotLesson } from '../../services/cotAI';
-import { deductTokens, refundTokens, saveCotPlan } from '../../services/db';
+import { saveCotPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function CotStep3() {
   const navigate     = useNavigate();
   const store        = useCotStore();
   const { addToast } = useToast();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
 
   const [generating, setGenerating] = useState(false);
   const [progress,   setProgress]   = useState(0);
@@ -43,15 +43,7 @@ export default function CotStep3() {
     setGenerating(true);
     setGenError(null);
     setProgress(5);
-    setStatusMsg(freeMode ? 'Preparing…' : 'Checking tokens…');
-
-    try {
-      await deductTokens(user.uid, 'cot-lesson');
-    } catch (err) {
-      setGenerating(false);
-      setGenError(err.message);
-      return;
-    }
+    setStatusMsg('Preparing…');
 
     const genId = ++activeRef.current;
     const elapsedMs = startTimer();
@@ -97,12 +89,13 @@ export default function CotStep3() {
     if (!plan) {
       setGenerating(false);
       setGenError(
-        lastErr?.status === 429
+        lastErr?.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : lastErr?.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (lastErr?.message || 'Generation failed. Check your connection and try again.')
       );
       trackGeneration(user.uid, 'cot', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
-      refundTokens(user.uid, 'cot-lesson').catch(e => console.error('Token refund failed:', e));
       return;
     }
 
@@ -279,7 +272,7 @@ export default function CotStep3() {
               Generate Now <ArrowRight size={18} />
             </button>
             <p style={{ margin: '12px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              {freeMode ? 'Generation takes 15–30 seconds' : 'Costs 3 tokens · Generation takes 15–30 seconds'}
+              Generation takes 15–30 seconds
             </p>
           </>
         ) : (

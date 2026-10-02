@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
-import { useAuth } from '../../hooks/useAuth';
 import { BookOpen, CalendarDays, ArrowRight, RotateCcw, Award, CheckCircle2, Sparkles } from 'lucide-react';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
 
@@ -52,7 +51,6 @@ const TYPES = [
 export default function LessonGenGateway() {
   const navigate = useNavigate();
   const store    = useLessonGenStore();
-  const { freeMode } = useAuth();
 
   const hasDraft = !!(store.subject || store.selectedDays?.length > 0);
 
@@ -218,25 +216,7 @@ export default function LessonGenGateway() {
                   paddingTop: 12,
                   borderTop: '1px solid var(--kt-border, #DCD0AE)',
                 }}>
-                  {!freeMode ? (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'var(--kt-text-secondary, #6E6455)',
-                      fontFamily: 'var(--kt-font-mono, monospace)',
-                    }}>
-                      3 tokens
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: 'var(--kt-sage, #5F7A54)',
-                      fontFamily: 'var(--kt-font-mono, monospace)',
-                    }}>
-                      FREE MODE
-                    </span>
-                  )}
+                  <span />
 
                   <div style={{
                     display: 'inline-flex',

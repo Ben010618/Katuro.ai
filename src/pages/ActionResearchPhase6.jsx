@@ -4,7 +4,6 @@ import { Sparkles, Loader2, MessageSquare, BookOpen, ListChecks, Lightbulb, Hear
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens, refundTokens } from '../services/db';
 import { interpretFindings, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import ActionResearchShell  from '../components/ActionResearchShell';
@@ -50,7 +49,7 @@ const fieldStyle = {
 
 export default function ActionResearchPhase6() {
   const { docId }  = useParams();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,     setDocData]     = useState(null);
@@ -80,10 +79,7 @@ export default function ActionResearchPhase6() {
     if (!user?.uid || !docData || rawData.trim().length < 30 || generating) return;
     setGenerating(true); setError(''); setStatusMsg('Isinusulat ang kumpletong Chapter V (Results & Discussion) — maaaring tumagal nang 20–40 segundo…');
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'action-research-findings', 30);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -101,6 +97,7 @@ export default function ActionResearchPhase6() {
         } catch (err) {
           lastErr = err;
           console.warn(`interpretFindings attempt ${attempt + 1} failed:`, err);
+          if (err.dailyLimit) break;
           if (attempt < 2) {
             const wait = err.status === 429
               ? Math.min((err.retryAfter || 30) * 1000, 30_000)
@@ -123,13 +120,12 @@ export default function ActionResearchPhase6() {
       trackGeneration(user.uid, 'ar_phase6', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(
-        err.status === 429
+        err.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : err.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'action-research-findings', 30).catch(e => console.error('Token refund failed:', e));
-      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase6', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -283,7 +279,7 @@ export default function ActionResearchPhase6() {
               </>
             ) : (
               <>
-                <Sparkles size={14} /> {findings ? 'Muling Isulat ang Findings' : 'Bumuo ng Findings & Full Report'}{!freeMode && ' (30 tokens)'}
+                <Sparkles size={14} /> {findings ? 'Muling Isulat ang Findings' : 'Bumuo ng Findings & Full Report'}
               </>
             )}
           </button>

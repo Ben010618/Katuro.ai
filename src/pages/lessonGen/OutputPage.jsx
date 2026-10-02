@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useCotStore } from '../../store/cotStore';
-import { getTeacherProfile, deductTokens, refundTokens, createSharedPlan, saveIlawPlan } from '../../services/db';
+import { getTeacherProfile, createSharedPlan, saveIlawPlan } from '../../services/db';
 import { trackEvent } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
@@ -167,7 +167,7 @@ function InfoRow({ label, value }) {
 export default function OutputPage() {
   const navigate      = useNavigate();
   const { addToast }  = useToast();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const store         = useLessonGenStore();
   const cotStore      = useCotStore();
 
@@ -299,10 +299,10 @@ export default function OutputPage() {
       });
 
       const engineBadge = engine === 'nvidia' ? ' (NVIDIA NIM)' : '';
-      addToast(freeMode ? `Presentation downloaded!${engineBadge}` : `Presentation downloaded! (3 tokens used)${engineBadge}`, 'success');
+      addToast(`Presentation downloaded!${engineBadge}`, 'success');
       setSelectedSession(null);
     } catch (err) {
-      addToast(err.message || 'Presentation generation failed. Please try again.', 'error');
+      addToast(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Presentation generation failed. Please try again.'), 'error');
       console.error('PPT error:', err);
     } finally {
       setPptLoading(false);
@@ -324,10 +324,7 @@ export default function OutputPage() {
     };
     setGameLoading(true);
     setGameModal('loading');
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'game_gen', 0.5);
-      tokensDeducted = true;
       let data;
       if (selGameType === 'matching') {
         const pairs = await genMatching(lesson, gameCount);
@@ -349,13 +346,10 @@ export default function OutputPage() {
       }
       setGameResult(data);
       setGameModal('result');
-      addToast(freeMode ? 'Game generated!' : 'Game generated! (0.5 tokens used)', 'success');
+      addToast('Game generated!', 'success');
     } catch (err) {
-      addToast(err.message || 'Game generation failed.', 'error');
+      addToast(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Game generation failed.'), 'error');
       setGameModal('pick');
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'game_gen', 0.5).catch(e => console.error('Token refund failed:', e));
-      }
     } finally {
       setGameLoading(false);
     }
@@ -635,7 +629,7 @@ export default function OutputPage() {
                   melc: store.competencyText,
                   preview,
                 });
-                const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
+                const url = `${window.location.origin}/shared/${shareId}`;
                 trackEvent(user?.uid, 'lesson_shared', { subject: store.subject });
                 setShareUrl(url);
               } catch {
@@ -861,7 +855,7 @@ export default function OutputPage() {
                 >
                   {pptLoading
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
-                    : <><Presentation size={14} color="var(--kt-manila)" /> Presentation Deck (PPTX) {!freeMode && <span style={{ fontSize: 11, opacity: 0.8, color: 'var(--kt-manila)' }}>· 3 tokens</span>}</>}
+                    : <><Presentation size={14} color="var(--kt-manila)" /> Presentation Deck (PPTX)</>}
                 </button>
 
                 <button
@@ -879,7 +873,7 @@ export default function OutputPage() {
                   onMouseEnter={e => e.currentTarget.style.background = '#dac797'}
                   onMouseLeave={e => e.currentTarget.style.background = 'var(--kt-manila)'}
                 >
-                  <Gamepad2 size={14} /> Interactive Game Worksheet {!freeMode && <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', fontWeight: 600 }}>(0.5 token)</span>}
+                  <Gamepad2 size={14} /> Interactive Game Worksheet
                 </button>
               </div>
             </div>
@@ -918,7 +912,7 @@ export default function OutputPage() {
             {/* Pick step */}
             {gameModal === 'pick' && (
               <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#4b5563' }}>Select a classroom activity format and question count.{!freeMode && ' (0.5 token)'}</p>
+                <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#4b5563' }}>Select a classroom activity format and question count.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
                   {GAME_TYPES.map(gt => (
                     <button
@@ -949,7 +943,7 @@ export default function OutputPage() {
                   disabled={gameLoading}
                   style={{ width: '100%', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 20px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
                 >
-                  <Gamepad2 size={14} /> Generate Worksheet {!freeMode && <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '2px 5px', fontWeight: 700 }}>0.5 token</span>}
+                  <Gamepad2 size={14} /> Generate Worksheet
                 </button>
               </div>
             )}

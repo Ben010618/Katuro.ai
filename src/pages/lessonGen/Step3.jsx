@@ -4,7 +4,7 @@ import { useLessonGenStore } from '../../store/lessonGenStore';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { generateIlawSession } from '../../services/ai';
-import { saveIlawPlan, deductTokens, refundTokens } from '../../services/db';
+import { saveIlawPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { retryAsync } from '../../utils/retry';
 import { ArrowRight, AlertCircle } from 'lucide-react';
@@ -36,7 +36,7 @@ export default function Step3() {
   const navigate     = useNavigate();
   const store        = useLessonGenStore();
   const { addToast } = useToast();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
 
   const [decl,       setDecl]       = useState(store.declarationOfAIUse);
   const [generating, setGenerating] = useState(false);
@@ -74,14 +74,7 @@ export default function Step3() {
     setGenerating(true);
     setGenError(null);
     setProgress(5);
-    setStatusMsg(freeMode ? 'Preparing…' : 'Checking tokens…');
-    try {
-      await deductTokens(user.uid, 'lesson');
-    } catch (err) {
-      setGenerating(false);
-      setGenError(err.message);
-      return;
-    }
+    setStatusMsg('Preparing…');
 
     const genId = ++activeGenRef.current;
     const elapsedMs = startTimer();
@@ -139,6 +132,11 @@ export default function Step3() {
           }
         }
       }
+      if (lastErr?.dailyLimit) {
+        const limitErr = new Error("You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits.");
+        limitErr.dailyLimit = true;
+        throw limitErr;
+      }
       const REASON_MESSAGES = {
         429:            'Rate limit reached — wait a moment and try again.',
         truncated:      'The AI response was cut off. Try again — it usually succeeds on retry.',
@@ -159,15 +157,14 @@ export default function Step3() {
     const failed = results.filter(r => r.status === 'rejected');
     if (failed.length > 0) {
       setGenerating(false);
+      const limitHit = failed.find(r => r.reason?.dailyLimit);
       setGenError(
-        failed.length === 1
+        limitHit
+          ? limitHit.reason.message
+          : failed.length === 1
           ? failed[0].reason.message
           : `${failed.length} sessions could not be generated. Check your connection and try again.`
       );
-      // The lesson charge already went through before generation started —
-      // refund it since no usable plan came out of this attempt. Best-effort:
-      // a refund failure shouldn't replace the real error shown above.
-      refundTokens(user.uid, 'lesson').catch(err => console.error('Token refund failed:', err));
       trackGeneration(user.uid, 'ilaw', {
         success: false,
         durationMs: elapsedMs(),

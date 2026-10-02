@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 import { ClipboardList, ClipboardCheck, ArrowRight, CheckCircle2, Sparkles, ScanLine, FileSpreadsheet } from 'lucide-react';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
 
@@ -36,7 +35,6 @@ const TYPES = [
 
 export default function AssessmentGateway() {
   const navigate = useNavigate();
-  const { freeMode } = useAuth();
 
   const HANDLERS = {
     quiz: () => navigate('/quiz-builder'),
@@ -223,25 +221,7 @@ export default function AssessmentGateway() {
                   paddingTop: 14,
                   borderTop: '1px solid var(--kt-border, #DCD0AE)',
                 }}>
-                  {!freeMode ? (
-                    <span style={{
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: 'var(--kt-text-secondary, #6E6455)',
-                      fontFamily: 'var(--kt-font-mono, monospace)',
-                    }}>
-                      3 tokens per gen
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      color: 'var(--kt-sage, #5F7A54)',
-                      fontFamily: 'var(--kt-font-mono, monospace)',
-                    }}>
-                      FREE MODE
-                    </span>
-                  )}
+                  <span />
 
                   <div style={{
                     display: 'inline-flex',

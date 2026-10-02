@@ -4,6 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { teacherRef, applyPendingPassword } from '../services/db';
 import { trackEvent } from '../services/usageTracker';
+import { planInfo } from '../services/plans';
 
 export function useAuth() {
   const [user,     setUser]     = useState(null);
@@ -36,7 +37,7 @@ export function useAuth() {
     return unsub;
   }, [user?.uid]);
 
-  // Subscribe to global free-mode flag (adminConfig/billing)
+  // Global "free for everyone" promo switch (adminConfig/billing.freeMode)
   useEffect(() => {
     const unsub = onSnapshot(
       doc(db, 'adminConfig', 'billing'),
@@ -54,7 +55,8 @@ export function useAuth() {
     // photoURL prefers Firestore (real-time after upload) over stale Firebase Auth value
     photoURL:        profile?.photoURL         || user?.photoURL || null,
     isAdmin:         profile?.isAdmin          ?? false,
-    tokenBalance:    profile?.tokenBalance     ?? 0,
+    // Access plan: { plan: 'free'|'subscription', mode, until, daysLeft, expired, expiringSoon, freeForAll, label }
+    plan:            planInfo(profile, freeMode),
     disabled:        profile?.disabled         ?? false,
     pendingApproval: profile?.pendingApproval  ?? false,
   };

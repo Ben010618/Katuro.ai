@@ -5,11 +5,12 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import {
-  getAllTeachers, adminCreateUser, adminSetDisabled, adminAddTokens,
+  getAllTeachers, adminCreateUser, adminSetDisabled, adminSetAccess,
   adminChangePassword, adminDeleteUser,
   subscribeAdminNotifications, markAllNotificationsRead,
-  adminSetFreeMode, subscribeFreeModeStatus, adminEqualizeTokens,
+  adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
+import { planInfo, planStatusText, formatPlanDate } from '../services/plans';
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
@@ -22,7 +23,7 @@ import {
 } from 'recharts';
 import ktLogo from '../assets/KT-Favicon.webp';
 import {
-  Users, Plus, Coins, ShieldOff, ShieldCheck, LogOut,
+  Users, Plus, BadgeCheck, ShieldOff, ShieldCheck, LogOut,
   X, Loader2, AlertCircle, RefreshCw, LayoutDashboard,
   Key, Eye, EyeOff, CheckCircle2, FlaskConical, Lock,
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
@@ -107,10 +108,11 @@ function Modal({ onClose, title, children }) {
 }
 
 // ── Add User modal ────────────────────────────────────────────────────────────
-function AddUserModal({ adminUid, onClose, onSuccess }) {
+function AddUserModal({ onClose, onSuccess }) {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [tokens,   setTokens]   = useState(0);
+  const [plan,     setPlan]     = useState('free');
+  const [until,    setUntil]    = useState(defaultSubscriptionEnd());
   const [saving,   setSaving]   = useState(false);
   const [err,      setErr]      = useState('');
 
@@ -120,7 +122,7 @@ function AddUserModal({ adminUid, onClose, onSuccess }) {
     if (password.length < 6) { setErr('Password must be at least 6 characters.'); return; }
     setSaving(true); setErr('');
     try {
-      await adminCreateUser(email.trim().toLowerCase(), password, Number(tokens) || 0, adminUid);
+      await adminCreateUser(email.trim().toLowerCase(), password, { plan, subscriptionUntil: plan === 'subscription' ? until || null : null });
       onSuccess();
       onClose();
     } catch (ex) {
@@ -142,9 +144,8 @@ function AddUserModal({ adminUid, onClose, onSuccess }) {
           <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 6 characters" required />
         </div>
         <div>
-          <label style={labelStyle}>Initial Tokens</label>
-          <input style={inputStyle} type="number" min={0} value={tokens} onChange={e => setTokens(e.target.value)} placeholder="0" />
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 Lesson Plan or 1 Quiz</p>
+          <label style={labelStyle}>Plan</label>
+          <PlanPicker plan={plan} setPlan={setPlan} until={until} setUntil={setUntil} />
         </div>
         {err && (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
@@ -163,46 +164,105 @@ function AddUserModal({ adminUid, onClose, onSuccess }) {
   );
 }
 
-// ── Add Tokens modal ──────────────────────────────────────────────────────────
-function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
-  const [amount, setAmount] = useState('');
+// ── Plans (Free / Subscription) ───────────────────────────────────────────────
+// Default subscription end: the coming June 30 (end of a DepEd school year).
+function defaultSubscriptionEnd(now = new Date()) {
+  const y = now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
+  return `${y}-06-30`;
+}
+
+function PlanPicker({ plan, setPlan, until, setUntil }) {
+  const noEnd = plan === 'subscription' && !until;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {[
+          { id: 'free', title: 'Free', desc: 'Lower daily AI limits' },
+          { id: 'subscription', title: 'Subscription', desc: 'Full daily AI limits' },
+        ].map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => setPlan(o.id)}
+            aria-pressed={plan === o.id}
+            style={{
+              flex: 1, textAlign: 'left', cursor: 'pointer', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit',
+              border: plan === o.id ? '2px solid #2d6a4f' : '1px solid var(--kt-border)',
+              background: plan === o.id ? '#d8f3dc' : 'var(--kt-surface)',
+            }}
+          >
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{o.title}</span>
+            <span style={{ display: 'block', fontSize: 11, color: 'var(--kt-text-secondary)' }}>{o.desc}</span>
+          </button>
+        ))}
+      </div>
+      {plan === 'subscription' && (
+        <div>
+          <label style={labelStyle}>Subscription ends on</label>
+          <input style={{ ...inputStyle, opacity: noEnd ? 0.5 : 1 }} type="date" value={until || ''} disabled={noEnd} onChange={(e) => setUntil(e.target.value)} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+            <input type="checkbox" checked={noEnd} onChange={(e) => setUntil(e.target.checked ? '' : defaultSubscriptionEnd())} /> No end date
+          </label>
+          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>When it ends, the teacher goes back to Free automatically. They see a renewal reminder 7 days before.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanBadge({ teacher }) {
+  const info = planInfo(teacher);
+  const sub = info.mode === 'subscription';
+  const ended = sub && info.expired;
+  return (
+    <span title={planStatusText(info)} style={{
+      fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap',
+      background: ended ? 'rgba(224,92,92,0.1)' : sub ? '#1F3A2E' : 'var(--kt-surface)',
+      color: ended ? '#c0392b' : sub ? '#E4D5AC' : 'var(--kt-text-secondary)',
+      border: sub && !ended ? 'none' : '1px solid var(--kt-border)',
+    }}>
+      {ended ? `Ended ${formatPlanDate(info.until)}` : sub ? (info.until ? `Subscription · until ${formatPlanDate(info.until)}` : 'Subscription') : 'Free'}
+    </span>
+  );
+}
+
+function SetPlanModal({ target, onClose, onSuccess }) {
+  const current = planInfo(target);
+  const [plan,   setPlan]   = useState(current.mode);
+  const [until,  setUntil]  = useState(current.until ? current.until.toLocaleDateString('en-CA') : defaultSubscriptionEnd());
   const [note,   setNote]   = useState('');
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const n = Number(amount);
-    if (!n || n < 1) { setErr('Enter a positive token amount.'); return; }
+    if (plan === 'subscription' && until && until < new Date().toLocaleDateString('en-CA')) {
+      setErr('The end date is in the past. Pick a future date, or tick "No end date".');
+      return;
+    }
     setSaving(true); setErr('');
     try {
-      await adminAddTokens(target.id, n, note.trim() || `Admin top-up`, adminUid);
+      await adminSetAccess(target.id, plan, plan === 'subscription' ? until || null : null, note.trim());
       onSuccess();
       onClose();
     } catch (ex) {
-      setErr(ex.message || 'Failed to add tokens.');
+      setErr(ex.message || 'Failed to update the plan.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal onClose={onClose} title={`Add Tokens — ${target.email}`}>
+    <Modal onClose={onClose} title={`Plan — ${target.displayName || target.email}`}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: 'var(--kt-surface)', borderRadius: 8, padding: '10px 14px' }}>
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>Current balance</p>
-          <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>
-            {target.tokenBalance ?? 0} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--kt-text-secondary)' }}>tokens</span>
-          </p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>Current plan</p>
+          <p style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary)' }}>{planStatusText(current)}</p>
         </div>
-        <div>
-          <label style={labelStyle}>Tokens to Add</label>
-          <input style={inputStyle} type="number" min={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 9" required />
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>3 tokens = 1 AI action</p>
-        </div>
+        <PlanPicker plan={plan} setPlan={setPlan} until={until} setUntil={setUntil} />
         <div>
           <label style={labelStyle}>Note (optional)</label>
-          <input style={inputStyle} type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. September allocation" />
+          <input style={inputStyle} type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Paid via GCash, ref 1234 — SY 2026-2027" />
         </div>
         {err && (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '10px 12px' }}>
@@ -213,7 +273,7 @@ function AddTokensModal({ target, adminUid, onClose, onSuccess }) {
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
           <button type="button" onClick={onClose} style={btnSecondary}>Cancel</button>
           <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
-            {saving ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><Coins size={14} /> Add Tokens</>}
+            {saving ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><BadgeCheck size={14} /> Save plan</>}
           </button>
         </div>
       </form>
@@ -418,7 +478,7 @@ function UserDetailsModal({ teacher: t, onClose }) {
             <Row label="Last Name"    value={t.surname} />
             <Row label="School"       value={t.school} />
             <Row label="Email"        value={t.email} />
-            <Row label="Token Balance" value={t.tokenBalance !== undefined ? `${t.tokenBalance} tokens` : undefined} />
+            <Row label="Plan" value={planStatusText(planInfo(t))} />
             <Row label="Signed Up"    value={createdAt} />
           </div>
         </div>
@@ -2325,10 +2385,10 @@ function FreeModeSection() {
     try {
       const next = !freeMode;
       await adminSetFreeMode(next, note.trim() || undefined);
-      setOk(next ? 'Free mode enabled — all AI features are now free for all teachers.' : 'Free mode disabled — tokens are now required.');
+      setOk(next ? 'Free for everyone is ON — every teacher now gets Subscription-level daily limits.' : "Free for everyone is OFF — each teacher is back on their own plan.");
       setNote('');
     } catch (e) {
-      setErr(e.message || 'Failed to update free mode.');
+      setErr(e.message || 'Failed to update the promo switch.');
     } finally {
       setSaving(false);
     }
@@ -2341,9 +2401,9 @@ function FreeModeSection() {
           <Gift size={16} color={freeMode ? '#2d6a4f' : '#d97706'} />
         </div>
         <div>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Free Mode</h3>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Free for Everyone (promo)</h3>
           <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-            When ON, all AI features are completely free — no tokens deducted. Use during the launch phase to build habit.
+            When ON, every teacher gets Subscription-level daily limits, whatever their own plan. Use for launch periods and promos.
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2354,7 +2414,7 @@ function FreeModeSection() {
             onClick={handleToggle}
             disabled={saving}
             style={{ background: 'none', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', padding: 0, opacity: saving ? 0.6 : 1 }}
-            title={freeMode ? 'Disable free mode' : 'Enable free mode'}
+            title={freeMode ? 'Turn off free for everyone' : 'Turn on free for everyone'}
           >
             {freeMode
               ? <ToggleRight size={38} color="#2d6a4f" />
@@ -2371,7 +2431,7 @@ function FreeModeSection() {
             style={inputStyle}
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder={freeMode ? 'Reason for disabling…' : 'Launch phase — free until 1000 active users'}
+            placeholder={freeMode ? 'Reason for turning off…' : 'e.g. Launch week — everyone gets full limits'}
           />
         </div>
       </div>
@@ -2380,76 +2440,6 @@ function FreeModeSection() {
         <div style={{ marginTop: 10, display: 'flex', gap: 7, background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 12px' }}>
           <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ margin: 0, fontSize: 12, color: '#163828' }}>{ok}</p>
-        </div>
-      )}
-      {err && (
-        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
-          <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{err}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Token equalizer — one-click reset of every user's balance to a fixed amount ─
-function TokenEqualizerSection({ adminUid, teacherCount }) {
-  const [target,  setTarget]  = useState(30);
-  const [running, setRunning] = useState(false);
-  const [result,  setResult]  = useState(null);
-  const [err,     setErr]     = useState('');
-
-  async function handleRun() {
-    setErr(''); setResult(null);
-    const confirmed = window.confirm(
-      `This will set tokenBalance to exactly ${target} for ALL ${teacherCount} accounts ` +
-      `(including admins and disabled/pending accounts). This cannot be undone. Continue?`
-    );
-    if (!confirmed) return;
-
-    setRunning(true);
-    try {
-      const updatedCount = await adminEqualizeTokens(adminUid, Number(target));
-      setResult(`Done — ${updatedCount} account(s) updated to ${target} tokens.`);
-    } catch (e) {
-      setErr(e.message || 'Failed to equalize tokens.');
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  return (
-    <div style={{ ...card, marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fef3c7', display: 'grid', placeItems: 'center' }}>
-          <Coins size={16} color="#d97706" />
-        </div>
-        <div>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Token Equalizer</h3>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-            Sets EVERY account's token balance to a fixed amount — a one-time reset, not reversible.
-          </p>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-        <div>
-          <label style={labelStyle}>Target balance</label>
-          <input
-            type="number" min="0" style={{ ...inputStyle, width: 120 }}
-            value={target} onChange={e => setTarget(e.target.value)}
-          />
-        </div>
-        <button onClick={handleRun} disabled={running} style={{ ...btnPrimary, background: '#d97706', opacity: running ? 0.6 : 1 }}>
-          {running ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Coins size={14} />}
-          {running ? 'Equalizing…' : `Set all ${teacherCount} accounts to ${target}`}
-        </button>
-      </div>
-
-      {result && (
-        <div style={{ marginTop: 10, display: 'flex', gap: 7, background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '8px 12px' }}>
-          <CheckCircle2 size={14} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ margin: 0, fontSize: 12, color: '#163828' }}>{result}</p>
         </div>
       )}
       {err && (
@@ -2572,7 +2562,7 @@ export default function AdminDashboard() {
   const [loadingList,    setLoadingList]     = useState(true);
   const [listErr,        setListErr]         = useState('');
   const [addUserOpen,    setAddUserOpen]     = useState(false);
-  const [tokensTarget,   setTokensTarget]    = useState(null);
+  const [planTarget,     setPlanTarget]      = useState(null);
   const [togglingUid,    setTogglingUid]     = useState(null);
   const [pwTarget,       setPwTarget]        = useState(null);
   const [detailUser,     setDetailUser]      = useState(null);
@@ -2750,7 +2740,7 @@ export default function AdminDashboard() {
     navigate('/login', { replace: true });
   }
 
-  const totalTokens   = teachers.reduce((s, t) => s + (t.tokenBalance ?? 0), 0);
+  const subscribedCount = teachers.filter((t) => planInfo(t).plan === 'subscription').length;
   const activeCount   = teachers.filter(t => !t.disabled).length;
   const pendingCount  = teachers.filter(t => t.pendingApproval).length;
 
@@ -2967,7 +2957,7 @@ export default function AdminDashboard() {
             { label: 'Total Users',      value: teachers.length, Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
             { label: 'Active Users',     value: activeCount,     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },
             { label: 'Pending Approval', value: pendingCount,    Icon: ShieldOff,   accent: pendingCount > 0 ? '#fef9e7' : '#f5faf7', iconColor: pendingCount > 0 ? '#d97706' : '#9BB8A5' },
-            { label: 'Tokens in Pool',   value: totalTokens,     Icon: Coins,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
+            { label: 'Subscribed',       value: subscribedCount, Icon: BadgeCheck,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
           ].map(({ label, value, Icon, accent, iconColor }) => (
             <div key={label} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: accent, display: 'grid', placeItems: 'center' }}>
@@ -3003,8 +2993,6 @@ export default function AdminDashboard() {
         {/* Free Mode control */}
         <FreeModeSection />
 
-        {/* Token Equalizer */}
-        <TokenEqualizerSection adminUid={user?.uid} teacherCount={teachers.length} />
 
         {/* AI Error Reports */}
         <AIErrorSection />
@@ -3135,7 +3123,7 @@ export default function AdminDashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(45,106,79,0.1)' }}>
-                    {['Name / School', 'Tokens', 'Status', 'Actions'].map(h => (
+                    {['Name / School', 'Plan', 'Status', 'Actions'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '6px 12px 10px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -3189,9 +3177,7 @@ export default function AdminDashboard() {
                         </button>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
-                        <span style={{ fontFamily: '"DM Mono", monospace', fontWeight: 700, fontSize: 15, color: 'var(--kt-text-primary)' }}>
-                          {t.tokenBalance ?? 0}
-                        </span>
+                        <PlanBadge teacher={t} />
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{
@@ -3209,11 +3195,11 @@ export default function AdminDashboard() {
                       <td style={{ padding: '10px 12px' }}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
-                            onClick={() => setTokensTarget(t)}
+                            onClick={() => setPlanTarget(t)}
                             style={{ ...btnSecondary, padding: '5px 10px', fontSize: 11 }}
-                            title="Add tokens"
+                            title="Set Free or Subscription plan"
                           >
-                            <Coins size={12} /> Tokens
+                            <BadgeCheck size={12} /> Plan
                           </button>
                           <button
                             onClick={() => setPwTarget(t)}
@@ -3275,14 +3261,13 @@ export default function AdminDashboard() {
           onSuccess={fetchTeachers}
         />
       )}
-      {tokensTarget && (
-        <AddTokensModal
-          target={tokensTarget}
-          adminUid={user?.uid}
-          onClose={() => setTokensTarget(null)}
+      {planTarget && (
+        <SetPlanModal
+          target={planTarget}
+          onClose={() => setPlanTarget(null)}
           onSuccess={() => {
             fetchTeachers();
-            setTokensTarget(null);
+            setPlanTarget(null);
           }}
         />
       )}
@@ -3332,7 +3317,7 @@ export default function AdminDashboard() {
               </p>
               <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>{deleteTarget.email}</p>
               <p style={{ margin: '6px 0 0', fontSize: 11, color: '#c0392b' }}>
-                All lessons, quizzes, token logs, and classroom data will be erased. This cannot be undone.
+                All lessons, quizzes, plan history, and classroom data will be erased. This cannot be undone.
               </p>
             </div>
             {deleteError && (

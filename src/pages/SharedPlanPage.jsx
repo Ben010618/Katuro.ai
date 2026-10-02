@@ -25,8 +25,7 @@ export default function SharedPlanPage() {
   }, [shareId]);
 
   function handleCTA() {
-    const ref = plan?.ownerUid ? `?ref=${plan.ownerUid}` : '';
-    navigate(`/login${ref}`);
+    navigate('/login');
   }
 
   const accent = PLAN_COLORS[plan?.type] ?? '#2d6a4f';

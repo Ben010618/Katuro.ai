@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useLessonPlans } from '../hooks/useLessonPlans';
 import { generateQuizAI } from '../services/ai';
-import { createQuiz, deductTokens, refundTokens } from '../services/db';
+import { createQuiz } from '../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
 import {
@@ -17,6 +17,7 @@ const STEPS = ['Select Lesson', 'Quiz Settings', 'Preview & Print'];
 const NUM_Q_OPTS = [5, 10, 15, 20, 30];
 
 const SHEETS_PER_PAGE = { 5: 6, 10: 4, 15: 4, 20: 4 };
+const DAILY_LIMIT_MSG = "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits.";
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 function normalizeTitle(doc) {
@@ -127,16 +128,8 @@ export default function QuizBuilderPage() {
     setGenError(null);
     setGenStatus('');
 
-    let elapsedMs;
-    try {
-      await deductTokens(user.uid, 'quiz');
-      trackEvent(user.uid, 'quiz_generated', { subject: selectedLesson?.subject });
-      elapsedMs = startTimer();
-    } catch (err) {
-      setGenError(err.message);
-      setGenerating(false);
-      return;
-    }
+    trackEvent(user.uid, 'quiz_generated', { subject: selectedLesson?.subject });
+    const elapsedMs = startTimer();
 
     /* build AI context from the selected plan */
     const isDLL = selectedLesson.type === 'dll';
@@ -196,9 +189,8 @@ export default function QuizBuilderPage() {
     }
 
     if (!result) {
-      setGenError(lastErr?.message || 'Generation failed. Check your connection and try again.');
+      setGenError(lastErr?.dailyLimit ? DAILY_LIMIT_MSG : lastErr?.message || 'Generation failed. Check your connection and try again.');
       trackGeneration(user.uid, 'quiz', { success: false, durationMs: elapsedMs(), error: lastErr?.message });
-      refundTokens(user.uid, 'quiz').catch(e => console.error('Token refund failed:', e));
       setGenerating(false);
       setGenStatus('');
       return;

@@ -12,15 +12,31 @@ service cloud.firestore {
     // create is intentionally blocked for all clients — teacher documents are
     // only ever created by the registerUser Cloud Function (Admin SDK), which
     // bypasses these rules. This prevents rogue registrations via REST API.
+    // Account-control fields only an admin (or a Cloud Function) may change.
+    // Without this, a teacher could grant themselves a Subscription or admin rights.
+    function protectedTeacherFields() {
+      return ['isAdmin', 'access', 'disabled', 'pendingApproval', 'tokenBalance',
+              'deactivatedForInactivityAt', 'createdBy', '_registeredViaFunction'];
+    }
+
     match /teachers/{userId} {
       allow read:   if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow create: if false;
-      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedTeacherFields()))
+      );
       allow delete: if false;
     }
-    match /teachers/{userId}/{document=**} {
-      allow read, write: if request.auth != null &&
-        (request.auth.uid == userId || isAdmin());
+    // Teachers own their subcollections, except the server-kept ledgers:
+    // usage (daily AI limits), accessLogs (plan history), tokenLogs (legacy) — read-only to them.
+    match /teachers/{userId}/{sub}/{document=**} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && (
+        isAdmin() ||
+        (request.auth.uid == userId && !(sub in ['usage', 'accessLogs', 'tokenLogs']))
+      );
     }
 
     // Adviser cascade-delete: allow read + delete on a teacher's assignments/gradeSheets
@@ -35,7 +51,7 @@ service cloud.firestore {
     }
 
     // ── Admin config — API key lives here, BLOCKED from regular users ───────
-    // billing doc exposes freeMode flag — all authenticated teachers need to read it
+    // billing doc holds the global "free for everyone" promo switch — every teacher reads it
     match /adminConfig/billing {
       allow read:  if request.auth != null;
       allow write: if isAdmin();

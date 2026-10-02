@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  * The problem this solves: our generators set progress at a handful of points
  * (COT goes 5 → 15 → 85 → 100), so the bar sat frozen at 15% for the entire
  * 60–180s AI call. A stationary progress bar reads as a hung app, and teachers
- * reload the page — which throws away a generation they already paid tokens for.
+ * reload the page — which throws away a generation already in progress.
  *
  * So between milestones the value creeps forward on its own, easing toward a
  * ceiling part-way to the next milestone and slowing as it approaches. Real

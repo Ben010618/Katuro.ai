@@ -20,7 +20,7 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
-import { runDeskAgentTurn, TURN_COST } from '../../services/deskAgentAI';
+import { runDeskAgentTurn } from '../../services/deskAgentAI';
 import DeskFormattedText from './DeskFormattedText';
 import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
@@ -65,8 +65,6 @@ export default function DeskAgentChatPanel({
   user,
   profile,
   photoURL,
-  tokenBalance = 0,
-  freeMode = false,
   onOpenCanvas,
   onToggleLeftPanel,
   showLeftPanel,
@@ -140,8 +138,6 @@ export default function DeskAgentChatPanel({
         history,
         user,
         profile,
-        tokenBalance,
-        freeMode,
         privacyMode,
         persona,
         onUpdate: ({ steps, reply }) => {
@@ -164,16 +160,13 @@ export default function DeskAgentChatPanel({
       clearAttachments();
     } catch (err) {
       console.error('Agent execution error:', err);
-      if (err.message === 'INSUFFICIENT_TOKENS') {
+      if (err.dailyLimit || err.status === 429) {
         updateLastAssistantMessage({
           content: persona === 'luna'
-            ? `I am sorry, ${teacherSalutationName}. This task needs at least ${TURN_COST} tokens. Kindly tap Top-up / GCash on the left to continue.`
-            : `Ay, sorry ${teacherSalutationName}! Kulang na tayo sa tokens, kailangan ng at least ${TURN_COST}. Tap Top-up / GCash sa left para tuloy tayo!`,
+            ? `I am sorry, ${teacherSalutationName}. We have reached today's limit for your plan. It resets at midnight, or you may ask the KaTuro admin about a Subscription for higher limits.`
+            : `Ay, sorry ${teacherSalutationName}! Naubos na natin ang daily limit ng plan mo. Babalik 'yan pag midnight — or ask the KaTuro admin about a Subscription para mas marami!`,
           isThinking: false,
         });
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
-        }
       } else {
         updateLastAssistantMessage({
           content: `Something went wrong: ${err.message || 'Unknown error'}. Please try again.`,
@@ -459,7 +452,7 @@ export default function DeskAgentChatPanel({
                 ) : (
                   <>
                     <Send size={14} />
-                    <span className="hidden sm:inline">Send · {TURN_COST}🪙</span>
+                    <span className="hidden sm:inline">Send</span>
                   </>
                 )}
               </button>

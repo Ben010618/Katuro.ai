@@ -379,7 +379,6 @@ async function callNvidiaServer(nvidiaConfig, prompt, { temperature = 0.4, maxTo
   return text;
 }
 const CACHE_TTL_DAYS = 30;
-const EXPAND_TOKENS  = 3;
 
 // Subjects that need Tagalog output
 const TAGALOG_SUBJECTS = ['filipino', 'araling panlipunan'];
@@ -515,7 +514,7 @@ function cacheKey(obj) {
   return crypto.createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 32);
 }
 
-// ── Per-user daily limits (applied in free mode too — abuse prevention) ────────
+// ── Per-user daily limits: these are the Subscription (full) limits; the Free plan uses FREE_DAILY_LIMITS ──
 const DAILY_LIMITS = {
   outline_gen:      15,  // generateOutline
   expand_slides:     5,  // expandSlides (most expensive)
@@ -572,9 +571,72 @@ function todayInManila() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // en-CA formats as YYYY-MM-DD
 }
 
+// ── Plans: Free / Subscription (admin-assigned), replaces the old token currency ──
+// teachers/{uid}.access = { mode: 'free'|'subscription', subscriptionUntil: Timestamp|null, ... }
+// Only admins (via adminSetAccess) or this server write `access` — see firestore.rules.
+// adminConfig/billing.freeMode is the global "free for everyone" promo switch:
+// while it is ON, every teacher gets Subscription-level limits.
+
+// Daily limits on the Free plan. Subscription uses DAILY_LIMITS (the full limits).
+const FREE_DAILY_LIMITS = {
+  outline_gen:          5,
+  expand_slides:        2,
+  dll_gen:              3,
+  cot_gen:              3,
+  quiz_gen:             4,
+  gamification_gen:     4,
+  ilaw_unpack:          5,
+  ilaw_session:        30,
+  quiz_title:          40,
+  test_builder_blooms: 10,
+  test_builder_items:  20,
+  action_research_ai: 10,
+  ar_problem_suggest:  20,
+  desk_agent_run:      15,
+  desk_agent_task:     80,
+  // Same on every plan: scanning a class set of answer sheets, child protection, MELC checks.
+  scan_answer_sheet:   80,
+  protect_chat:        40,
+  melc_validate:       50,
+};
+
+let _freeModeCache = null;
+let _freeModeExpiry = 0;
+
+async function isFreeForAll() {
+  const now = Date.now();
+  if (_freeModeCache !== null && now < _freeModeExpiry) return _freeModeCache;
+  const snap = await db.doc('adminConfig/billing').get();
+  _freeModeCache  = snap.data()?.freeMode === true;
+  _freeModeExpiry = now + 5 * 60 * 1000; // 5-min TTL
+  return _freeModeCache;
+}
+
+/** 'subscription' while an admin-granted subscription is active (or free-for-all is on), else 'free'. */
+function effectivePlan(teacher, freeForAll, now = Date.now()) {
+  if (freeForAll) return 'subscription';
+  const access = teacher?.access;
+  if (access?.mode !== 'subscription') return 'free';
+  const until = access.subscriptionUntil?.toMillis ? access.subscriptionUntil.toMillis() : null;
+  return until === null || until >= now ? 'subscription' : 'free';
+}
+
+async function getPlan(uid) {
+  const [teacherSnap, freeForAll] = await Promise.all([db.doc(`teachers/${uid}`).get(), isFreeForAll()]);
+  return effectivePlan(teacherSnap.data(), freeForAll);
+}
+
+function dailyLimitFor(action, plan) {
+  const full = DAILY_LIMITS[action];
+  if (!full) return 0;
+  if (plan === 'subscription') return full;
+  return Math.min(full, FREE_DAILY_LIMITS[action] ?? Math.max(1, Math.round(full / 3)));
+}
+
 async function checkAndIncrementDailyUsage(uid, action) {
-  const limit = DAILY_LIMITS[action];
-  if (!limit) return;
+  if (!DAILY_LIMITS[action]) return;
+  const plan  = await getPlan(uid);
+  const limit = dailyLimitFor(action, plan);
   const today = todayInManila();
   const ref   = db.doc(`teachers/${uid}/usage/${today}`);
 
@@ -584,62 +646,16 @@ async function checkAndIncrementDailyUsage(uid, action) {
     if (current >= limit) {
       throw new HttpsError(
         'resource-exhausted',
-        `You've reached today's limit (${limit}) for this feature. kaTuro resets at midnight. Come back tomorrow!`,
-        { dailyLimit: true } // lets the client skip retrying — this won't clear up in the next few seconds
+        plan === 'free'
+          ? `You've reached today's Free plan limit (${limit}) for this feature. It resets at midnight — ask your admin about a Subscription for higher limits.`
+          : `You've reached today's limit (${limit}) for this feature. kaTuro resets at midnight. Come back tomorrow!`,
+        { dailyLimit: true, plan, limit } // lets the client skip retrying — this won't clear up in the next few seconds
       );
     }
     tx.set(ref, {
       [action]:  admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-  });
-}
-
-// ── Global free-mode flag — reads adminConfig/billing ───────────────────────
-// Cached per instance for 5 minutes to avoid a Firestore read on every call.
-let _freeModeCache = null;
-let _freeModeExpiry = 0;
-
-async function isFreeModeEnabled() {
-  const now = Date.now();
-  if (_freeModeCache !== null && now < _freeModeExpiry) return _freeModeCache;
-  const snap = await db.doc('adminConfig/billing').get();
-  _freeModeCache  = snap.data()?.freeMode === true;
-  _freeModeExpiry = now + 5 * 60 * 1000; // 5-min TTL
-  return _freeModeCache;
-}
-
-async function deductTokensServer(uid, action, cost) {
-  if (!cost || cost <= 0) return;
-
-  // Free-mode: skip deduction entirely but still log the action
-  if (await isFreeModeEnabled()) {
-    await db.collection(`teachers/${uid}/tokenLogs`).add({
-      uid, amount: 0, action, freeMode: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch(() => {});
-    return;
-  }
-
-  const ref = db.doc(`teachers/${uid}`);
-  await db.runTransaction(async tx => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) throw new HttpsError('not-found', 'User profile not found.');
-    const balance = snap.data().tokenBalance ?? 0;
-    if (balance < cost) {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Not enough tokens. Ask your administrator to add tokens, or wait — kaTuro will be free during our launch period.'
-      );
-    }
-    tx.update(ref, {
-      tokenBalance: admin.firestore.FieldValue.increment(-cost),
-      updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
-  await db.collection(`teachers/${uid}/tokenLogs`).add({
-    uid, amount: -cost, action,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
 
@@ -673,7 +689,7 @@ exports.adminChangePassword = onCall(
 );
 
 // ── generateOutline ─────────────────────────────────────────────────────────
-// Free to call — lets teachers iterate on the outline before committing tokens.
+// Free to call — lets teachers iterate on the outline before expanding (expand has its own daily limit).
 exports.generateOutline = onCall(
   { region: 'us-central1', timeoutSeconds: 60 },
   async (req) => {
@@ -789,7 +805,7 @@ Return ONLY this JSON:
 );
 
 // ── expandSlides ─────────────────────────────────────────────────────────────
-// Costs 3 tokens. Parallel-expands all slides marked expand: true.
+// Counts against the expand_slides daily limit. Parallel-expands all slides marked expand: true.
 // FIX: Raised timeout 180s→300s and memory 512MiB→1GiB.
 // 14 slides × ~1.2s each = ~17s minimum, but under Gemini load spikes can reach
 // 250s+. The old 180s cap caused deadline-exceeded errors for large slide sets.
@@ -804,7 +820,6 @@ exports.expandSlides = onCall(
     }
 
     await checkAndIncrementDailyUsage(req.auth.uid, 'expand_slides');
-    await deductTokensServer(req.auth.uid, 'presentation-expand', EXPAND_TOKENS);
 
     const lang         = langLabel(subject);
     const nvidiaConfig = await getNvidiaConfigServer();
@@ -1274,7 +1289,7 @@ exports.generateAI = onCall(
 exports.registerUser = onCall(
   { region: 'us-central1' },
   async (req) => {
-    const { email, password, surname, givenName, mi, school, referredBy } = req.data || {};
+    const { email, password, surname, givenName, mi, school } = req.data || {};
 
     // Layer 1: Server-side field validation — cannot be bypassed by any client or cached bundle
     if (!surname?.trim())                 throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
@@ -1284,14 +1299,13 @@ exports.registerUser = onCall(
     if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
 
     const MAX_ACCOUNTS   = 1000;
-    const WELCOME_TOKENS = 30;
 
     const countSnap   = await db.collection('teachers').get();
     const activeCount = countSnap.docs.filter(d => !d.data().disabled).length;
 
     // Hard cap — registration is rejected outright once full. No more
     // disabled/pending-approval waitlist state: every account created past
-    // this point is auto-approved with the full welcome bonus immediately.
+    // this point is auto-approved and starts on the Free plan.
     if (activeCount >= MAX_ACCOUNTS) {
       throw new HttpsError('resource-exhausted', `kaTuro is at capacity (${MAX_ACCOUNTS} accounts). Please try again later.`);
     }
@@ -1310,7 +1324,7 @@ exports.registerUser = onCall(
       givenName:       givenName.trim(),
       mi:              mi?.trim() || '',
       school:          school.trim(),
-      tokenBalance:    WELCOME_TOKENS,
+      access:          { mode: 'free', subscriptionUntil: null, note: 'New account', setAt: admin.firestore.FieldValue.serverTimestamp() },
       isAdmin:         false,
       disabled:        false,
       pendingApproval: false,
@@ -1332,15 +1346,7 @@ exports.registerUser = onCall(
       throw new HttpsError('internal', err.message || 'Registration failed. Please try again.');
     }
 
-    // Token log and admin notification — both non-fatal
-    try {
-      await db.collection(`teachers/${uid}/tokenLogs`).add({
-        uid, amount: WELCOME_TOKENS, action: 'welcome_bonus',
-        note: `Welcome! ${WELCOME_TOKENS} free tokens to get started.`,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } catch { /* welcome bonus is a nice-to-have — registration already succeeded */ }
-
+    // Admin notification — non-fatal
     try {
       await db.collection('adminNotifications').add({
         type: 'new_user', uid,
@@ -1354,26 +1360,6 @@ exports.registerUser = onCall(
         createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch { /* admin notification is best-effort — registration already succeeded */ }
-
-    // Referral bonus — credit 20 tokens to the referrer (non-fatal)
-    if (referredBy && typeof referredBy === 'string' && referredBy !== uid) {
-      try {
-        const referrerSnap = await db.doc(`teachers/${referredBy}`).get();
-        if (referrerSnap.exists && !referrerSnap.data()?.disabled) {
-          const REFERRAL_BONUS = 20;
-          await db.doc(`teachers/${referredBy}`).update({
-            tokenBalance: admin.firestore.FieldValue.increment(REFERRAL_BONUS),
-            updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
-          });
-          await db.collection(`teachers/${referredBy}/tokenLogs`).add({
-            uid: referredBy, amount: REFERRAL_BONUS,
-            action: 'referral_bonus', referredUid: uid,
-            note: `Referral bonus — ${displayName} signed up via your link.`,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      } catch { /* referral bonus is best-effort — registration already succeeded */ }
-    }
 
     // Client will sign in with email+password — no custom token needed
     return { pendingApproval: false };
@@ -1558,11 +1544,11 @@ exports.adminCreateUserFn = onCall(
       throw new HttpsError('permission-denied', 'Admin access required.');
     }
 
-    const { email, password, initialTokens = 0 } = req.data || {};
+    const { email, password, plan = 'free', subscriptionUntil = null } = req.data || {};
     if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email is required.');
     if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
 
-    const tokens = Math.max(0, Number(initialTokens) || 0);
+    const access = buildAccess(plan, subscriptionUntil, req.auth.uid, 'Created by admin');
     const uid    = crypto.randomBytes(14).toString('hex');
 
     // Write Firestore BEFORE creating Auth user (same ordering as registerUser).
@@ -1572,7 +1558,7 @@ exports.adminCreateUserFn = onCall(
     await db.doc(`teachers/${uid}`).set({
       email:           email.trim().toLowerCase(),
       displayName:     email.trim().toLowerCase(),
-      tokenBalance:    tokens,
+      access,
       isAdmin:         false,
       disabled:        false,
       pendingApproval: false,
@@ -1592,16 +1578,6 @@ exports.adminCreateUserFn = onCall(
         throw new HttpsError('invalid-argument', 'The email address is not valid.');
       }
       throw new HttpsError('internal', err.message || 'Failed to create account.');
-    }
-
-    if (tokens > 0) {
-      try {
-        await db.collection(`teachers/${uid}/tokenLogs`).add({
-          uid, amount: tokens, action: 'top_up', note: 'Initial balance',
-          addedBy: req.auth.uid,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } catch { /* log entry is best-effort — the account/balance already exist */ }
     }
 
     return { uid, email: email.trim().toLowerCase() };
@@ -1630,53 +1606,52 @@ exports.adminSetFreeMode = onCall(
   }
 );
 
-// ── Scheduled: auto-grant bonus tokens before DepEd inspection seasons ────────
-// Runs Feb 1 and Sep 1 at 6 AM Philippine time (UTC+8).
-// Sep 1  → ahead of Q2 inspections (Oct–Nov)
-// Feb 1  → ahead of Q4 inspections (Mar–Apr)
-exports.autoGrantSeasonalTokens = onSchedule(
-  { schedule: '0 6 1 2,9 *', timeZone: 'Asia/Manila', region: 'us-central1' },
-  async () => {
-    const BONUS = 30;
-    const month = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long' });
-    const note  = `Inspection season bonus — ${month}`;
+// ── Plans: admin assigns Free / Subscription per teacher ─────────────────────
+function buildAccess(plan, subscriptionUntil, setBy, note = '') {
+  if (!['free', 'subscription'].includes(plan)) {
+    throw new HttpsError('invalid-argument', 'Plan must be "free" or "subscription".');
+  }
+  let until = null;
+  if (plan === 'subscription' && subscriptionUntil) {
+    // "YYYY-MM-DD" means the end of that day, Philippine time.
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(subscriptionUntil)) ? `${subscriptionUntil}T23:59:59+08:00` : String(subscriptionUntil);
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) throw new HttpsError('invalid-argument', 'Subscription end date is not valid.');
+    until = admin.firestore.Timestamp.fromMillis(ms);
+  }
+  return {
+    mode: plan,
+    subscriptionUntil: until,
+    note: String(note || '').slice(0, 200),
+    setBy,
+    setAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
 
-    const snap  = await db.collection('teachers')
-      .where('disabled', '==', false)
-      .where('pendingApproval', '==', false)
-      .get();
-
-    // Firestore batch limit is 500 writes; chunk if needed
-    const chunks = [];
-    for (let i = 0; i < snap.docs.length; i += 400) {
-      chunks.push(snap.docs.slice(i, i + 400));
+exports.adminSetAccess = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
     }
-
-    for (const chunk of chunks) {
-      const batch = db.batch();
-      chunk.forEach(d => {
-        batch.update(d.ref, {
-          tokenBalance: admin.firestore.FieldValue.increment(BONUS),
-          updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-      await batch.commit();
-
-      // Log token grants (non-fatal if fails)
-      await Promise.allSettled(chunk.map(d =>
-        db.collection(`teachers/${d.id}/tokenLogs`).add({
-          uid: d.id, amount: BONUS, action: 'seasonal_bonus', note,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        })
-      ));
-    }
-
-    await db.collection('adminNotifications').add({
-      type: 'seasonal_tokens',
-      message: `Granted ${BONUS} inspection-season tokens to ${snap.docs.length} teachers.`,
-      month, read: false,
+    const { uid, plan, subscriptionUntil = null, note = '' } = req.data || {};
+    if (!uid || typeof uid !== 'string') throw new HttpsError('invalid-argument', 'Teacher id is required.');
+    const ref = db.doc(`teachers/${uid}`);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError('not-found', 'Teacher not found.');
+    const access = buildAccess(plan, subscriptionUntil, req.auth.uid, note);
+    await ref.update({ access, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    await db.collection(`teachers/${uid}/accessLogs`).add({
+      plan: access.mode,
+      subscriptionUntil: access.subscriptionUntil,
+      note: access.note,
+      previous: snap.data()?.access?.mode || 'free',
+      setBy: req.auth.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    }).catch(() => {});
+    return { uid, plan: access.mode, subscriptionUntil: access.subscriptionUntil ? access.subscriptionUntil.toDate().toISOString() : null };
   }
 );
 

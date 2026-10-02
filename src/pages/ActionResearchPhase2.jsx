@@ -4,7 +4,6 @@ import { Sparkles, Loader2, CheckSquare, Square } from 'lucide-react';
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens, refundTokens } from '../services/db';
 import { generateResearchQuestions, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import ActionResearchShell  from '../components/ActionResearchShell';
@@ -27,7 +26,7 @@ const cardStyle = (active) => ({
 
 export default function ActionResearchPhase2() {
   const { docId }  = useParams();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,          setDocData]          = useState(null);
@@ -56,10 +55,7 @@ export default function ActionResearchPhase2() {
     if (!user?.uid || !docData || generating) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'action-research-questions', 5);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -95,13 +91,12 @@ export default function ActionResearchPhase2() {
       trackGeneration(user.uid, 'ar_phase2', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(
-        err.status === 429
+        err.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : err.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'action-research-questions', 5).catch(e => console.error('Token refund failed:', e));
-      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase2', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -235,7 +230,7 @@ export default function ActionResearchPhase2() {
               </>
             ) : (
               <>
-                <Sparkles size={14} /> {questions.length ? 'Muling Bumuo (Regenerate)' : 'Bumuo ng Research Questions'}{!freeMode && ' (5 tokens)'}
+                <Sparkles size={14} /> {questions.length ? 'Muling Bumuo (Regenerate)' : 'Bumuo ng Research Questions'}
               </>
             )}
           </button>

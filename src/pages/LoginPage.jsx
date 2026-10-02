@@ -431,10 +431,11 @@ const CSS = `
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
-  const referredBy = searchParams.get('ref') || '';
+  // Old share links may still carry ?ref= — just open the sign-up form for them.
+  const openSignup = searchParams.has('ref') || searchParams.get('mode') === 'signup';
 
   const [activeSlide, setActiveSlide] = useState(0);
-  const [mode, setMode]         = useState(referredBy ? 'signup' : 'login');
+  const [mode, setMode]         = useState(openSignup ? 'signup' : 'login');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
@@ -484,7 +485,7 @@ export default function LoginPage() {
     if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
     setError(''); setLoading(true);
     try {
-      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school, referredBy });
+      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
       setError((err?.message ?? 'Registration failed. Please try again.')
@@ -632,7 +633,7 @@ export default function LoginPage() {
                   onClick={() => switchMode('signup')}
                   className={`kt-folder-tab ${mode === 'signup' ? 'kt-folder-tab--active' : 'kt-folder-tab--idle'}`}
                 >
-                  Register (30 Free Tokens)
+                  Register (Free plan)
                 </button>
               </div>
 
@@ -650,7 +651,7 @@ export default function LoginPage() {
                     Maligayang Pagdating, Guro!
                   </h2>
                   <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
-                    Matagumpay na nagawa ang iyong account. Mayroon kang <strong>30 libreng tokens</strong>. I-sign in na ang iyong account…
+                    Matagumpay na nagawa ang iyong account. Naka-<strong>Free plan</strong> ka na. I-sign in na ang iyong account…
                   </p>
                 </div>
               )}
@@ -699,8 +700,8 @@ export default function LoginPage() {
                     <div className="kt-voucher-banner">
                       <Gift size={18} className="kt-voucher-icon" />
                       <div>
-                        <div className="kt-voucher-title">LIBRENG 30 TOKENS</div>
-                        <p className="kt-voucher-desc">Sapat para sa 5 kumpletong Lesson Plans, DLL, o Test Papers.</p>
+                        <div className="kt-voucher-title">LIBRE ANG PAG-REGISTER</div>
+                        <p className="kt-voucher-desc">Magsimula sa Free plan: araw-araw na Lesson Plans, DLL, at Test Papers. Mag-Subscription para sa mas mataas na daily limits.</p>
                       </div>
                     </div>
                   )}
@@ -847,7 +848,7 @@ export default function LoginPage() {
                     ) : mode === 'signup' ? (
                       <>
                         <Gift size={15} />
-                        Lumikha ng Account — 30 Free Tokens
+                        Lumikha ng Account — Libre
                       </>
                     ) : (
                       'Sign In to kaTuro'
@@ -861,7 +862,7 @@ export default function LoginPage() {
                       <p style={{ margin: 0, textAlign: 'center', fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>
                         Wala pang account?{' '}
                         <button type="button" onClick={() => switchMode('signup')} className="kt-auth-footer-link">
-                          Magrehistro nang libre (30 Tokens)
+                          Magrehistro nang libre
                         </button>
                       </p>
                     </>

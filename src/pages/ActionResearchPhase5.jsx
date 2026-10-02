@@ -7,7 +7,6 @@ import {
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens, refundTokens } from '../services/db';
 import { generateDataCollection, generateResearchInstrument, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import ActionResearchShell  from '../components/ActionResearchShell';
@@ -334,7 +333,7 @@ function InstrumentDisplay({ type, data }) {
 
 export default function ActionResearchPhase5() {
   const { docId }  = useParams();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,             setDocData]             = useState(null);
@@ -380,10 +379,7 @@ export default function ActionResearchPhase5() {
     if (!user?.uid || !docData || generating) return;
     setGenerating(true); setError(''); setStatusMsg('');
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'action-research-datacollection', 5);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -423,13 +419,12 @@ export default function ActionResearchPhase5() {
       trackGeneration(user.uid, 'ar_phase5_data', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(
-        err.status === 429
+        err.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : err.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'action-research-datacollection', 5).catch(e => console.error('Token refund failed:', e));
-      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_data', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -440,10 +435,7 @@ export default function ActionResearchPhase5() {
     if (!user?.uid || !docData || generatingInstrument) return;
     setGeneratingInstrument(true); setError(''); setInstrumentStatusMsg('Building your complete instrument — this takes about 10–20 seconds…');
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'action-research-instrument', 5);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -483,13 +475,12 @@ export default function ActionResearchPhase5() {
       trackGeneration(user.uid, 'ar_phase5_instrument', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(
-        err.status === 429
+        err.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : err.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate instrument. Please try again.')
       );
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'action-research-instrument', 5).catch(e => console.error('Token refund failed:', e));
-      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase5_instrument', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -598,7 +589,7 @@ export default function ActionResearchPhase5() {
               </>
             ) : (
               <>
-                <Sparkles size={14} /> {dc ? 'Muling Bumuo (Regenerate Plan)' : 'Bumuo ng Data Collection Plan'}{!freeMode && ' (5 tokens)'}
+                <Sparkles size={14} /> {dc ? 'Muling Bumuo (Regenerate Plan)' : 'Bumuo ng Data Collection Plan'}
               </>
             )}
           </button>
@@ -839,7 +830,7 @@ export default function ActionResearchPhase5() {
               </>
             ) : (
               <>
-                <Sparkles size={14} /> {instrument ? 'Muling Bumuo' : 'Bumuo ng'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}{!freeMode && ' (5 tokens)'}
+                <Sparkles size={14} /> {instrument ? 'Muling Bumuo' : 'Bumuo ng'} {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}
               </>
             )}
           </button>

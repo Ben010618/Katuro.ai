@@ -4,7 +4,6 @@ import { Sparkles, Loader2, Globe, MapPin, School, BookOpen, Link2 } from 'lucid
 import { useAuth }          from '../hooks/useAuth';
 import { db }               from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { deductTokens, refundTokens } from '../services/db';
 import { generateLiteratureReview, THEME_LABELS } from '../services/actionResearchAI';
 import { trackEvent, trackGeneration, startTimer } from '../services/usageTracker';
 import ActionResearchShell  from '../components/ActionResearchShell';
@@ -19,7 +18,7 @@ const SECTIONS = [
 
 export default function ActionResearchPhase3() {
   const { docId }  = useParams();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const navigate   = useNavigate();
 
   const [docData,     setDocData]     = useState(null);
@@ -48,10 +47,7 @@ export default function ActionResearchPhase3() {
     const initialStatus = 'Maaaring tumagal ito nang 15–30 segundo. Nagsasagawa ng pagsasaliksik sa pandaigdigan, pambansa, at lokal na literatura…';
     setGenerating(true); setError(''); setStatusMsg(initialStatus);
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'action-research-literature', 5);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -87,13 +83,12 @@ export default function ActionResearchPhase3() {
       trackGeneration(user.uid, 'ar_phase3', { success: true, durationMs: elapsedMs() });
     } catch (err) {
       setError(
-        err.status === 429
+        err.dailyLimit
+          ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : err.status === 429
           ? 'Rate limit reached — wait a moment then try again.'
           : (err.message || 'Failed to generate. Please try again.')
       );
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'action-research-literature', 5).catch(e => console.error('Token refund failed:', e));
-      }
       if (elapsedMs) {
         trackGeneration(user.uid, 'ar_phase3', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -220,7 +215,7 @@ export default function ActionResearchPhase3() {
               </>
             ) : (
               <>
-                <Sparkles size={14} /> {litReview ? 'Muling Bumuo (Regenerate RRL)' : 'Bumuo ng Literature Review'}{!freeMode && ' (5 tokens)'}
+                <Sparkles size={14} /> {litReview ? 'Muling Bumuo (Regenerate RRL)' : 'Bumuo ng Literature Review'}
               </>
             )}
           </button>

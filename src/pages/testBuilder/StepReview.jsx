@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTestBuilderStore } from '../../store/testBuilderStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { getTeacherProfile, deductTokens, refundTokens } from '../../services/db';
+import { getTeacherProfile } from '../../services/db';
 import { updateTestSession } from '../../services/testBuilderDb';
 import { generateItemsForCompetency } from '../../services/testBuilderItemsAI';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor, deriveLanguage, KEY_STAGE_LABELS, resolveItemCeiling } from '../../config/testBuilderConfig';
@@ -29,11 +29,9 @@ const sectionLabel = {
   textTransform: 'uppercase', letterSpacing: '1.2px',
 };
 
-const GENERATE_ITEMS_COST = 5;
-
 export default function StepReview() {
   const store = useTestBuilderStore();
-  const { user, freeMode } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
 
   const keyStage = deriveKeyStage(store.gradeLevel);
@@ -82,11 +80,8 @@ export default function StepReview() {
     setGenError('');
     store.setGeneratedParts(null);
     let elapsedMs;
-    let tokensDeducted = false;
     try {
-      setGenPhase(freeMode ? 'Preparing…' : 'Checking tokens…');
-      await deductTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST);
-      tokensDeducted = true;
+      setGenPhase('Preparing…');
       elapsedMs = startTimer();
 
       // Each competency is one independent AI call. They used to run strictly
@@ -180,7 +175,9 @@ export default function StepReview() {
       // than being made to rerun the whole test.
       if (failedRows.length > 0) {
         const names = failedRows.map(f => `#${f.index} ${f.label}`).join(', ');
-        const why   = failedRows[0]?.err?.quotaExhausted
+        const why   = failedRows.some(f => f.err?.dailyLimit)
+          ? ' ' + "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits."
+          : failedRows[0]?.err?.quotaExhausted
           ? " Today's AI quota is used up — it resets at midnight."
           : '';
         setGenError(
@@ -190,16 +187,13 @@ export default function StepReview() {
         );
       }
       addToast(
-        freeMode ? 'Test items generated! You can now download.' : `Test items generated! (${GENERATE_ITEMS_COST} tokens used) You can now download.`,
+        'Test items generated! You can now download.',
         'success'
       );
       trackEvent(user.uid, 'test_builder_items_generated', { subject: store.subject, grade: store.gradeLevel });
       trackGeneration(user.uid, 'test_builder_items', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setGenError(err.message || 'Item generation failed. Please try again.');
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'test_builder_generate_doc', GENERATE_ITEMS_COST).catch(e => console.error('Token refund failed:', e));
-      }
+      setGenError(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Item generation failed. Please try again.'));
       if (elapsedMs) {
         trackGeneration(user.uid, 'test_builder_items', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -342,7 +336,7 @@ export default function StepReview() {
           <div style={{ flex: 1 }}>
             <p style={{ margin: '0', fontSize: 14, fontWeight: 800, color: '#fff' }}>Generate Test Items with AI</p>
             <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(216,243,220,0.8)', lineHeight: 1.5 }}>
-              AI writes items for exactly the counts in your TOS, using only your selected Question Format(s).{freeMode ? '' : ` (${GENERATE_ITEMS_COST} tokens)`}
+              AI writes items for exactly the counts in your TOS, using only your selected Question Format(s).
             </p>
           </div>
           <button

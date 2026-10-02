@@ -24,8 +24,6 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
-  runTransaction,
-  writeBatch,
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
@@ -61,7 +59,6 @@ export async function ensureTeacherProfile(uid, email) {
   if (snap.exists()) return { id: snap.id, ...snap.data() };
   const profile = {
     email,
-    tokenBalance: 0,
     isAdmin: false,
     disabled: false,
     createdAt: serverTimestamp(),
@@ -497,10 +494,6 @@ export function subscribeScores(uid, callback) {
   });
 }
 
-// ─── Token logs ───────────────────────────────────────────────────────────────
-
-export const tokenLogsRef = (uid) => collection(db, "teachers", uid, "tokenLogs");
-
 // ─── Admin: read all teachers ─────────────────────────────────────────────────
 // Requires Firestore rule: allow read on /teachers/{uid} if isAdmin() == true
 
@@ -512,12 +505,12 @@ export async function getAllTeachers() {
 // ─── Admin: create a new user account ────────────────────────────────────────
 // Uses a secondary Firebase App instance so the admin stays logged in.
 
-export async function adminCreateUser(email, password, initialTokens) {
+export async function adminCreateUser(email, password, { plan = 'free', subscriptionUntil = null } = {}) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   const app = (await import('../firebase')).default;
   const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminCreateUserFn');
   try {
-    const result = await fn({ email, password, initialTokens });
+    const result = await fn({ email, password, plan, subscriptionUntil });
     return result.data; // { uid, email }
   } catch (err) {
     const raw   = err?.message ?? '';
@@ -531,7 +524,7 @@ export async function adminCreateUser(email, password, initialTokens) {
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
 
-export async function selfSignUp({ email, password, surname, givenName, mi, school, referredBy }) {
+export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
   // Registration is handled by a Cloud Function — validation runs server-side so it
   // cannot be bypassed by any client version or cached bundle.
   const { getFunctions, httpsCallable } = await import('firebase/functions');
@@ -540,7 +533,7 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const registerFn = httpsCallable(getFunctions(app, 'us-central1'), 'registerUser');
   let result;
   try {
-    result = await registerFn({ email, password, surname, givenName, mi, school, referredBy: referredBy || null });
+    result = await registerFn({ email, password, surname, givenName, mi, school });
   } catch (err) {
     // Surface the Cloud Function's user-friendly message; hide opaque internal codes
     const raw = err?.message ?? '';
@@ -595,52 +588,6 @@ export async function adminSetDisabled(uid, disabled) {
   const update = { disabled, updatedAt: serverTimestamp() };
   if (!disabled) update.pendingApproval = false; // clear waitlist flag when enabling
   return updateDoc(teacherRef(uid), update);
-}
-
-// ─── Admin: add tokens to a user ─────────────────────────────────────────────
-
-export async function adminAddTokens(targetUid, amount, note, adminUid) {
-  const ref = teacherRef(targetUid);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const current = snap.exists() ? (snap.data().tokenBalance ?? 0) : 0;
-    tx.update(ref, { tokenBalance: current + amount, updatedAt: serverTimestamp() });
-  });
-  await addDoc(tokenLogsRef(targetUid), {
-    uid: targetUid, amount, note, action: "top_up",
-    addedBy: adminUid, createdAt: serverTimestamp(),
-  });
-}
-
-// ─── Admin: equalize every user's token balance to a fixed amount ───────────
-// No per-user tokenLogs (would be one write per user on top of the balance
-// write); a single adminNotifications summary doc is enough of an audit trail.
-
-export async function adminEqualizeTokens(adminUid, target = 30) {
-  const snap = await getDocs(collection(db, "teachers"));
-  let batch = writeBatch(db);
-  let pending = 0;
-  let updated = 0;
-
-  for (const d of snap.docs) {
-    if ((d.data().tokenBalance ?? 0) === target) continue;
-    batch.update(d.ref, { tokenBalance: target, updatedAt: serverTimestamp() });
-    pending++;
-    updated++;
-    if (pending === 450) {
-      await batch.commit();
-      batch = writeBatch(db);
-      pending = 0;
-    }
-  }
-  if (pending > 0) await batch.commit();
-
-  await addDoc(collection(db, "adminNotifications"), {
-    type: "token_equalize", adminUid, target, updatedCount: updated,
-    read: false, createdAt: serverTimestamp(),
-  });
-
-  return updated;
 }
 
 // ─── Admin: permanently delete a user account and all their data ─────────────
@@ -710,6 +657,18 @@ export async function adminSetFreeMode(enabled, note = '') {
   return result.data;
 }
 
+/**
+ * Admin: set a teacher's plan. plan = 'free' | 'subscription';
+ * subscriptionUntil = 'YYYY-MM-DD' (end of that day, PH time) or null for no end date.
+ */
+export async function adminSetAccess(uid, plan, subscriptionUntil = null, note = '') {
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminSetAccess');
+  const result = await fn({ uid, plan, subscriptionUntil, note });
+  return result.data;
+}
+
 export function subscribeFreeModeStatus(cb) {
   return onSnapshot(
     doc(db, 'adminConfig', 'billing'),
@@ -746,13 +705,6 @@ export async function deleteActionResearch(uid, docId) {
   return deleteDoc(actionResearchDocRef(uid, docId));
 }
 
-// ─── Free mode ────────────────────────────────────────────────────────────────
-
-export async function getFreeMode() {
-  const snap = await getDoc(doc(db, 'adminConfig', 'billing'));
-  return snap.data()?.freeMode === true;
-}
-
 // ─── AI error reporting ───────────────────────────────────────────────────────
 
 export async function reportAIError({ uid, feature, errorMessage, inputContext }) {
@@ -763,73 +715,6 @@ export async function reportAIError({ uid, feature, errorMessage, inputContext }
     inputContext: inputContext  || {},
     resolved:     false,
     createdAt:    serverTimestamp(),
-  });
-}
-
-// ─── Token deduction ──────────────────────────────────────────────────────────
-// cost defaults to 3; pass a custom value for cheaper actions (e.g. 0.5 for gamification)
-
-const TOKEN_COST = 3;
-
-export async function deductTokens(uid, action, cost = TOKEN_COST) {
-  // Free-mode: skip deduction, just log
-  const freeMode = await getFreeMode();
-  if (freeMode) {
-    await addDoc(tokenLogsRef(uid), {
-      uid, amount: 0, action, freeMode: true, createdAt: serverTimestamp(),
-    }).catch(() => {});
-    return;
-  }
-
-  const ref = teacherRef(uid);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) throw new Error("User profile not found.");
-    const data    = snap.data();
-    const balance = data.tokenBalance ?? 0;
-    if (balance < cost) {
-      // Guard: window is not defined in Node/test environments (e.g. Vitest without jsdom)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
-      }
-      throw new Error("Not enough tokens. Ask your administrator to add tokens.");
-    }
-    tx.update(ref, { tokenBalance: balance - cost, updatedAt: serverTimestamp() });
-  });
-  await addDoc(tokenLogsRef(uid), {
-    uid, amount: -cost, action, createdAt: serverTimestamp(),
-  });
-}
-
-/**
- * Credits back tokens previously taken by deductTokens for the same action,
- * for use when a generation totally fails (all internal retries exhausted)
- * after the charge already went through — without this, a teacher pays for
- * a lesson/quiz/plan that was never actually produced, and pays again on
- * every retry. Call sites should catch their own generation errors, call
- * this, and only then surface the failure to the user — refunding is a
- * best-effort side effect and should never mask the original error, so
- * callers should swallow/log a refund failure rather than let it replace
- * the real error message.
- */
-export async function refundTokens(uid, action, cost = TOKEN_COST) {
-  const freeMode = await getFreeMode();
-  if (freeMode) {
-    await addDoc(tokenLogsRef(uid), {
-      uid, amount: 0, action, freeMode: true, reason: 'refund', createdAt: serverTimestamp(),
-    }).catch(() => {});
-    return;
-  }
-
-  const ref = teacherRef(uid);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) throw new Error("User profile not found.");
-    const balance = snap.data().tokenBalance ?? 0;
-    tx.update(ref, { tokenBalance: balance + cost, updatedAt: serverTimestamp() });
-  });
-  await addDoc(tokenLogsRef(uid), {
-    uid, amount: cost, action, reason: 'refund', createdAt: serverTimestamp(),
   });
 }
 

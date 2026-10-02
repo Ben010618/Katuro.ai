@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as XLSX from 'xlsx';
 import { callGeminiProxy } from '../../geminiConfig';
-import { deductTokens } from '../../db';
 import { runDeskAgentTurn, personaFor, docPersonaFor } from './deskAgent';
 import { getPersona, PERSONAS, timeOfDay } from '../personas';
 import { runTaskGraph } from './runner';
@@ -12,7 +11,6 @@ import { createVirtualWorkspace, flattenFileTree, readFileBytes } from '../../lo
 import { readDocument } from '../readers/index.js';
 
 vi.mock('../../geminiConfig', () => ({ callGeminiProxy: vi.fn() }));
-vi.mock('../../db', () => ({ deductTokens: vi.fn().mockResolvedValue(true) }));
 
 const LEARNERS = [
   ['Dela Cruz, Juan P.', 1, 1, 0, 1, 0],
@@ -49,29 +47,21 @@ function sentText(callIndex) {
 beforeEach(() => {
   resetTaskActionSupport();
   callGeminiProxy.mockReset();
-  deductTokens.mockClear();
 });
 
 describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
-  it('refuses to start without enough tokens', async () => {
-    await expect(runDeskAgentTurn({ prompt: 'hi', tokenBalance: 0, user: { uid: 'u1' } })).rejects.toThrow('INSUFFICIENT_TOKENS');
-    expect(callGeminiProxy).not.toHaveBeenCalled();
-  });
-
-  it('answers a greeting in one AI call with no tasks and charges once', async () => {
+  it('answers a greeting in one AI call with no tasks', async () => {
     callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify({ reply: 'Hello, Sir Ben! How can I help?', tasks: [] }) });
     const res = await runDeskAgentTurn({
       prompt: 'hello',
       workspace: createVirtualWorkspace('X'),
       user: { uid: 'u1' },
       profile: { firstName: 'Ben', gender: 'male' },
-      tokenBalance: 10,
     });
     expect(res.content).toContain('Sir Ben');
     expect(res.artifacts).toHaveLength(0);
     expect(callGeminiProxy).toHaveBeenCalledTimes(1);
     expect(callGeminiProxy.mock.calls[0][0].action).toBe('desk_agent_run');
-    expect(deductTokens).toHaveBeenCalledTimes(1);
   });
 
   it('runs an item analysis on a real xlsx, saves docx + xlsx, and masks learner names', async () => {
@@ -90,7 +80,6 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
       prompt: 'Item analysis please',
       workspace,
       user: { uid: 'u1' },
-      tokenBalance: 10,
       privacyMode: true,
       onUpdate: ({ steps: s }) => steps.push(s),
     });
@@ -116,10 +105,9 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
     const art = res.artifacts[0];
     expect(art.data.analysis.leastMastered.map((i) => i.number)).toContain(5);
     expect(steps.some((s) => s.some((x) => x.status === 'running'))).toBe(true);
-    expect(deductTokens).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the offline planner when the AI is unreachable and does not charge', async () => {
+  it('falls back to the offline planner when the AI is unreachable', async () => {
     const workspace = workspaceWithScores();
     const err = Object.assign(new Error('unavailable'), { code: 'functions/unavailable' });
     callGeminiProxy.mockRejectedValue(err);
@@ -128,22 +116,19 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
       workspace,
       attachedPaths: ['Scores/Quiz1_Rizal.xlsx'],
       user: { uid: 'u1' },
-      tokenBalance: 10,
     });
     expect(res.aiOffline).toBeTruthy();
     expect(res.createdFiles.length).toBeGreaterThan(0);
     expect(res.content).toMatch(/offline/i);
-    expect(deductTokens).not.toHaveBeenCalled();
   });
 
   it('reports a bad file path instead of inventing one', async () => {
     callGeminiProxy.mockResolvedValueOnce({
       text: JSON.stringify({ reply: 'On it.', tasks: [{ id: 't1', tool: 'analyze_scores', args: { path: 'Nope/missing.xlsx' } }] }),
     });
-    const res = await runDeskAgentTurn({ prompt: 'analyze', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' }, tokenBalance: 10 });
+    const res = await runDeskAgentTurn({ prompt: 'analyze', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' } });
     expect(res.content).toContain("couldn't find");
     expect(res.createdFiles).toHaveLength(0);
-    expect(deductTokens).not.toHaveBeenCalled();
   });
 
   it('writes a document from an AI DocumentSpec into a named folder', async () => {
@@ -158,7 +143,7 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
       .mockResolvedValueOnce({
         text: '```json\n{"title":"x","blocks":[{"type":"paragraph","text":"Dear Parents, **please** attend."},{"type":"table","columns":["Date","Time"],"rows":[["Oct 10","2 PM"]]}]}\n```',
       });
-    const res = await runDeskAgentTurn({ prompt: 'letter', workspace, user: { uid: 'u1' }, tokenBalance: 10 });
+    const res = await runDeskAgentTurn({ prompt: 'letter', workspace, user: { uid: 'u1' } });
     const file = res.createdFiles[0];
     expect(file.path).toBe('Letters/Parent_Meeting_Notice.docx');
     expect(res.artifacts[0].spec.title).toBe('Parent Meeting Notice');
@@ -174,7 +159,7 @@ describe('gateway compatibility', () => {
       // Exactly what callGeminiProxy throws today: message only, Firebase code stripped.
       .mockRejectedValueOnce(new Error('Unknown or missing action.'))
       .mockResolvedValueOnce({ text: JSON.stringify({ title: 'Folder Summary', blocks: [{ type: 'paragraph', text: 'Overview.' }] }) });
-    const res = await runDeskAgentTurn({ prompt: 'summary', workspace, user: { uid: 'u1' }, tokenBalance: 10 });
+    const res = await runDeskAgentTurn({ prompt: 'summary', workspace, user: { uid: 'u1' } });
     expect(callGeminiProxy.mock.calls.map((c) => c[0].action)).toEqual(['desk_agent_run', 'desk_agent_task', 'desk_agent_run']);
     expect(res.createdFiles).toHaveLength(1);
     expect(res.content).not.toMatch(/Unknown or missing action/);
@@ -183,9 +168,8 @@ describe('gateway compatibility', () => {
   it('treats the gateway daily-limit error (status 429, no code) as AI unavailable', async () => {
     const limit = Object.assign(new Error("You've reached today's limit."), { status: 429, dailyLimit: true });
     callGeminiProxy.mockRejectedValue(limit);
-    const res = await runDeskAgentTurn({ prompt: 'make a DLL', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' }, tokenBalance: 10 });
+    const res = await runDeskAgentTurn({ prompt: 'make a DLL', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' } });
     expect(res.aiOffline).toMatch(/limit/i);
-    expect(deductTokens).not.toHaveBeenCalled();
   });
 });
 
@@ -214,7 +198,7 @@ describe('personas (Matt / Luna)', () => {
     callGeminiProxy
       .mockResolvedValueOnce({ text: JSON.stringify({ reply: 'A pleasant morning, Sir Ben.', tasks: [{ id: 't1', tool: 'analyze_scores', args: { path: 'Scores/Quiz1_Rizal.xlsx' } }] }) })
       .mockResolvedValueOnce({ text: JSON.stringify({ remarks: ['ok'], interventions: ['ok'] }) });
-    await runDeskAgentTurn({ prompt: 'analyze', workspace, user: { uid: 'u1' }, tokenBalance: 10, persona: 'luna' });
+    await runDeskAgentTurn({ prompt: 'analyze', workspace, user: { uid: 'u1' }, persona: 'luna' });
     expect(sentText(0)).toContain('Your name is Luna');
     expect(sentText(1)).not.toMatch(/Your name is (Luna|Matt)/);
     expect(sentText(1)).toMatch(/formal, clear, professional/);

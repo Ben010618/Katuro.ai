@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { deductTokens, refundTokens, saveDLLPlan } from '../../services/db';
+import { saveDLLPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
 import { retryAsync } from '../../utils/retry';
@@ -233,7 +233,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
 export default function DLLStep2() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
-  const { user, tokenBalance, freeMode } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genError,   setGenError]   = useState('');
@@ -292,8 +292,7 @@ export default function DLLStep2() {
   const canGenerate =
     store.contentStandards.trim() &&
     store.performanceStandards.trim() &&
-    melcFilled && contentFilled &&
-    (freeMode || tokenBalance >= 3);
+    melcFilled && contentFilled;
 
   async function handleGenerate() {
     if (!canGenerate || generating) return;
@@ -301,10 +300,7 @@ export default function DLLStep2() {
     setGenError('');
     setStatusMsg('Preparing lesson parameters…');
     let elapsedMs = null;
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'dll', 3);
-      tokensDeducted = true;
       elapsedMs = startTimer();
 
       let result;
@@ -373,10 +369,7 @@ export default function DLLStep2() {
       trackEvent(user.uid, 'dll_generated', { subject: store.subject, grade: store.gradeLevel });
       trackGeneration(user.uid, 'dll', { success: true, durationMs: elapsedMs() });
     } catch (err) {
-      setGenError(err.message || 'Generation failed. Please try again.');
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'dll', 3).catch(e => console.error('Token refund failed:', e));
-      }
+      setGenError(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Generation failed. Please try again.'));
       if (elapsedMs) {
         trackGeneration(user.uid, 'dll', { success: false, durationMs: elapsedMs(), error: err.message });
       }
@@ -480,17 +473,6 @@ export default function DLLStep2() {
         onChange={list => store.setContentList(list)}
       />
 
-      {/* Token warning */}
-      {!freeMode && tokenBalance < 3 && (
-        <div style={{
-          background: '#fff7ed', border: '1px solid #fed7aa',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
-          fontSize: 13, color: '#9a3412',
-        }}>
-          You need at least 3 tokens to generate. Current balance: {tokenBalance} tokens.
-        </div>
-      )}
-
       {/* Generation error */}
       {genError && (
         <div style={{
@@ -531,7 +513,7 @@ export default function DLLStep2() {
             ) : (
               <>
                 <Sparkles size={15} />
-                Generate Daily Lesson Log{!freeMode && ' (3 tokens)'}
+                Generate Daily Lesson Log
                 <ArrowRight size={15} />
               </>
             )}

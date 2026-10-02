@@ -10,7 +10,7 @@ import img2 from '../assets/2.webp';
 import img3 from '../assets/3.webp';
 import img4 from '../assets/4.webp';
 import ktLogo from '../assets/KT-Favicon.webp';
-import TokenBundleModal from './TokenBundleModal';
+import { planStatusText, formatPlanDate, SUBSCRIBE_CONTACT_URL } from '../services/plans';
 import FloatingSuggestButton from '../features/feedback/FloatingSuggestButton';
 import InactivityAnnouncementModal from './InactivityAnnouncementModal';
 import FacultyCustomizerModal from './FacultyCustomizerModal';
@@ -19,7 +19,7 @@ const SLIDE_IMGS = [img1, img2, img3, img4];
 import {
   LayoutDashboard, Sparkles, BookOpen,
   LogOut, Menu, X, ChevronRight, ChevronDown,
-  ShieldCheck, Coins, FlaskConical, Zap, ClipboardCheck,
+  ShieldCheck, BadgeCheck, FlaskConical, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
   Settings, Camera, Loader2, Images, Lightbulb,
   Users,
@@ -57,7 +57,7 @@ const TITLES = {
 };
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
-function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClose, dark, toggle, onProfileOpen, onFacultyOpen }) {
+function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, onProfileOpen, onFacultyOpen }) {
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -237,10 +237,10 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
           }}>{!photoURL && initials}</div>
           <div style={{ overflow: 'hidden', flex: 1, textAlign: 'left' }}>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#FBF7EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
-            {!freeMode
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><Coins size={10} color="#E4D5AC" /><span style={{ fontSize: 10, fontWeight: 700, color: tokenBalance === 0 ? '#E06D5E' : '#E4D5AC', fontFamily: 'var(--kt-font-mono)' }}>{tokenBalance} tokens</span></div>
-              : <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><span style={{ fontSize: 10, fontWeight: 700, color: '#5F7A54' }}>✦ Free Mode ON</span></div>
-            }
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              {plan?.plan === 'subscription' && <BadgeCheck size={10} color="#E4D5AC" />}
+              <span style={{ fontSize: 10, fontWeight: 700, color: plan?.plan === 'subscription' ? '#E4D5AC' : '#B9C4B0' }}>{plan ? planStatusText(plan) : 'Free plan'}</span>
+            </div>
           </div>
         </button>
 
@@ -371,17 +371,15 @@ function SidebarContent({ user, photoURL, tokenBalance, isAdmin, freeMode, onClo
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
 export default function AppShell() {
-  const { user, tokenBalance, isAdmin, freeMode, loading, photoURL } = useAuth();
+  const { user, plan, isAdmin, photoURL } = useAuth();
   const { dark, toggle } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen,     setMobileOpen]     = useState(false);
   const [slideIdx,       setSlideIdx]       = useState(0);
-  const [showBundle,     setShowBundle]     = useState(false);
   const [profileData,    setProfileData]    = useState(null); // lifted out of sidebar
   const [photoUploading, setPhotoUploading] = useState(false);
   const [facultyOpen,    setFacultyOpen]    = useState(false);
-  const shownOnLogin = useRef(false);
   const photoRef     = useRef(null);
 
   useEffect(() => {
@@ -389,18 +387,6 @@ export default function AppShell() {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    if (!loading && !freeMode && tokenBalance === 0 && !shownOnLogin.current) {
-      shownOnLogin.current = true;
-      setShowBundle(true);
-    }
-  }, [loading, freeMode, tokenBalance]);
-
-  useEffect(() => {
-    const handler = () => setShowBundle(true);
-    window.addEventListener('kt-zero-tokens', handler);
-    return () => window.removeEventListener('kt-zero-tokens', handler);
-  }, []);
 
   async function handlePhotoUpload(e) {
     const file = e.target.files?.[0];
@@ -462,8 +448,8 @@ export default function AppShell() {
         {/* Sidebar — desktop */}
         <div className="shell-sidebar" style={{ width: 220, flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
           <SidebarContent
-            user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
-            freeMode={freeMode} dark={dark} toggle={toggle}
+            user={user} photoURL={photoURL} plan={plan} isAdmin={isAdmin}
+            dark={dark} toggle={toggle}
             onProfileOpen={setProfileData}
             onFacultyOpen={() => setFacultyOpen(true)}
           />
@@ -475,8 +461,8 @@ export default function AppShell() {
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,34,24,0.45)' }} onClick={() => setMobileOpen(false)} />
             <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
               <SidebarContent
-                user={user} photoURL={photoURL} tokenBalance={tokenBalance} isAdmin={isAdmin}
-                freeMode={freeMode} dark={dark} toggle={toggle}
+                user={user} photoURL={photoURL} plan={plan} isAdmin={isAdmin}
+                dark={dark} toggle={toggle}
                 onProfileOpen={setProfileData}
                 onFacultyOpen={() => setFacultyOpen(true)}
                 onClose={() => setMobileOpen(false)}
@@ -504,28 +490,31 @@ export default function AppShell() {
               onMouseEnter={e => { e.currentTarget.style.background = '#E4D5AC'; e.currentTarget.style.color = '#262119'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; e.currentTarget.style.color = 'var(--kt-text-secondary)'; }}>
               <Lightbulb size={13} /> <span>Request Feature</span>
             </button>
-            {freeMode ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-success-tint)', border: '1px solid rgba(95,122,84,0.3)', borderRadius: 'var(--kt-radius-md)', padding: '4px 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-success)', flexShrink: 0 }}>✦ Free</div>
-            ) : tokenBalance === 0 ? (
-              <button onClick={() => setShowBundle(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-chalkboard)', color: '#fff', border: 'none', borderRadius: 'var(--kt-radius-md)', padding: '5px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s', flexShrink: 0 }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
-                <Zap size={12} color="#E4D5AC" /> Tokens
-              </button>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '4px 8px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-primary)', flexShrink: 0 }}>
-                <Coins size={12} color="#8C7847" />
-                <span style={{ fontFamily: 'var(--kt-font-mono)', color: '#8C7847' }}>{tokenBalance}</span>
-              </div>
-            )}
+            <button
+              onClick={() => navigate('/settings?tab=plan')}
+              title={`${planStatusText(plan)} — see your plan and daily limits`}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: plan.plan === 'subscription' ? 'var(--kt-chalkboard)' : 'var(--kt-card-2)', color: plan.plan === 'subscription' ? '#E4D5AC' : 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '4px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+            >
+              {plan.plan === 'subscription' && <BadgeCheck size={12} />} {plan.label}
+            </button>
           </header>
+
+          {(plan.expiringSoon || (plan.mode === 'subscription' && plan.expired && !plan.freeForAll)) && (
+            <div role="status" style={{ background: plan.expired ? '#FDECEA' : '#FBF3DF', borderBottom: '1px solid var(--kt-border)', color: '#5B4A1F', fontSize: 12, padding: '7px 16px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>
+                {plan.expired
+                  ? `Your Subscription ended on ${formatPlanDate(plan.until)}. You're on the Free plan's daily limits for now.`
+                  : `Your Subscription ends on ${formatPlanDate(plan.until)} (${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'} left).`}
+              </span>
+              <a href={SUBSCRIBE_CONTACT_URL} target="_blank" rel="noreferrer" style={{ fontWeight: 700, color: '#2d6a4f' }}>Message KaTuro to renew</a>
+            </div>
+          )}
 
           <main className="shell-main">
             <Outlet />
           </main>
         </div>
       </div>
-
-      {showBundle && <TokenBundleModal onClose={() => setShowBundle(false)} />}
 
       <FloatingSuggestButton />
       <InactivityAnnouncementModal />

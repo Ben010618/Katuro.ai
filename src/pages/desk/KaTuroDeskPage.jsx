@@ -7,7 +7,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Coins,
+  BadgeCheck,
   FileText,
   Settings,
 } from 'lucide-react';
@@ -19,9 +19,10 @@ import { useDeskStore } from '../../store/deskStore';
 import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
 import { getPersona } from '../../services/desk/personas';
+import { planStatusText } from '../../services/plans';
 
 export default function KaTuroDeskPage() {
-  const { user, profile, photoURL, tokenBalance, freeMode } = useAuth();
+  const { user, profile, photoURL, plan } = useAuth();
   const { workspace, activeArtifact, persona } = useDeskStore();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -30,12 +31,6 @@ export default function KaTuroDeskPage() {
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
-
-  const handleTopUpClick = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
-    }
-  };
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
@@ -93,15 +88,13 @@ export default function KaTuroDeskPage() {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleTopUpClick}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#243429] hover:bg-[#2e4335] text-amber-300 text-xs border border-amber-500/20 transition cursor-pointer"
-            title="Click to top-up tokens via GCash"
+          <span
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${plan.plan === 'subscription' ? 'bg-[#243429] text-amber-300 border-amber-500/30' : 'bg-[#1f2b23] text-emerald-200 border-[#2d3e33]'}`}
+            title={planStatusText(plan)}
           >
-            <Coins size={12} className="text-amber-400" />
-            <span className="font-bold">{tokenBalance ?? 0}</span>
-            <span className="text-[10px] text-gray-300 hidden sm:inline">Tokens</span>
-          </button>
+            {plan.plan === 'subscription' && <BadgeCheck size={12} />}
+            <span className="font-semibold">{plan.label}</span>
+          </span>
 
           <button
             onClick={() => setShowSettings(true)}
@@ -132,7 +125,7 @@ export default function KaTuroDeskPage() {
             <DeskFolderPanel
               user={user}
               profile={profile}
-              tokenBalance={tokenBalance}
+              plan={plan}
               onCollapse={() => setShowLeftPanel(false)}
             />
           </div>
@@ -155,8 +148,7 @@ export default function KaTuroDeskPage() {
             user={user}
             profile={profile}
             photoURL={photoURL}
-            tokenBalance={tokenBalance}
-            freeMode={freeMode}
+            plan={plan}
             onOpenCanvas={() => setShowRightPanel(true)}
             onToggleLeftPanel={() => setShowLeftPanel(!showLeftPanel)}
             showLeftPanel={showLeftPanel}
@@ -205,7 +197,7 @@ export default function KaTuroDeskPage() {
               <DeskFolderPanel
                 user={user}
                 profile={profile}
-                tokenBalance={tokenBalance}
+                plan={plan}
               />
             </div>
           )}
@@ -215,8 +207,7 @@ export default function KaTuroDeskPage() {
                 user={user}
                 profile={profile}
                 photoURL={photoURL}
-                tokenBalance={tokenBalance}
-                freeMode={freeMode}
+                plan={plan}
                 onOpenCanvas={() => setActiveMobileTab('canvas')}
               />
             </div>

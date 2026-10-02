@@ -4,7 +4,7 @@ import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
-import { deductTokens, refundTokens, createSharedPlan, saveDLLPlan } from '../../services/db';
+import { createSharedPlan, saveDLLPlan } from '../../services/db';
 import { generateOutline, expandSlides, toExportSlides } from '../../services/presentationAI';
 import { retryAsync } from '../../utils/retry';
 import { FileDown, RotateCcw, Printer, X, Sparkles, BookOpenCheck, Projector, Gamepad2, Loader2, Share2 } from 'lucide-react';
@@ -84,7 +84,7 @@ export default function DLLOutputPage() {
   const navigate     = useNavigate();
   const store        = useDLLStore();
   const cotStore     = useCotStore();
-  const { profile, user, freeMode } = useAuth();
+  const { profile, user } = useAuth();
   const { addToast } = useToast();
 
   const [downloading,  setDownloading]  = useState(false);
@@ -213,7 +213,6 @@ export default function DLLOutputPage() {
     setPptLoading(true);
     setGenError('');
     try {
-      // Tokens are deducted server-side inside expandSlides — don't double-charge here.
       setPptPhase('Generating pedagogical slide outline…');
       const { outline: outlineSlides } = await generateOutline({
         subject:    store.subject,
@@ -247,14 +246,10 @@ export default function DLLOutputPage() {
       });
 
       const engineBadge = engine === 'nvidia' ? ' (NVIDIA NIM)' : '';
-      addToast(freeMode ? `Presentation downloaded!${engineBadge}` : `Presentation downloaded! (3 tokens used)${engineBadge}`, 'success');
+      addToast(`Presentation downloaded!${engineBadge}`, 'success');
       setSelectedDay(null);
     } catch (err) {
-      if (err.message?.includes('Insufficient tokens') || err.message?.includes('tokens')) {
-        setGenError('Not enough tokens. You need 3 tokens to generate a presentation.');
-      } else {
-        setGenError(err.message || 'Generation failed. Please try again.');
-      }
+      setGenError(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Generation failed. Please try again.'));
     } finally {
       setPptLoading(false);
       setPptPhase('');
@@ -274,10 +269,7 @@ export default function DLLOutputPage() {
     };
     setGameLoading(true);
     setGameModal('loading');
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'game_gen', 0.5);
-      tokensDeducted = true;
       let data;
       if (selGameType === 'matching') {
         const pairs = await genMatching(lesson, gameCount);
@@ -299,13 +291,10 @@ export default function DLLOutputPage() {
       }
       setGameResult(data);
       setGameModal('result');
-      addToast(freeMode ? 'Game generated!' : 'Game generated! (0.5 tokens used)', 'success');
+      addToast('Game generated!', 'success');
     } catch (err) {
-      addToast(err.message || 'Game generation failed.', 'error');
+      addToast(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'Game generation failed.'), 'error');
       setGameModal('pick');
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'game_gen', 0.5).catch(e => console.error('Token refund failed:', e));
-      }
     } finally {
       setGameLoading(false);
     }
@@ -453,7 +442,7 @@ export default function DLLOutputPage() {
                 melc: store.melc,
                 preview,
               });
-              const url = `${window.location.origin}/shared/${shareId}?ref=${user?.uid || ''}`;
+              const url = `${window.location.origin}/shared/${shareId}`;
               setShareUrl(url);
             } catch {
               addToast('Could not create share link. Try again.', 'error');
@@ -828,16 +817,6 @@ export default function DLLOutputPage() {
                 <Projector size={16} />
                 {pptLoading ? pptPhase || 'Generating…' : 'Generate Presentation'}
               </button>
-              {!pptLoading && !freeMode && (
-                <span style={{
-                  position: 'absolute', top: -9, right: 14,
-                  background: '#2d6a4f', color: '#fff',
-                  fontSize: 9, fontWeight: 800, borderRadius: 20,
-                  padding: '2px 9px', letterSpacing: '0.06em', pointerEvents: 'none',
-                }}>
-                  3 tokens
-                </span>
-              )}
             </div>
 
             {/* Generate Games */}
@@ -855,7 +834,6 @@ export default function DLLOutputPage() {
             >
               <Gamepad2 size={16} />
               Generate Games
-              {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 7px', fontWeight: 800 }}>0.5 token</span>}
             </button>
           </div>
         </div>
@@ -887,7 +865,7 @@ export default function DLLOutputPage() {
 
             {gameModal === 'pick' && (
               <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate.{!freeMode && ' Costs 0.5 token.'}</p>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280' }}>Select a game type and item count, then click Generate.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 16 }}>
                   {GAME_TYPES.map(gt => (
                     <button
@@ -914,7 +892,7 @@ export default function DLLOutputPage() {
                   disabled={gameLoading}
                   style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
-                  <Gamepad2 size={15} /> Generate Game {!freeMode && <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.18)', borderRadius: 5, padding: '2px 6px', fontWeight: 800 }}>0.5 token</span>}
+                  <Gamepad2 size={15} /> Generate Game
                 </button>
               </div>
             )}

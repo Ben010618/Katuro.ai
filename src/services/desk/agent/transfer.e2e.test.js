@@ -9,7 +9,6 @@ import { createVirtualWorkspace, readFileBytes, fileExists } from '../../localFi
 import { useDeskStore } from '../../../store/deskStore';
 
 vi.mock('../../geminiConfig', () => ({ callGeminiProxy: vi.fn() }));
-vi.mock('../../db', () => ({ deductTokens: vi.fn().mockResolvedValue(true) }));
 
 const PNG_1x1 = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
 
@@ -106,7 +105,7 @@ describe('end to end: Word attendance → school SF2 Excel, formatting preserved
       return { text: JSON.stringify({ mapping: {} }) };
     });
 
-    const res = await runDeskAgentTurn({ prompt: 'Encode my Word attendance into the SF2', workspace, user: { uid: 'u1' }, tokenBalance: 10 });
+    const res = await runDeskAgentTurn({ prompt: 'Encode my Word attendance into the SF2', workspace, user: { uid: 'u1' } });
     const art = res.artifacts.find((a) => a.type === 'changes');
     expect(art, res.content).toBeTruthy();
     expect(art.data.status).toBe('pending');

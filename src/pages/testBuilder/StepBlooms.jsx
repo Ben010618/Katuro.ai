@@ -5,14 +5,12 @@ import { useToast } from '../../context/ToastContext';
 import { COGNITIVE_LEVELS, deriveKeyStage, deriveHotsFloor } from '../../config/testBuilderConfig';
 import { normalizeWeights, computeHotsPct, coerceWeightsTo100, equalDistributionWeights } from '../../utils/testBuilderCalc';
 import { suggestCognitiveWeights } from '../../services/testBuilderAI';
-import { deductTokens, refundTokens } from '../../services/db';
 import { AI_ENABLED } from '../../services/ai';
 import {
   TrendingUp, CheckCircle2, AlertTriangle,
   Sparkles, Loader2, AlertCircle, X, Check, Scale,
 } from 'lucide-react';
 
-const SUGGEST_COST = 0.5;
 
 export default function StepBlooms() {
   const store = useTestBuilderStore();
@@ -46,11 +44,7 @@ export default function StepBlooms() {
     setAiLoading(true);
     setAiError('');
     setAiStatus('');
-    let tokensDeducted = false;
     try {
-      await deductTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST);
-      tokensDeducted = true;
-
       let result;
       let lastErr;
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -81,10 +75,7 @@ export default function StepBlooms() {
 
       setAiSuggestion(result);
     } catch (err) {
-      setAiError(err.message || 'AI suggestion failed. Please try again.');
-      if (tokensDeducted) {
-        refundTokens(user.uid, 'test_builder_blooms_suggest', SUGGEST_COST).catch(e => console.error('Token refund failed:', e));
-      }
+      setAiError(err.dailyLimit ? "You've reached today's limit for this feature on your plan. It resets tomorrow — or ask your admin about a Subscription for higher limits." : (err.message || 'AI suggestion failed. Please try again.'));
     } finally {
       setAiLoading(false);
       setAiStatus('');

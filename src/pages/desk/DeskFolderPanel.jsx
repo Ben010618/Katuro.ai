@@ -6,7 +6,6 @@ import {
   Search,
   HardDrive,
   Cloud,
-  Coins,
   CreditCard,
   UserCheck,
   ChevronRight,
@@ -27,6 +26,7 @@ import {
   openInDefaultApp,
 } from '../../services/localFileSystem';
 import { getFileIcon } from './deskFileIcons';
+import { planStatusText, SUBSCRIBE_CONTACT_URL } from '../../services/plans';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
 
@@ -104,7 +104,7 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
   );
 }
 
-export default function DeskFolderPanel({ user, profile, tokenBalance = 0, onCollapse }) {
+export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
   const {
     workspace,
     setWorkspace,
@@ -232,12 +232,6 @@ export default function DeskFolderPanel({ user, profile, tokenBalance = 0, onCol
       if (!opened) openPreview(item);
     } catch (err) {
       flash(`Could not open: ${err.message}`);
-    }
-  };
-
-  const handleTopUpClick = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('kt-zero-tokens'));
     }
   };
 
@@ -439,7 +433,7 @@ export default function DeskFolderPanel({ user, profile, tokenBalance = 0, onCol
         )}
       </div>
 
-      {/* Account & Token Status (Bottom Bar) */}
+      {/* Account & Plan (Bottom Bar) */}
       <div className="p-2.5 bg-[#141f17] border-t border-[#2d3e33] space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -457,22 +451,23 @@ export default function DeskFolderPanel({ user, profile, tokenBalance = 0, onCol
           </div>
         </div>
 
-        {/* Token Balance & GCash Top-Up */}
-        <div className="bg-[#1c2a20] rounded p-1.5 border border-[#2b3f31] flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <Coins size={13} className="text-amber-400" />
-            <span className="text-[11px] font-bold text-amber-300">
-              {tokenBalance ?? 0}
-            </span>
-            <span className="text-[9px] text-gray-400">Tokens</span>
+        {/* Plan: Free / Subscription (set by the KaTuro admin) */}
+        <div className="bg-[#1c2a20] rounded p-1.5 border border-[#2b3f31] flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`text-[11px] font-bold truncate ${plan?.plan === 'subscription' ? 'text-amber-300' : 'text-emerald-200'}`}>{plan?.label || 'Free'}</p>
+            <p className="text-[9px] text-gray-400 truncate">{plan ? planStatusText(plan) : 'Free plan'}{plan?.expiringSoon ? ` · ${plan.daysLeft}d left` : ''}</p>
           </div>
-          <button
-            onClick={handleTopUpClick}
-            className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded shadow-2xs flex items-center gap-1 transition"
-          >
-            <CreditCard size={10} />
-            <span>Top-up / GCash</span>
-          </button>
+          {(!plan || plan.plan === 'free' || plan.expiringSoon) && (
+            <a
+              href={SUBSCRIBE_CONTACT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded shadow-2xs flex items-center gap-1 transition flex-shrink-0"
+            >
+              <CreditCard size={10} />
+              <span>{plan?.expiringSoon ? 'Renew' : 'Subscribe'}</span>
+            </a>
+          )}
         </div>
       </div>
     </aside>

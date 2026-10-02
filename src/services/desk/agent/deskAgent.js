@@ -7,7 +7,7 @@
  *     → outputs saved to "KaTuro Outputs/<date>/" (never overwrites; auto-renames)
  *     → reply + live checklist + Canvas artifacts
  *
- * Tokens are charged once per turn, only after the AI actually produced something.
+ * Access is controlled by the teacher's plan (Free / Subscription) through the server's daily limits.
  */
 
 import { callDeskLLM, AIUnavailableError } from './llm.js';
@@ -29,9 +29,7 @@ import {
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
-import { deductTokens } from '../../db.js';
 
-export const TURN_COST = 2;
 export const OUTPUT_ROOT = 'KaTuro Outputs';
 
 const MIME_BY_EXT = {
@@ -102,7 +100,7 @@ function cleanReply(text) {
 
 /**
  * Runs one teacher turn.
- * @returns {Promise<{ content, steps, artifacts, createdFiles, charged }>}
+ * @returns {Promise<{ content, steps, artifacts, createdFiles, aiOffline }>}
  */
 export async function runDeskAgentTurn({
   prompt,
@@ -113,14 +111,10 @@ export async function runDeskAgentTurn({
   history = [],
   user,
   profile,
-  tokenBalance = 0,
-  freeMode = false,
   privacyMode = true,
   persona: personaId,
   onUpdate,
 }) {
-  if (!freeMode && tokenBalance < TURN_COST) throw new Error('INSUFFICIENT_TOKENS');
-
   const teacher = teacherFromProfile(profile, user);
   const persona = personaFor(teacher, personaId);
   const docPersona = docPersonaFor(teacher);
@@ -131,7 +125,6 @@ export async function runDeskAgentTurn({
   const today = new Date();
   const outputRoot = `${OUTPUT_ROOT}/${localDateStamp(today)}`;
   let outputFolder = outputRoot;
-  let aiCalls = 0;
   const createdFiles = [];
   const parsedCache = new Map();
 
@@ -166,7 +159,6 @@ export async function runDeskAgentTurn({
     },
     async llm(opts) {
       const out = await callDeskLLM({ kind: 'task', ...opts });
-      aiCalls += 1;
       return out;
     },
     async saveOutput(fileName, bytes, format, folder = outputFolder) {
@@ -215,7 +207,6 @@ export async function runDeskAgentTurn({
   let reply = '';
   let tasks;
   let problems = [];
-  let plannedCount = 0;
   let aiOffline = null;
 
   try {
@@ -236,9 +227,7 @@ export async function runDeskAgentTurn({
       maxTokens: 3000,
       temperature: 0.2,
     });
-    aiCalls += 1;
     reply = cleanReply(masker.unmask(plan?.reply || ''));
-    plannedCount = Array.isArray(plan?.tasks) ? plan.tasks.length : 0;
     ({ tasks, problems } = sanitizePlan(plan, flat, attachedPaths));
   } catch (err) {
     if (!(err instanceof AIUnavailableError)) throw err;
@@ -303,18 +292,5 @@ export async function runDeskAgentTurn({
   }
   const content = parts.join('\n\n') || `Sorry ${teacher.salutation}, I wasn't able to do that. Could you rephrase it?`;
 
-  // ── 4. Charge only for AI work that produced something ────
-  let charged = false;
-  // A plain answer counts; a plan whose every task was invalid or failed does not.
-  const succeeded = aiCalls > 0 && (plannedCount === 0 ? Boolean(reply) : lines.some((l) => l.startsWith('✓')));
-  if (succeeded && user?.uid && !freeMode) {
-    try {
-      await deductTokens(user.uid, 'katuro_desk_agent_run', TURN_COST);
-      charged = true;
-    } catch (e) {
-      console.warn('[KaTuroDesk] Token deduction failed:', e);
-    }
-  }
-
-  return { content, steps, artifacts, createdFiles, charged, aiOffline };
+  return { content, steps, artifacts, createdFiles, aiOffline };
 }
