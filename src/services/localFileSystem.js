@@ -1,40 +1,64 @@
 /**
- * localFileSystem.js - Web File System Access API Engine for KaTuroDesk
- * 
- * Provides native file system access in modern Chromium browsers (Chrome, Edge)
- * with graceful in-memory virtual fallback for unsupported environments.
+ * localFileSystem.js - Unified workspace file engine for KaTuroDesk
+ *
+ * One API over three backends, chosen by `handle.kind`:
+ *   'electron' — KaTuroDesk desktop app, real disk via the preload IPC bridge (binary safe)
+ *   'fsa'      — Chromium File System Access API (web /desk route)
+ *   'virtual'  — in-memory demo workspace (browsers without FSA, tests)
+ *
+ * All paths passed in are workspace-relative and use forward slashes.
  */
 
 export const isFileSystemAccessSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
+const desk = () => (typeof window !== 'undefined' ? window.katuroDeskApi : undefined);
+
+function joinRoot(rootPath, relPath) {
+  const sep = rootPath.includes('\\') ? '\\' : '/';
+  const clean = String(relPath).replace(/^[\\/]+/, '').split(/[\\/]+/).join(sep);
+  return `${rootPath.replace(/[\\/]+$/, '')}${sep}${clean}`;
+}
+
+function cleanRelPath(relPath) {
+  const parts = String(relPath || '').replace(/\\/g, '/').split('/').filter((p) => p && p !== '.');
+  if (parts.some((p) => p === '..')) throw new Error('Invalid path: ".." is not allowed');
+  return parts.join('/');
+}
+
+function toUint8(content) {
+  if (content instanceof Uint8Array) return content;
+  if (content instanceof ArrayBuffer) return new Uint8Array(content);
+  if (ArrayBuffer.isView(content)) return new Uint8Array(content.buffer, content.byteOffset, content.byteLength);
+  if (typeof content === 'string') return new TextEncoder().encode(content);
+  throw new Error('Unsupported content type');
+}
+
+async function contentToBytes(content) {
+  if (typeof Blob !== 'undefined' && content instanceof Blob) {
+    return new Uint8Array(await content.arrayBuffer());
+  }
+  return toUint8(content);
+}
+
+function electronWorkspace(res) {
+  return {
+    handle: { kind: 'electron', isElectron: true, rootPath: res.path },
+    name: res.name,
+    rootPath: res.path,
+    isVirtual: false,
+    files: res.files || [],
+  };
+}
+
 /**
  * Prompts the user to pick a local directory from their computer.
- * Returns { handle, name, files }
+ * Returns { handle, name, files, isVirtual, rootPath? } or null if cancelled.
  */
 export async function pickLocalDirectory() {
-  // If running in Native KaTuroDesk Desktop App (Electron)
-  if (typeof window !== 'undefined' && window.katuroDeskApi) {
-    const res = await window.katuroDeskApi.selectFolder();
+  if (desk()) {
+    const res = await desk().selectFolder();
     if (!res || res.canceled) return null;
-    return {
-      handle: {
-        isElectron: true,
-        path: res.path,
-        saveVirtualFile: async (filename, content) => {
-          const fullPath = `${res.path}/${filename}`;
-          await window.katuroDeskApi.writeFile(fullPath, content);
-          return { success: true, name: filename, path: fullPath };
-        },
-        createVirtualDirectory: async (dirName) => {
-          const fullPath = `${res.path}/${dirName}`;
-          await window.katuroDeskApi.createDirectory(fullPath);
-          return { success: true, name: dirName, path: fullPath };
-        },
-      },
-      name: res.name,
-      isVirtual: false,
-      files: res.files || [],
-    };
+    return electronWorkspace(res);
   }
 
   if (!isFileSystemAccessSupported) {
@@ -42,30 +66,40 @@ export async function pickLocalDirectory() {
   }
 
   try {
-    const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite',
-    });
-
-    const fileTree = await readDirectoryRecursively(dirHandle);
+    const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     return {
       handle: dirHandle,
       name: dirHandle.name,
       isVirtual: false,
-      files: fileTree,
+      files: await readDirectoryRecursively(dirHandle),
     };
   } catch (err) {
-    if (err.name === 'AbortError') {
-      return null; // User cancelled
-    }
+    if (err.name === 'AbortError') return null;
     console.warn('Native directory picker failed, falling back to virtual workspace:', err);
     return createVirtualWorkspace('My DepEd Classroom Files (Cloud/Virtual)');
   }
 }
 
+/** Desktop only: reopens the folder the teacher used last time. */
+export async function reopenLastDirectory() {
+  if (!desk()?.reopenLastFolder) return null;
+  const res = await desk().reopenLastFolder();
+  if (!res || res.canceled) return null;
+  return electronWorkspace(res);
+}
+
 /**
- * Reads a directory handle recursively and returns a tree of files and subdirectories.
+ * Reads a directory (any backend) recursively and returns a tree of files and subdirectories.
  */
 export async function readDirectoryRecursively(dirHandle, path = '') {
+  if (!dirHandle) return [];
+  if (dirHandle.kind === 'electron') {
+    return desk().readDirectory(dirHandle.rootPath);
+  }
+  if (dirHandle.isVirtual) {
+    return dirHandle.getFiles ? dirHandle.getFiles() : [];
+  }
+
   const entries = [];
   try {
     for await (const entry of dirHandle.values()) {
@@ -82,13 +116,12 @@ export async function readDirectoryRecursively(dirHandle, path = '') {
           handle: entry,
         });
       } else if (entry.kind === 'directory') {
-        const children = await readDirectoryRecursively(entry, entryPath);
         entries.push({
           name: entry.name,
           path: entryPath,
           kind: 'directory',
           handle: entry,
-          children,
+          children: await readDirectoryRecursively(entry, entryPath),
         });
       }
     }
@@ -96,53 +129,120 @@ export async function readDirectoryRecursively(dirHandle, path = '') {
     console.error(`Error reading directory ${dirHandle.name}:`, err);
   }
   return entries.sort((a, b) => {
-    // Directories first, then alphabetically
     if (a.kind === b.kind) return a.name.localeCompare(b.name);
     return a.kind === 'directory' ? -1 : 1;
   });
 }
 
-/**
- * Writes or saves a file directly into the local directory handle.
- */
-export async function writeFileToDirectory(dirHandle, filename, content, mimeType = 'text/plain') {
-  if (!dirHandle) throw new Error('No directory selected');
-
-  // If virtual workspace
-  if (dirHandle.isVirtual) {
-    return dirHandle.saveVirtualFile(filename, content, mimeType);
+async function fsaResolveDir(rootHandle, dirParts, create) {
+  let dir = rootHandle;
+  for (const part of dirParts) {
+    dir = await dir.getDirectoryHandle(part, { create });
   }
+  return dir;
+}
 
+/** True if a workspace-relative path already exists. */
+export async function fileExists(dirHandle, relPath) {
+  const rel = cleanRelPath(relPath);
+  if (!dirHandle || !rel) return false;
+  if (dirHandle.kind === 'electron') return desk().exists(joinRoot(dirHandle.rootPath, rel));
+  if (dirHandle.isVirtual) return Boolean(dirHandle.findEntry?.(rel));
   try {
-    // Resolve subpaths if filename contains '/'
-    const parts = filename.split('/');
-    let targetDir = dirHandle;
-    for (let i = 0; i < parts.length - 1; i++) {
-      targetDir = await targetDir.getDirectoryHandle(parts[i], { create: true });
+    const parts = rel.split('/');
+    const dir = await fsaResolveDir(dirHandle, parts.slice(0, -1), false);
+    const name = parts[parts.length - 1];
+    try {
+      await dir.getFileHandle(name);
+      return true;
+    } catch {
+      await dir.getDirectoryHandle(name);
+      return true;
     }
-
-    const actualName = parts[parts.length - 1];
-    const fileHandle = await targetDir.getFileHandle(actualName, { create: true });
-    const writable = await fileHandle.createWritable();
-
-    if (content instanceof Blob) {
-      await writable.write(content);
-    } else if (typeof content === 'string') {
-      await writable.write(content);
-    } else {
-      await writable.write(new Blob([content], { type: mimeType }));
-    }
-    await writable.close();
-
-    return {
-      success: true,
-      name: actualName,
-      path: filename,
-    };
-  } catch (err) {
-    console.error(`Error writing file ${filename}:`, err);
-    throw err;
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Returns `relPath` if free, otherwise "name (2).ext", "name (3).ext"...
+ * KaTuroDesk never silently overwrites a teacher's file.
+ */
+export async function getAvailablePath(dirHandle, relPath) {
+  const rel = cleanRelPath(relPath);
+  if (!(await fileExists(dirHandle, rel))) return rel;
+  const slash = rel.lastIndexOf('/');
+  const dir = slash >= 0 ? rel.slice(0, slash + 1) : '';
+  const file = rel.slice(slash + 1);
+  const dot = file.lastIndexOf('.');
+  const base = dot > 0 ? file.slice(0, dot) : file;
+  const ext = dot > 0 ? file.slice(dot) : '';
+  for (let i = 2; i < 500; i++) {
+    const candidate = `${dir}${base} (${i})${ext}`;
+    if (!(await fileExists(dirHandle, candidate))) return candidate;
+  }
+  return `${dir}${base} (${Date.now()})${ext}`;
+}
+
+/**
+ * Writes text or binary (string | Uint8Array | ArrayBuffer | Blob) into the workspace.
+ * Parent folders are created automatically. Overwrites by default; pass
+ * { overwrite: false } to get an auto-renamed path instead.
+ */
+export async function writeFileToDirectory(dirHandle, filename, content, mimeType = 'text/plain', { overwrite = true } = {}) {
+  if (!dirHandle) throw new Error('No directory selected');
+  const rel = overwrite ? cleanRelPath(filename) : await getAvailablePath(dirHandle, filename);
+  const actualName = rel.split('/').pop();
+
+  if (dirHandle.kind === 'electron') {
+    const fullPath = joinRoot(dirHandle.rootPath, rel);
+    await desk().writeFile(fullPath, await contentToBytes(content));
+    return { success: true, name: actualName, path: rel, fullPath };
+  }
+
+  if (dirHandle.isVirtual) {
+    const data = typeof content === 'string' ? content : await contentToBytes(content);
+    return dirHandle.saveVirtualFile(rel, data, mimeType);
+  }
+
+  const parts = rel.split('/');
+  const targetDir = await fsaResolveDir(dirHandle, parts.slice(0, -1), true);
+  const fileHandle = await targetDir.getFileHandle(actualName, { create: true });
+  const writable = await fileHandle.createWritable();
+  if (typeof content === 'string' || (typeof Blob !== 'undefined' && content instanceof Blob)) {
+    await writable.write(content);
+  } else {
+    await writable.write(new Blob([toUint8(content)], { type: mimeType }));
+  }
+  await writable.close();
+  return { success: true, name: actualName, path: rel };
+}
+
+/**
+ * Reads raw bytes of a workspace file. Accepts a tree entry or a relative path.
+ */
+export async function readFileBytes(dirHandle, fileOrPath) {
+  const entry = typeof fileOrPath === 'string' ? null : fileOrPath;
+  const rel = cleanRelPath(entry ? entry.path : fileOrPath);
+
+  if (entry?.bytes) return toUint8(entry.bytes);
+  if (entry && typeof entry.content === 'string' && !entry.fullPath && !entry.handle) {
+    return new TextEncoder().encode(entry.content);
+  }
+  if (entry?.fullPath && desk()) return toUint8(await desk().readBinary(entry.fullPath));
+  if (entry?.handle?.getFile) return new Uint8Array(await (await entry.handle.getFile()).arrayBuffer());
+
+  if (!dirHandle) throw new Error('No directory selected');
+  if (dirHandle.kind === 'electron') return toUint8(await desk().readBinary(joinRoot(dirHandle.rootPath, rel)));
+  if (dirHandle.isVirtual) {
+    const found = dirHandle.findEntry?.(rel);
+    if (!found) throw new Error(`File not found: ${rel}`);
+    return found.bytes ? toUint8(found.bytes) : new TextEncoder().encode(found.content || '');
+  }
+  const parts = rel.split('/');
+  const dir = await fsaResolveDir(dirHandle, parts.slice(0, -1), false);
+  const fh = await dir.getFileHandle(parts[parts.length - 1]);
+  return new Uint8Array(await (await fh.getFile()).arrayBuffer());
 }
 
 /**
@@ -161,32 +261,42 @@ export async function readFileText(fileHandle) {
 }
 
 /**
- * Creates a new directory inside the workspace directory handle.
+ * Creates a new directory (nested paths allowed) inside the workspace.
  */
 export async function createDirectoryInWorkspace(dirHandle, folderName) {
   if (!dirHandle) throw new Error('No directory selected');
+  const cleanName = cleanRelPath(folderName);
 
-  const cleanName = folderName.replace(/^\/+|\/+$/g, '');
+  if (dirHandle.kind === 'electron') {
+    await desk().createDirectory(joinRoot(dirHandle.rootPath, cleanName));
+    return { success: true, name: cleanName.split('/').pop(), path: cleanName };
+  }
   if (dirHandle.isVirtual) {
     return dirHandle.createVirtualDirectory(cleanName);
   }
+  const parts = cleanName.split('/');
+  const current = await fsaResolveDir(dirHandle, parts, true);
+  return { success: true, name: parts[parts.length - 1], path: cleanName, handle: current };
+}
 
-  try {
-    const parts = cleanName.split('/');
-    let current = dirHandle;
-    for (const part of parts) {
-      current = await current.getDirectoryHandle(part, { create: true });
-    }
-    return {
-      success: true,
-      name: parts[parts.length - 1],
-      path: cleanName,
-      handle: current,
-    };
-  } catch (err) {
-    console.error(`Error creating directory ${cleanName}:`, err);
-    throw err;
-  }
+/** Desktop only: open a file in its default app (Word, Excel, PowerPoint...). */
+export async function openInDefaultApp(dirHandle, relPath) {
+  if (dirHandle?.kind !== 'electron') return false;
+  await desk().openPath(joinRoot(dirHandle.rootPath, cleanRelPath(relPath)));
+  return true;
+}
+
+/** Desktop only: show the file highlighted in Windows Explorer. */
+export async function revealInFolder(dirHandle, relPath) {
+  if (dirHandle?.kind !== 'electron') return false;
+  await desk().showItemInFolder(joinRoot(dirHandle.rootPath, cleanRelPath(relPath)));
+  return true;
+}
+
+/** Desktop only: Chromium print-to-PDF of a self-contained HTML page. Returns Uint8Array or null. */
+export async function renderHtmlToPdf(html, options = {}) {
+  if (!desk()?.htmlToPdf) return null;
+  return toUint8(await desk().htmlToPdf(html, options));
 }
 
 /**
@@ -196,16 +306,23 @@ export function flattenFileTree(entries = []) {
   const result = [];
   function traverse(list) {
     for (const item of list) {
-      if (item.kind === 'file') {
-        result.push(item);
-      }
-      if (item.children && Array.isArray(item.children)) {
-        traverse(item.children);
-      }
+      if (item.kind === 'file') result.push(item);
+      if (Array.isArray(item.children)) traverse(item.children);
     }
   }
   traverse(entries);
   return result;
+}
+
+/** Demo-workspace files hold plain text under an Office extension; read them as text. */
+export function readerNameFor(entry, name) {
+  return entry && typeof entry.content === 'string' && !entry.bytes && !entry.fullPath && !entry.handle ? `${name}.txt` : name;
+}
+
+/** Finds a file entry in the tree by its workspace-relative path. */
+export function findEntryByPath(entries = [], relPath) {
+  const target = cleanRelPath(relPath).toLowerCase();
+  return flattenFileTree(entries).find((f) => cleanRelPath(f.path).toLowerCase() === target) || null;
 }
 
 /**
@@ -219,23 +336,24 @@ export function findFilesByNames(entries = [], names = []) {
 }
 
 /**
- * Reads content from a file object (virtual or native handle).
+ * Reads plain text content from a file object (virtual or native handle).
+ * For real Office/PDF parsing use services/desk/readers instead.
  */
 export async function readWorkspaceFileContent(fileObj) {
   if (!fileObj) return '';
   if (fileObj.content) return fileObj.content;
-  if (fileObj.handle) {
-    return await readFileText(fileObj.handle);
-  }
+  if (fileObj.handle) return readFileText(fileObj.handle);
+  if (fileObj.fullPath && desk()) return desk().readFile(fileObj.fullPath);
   return '';
 }
 
 /**
  * Creates an initial virtual workspace with sample DepEd lesson folders
  * when running in demo mode or browsers without File System Access API.
+ * Files with a `content` string are plain-text stand-ins (clearly marked demo data).
  */
 export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
-  let virtualStorage = [
+  const virtualStorage = [
     {
       name: 'Lesson Logs (DLL)',
       path: 'Lesson Logs (DLL)',
@@ -304,60 +422,70 @@ export function createVirtualWorkspace(name = 'Grade 7 Science (Quarter 2)') {
     },
   ];
 
+  function ensureDir(parts) {
+    let list = virtualStorage;
+    let path = '';
+    for (const part of parts) {
+      path = path ? `${path}/${part}` : part;
+      let dir = list.find((i) => i.kind === 'directory' && i.name === part);
+      if (!dir) {
+        dir = { name: part, path, kind: 'directory', children: [] };
+        list.unshift(dir);
+      }
+      list = dir.children;
+    }
+    return list;
+  }
+
+  const handle = {
+    kind: 'virtual',
+    isVirtual: true,
+    getFiles: () => virtualStorage.slice(),
+    findEntry: (relPath) => {
+      const target = cleanRelPath(relPath).toLowerCase();
+      const walk = (list) => {
+        for (const item of list) {
+          if (item.path.toLowerCase() === target) return item;
+          if (item.children) {
+            const hit = walk(item.children);
+            if (hit) return hit;
+          }
+        }
+        return null;
+      };
+      return walk(virtualStorage);
+    },
+    saveVirtualFile: (filename, content) => {
+      const rel = cleanRelPath(filename);
+      const parts = rel.split('/');
+      const fileNameOnly = parts.pop();
+      const isText = typeof content === 'string';
+      const newFileItem = {
+        name: fileNameOnly,
+        path: rel,
+        kind: 'file',
+        size: isText ? content.length : content?.byteLength ?? content?.size ?? 0,
+        lastModified: Date.now(),
+        extension: fileNameOnly.split('.').pop().toLowerCase(),
+        ...(isText ? { content } : { bytes: toUint8(content) }),
+      };
+      const list = ensureDir(parts);
+      const idx = list.findIndex((f) => f.kind === 'file' && f.name === fileNameOnly);
+      if (idx !== -1) list.splice(idx, 1);
+      list.push(newFileItem);
+      return { success: true, name: fileNameOnly, path: rel };
+    },
+    createVirtualDirectory: (folderName) => {
+      const parts = cleanRelPath(folderName).split('/');
+      ensureDir(parts);
+      return { success: true, name: parts[parts.length - 1], path: parts.join('/') };
+    },
+  };
+
   return {
     isVirtual: true,
     name,
-    handle: {
-      isVirtual: true,
-      saveVirtualFile: (filename, content) => {
-        const parts = filename.split('/');
-        const fileNameOnly = parts[parts.length - 1];
-
-        const newFileItem = {
-          name: fileNameOnly,
-          path: filename,
-          kind: 'file',
-          size: typeof content === 'string' ? content.length : 32000,
-          lastModified: Date.now(),
-          extension: fileNameOnly.split('.').pop().toLowerCase(),
-          content: typeof content === 'string' ? content : 'Binary content saved',
-        };
-
-        if (parts.length > 1) {
-          const folderName = parts[0];
-          let folder = virtualStorage.find((i) => i.name === folderName && i.kind === 'directory');
-          if (!folder) {
-            folder = {
-              name: folderName,
-              path: folderName,
-              kind: 'directory',
-              children: [],
-            };
-            virtualStorage.unshift(folder);
-          }
-          folder.children = folder.children.filter((f) => f.name !== fileNameOnly);
-          folder.children.push(newFileItem);
-        } else {
-          const idx = virtualStorage.findIndex((f) => f.name === fileNameOnly);
-          if (idx !== -1) virtualStorage.splice(idx, 1);
-          virtualStorage.push(newFileItem);
-        }
-
-        return { success: true, name: fileNameOnly, path: filename };
-      },
-      createVirtualDirectory: (folderName) => {
-        const existing = virtualStorage.find((i) => i.name === folderName && i.kind === 'directory');
-        if (!existing) {
-          virtualStorage.unshift({
-            name: folderName,
-            path: folderName,
-            kind: 'directory',
-            children: [],
-          });
-        }
-        return { success: true, name: folderName, path: folderName };
-      },
-    },
+    handle,
     files: virtualStorage,
   };
 }

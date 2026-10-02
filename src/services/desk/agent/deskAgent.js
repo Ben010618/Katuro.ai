@@ -1,0 +1,297 @@
+/**
+ * deskAgent.js — KaTuroDesk agent turn: plan → run tasks in parallel → save real files.
+ *
+ *   Teacher request
+ *     → planner (1 Gemini call, JSON)          — or the offline keyword planner
+ *     → task graph (runner.js, 3 at a time)    — READ / THINK / WRITE tools (tools.js)
+ *     → outputs saved to "KaTuro Outputs/<date>/" (never overwrites; auto-renames)
+ *     → reply + live checklist + Canvas artifacts
+ *
+ * Tokens are charged once per turn, only after the AI actually produced something.
+ */
+
+import { callDeskLLM, AIUnavailableError } from './llm.js';
+import { createNameMasker } from './privacy.js';
+import { runTaskGraph, TASK_CONCURRENCY } from './runner.js';
+import { TOOLS } from './tools.js';
+import { buildFileIndex, buildPlannerSystem, buildPlannerPrompt, sanitizePlan, planOffline } from './planner.js';
+import { readDocument } from '../readers/index.js';
+import {
+  flattenFileTree,
+  findEntryByPath,
+  readFileBytes,
+  writeFileToDirectory,
+  createDirectoryInWorkspace,
+  renderHtmlToPdf,
+  readerNameFor,
+} from '../../localFileSystem.js';
+import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
+import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
+import { deductTokens } from '../../db.js';
+
+export const TURN_COST = 2;
+export const OUTPUT_ROOT = 'KaTuro Outputs';
+
+const MIME_BY_EXT = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  csv: 'text/csv',
+};
+
+export function localDateStamp(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function schoolYearFor(d = new Date()) {
+  const y = d.getFullYear();
+  return d.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+}
+
+export function teacherFromProfile(profile = {}, user = {}) {
+  const p = profile || {};
+  const fullName = p.displayName || [p.firstName, p.middleName ? `${String(p.middleName).charAt(0)}.` : '', p.lastName].filter(Boolean).join(' ') || user?.displayName || '';
+  return {
+    salutation: getTeacherSalutationName(profile, user),
+    fullName,
+    school: p.school || p.schoolName || '',
+    schoolId: p.schoolId || '',
+    region: p.region || '',
+    division: p.division || '',
+    position: p.designation || p.position || '',
+  };
+}
+
+export function personaFor(teacher) {
+  return `You are KaTuro, a friendly DepEd (Philippines) co-teacher assistant for ${teacher.salutation}. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Use simple, conversational English (Filipino words are fine when natural). Be straight to the point. Do not use markdown symbols like #, ** or backticks; use plain sentences and simple "•" bullets when listing.`;
+}
+
+function curriculumHint(subject, gradeLevel, text = '') {
+  if (!subject || !gradeLevel) return '';
+  const subjKey = Object.keys(DEPED_CURRICULUM_DATABASE).find((k) => k.toLowerCase() === String(subject).toLowerCase());
+  if (!subjKey || !DEPED_CURRICULUM_DATABASE[subjKey][gradeLevel]) return '';
+  const quarter = (String(text).match(/\b(?:quarter|q)\s*([1-4])\b/i) || [])[1];
+  const list = queryDepEdCompetencies({ subject: subjKey, gradeLevel, quarter: quarter ? `Quarter ${quarter}` : 'Quarter 1' }).slice(0, 12);
+  if (!list.length) return '';
+  return `Official MATATAG competencies for reference (${subjKey}, ${gradeLevel}${quarter ? `, Quarter ${quarter}` : ''}):\n${list.map((c) => `[${c.code}] ${c.text}`).join('\n')}`;
+}
+
+function cleanReply(text) {
+  return String(text || '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+}
+
+/**
+ * Runs one teacher turn.
+ * @returns {Promise<{ content, steps, artifacts, createdFiles, charged }>}
+ */
+export async function runDeskAgentTurn({
+  prompt,
+  workspace,
+  activeFile,
+  activeArtifact,
+  attachedPaths = [],
+  history = [],
+  user,
+  profile,
+  tokenBalance = 0,
+  freeMode = false,
+  privacyMode = true,
+  onUpdate,
+}) {
+  if (!freeMode && tokenBalance < TURN_COST) throw new Error('INSUFFICIENT_TOKENS');
+
+  const teacher = teacherFromProfile(profile, user);
+  const persona = personaFor(teacher);
+  const masker = createNameMasker({ enabled: privacyMode });
+  const handle = workspace?.handle;
+  const tree = workspace?.files || [];
+  const flat = flattenFileTree(tree);
+  const today = new Date();
+  const outputRoot = `${OUTPUT_ROOT}/${localDateStamp(today)}`;
+  let outputFolder = outputRoot;
+  let aiCalls = 0;
+  const createdFiles = [];
+  const parsedCache = new Map();
+
+  let steps = [];
+  const emit = (extra = {}) => onUpdate?.({ steps, ...extra });
+
+  const readBytes = async (path) => {
+    const entry = findEntryByPath(tree, path);
+    return readFileBytes(handle, entry || path);
+  };
+
+  const ctx = {
+    teacher,
+    persona,
+    masker,
+    memory: new Map(),
+    activeArtifact,
+    schoolYear: schoolYearFor(today),
+    curriculumHint,
+    readBytes,
+    async readParsed(path) {
+      const entry = findEntryByPath(tree, path);
+      const key = `${path}|${entry?.lastModified || ''}`;
+      if (!parsedCache.has(key)) {
+        parsedCache.set(key, (async () => {
+          const bytes = await readBytes(path);
+          return readDocument({ bytes, name: readerNameFor(entry, path.split('/').pop()) });
+        })());
+      }
+      return parsedCache.get(key);
+    },
+    async llm(opts) {
+      const out = await callDeskLLM({ kind: 'task', ...opts });
+      aiCalls += 1;
+      return out;
+    },
+    async saveOutput(fileName, bytes, format, folder = outputFolder) {
+      if (!handle) throw new Error('Open a classroom folder first so I can save files.');
+      const ext = fileName.split('.').pop().toLowerCase();
+      const res = await writeFileToDirectory(handle, `${folder}/${fileName}`, bytes, MIME_BY_EXT[ext] || 'application/octet-stream', { overwrite: false });
+      const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? bytes?.length ?? 0 };
+      createdFiles.push(file);
+      return file;
+    },
+    async makeDir(path) {
+      if (!handle) throw new Error('Open a classroom folder first.');
+      await createDirectoryInWorkspace(handle, path);
+    },
+    setOutputFolder(path) {
+      outputFolder = path.replace(/^\/+|\/+$/g, '');
+    },
+    htmlToPdf: (html, options) => renderHtmlToPdf(html, options),
+    async renderPdf(spec) {
+      const { buildHtml } = await import('../generators/htmlFromSpec.js');
+      const viaChromium = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), {
+        pageSize: spec.paper,
+        landscape: spec.orientation === 'landscape',
+      });
+      if (viaChromium) return viaChromium;
+      const { buildPdf } = await import('../generators/pdfFromSpec.js');
+      return buildPdf(spec);
+    },
+  };
+
+  // ── 1. Plan ───────────────────────────────────────────────
+  steps = [{ id: 'plan', label: 'Understanding your request', status: 'running' }];
+  emit();
+
+  const activePath = activeFile?.kind === 'file' ? activeFile.path : null;
+  const fileIndex = buildFileIndex(tree, { attachedPaths, activePath });
+  let reply = '';
+  let tasks;
+  let problems = [];
+  let plannedCount = 0;
+  let aiOffline = null;
+
+  try {
+    const plan = await callDeskLLM({
+      kind: 'plan',
+      system: buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() }),
+      history: history.slice(-8).map((m) => ({ role: m.role, content: masker.mask(m.content) })),
+      prompt: buildPlannerPrompt({
+        prompt: masker.mask(prompt),
+        workspaceName: workspace?.name,
+        fileIndex,
+        attachedPaths,
+        activePath,
+        activeArtifact,
+        privacyOn: privacyMode,
+      }),
+      json: true,
+      maxTokens: 3000,
+      temperature: 0.2,
+    });
+    aiCalls += 1;
+    reply = cleanReply(masker.unmask(plan?.reply || ''));
+    plannedCount = Array.isArray(plan?.tasks) ? plan.tasks.length : 0;
+    ({ tasks, problems } = sanitizePlan(plan, flat, attachedPaths));
+  } catch (err) {
+    if (!(err instanceof AIUnavailableError)) throw err;
+    aiOffline = err.message;
+    tasks = planOffline(prompt, { attachedPaths, activePath, flatFiles: flat });
+    reply = tasks.length
+      ? `${aiOffline} I can still do the number-crunching part offline, so here it is.`
+      : `${aiOffline} Without the AI I can only run item analysis, class records, attendance checks, and PDF tools on files you select.`;
+  }
+
+  steps = [{ id: 'plan', label: tasks.length ? `Planned ${tasks.length} task(s)` : 'Understood your request', status: 'done' }];
+  emit({ reply });
+
+  // ── 2. Run tasks (parallel where independent) ─────────────
+  const artifacts = [];
+  const lines = [];
+  const extraReplies = [];
+
+  if (tasks.length) {
+    const results = await runTaskGraph(
+      tasks,
+      async (task, deps, report) => {
+        const tool = TOOLS[task.tool];
+        const folder = typeof task.args.outputFolder === 'string' ? task.args.outputFolder.replace(/^\/+|\/+$/g, '') : null;
+        const taskCtx = folder ? { ...ctx, saveOutput: (n, b, f) => ctx.saveOutput(n, b, f, folder) } : ctx;
+        return tool.run(task.args, taskCtx, report, deps);
+      },
+      {
+        concurrency: TASK_CONCURRENCY,
+        onChange: (list) => {
+          steps = [steps[0], ...list.map((s) => ({ id: s.id, label: s.label, status: s.status, detail: s.status === 'error' || s.status === 'skipped' ? s.error : s.detail }))];
+          emit({ reply });
+        },
+      },
+    );
+
+    for (const t of tasks) {
+      const r = results.get(t.id);
+      if (r?.status === 'done') {
+        lines.push(`✓ ${t.label}: ${r.result?.summary || 'done'}`);
+        if (r.result?.reply) extraReplies.push(cleanReply(r.result.reply));
+        for (const a of r.result?.artifacts || []) {
+          artifacts.push({ id: `art-${Date.now()}-${artifacts.length}`, createdAt: Date.now(), sourceTool: t.tool, ...a });
+        }
+      } else if (r?.status === 'error') {
+        lines.push(`✗ ${t.label}: ${r.error}`);
+      } else if (r?.status === 'skipped') {
+        lines.push(`– ${t.label}: ${r.error}`);
+      }
+    }
+  }
+
+  // ── 3. Compose reply ──────────────────────────────────────
+  const parts = [];
+  if (reply) parts.push(reply);
+  if (problems.length) parts.push(problems.join(' '));
+  if (extraReplies.length) parts.push(extraReplies.join('\n\n'));
+  if (lines.length) parts.push(lines.join('\n'));
+  if (createdFiles.length) {
+    const folders = [...new Set(createdFiles.map((f) => f.path.split('/').slice(0, -1).join('/')))];
+    parts.push(`Saved in: ${folders.join(', ')}`);
+  }
+  const content = parts.join('\n\n') || `Sorry ${teacher.salutation}, I wasn't able to do that. Could you rephrase it?`;
+
+  // ── 4. Charge only for AI work that produced something ────
+  let charged = false;
+  // A plain answer counts; a plan whose every task was invalid or failed does not.
+  const succeeded = aiCalls > 0 && (plannedCount === 0 ? Boolean(reply) : lines.some((l) => l.startsWith('✓')));
+  if (succeeded && user?.uid && !freeMode) {
+    try {
+      await deductTokens(user.uid, 'katuro_desk_agent_run', TURN_COST);
+      charged = true;
+    } catch (e) {
+      console.warn('[KaTuroDesk] Token deduction failed:', e);
+    }
+  }
+
+  return { content, steps, artifacts, createdFiles, charged, aiOffline };
+}

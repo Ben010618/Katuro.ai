@@ -8,12 +8,55 @@ import {
   Trash2,
   ExternalLink,
   PanelLeftOpen,
+  Paperclip,
+  X,
+  ShieldCheck,
+  ShieldOff,
+  CheckCircle2,
+  XCircle,
+  MinusCircle,
+  Circle,
+  Files,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
-import { runDeskAgentTurn } from '../../services/deskAgentAI';
+import { runDeskAgentTurn, TURN_COST } from '../../services/deskAgentAI';
 import DeskFormattedText from './DeskFormattedText';
 import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
+
+function StepIcon({ status }) {
+  if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
+  if (status === 'done') return <CheckCircle2 size={12} className="text-emerald-600 flex-shrink-0" />;
+  if (status === 'error') return <XCircle size={12} className="text-red-500 flex-shrink-0" />;
+  if (status === 'skipped') return <MinusCircle size={12} className="text-gray-400 flex-shrink-0" />;
+  return <Circle size={12} className="text-gray-300 flex-shrink-0" />;
+}
+
+function StepList({ steps }) {
+  if (!steps?.length) return null;
+  return (
+    <ul className="mb-2 space-y-1 border border-gray-100 bg-gray-50/70 rounded-lg p-2">
+      {steps.map((s) => (
+        <li key={s.id} className="flex items-start gap-1.5 text-[11px] text-gray-700">
+          <span className="mt-0.5">
+            <StepIcon status={s.status} />
+          </span>
+          <span className="min-w-0">
+            <span className={s.status === 'running' ? 'font-semibold' : ''}>{s.label}</span>
+            {s.detail && <span className={`block text-[10px] ${s.status === 'error' ? 'text-red-600' : 'text-gray-500'}`}>{s.detail}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ArtifactIcon({ type }) {
+  if (type === 'slides') return <Presentation size={14} className="text-amber-600" />;
+  if (type === 'sheet' || type === 'table') return <FileSpreadsheet size={14} className="text-blue-600" />;
+  if (type === 'files') return <Files size={14} className="text-gray-600" />;
+  return <FileText size={14} className="text-emerald-600" />;
+}
 
 export default function DeskAgentChatPanel({
   user,
@@ -33,76 +76,91 @@ export default function DeskAgentChatPanel({
     setIsGenerating,
     workspace,
     activeFile,
+    activeArtifact,
     setActiveArtifact,
+    addArtifacts,
     clearConversation,
+    attachedPaths,
+    toggleAttachment,
+    clearAttachments,
+    importFiles,
+    refreshFiles,
+    privacyMode,
+    setPrivacyMode,
   } = useDeskStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [importError, setImportError] = useState('');
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const teacherSalutationName = getTeacherSalutationName(profile, user);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
+  const handleImport = async (files) => {
+    if (!files?.length) return;
+    setImportError('');
+    try {
+      await importFiles(files);
+    } catch (err) {
+      setImportError(err.message);
+    }
+  };
+
   const handleSendPrompt = async (customText = null) => {
-    const textToSend = customText || inputPrompt;
-    if (!textToSend.trim() || isGenerating) return;
+    const textToSend = (customText || inputPrompt).trim();
+    if (!textToSend || isGenerating) return;
+
+    const attachmentsForTurn = [...attachedPaths];
+    const history = messages
+      .filter((m) => m.id !== 'msg-welcome' && m.content && !m.isThinking)
+      .map((m) => ({ role: m.role, content: m.content }));
 
     setInputPrompt('');
-
-    // 1. Add User Message
-    addMessage({
-      role: 'user',
-      content: textToSend.trim(),
-    });
-
-    // 2. Add Placeholder Assistant Message with thinking state
-    const assistantMsgId = `msg-assistant-${messages.length + 1}`;
-    addMessage({
-      id: assistantMsgId,
-      role: 'assistant',
-      agentId: 'katuro_assistant',
-      content: '',
-      isThinking: true,
-    });
-
+    addMessage({ role: 'user', content: textToSend, attachments: attachmentsForTurn });
+    addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
     setIsGenerating(true);
 
     try {
       const result = await runDeskAgentTurn({
-        prompt: textToSend.trim(),
-        agentId: 'katuro_assistant',
+        prompt: textToSend,
         workspace,
         activeFile,
+        activeArtifact: activeArtifact?.type === 'preview' ? null : activeArtifact,
+        attachedPaths: attachmentsForTurn,
+        history,
         user,
         profile,
         tokenBalance,
         freeMode,
+        privacyMode,
+        onUpdate: ({ steps, reply }) => {
+          updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
+        },
       });
 
-      // Update assistant message with response and artifacts
       updateLastAssistantMessage({
         content: result.content,
+        steps: result.steps,
         isThinking: false,
-        artifacts: result.artifact ? [result.artifact] : [],
+        artifacts: result.artifacts,
       });
-
-      // Automatically display artifact on canvas panel
-      if (result.artifact) {
-        setActiveArtifact(result.artifact);
+      if (result.artifacts.length) {
+        addArtifacts(result.artifacts);
+        setActiveArtifact(result.artifacts[0]);
         onOpenCanvas?.();
       }
+      if (result.createdFiles.length) await refreshFiles();
+      clearAttachments();
     } catch (err) {
       console.error('Agent execution error:', err);
       if (err.message === 'INSUFFICIENT_TOKENS') {
         updateLastAssistantMessage({
-          content: '⚠️ Paumanhin Teacher, kinakailangan ng hindi bababa sa **2 tokens** upang maisagawa ang gawaing ito sa iyong classroom folder.\n\nPaki-click ang **Top-up / GCash** button sa kaliwa upang magpatuloy!',
+          content: `Sorry ${teacherSalutationName}, you need at least ${TURN_COST} tokens for this. Please tap Top-up / GCash on the left to continue.`,
           isThinking: false,
         });
         if (typeof window !== 'undefined') {
@@ -110,7 +168,7 @@ export default function DeskAgentChatPanel({
         }
       } else {
         updateLastAssistantMessage({
-          content: `⚠️ Naka-encounter ng error: ${err.message || 'Unknown network error'}. Subukan muling magpadala ng mensahe.`,
+          content: `Something went wrong: ${err.message || 'Unknown error'}. Please try again.`,
           isThinking: false,
         });
       }
@@ -126,31 +184,75 @@ export default function DeskAgentChatPanel({
     }
   };
 
+  const handlePaste = (e) => {
+    const files = Array.from(e.clipboardData?.files || []);
+    if (files.length) {
+      e.preventDefault();
+      handleImport(files);
+    }
+  };
+
   const QUICK_PROMPTS = [
     {
-      label: '📊 Quiz Item Analysis & LMC',
-      prompt: "Analyze our latest quiz scores. Identify the Least Mastered Competencies (LMC), calculate the mastery percentage, and generate the official DepEd Item Analysis remarks.",
+      label: '📊 Item Analysis & LMC',
+      prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.',
     },
     {
-      label: '🎯 Remediation & Re-test Slip',
-      prompt: "For the learners who scored below 75% on our recent assessment, create a 1-page Remedial Practice Slip and a 5-item Quick Re-test ready for 2-up printing.",
+      label: '🎯 Remedial Slips & Re-test',
+      prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.',
     },
     {
-      label: '📑 Encode to e-Class Record',
-      prompt: "Interpret these recent formative and summative scores and map them into the DepEd e-Class Record format (Written Works & Performance Tasks) with transmutation.",
+      label: '📑 e-Class Record',
+      prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.',
     },
     {
-      label: '🚨 Check Attendance & SARDO',
-      prompt: "Review the attendance records in this folder. Flag any students with 3 or more consecutive absences and generate a DepEd Home Visitation Notice for them.",
+      label: '🚨 Attendance & SARDO',
+      prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.',
     },
     {
-      label: '📁 Synthesize Docs into Subfolder',
-      prompt: "Study 'Week 1 - Cell Theory.docx' and 'Q1_Summative_Test_1_with_TOS.docx', create a new subfolder named 'Remediation_Week1', and generate the differentiated remedial package inside it.",
+      label: '📝 DLL from my lesson',
+      prompt: 'Turn the attached lesson file into a complete Daily Lesson Log (Monday to Friday).',
+    },
+    {
+      label: '🖥️ Slides from file',
+      prompt: 'Make a PowerPoint presentation from the attached lesson.',
+    },
+    {
+      label: '📷 Photo to Excel',
+      prompt: 'Read the table in the attached photo and turn it into an Excel file I can check.',
+    },
+    {
+      label: '📎 Merge PDFs',
+      prompt: 'Merge the attached PDFs into one file in the order I attached them.',
     },
   ];
 
   return (
-    <main className="flex-1 flex flex-col h-full bg-[#f8faf9] min-w-0">
+    <main
+      className="flex-1 flex flex-col h-full bg-[#f8faf9] min-w-0 relative"
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          setIsDragging(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setIsDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        handleImport(e.dataTransfer?.files);
+      }}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-30 bg-emerald-50/90 border-2 border-dashed border-emerald-500 rounded-lg flex flex-col items-center justify-center pointer-events-none">
+          <Paperclip size={28} className="text-emerald-700 mb-2" />
+          <p className="text-sm font-bold text-emerald-900">Drop files to import & attach</p>
+          <p className="text-[11px] text-emerald-800">Copied into "KaTuro Imports" inside your classroom folder</p>
+        </div>
+      )}
+
       {/* KaTuro Teaching Assistant Header */}
       <header className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10">
         <div className="flex items-center gap-3">
@@ -166,27 +268,39 @@ export default function DeskAgentChatPanel({
           <KaTuroAIAvatar size={36} />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-gray-900">
-                KaTuro Teaching Assistant
-              </h1>
+              <h1 className="text-sm font-bold text-gray-900">KaTuro Teaching Assistant</h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 Co-Teacher Studio
               </span>
             </div>
             <p className="text-[11px] text-gray-500 truncate max-w-md">
-              Manipulate, analyze, encode & check classroom documents across your active folder
+              Reads, analyzes & creates Word, Excel, PowerPoint & PDF files in your folder
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setPrivacyMode(!privacyMode)}
+            title={
+              privacyMode
+                ? 'Privacy mode ON: learner names in file text are replaced with codes (Learner 01…) before going to the AI, and restored in your files. Photos and scans are sent as they are.'
+                : 'Privacy mode OFF: learner names are sent to the AI as written.'
+            }
+            className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 border transition ${
+              privacyMode ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}
+          >
+            {privacyMode ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
+            <span className="hidden sm:inline">{privacyMode ? 'Names protected' : 'Names visible to AI'}</span>
+          </button>
+          <button
             onClick={clearConversation}
             title="Clear Chat History"
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition flex items-center gap-1 text-xs"
           >
             <Trash2 size={14} />
-            <span className="hidden sm:inline">Clear Chat</span>
+            <span className="hidden sm:inline">Clear</span>
           </button>
         </div>
       </header>
@@ -196,34 +310,22 @@ export default function DeskAgentChatPanel({
         <div className="max-w-4xl mx-auto w-full space-y-4">
           {messages.map((msg, idx) => {
             const isAssistant = msg.role === 'assistant';
-            const showThinking =
-              isAssistant &&
-              (!msg.content || msg.isThinking || (isGenerating && idx === messages.length - 1 && !msg.content));
+            const showThinking = isAssistant && msg.isThinking && !msg.content && !msg.steps?.length;
 
             return (
               <div
                 key={msg.id || idx}
-                className={`flex gap-3 max-w-3xl ${
-                  isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'
-                }`}
+                className={`flex gap-3 max-w-3xl ${isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'}`}
               >
-                {/* Assistant Avatar vs User Avatar */}
-                <DeskAvatar
-                  role={msg.role}
-                  photoURL={photoURL || user?.photoURL}
-                  name={teacherSalutationName}
-                  size={32}
-                />
+                <DeskAvatar role={msg.role} photoURL={photoURL || user?.photoURL} name={teacherSalutationName} size={32} />
 
-                {/* Message Content Container */}
                 <div
-                  className={`flex-1 rounded-xl p-3.5 shadow-xs border ${
-                    isAssistant
-                      ? 'bg-white border-gray-200 text-gray-800'
-                      : 'bg-[#2d6a4f] text-white border-emerald-800'
+                  className={`flex-1 rounded-xl p-3.5 shadow-xs border min-w-0 ${
+                    isAssistant ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#2d6a4f] text-white border-emerald-800'
                   }`}
                 >
-                  {/* Message Body */}
+                  {isAssistant && <StepList steps={msg.steps} />}
+
                   {showThinking ? (
                     <div className="flex items-center gap-2 py-1 text-gray-500 text-xs">
                       <div className="flex items-center gap-1">
@@ -231,18 +333,24 @@ export default function DeskAgentChatPanel({
                         <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                         <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
-                      <span className="text-[11px] text-gray-400 italic">...</span>
                     </div>
                   ) : isAssistant ? (
-                    <DeskFormattedText text={msg.content} />
+                    msg.content && <DeskFormattedText text={msg.content} />
                   ) : (
-                    <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">
-                      {msg.content}
+                    <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">{msg.content}</div>
+                  )}
+
+                  {!isAssistant && msg.attachments?.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {msg.attachments.map((p) => (
+                        <span key={p} className="px-1.5 py-0.5 rounded bg-emerald-900/40 text-[10px] text-emerald-50 flex items-center gap-1">
+                          <Paperclip size={9} /> {p.split('/').pop()}
+                        </span>
+                      ))}
                     </div>
                   )}
 
-                  {/* Artifact Action Pills */}
-                  {isAssistant && msg.artifacts && msg.artifacts.length > 0 && (
+                  {isAssistant && msg.artifacts?.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap gap-2">
                       {msg.artifacts.map((art) => (
                         <button
@@ -251,17 +359,11 @@ export default function DeskAgentChatPanel({
                             setActiveArtifact(art);
                             onOpenCanvas?.();
                           }}
-                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition shadow-xs"
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition shadow-xs max-w-full"
                         >
-                          {art.type === 'slides' ? (
-                            <Presentation size={14} className="text-amber-600" />
-                          ) : art.type === 'quiz' ? (
-                            <FileSpreadsheet size={14} className="text-blue-600" />
-                          ) : (
-                            <FileText size={14} className="text-emerald-600" />
-                          )}
-                          <span>{art.title}</span>
-                          <ExternalLink size={11} className="opacity-60" />
+                          <ArtifactIcon type={art.type} />
+                          <span className="truncate">{art.title}</span>
+                          <ExternalLink size={11} className="opacity-60 flex-shrink-0" />
                         </button>
                       ))}
                     </div>
@@ -277,11 +379,12 @@ export default function DeskAgentChatPanel({
       {/* Quick Prompt Pills */}
       <div className="px-4 py-2 border-t border-gray-100 bg-white/70 overflow-x-auto flex items-center gap-2">
         <div className="max-w-4xl mx-auto w-full flex items-center gap-2 overflow-x-auto py-0.5">
-          {QUICK_PROMPTS.map((qp, idx) => (
+          {QUICK_PROMPTS.map((qp) => (
             <button
-              key={idx}
-              onClick={() => handleSendPrompt(qp.prompt)}
+              key={qp.label}
+              onClick={() => setInputPrompt(qp.prompt)}
               disabled={isGenerating}
+              title={qp.prompt}
               className="px-2.5 py-1 bg-gray-50 hover:bg-emerald-50 hover:text-emerald-800 text-gray-600 text-[11px] font-medium rounded-full border border-gray-200 hover:border-emerald-300 transition whitespace-nowrap flex-shrink-0 disabled:opacity-50"
             >
               {qp.label}
@@ -293,17 +396,49 @@ export default function DeskAgentChatPanel({
       {/* Bottom Prompt Input */}
       <div className="p-3 bg-white border-t border-gray-200 shadow-md">
         <div className="max-w-4xl mx-auto w-full">
+          {(attachedPaths.length > 0 || importError) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {attachedPaths.map((p) => (
+                <span key={p} title={p} className="pl-2 pr-1 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 flex items-center gap-1 max-w-[240px]">
+                  <Paperclip size={10} className="flex-shrink-0" />
+                  <span className="truncate">{p.split('/').pop()}</span>
+                  <button onClick={() => toggleAttachment(p)} className="p-0.5 hover:bg-emerald-100 rounded-full" title="Remove">
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+              {importError && <span className="text-[11px] text-red-600">{importError}</span>}
+            </div>
+          )}
           <div className="relative flex items-center bg-gray-50 border border-gray-300 rounded-xl focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-600 focus-within:bg-white transition p-1.5">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isGenerating}
+              title="Attach files (Word, Excel, PowerPoint, PDF, photos)"
+              className="p-2 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition flex-shrink-0 disabled:opacity-40"
+            >
+              <Paperclip size={15} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                handleImport(e.target.files);
+                e.target.value = '';
+              }}
+            />
             <textarea
               rows={2}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message your Co-Teacher... (Press Enter to send)"
+              onPaste={handlePaste}
+              placeholder="Ask your Co-Teacher… e.g. “Make item analysis for all 4 sections” (Enter to send, paste photos here)"
               disabled={isGenerating}
               className="w-full bg-transparent text-gray-800 text-xs px-2 py-1 resize-none focus:outline-none placeholder-gray-400"
             />
-
             <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
               <button
                 onClick={() => handleSendPrompt()}
@@ -315,7 +450,7 @@ export default function DeskAgentChatPanel({
                 ) : (
                   <>
                     <Send size={14} />
-                    <span className="hidden sm:inline">Send · 2🪙</span>
+                    <span className="hidden sm:inline">Send · {TURN_COST}🪙</span>
                   </>
                 )}
               </button>
@@ -323,7 +458,6 @@ export default function DeskAgentChatPanel({
           </div>
         </div>
       </div>
-
     </main>
   );
 }

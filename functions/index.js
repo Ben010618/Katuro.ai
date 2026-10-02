@@ -548,7 +548,8 @@ const PROXY_LIMITS = {
   scan_answer_sheet:   80,  // one call per photographed sheet — a class set can be 40-60
   protect_chat:        40,  // kaTuro Protect chat + collabAIReply — shared 40/day limit
   melc_validate:       50,  // validateMelcCode — one call per lesson-plan save, generous headroom
-  desk_agent_run:      50,  // KaTuroDesk Co-Teacher Assistant operations
+  desk_agent_run:      50,  // KaTuroDesk Co-Teacher Assistant operations (one per teacher turn: the planner call)
+  desk_agent_task:    300,  // KaTuroDesk sub-tasks inside a turn (parallel document generation, vision reads) — a batch of 4 sections = ~5 calls
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
 
@@ -1229,7 +1230,7 @@ exports.generateAI = onCall(
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
 
     try {
-      const isDesk = action === 'desk_agent_run';
+      const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task';
       const key = await getGeminiKey(isDesk);
       return await callGeminiRaw(key, contents, {
         temperature: temperature ?? 0.5,

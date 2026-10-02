@@ -188,7 +188,7 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
   // one half of why DLL, ILAW and Test Builder stopped working. The client
   // budget must always outlast the server's own budget for the same request
   // (see geminiBudgetMs in functions/index.js) plus its NVIDIA fallback.
-  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides' || action === 'desk_agent_run';
+  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides' || action === 'desk_agent_run' || action === 'desk_agent_task';
   const serverBudgetMs = Math.min(180000, Math.max(45000, 30000 + (Number(maxTokens) || 2048) * 10));
   const effectiveTimeout = timeoutMs
     ?? (isHeavy ? 300000 : Math.min(300000, serverBudgetMs + 100000));
@@ -236,7 +236,7 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
 
       // 2. Try Client Direct Gemini API fallback
       try {
-        const isDesk = action === 'desk_agent_run';
+        const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task';
         const apiKey = await getGeminiKey(isDesk);
         if (apiKey) {
           console.log(`[callGeminiProxy] Swapping to direct Gemini client fallback...`);
