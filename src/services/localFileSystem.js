@@ -245,6 +245,66 @@ export async function readFileBytes(dirHandle, fileOrPath) {
   return new Uint8Array(await (await fh.getFile()).arrayBuffer());
 }
 
+// ── Safe-edit SOP ────────────────────────────────────────────────
+// KaTuroDesk never modifies a teacher's original file:
+//   1. the original is backed up to "KaTuro Backups/<date>/<same folders>/"
+//   2. edits go into a working clone next to it: "<name> (KaTuro edit).<ext>"
+//   3. before a clone is changed again, its current version is backed up too
+export const BACKUPS_ROOT = 'KaTuro Backups';
+export const WORKING_COPY_SUFFIX = ' (KaTuro edit)';
+
+function stamp(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`,
+  };
+}
+
+function splitName(relPath) {
+  const rel = cleanRelPath(relPath);
+  const slash = rel.lastIndexOf('/');
+  const dir = slash >= 0 ? rel.slice(0, slash) : '';
+  const file = rel.slice(slash + 1);
+  const dot = file.lastIndexOf('.');
+  return { dir, base: dot > 0 ? file.slice(0, dot) : file, ext: dot > 0 ? file.slice(dot) : '' };
+}
+
+/** "Grades/SF2.xlsx" → "Grades/SF2 (KaTuro edit).xlsx" (a clone's own path is returned unchanged). */
+export function workingCopyPath(relPath) {
+  const { dir, base, ext } = splitName(relPath);
+  if (base.endsWith(WORKING_COPY_SUFFIX)) return cleanRelPath(relPath);
+  return `${dir ? `${dir}/` : ''}${base}${WORKING_COPY_SUFFIX}${ext}`;
+}
+
+/** Copies a workspace file into KaTuro Backups (never overwrites an earlier backup). Returns the backup path. */
+export async function backupFile(dirHandle, relPath, now = new Date()) {
+  const { dir, base, ext } = splitName(relPath);
+  const { date, time } = stamp(now);
+  const bytes = await readFileBytes(dirHandle, relPath);
+  const target = `${BACKUPS_ROOT}/${date}/${dir ? `${dir}/` : ''}${base} (backup ${time})${ext}`;
+  const res = await writeFileToDirectory(dirHandle, target, bytes, 'application/octet-stream', { overwrite: false });
+  return res.path;
+}
+
+/**
+ * Saves edited bytes for `originalPath` following the safe-edit SOP.
+ * Returns { path: the working clone, backups: [backup paths made this time] }.
+ */
+export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType = 'application/octet-stream', now = new Date()) {
+  const backups = [];
+  const original = cleanRelPath(originalPath);
+  const clone = workingCopyPath(original);
+  if (clone !== original && (await fileExists(dirHandle, original))) {
+    backups.push(await backupFile(dirHandle, original, now));
+  }
+  if (await fileExists(dirHandle, clone)) {
+    backups.push(await backupFile(dirHandle, clone, now));
+  }
+  const res = await writeFileToDirectory(dirHandle, clone, bytes, mimeType, { overwrite: true });
+  return { path: res.path, name: res.name, backups };
+}
+
 /**
  * Reads text content from a file handle or virtual file object.
  */

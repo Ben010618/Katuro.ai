@@ -104,7 +104,7 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
   );
 }
 
-export default function DeskFolderPanel({ user, tokenBalance = 0, onCollapse }) {
+export default function DeskFolderPanel({ user, profile, tokenBalance = 0, onCollapse }) {
   const {
     workspace,
     setWorkspace,
@@ -132,6 +132,9 @@ export default function DeskFolderPanel({ user, tokenBalance = 0, onCollapse }) 
     if (isElectron && workspace?.isVirtual) restoreLastWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Account name: KaTuro profile first (Google sign-in often has no displayName).
+  const accountName = profile?.displayName || [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.email || 'Teacher';
 
   const flash = (msg) => {
     setNotice(msg);
@@ -441,11 +444,11 @@ export default function DeskFolderPanel({ user, tokenBalance = 0, onCollapse }) 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 min-w-0">
             <div className="w-6 h-6 rounded-full bg-emerald-800 text-emerald-200 flex items-center justify-center font-bold text-[11px]">
-              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'T'}
+              {accountName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-white truncate leading-tight">
-                {user?.displayName || 'Teacher'}
+                {accountName}
               </p>
               <p className="text-[9px] text-emerald-400 flex items-center gap-0.5 leading-tight">
                 <UserCheck size={9} /> Verified DepEd Account

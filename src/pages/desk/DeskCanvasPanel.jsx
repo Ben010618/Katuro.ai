@@ -32,6 +32,7 @@ import { buildHtml } from '../../services/desk/generators/htmlFromSpec';
 import DeskSpecEditor from './DeskSpecEditor';
 import DeskSheetGrid from './DeskSheetGrid';
 import DeskFilePreview from './DeskFilePreview';
+import DeskChangesView from './DeskChangesView';
 import { getFileIcon } from './deskFileIcons';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
@@ -44,7 +45,7 @@ const MIME = {
 };
 
 function TypeBadge({ type }) {
-  const label = { document: 'DOC', slides: 'SLIDES', sheet: 'SHEET', table: 'TABLE', files: 'FILES', preview: 'FILE' }[type] || String(type || '').toUpperCase();
+  const label = { document: 'DOC', slides: 'SLIDES', sheet: 'SHEET', table: 'TABLE', files: 'FILES', preview: 'FILE', changes: 'CHANGES' }[type] || String(type || '').toUpperCase();
   return (
     <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 flex-shrink-0">{label}</span>
   );
@@ -369,6 +370,8 @@ export default function DeskCanvasPanel({ onCollapse }) {
       <div ref={viewportRef} className="flex-1 overflow-y-auto p-3 flex justify-center custom-scrollbar">
         {isPreview ? (
           <DeskFilePreview path={art.path} />
+        ) : art.type === 'changes' ? (
+          <DeskChangesView key={art.id} art={art} />
         ) : art.type === 'document' ? (
           isEditing && draftSpec ? (
             <DeskSpecEditor spec={draftSpec} onChange={setDraftSpec} />

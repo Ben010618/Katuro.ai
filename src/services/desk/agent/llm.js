@@ -20,13 +20,26 @@ export class AIUnavailableError extends Error {
 
 let taskActionSupported = true;
 
+/** Test hook: forget that the deployed gateway lacked desk_agent_task. */
+export function resetTaskActionSupport() {
+  taskActionSupported = true;
+}
+
+// callGeminiProxy re-throws a plain Error: the Firebase `code` is dropped and only
+// message / status / dailyLimit / reason survive, so match on those (and on code for raw errors).
 function isUnknownActionError(err) {
-  return err?.code === 'functions/invalid-argument' && /unknown or missing action/i.test(err?.message || '');
+  return /unknown or missing action/i.test(err?.message || '');
 }
 
 function isDailyLimitError(err) {
-  return Boolean(err?.details?.dailyLimit) || err?.code === 'functions/resource-exhausted';
+  return Boolean(err?.dailyLimit || err?.details?.dailyLimit) || err?.status === 429 || err?.code === 'functions/resource-exhausted';
 }
+
+function isAuthError(err) {
+  return err?.reason === 'unauthenticated' || /unauthenticated|must be signed in/i.test(`${err?.code} ${err?.message}`);
+}
+
+const TRANSIENT_RE = /internal|unavailable|deadline|aborted|network|fetch|offline|took too long|went wrong on our end|try again/i;
 
 /**
  * Builds Gemini `contents`. The gateway has no systemInstruction field, so the
@@ -147,15 +160,15 @@ export async function callDeskLLM({
       if (isDailyLimitError(err)) {
         throw new AIUnavailableError("You've reached today's KaTuroDesk AI limit. It resets tomorrow.", err);
       }
-      if (/unauthenticated/i.test(err?.code || '')) {
+      if (isAuthError(err)) {
         throw new AIUnavailableError('Please sign in to your KaTuro account to use the AI features.', err);
       }
       lastErr = err;
-      const transient = /internal|unavailable|deadline|aborted|network|fetch/i.test(`${err?.code} ${err?.message}`);
+      const transient = TRANSIENT_RE.test(`${err?.code} ${err?.message}`) || err?.status === 408;
       if (!transient) break;
     }
   }
-  if (lastErr && !(lastErr instanceof AIUnavailableError) && /internal|unavailable|deadline|network|fetch|offline/i.test(`${lastErr.code} ${lastErr.message}`)) {
+  if (lastErr && !(lastErr instanceof AIUnavailableError) && (TRANSIENT_RE.test(`${lastErr.code} ${lastErr.message}`) || lastErr.status === 408)) {
     throw new AIUnavailableError('The KaTuro AI service could not be reached. Check your internet connection.', lastErr);
   }
   throw lastErr || new Error('AI call failed.');

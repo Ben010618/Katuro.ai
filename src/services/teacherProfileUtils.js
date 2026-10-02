@@ -18,7 +18,8 @@ export function getTeacherSalutationName(profile, user) {
     const prefix = user.email.split('@')[0].split('.')[0];
     rawName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
   }
-  if (!rawName) rawName = 'Teacher';
+  // No name anywhere: plain "Teacher" (never "Teacher Teacher").
+  if (!rawName) return 'Teacher';
 
   // 2. If name already starts with "Sir" or "Ma'am", return clean
   if (/^sir\b/i.test(rawName)) return rawName;

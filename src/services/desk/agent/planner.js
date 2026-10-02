@@ -3,7 +3,7 @@
  * with an offline keyword planner so code-only tools still work without AI.
  */
 
-import { TOOLS, TOOL_NAMES, toolCatalog } from './tools.js';
+import { TOOLS, TOOL_NAMES, toolCatalog } from './registry.js';
 import { flattenFileTree } from '../../localFileSystem.js';
 
 const MAX_TASKS = 12;
@@ -18,7 +18,8 @@ function fmtSize(bytes) {
 
 /** Compact file index for the planner: attached/active first, then most recent. */
 export function buildFileIndex(files, { attachedPaths = [], activePath } = {}) {
-  const flat = flattenFileTree(files);
+  // Backups are snapshots, never sources — keep them out of the AI's view of the folder.
+  const flat = flattenFileTree(files).filter((f) => !f.path.startsWith('KaTuro Backups/'));
   const priority = new Set([...attachedPaths, activePath].filter(Boolean).map((p) => p.toLowerCase()));
   const sorted = [...flat].sort((a, b) => {
     const pa = priority.has(a.path.toLowerCase()) ? 1 : 0;
@@ -53,9 +54,11 @@ Rules:
 6. Use dependsOn only when a task truly needs another task's result. Keep the plan minimal (max ${MAX_TASKS} tasks). "label" is a short human description, e.g. "Item analysis – Grade 7 Rizal".
 7. Prefer code tools for numbers: analyze_scores, make_class_record, check_attendance compute exactly. Never ask the AI to compute grades.
 8. If the teacher wants changes to the document open in the Canvas, use revise_document.
-9. Teacher wants a file typed/encoded into THEIR existing workbook → encode_scores. Wants a new official class record → make_class_record.
+8b. "Summarize / review this folder (or subfolder)": use write_document with docType "summary" (or answer_from_files if they only want a chat answer) and put the relevant document files from the index in sourcePaths (up to 40; skip code, images and duplicates; prefer docx/pdf/xlsx/pptx). Say which files you included.
+9. Schools use their OWN templates. Moving data between two existing papers (e.g. attendance in a Word doc → the SF2 Excel, scores → their class record, SF1 details → a masterlist) → transfer_data (source = where the data is, target = the file to fill). Checking/cross-checking two papers → compare_files. Changing words/values inside an existing Word/Excel file → edit_file. "What is this file / did you read it right" → understand_file. These keep the target's formatting and show a preview the teacher approves.
+9a. encode_scores is the older simple scores-into-one-column tool; prefer transfer_data when the target is a full school form. A NEW official class record built from scratch → make_class_record.
 9b. New files are saved in "KaTuro Outputs/<today>/" by default. If the teacher names a folder to save into, add "outputFolder": "<folder path>" to the args of every task that saves files (create_folder first if it doesn't exist, and make those tasks depend on it).
-10. Writing style for "reply": warm, simple conversational English, straight to the point, address the teacher as "${teacherName}". No markdown symbols (#, **, backticks), no long disclaimers.`;
+10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. No markdown symbols (#, **, backticks), no long disclaimers.`;
 }
 
 export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn }) {

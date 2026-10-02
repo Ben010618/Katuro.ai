@@ -9,16 +9,21 @@ import {
   ChevronRight,
   Coins,
   FileText,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
 import { useDeskStore } from '../../store/deskStore';
+import DeskSettingsModal from './DeskSettingsModal';
+import { KaTuroAIAvatar } from './DeskAvatar';
+import { getPersona } from '../../services/desk/personas';
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, tokenBalance, freeMode } = useAuth();
-  const { workspace, activeArtifact } = useDeskStore();
+  const { workspace, activeArtifact, persona } = useDeskStore();
+  const [showSettings, setShowSettings] = useState(false);
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -34,6 +39,7 @@ export default function KaTuroDeskPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
+      <DeskSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
       {/* Top Studio Bar */}
       <div className="h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none">
         <div className="flex items-center gap-2">
@@ -97,6 +103,16 @@ export default function KaTuroDeskPage() {
             <span className="text-[10px] text-gray-300 hidden sm:inline">Tokens</span>
           </button>
 
+          <button
+            onClick={() => setShowSettings(true)}
+            title="Settings: choose your assistant (Matt or Luna)"
+            className="flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <KaTuroAIAvatar persona={persona} size={22} />
+            <span className="text-[11px] font-semibold hidden sm:inline">{getPersona(persona).name}</span>
+            <Settings size={14} />
+          </button>
+
           {/* Toggle Right Panel */}
           <button
             onClick={() => setShowRightPanel(!showRightPanel)}
@@ -115,6 +131,7 @@ export default function KaTuroDeskPage() {
           <div className="hidden md:flex h-full flex-shrink-0 relative transition-all duration-200">
             <DeskFolderPanel
               user={user}
+              profile={profile}
               tokenBalance={tokenBalance}
               onCollapse={() => setShowLeftPanel(false)}
             />
@@ -187,6 +204,7 @@ export default function KaTuroDeskPage() {
             <div className="w-full h-full">
               <DeskFolderPanel
                 user={user}
+                profile={profile}
                 tokenBalance={tokenBalance}
               />
             </div>

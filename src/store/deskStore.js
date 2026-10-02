@@ -5,6 +5,11 @@ import {
   readDirectoryRecursively,
   reopenLastDirectory,
   writeFileToDirectory,
+  backupFile,
+  fileExists,
+  readFileBytes,
+  findEntryByPath,
+  saveWorkingCopy,
 } from '../services/localFileSystem';
 
 export const IMPORTS_ROOT = 'KaTuro Imports';
@@ -37,6 +42,9 @@ export const useDeskStore = create(
 
       // Learner-name masking before text goes to the AI (RA 10173)
       privacyMode: true,
+
+      // Assistant personality chosen in Settings: 'matt' | 'luna'
+      persona: 'matt',
 
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
@@ -108,6 +116,8 @@ export const useDeskStore = create(
 
       setPrivacyMode: (privacyMode) => set({ privacyMode }),
 
+      setPersona: (persona) => set({ persona }),
+
       setActiveAgent: (agentId) => set({ activeAgentId: agentId }),
 
       addMessage: (msg) => {
@@ -163,6 +173,39 @@ export const useDeskStore = create(
       clearConversation: () => set({ messages: [INITIAL_WELCOME_MESSAGE], activeArtifact: null }),
 
       /**
+       * Applies the teacher-approved subset of a pending "changes" artifact.
+       * Only those cells/paragraphs are written (docmap), into a working copy of the
+       * target; the original is backed up first (safe-edit SOP).
+       */
+      applyPendingChanges: async (id, selected) => {
+        const { workspace, artifacts, activeArtifact, updateArtifact, refreshFiles } = get();
+        const art = artifacts.find((a) => a.id === id) || (activeArtifact?.id === id ? activeArtifact : null);
+        if (!art || art.type !== 'changes' || !workspace?.handle) throw new Error('Nothing to apply.');
+        const { targetPath, edits } = art.data;
+        const chosen = edits.filter((_, i) => !selected || selected.includes(i));
+        if (!chosen.length) throw new Error('Select at least one change to apply.');
+        const { applyEdits } = await import('../services/desk/docmap/index.js');
+        const entry = findEntryByPath(workspace.files || [], targetPath);
+        const original = await readFileBytes(workspace.handle, entry || targetPath);
+        const result = await applyEdits(original, targetPath.split('/').pop(), chosen);
+        const saved = await saveWorkingCopy(workspace.handle, targetPath, result.bytes);
+        const ext = targetPath.split('.').pop().toLowerCase();
+        updateArtifact(id, {
+          files: [{ path: saved.path, name: saved.name, format: ext, size: result.bytes.byteLength }],
+          data: { ...art.data, status: 'applied', appliedCount: result.applied.length, skipped: result.skipped, backups: saved.backups, savedPath: saved.path },
+          subtitle: `${result.applied.length} change(s) saved to ${saved.name}${result.skipped.length ? `; ${result.skipped.length} skipped` : ''}`,
+        });
+        await refreshFiles();
+        return { ...saved, applied: result.applied, skipped: result.skipped };
+      },
+
+      discardPendingChanges: (id) => {
+        const { artifacts, activeArtifact, updateArtifact } = get();
+        const art = artifacts.find((a) => a.id === id) || (activeArtifact?.id === id ? activeArtifact : null);
+        if (art?.type === 'changes') updateArtifact(id, { data: { ...art.data, status: 'discarded' }, subtitle: 'Discarded — nothing was changed' });
+      },
+
+      /**
        * Re-renders an edited document/table artifact and overwrites ITS OWN output files
        * (files KaTuro generated this session — never the teacher's originals).
        */
@@ -191,6 +234,8 @@ export const useDeskStore = create(
             bytes = await buildSheetWorkbook(spec);
           }
           if (bytes) {
+            // Version history: keep the previous version before overwriting.
+            if (await fileExists(workspace.handle, f.path)) await backupFile(workspace.handle, f.path);
             await writeFileToDirectory(workspace.handle, f.path, bytes);
             files.push({ ...f, size: bytes.byteLength });
           } else {
@@ -207,6 +252,7 @@ export const useDeskStore = create(
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
         privacyMode: state.privacyMode,
+        persona: state.persona,
         // Don't persist native handles or file bytes (not serializable / private)
       }),
     }

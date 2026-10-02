@@ -13,7 +13,7 @@
 import { callDeskLLM, AIUnavailableError } from './llm.js';
 import { createNameMasker } from './privacy.js';
 import { runTaskGraph, TASK_CONCURRENCY } from './runner.js';
-import { TOOLS } from './tools.js';
+import { TOOLS } from './registry.js';
 import { buildFileIndex, buildPlannerSystem, buildPlannerPrompt, sanitizePlan, planOffline } from './planner.js';
 import { readDocument } from '../readers/index.js';
 import {
@@ -24,9 +24,11 @@ import {
   createDirectoryInWorkspace,
   renderHtmlToPdf,
   readerNameFor,
+  saveWorkingCopy,
 } from '../../localFileSystem.js';
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
+import { getPersona, timeOfDay } from '../personas.js';
 import { deductTokens } from '../../db.js';
 
 export const TURN_COST = 2;
@@ -67,8 +69,17 @@ export function teacherFromProfile(profile = {}, user = {}) {
   };
 }
 
-export function personaFor(teacher) {
-  return `You are KaTuro, a friendly DepEd (Philippines) co-teacher assistant for ${teacher.salutation}. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Use simple, conversational English (Filipino words are fine when natural). Be straight to the point. Do not use markdown symbols like #, ** or backticks; use plain sentences and simple "•" bullets when listing.`;
+const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${teacher.salutation}, a DepEd (Philippines) teacher. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Be straight to the point and genuinely helpful. Do not use markdown symbols like #, ** or backticks; use plain sentences and simple "•" bullets when listing.`;
+
+/** Chat voice: the persona the teacher picked in Settings (Matt / Luna). */
+export function personaFor(teacher, personaId, now = new Date()) {
+  const p = getPersona(personaId);
+  return `${baseRole(teacher)}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.`;
+}
+
+/** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
+export function docPersonaFor(teacher) {
+  return `${baseRole(teacher)} Write in formal, clear, professional DepEd English suitable for official school documents. No slang, jokes or emojis.`;
 }
 
 function curriculumHint(subject, gradeLevel, text = '') {
@@ -105,12 +116,14 @@ export async function runDeskAgentTurn({
   tokenBalance = 0,
   freeMode = false,
   privacyMode = true,
+  persona: personaId,
   onUpdate,
 }) {
   if (!freeMode && tokenBalance < TURN_COST) throw new Error('INSUFFICIENT_TOKENS');
 
   const teacher = teacherFromProfile(profile, user);
-  const persona = personaFor(teacher);
+  const persona = personaFor(teacher, personaId);
+  const docPersona = docPersonaFor(teacher);
   const masker = createNameMasker({ enabled: privacyMode });
   const handle = workspace?.handle;
   const tree = workspace?.files || [];
@@ -133,6 +146,7 @@ export async function runDeskAgentTurn({
   const ctx = {
     teacher,
     persona,
+    docPersona,
     masker,
     memory: new Map(),
     activeArtifact,
@@ -160,6 +174,15 @@ export async function runDeskAgentTurn({
       const ext = fileName.split('.').pop().toLowerCase();
       const res = await writeFileToDirectory(handle, `${folder}/${fileName}`, bytes, MIME_BY_EXT[ext] || 'application/octet-stream', { overwrite: false });
       const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? bytes?.length ?? 0 };
+      createdFiles.push(file);
+      return file;
+    },
+    /** Safe-edit SOP for changes to an EXISTING teacher file (backup + working clone). */
+    async saveWorkingCopy(originalPath, bytes, format) {
+      if (!handle) throw new Error('Open a classroom folder first so I can save files.');
+      const ext = originalPath.split('.').pop().toLowerCase();
+      const res = await saveWorkingCopy(handle, originalPath, bytes, MIME_BY_EXT[ext] || 'application/octet-stream');
+      const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? 0, backups: res.backups, originalPath };
       createdFiles.push(file);
       return file;
     },

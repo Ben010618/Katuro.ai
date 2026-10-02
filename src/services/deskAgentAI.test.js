@@ -7,6 +7,9 @@ import {
   getAvailablePath,
   createDirectoryInWorkspace,
   findEntryByPath,
+  saveWorkingCopy,
+  workingCopyPath,
+  fileExists,
 } from './localFileSystem';
 import { useDeskStore } from '../store/deskStore';
 
@@ -51,6 +54,40 @@ describe('KaTuroDesk workspace file engine (virtual backend)', () => {
     const ws = createVirtualWorkspace('X');
     await expect(writeFileToDirectory(ws.handle, '../escape.txt', 'x')).rejects.toThrow(/not allowed/);
     await expect(createDirectoryInWorkspace(ws.handle, 'a/../../b')).rejects.toThrow(/not allowed/);
+  });
+});
+
+describe('Safe-edit SOP (backup original, edit a working clone)', () => {
+  it('names working copies beside the original', () => {
+    expect(workingCopyPath('Grades/SF2.xlsx')).toBe('Grades/SF2 (KaTuro edit).xlsx');
+    expect(workingCopyPath('Grades/SF2 (KaTuro edit).xlsx')).toBe('Grades/SF2 (KaTuro edit).xlsx');
+  });
+
+  it('backs up the original, writes the clone, and versions the clone on re-edit', async () => {
+    const ws = createVirtualWorkspace('X');
+    await writeFileToDirectory(ws.handle, 'Grades/SF2.xlsx', 'ORIGINAL');
+    const t1 = new Date(2026, 9, 3, 8, 0, 0);
+    const first = await saveWorkingCopy(ws.handle, 'Grades/SF2.xlsx', 'EDIT 1', 'text/plain', t1);
+
+    expect(first.path).toBe('Grades/SF2 (KaTuro edit).xlsx');
+    expect(first.backups).toEqual(['KaTuro Backups/2026-10-03/Grades/SF2 (backup 080000).xlsx']);
+    expect(new TextDecoder().decode(await readFileBytes(ws.handle, 'Grades/SF2.xlsx'))).toBe('ORIGINAL');
+    expect(new TextDecoder().decode(await readFileBytes(ws.handle, first.backups[0]))).toBe('ORIGINAL');
+
+    const second = await saveWorkingCopy(ws.handle, 'Grades/SF2.xlsx', 'EDIT 2', 'text/plain', new Date(2026, 9, 3, 9, 30, 0));
+    expect(second.backups).toContain('KaTuro Backups/2026-10-03/Grades/SF2 (KaTuro edit) (backup 093000).xlsx');
+    expect(new TextDecoder().decode(await readFileBytes(ws.handle, 'KaTuro Backups/2026-10-03/Grades/SF2 (KaTuro edit) (backup 093000).xlsx'))).toBe('EDIT 1');
+    expect(new TextDecoder().decode(await readFileBytes(ws.handle, second.path))).toBe('EDIT 2');
+    expect(new TextDecoder().decode(await readFileBytes(ws.handle, 'Grades/SF2.xlsx'))).toBe('ORIGINAL');
+  });
+
+  it('never overwrites an earlier backup made in the same second', async () => {
+    const ws = createVirtualWorkspace('X');
+    await writeFileToDirectory(ws.handle, 'a.docx', 'v0');
+    const t = new Date(2026, 9, 3, 10, 0, 0);
+    await saveWorkingCopy(ws.handle, 'a.docx', 'v1', 'text/plain', t);
+    await saveWorkingCopy(ws.handle, 'a.docx', 'v2', 'text/plain', t);
+    expect(await fileExists(ws.handle, 'KaTuro Backups/2026-10-03/a (backup 100000) (2).docx')).toBe(true);
   });
 });
 

@@ -17,12 +17,14 @@ import {
   MinusCircle,
   Circle,
   Files,
+  ListChecks,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runDeskAgentTurn, TURN_COST } from '../../services/deskAgentAI';
 import DeskFormattedText from './DeskFormattedText';
 import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
+import { getPersona } from '../../services/desk/personas';
 
 function StepIcon({ status }) {
   if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
@@ -55,6 +57,7 @@ function ArtifactIcon({ type }) {
   if (type === 'slides') return <Presentation size={14} className="text-amber-600" />;
   if (type === 'sheet' || type === 'table') return <FileSpreadsheet size={14} className="text-blue-600" />;
   if (type === 'files') return <Files size={14} className="text-gray-600" />;
+  if (type === 'changes') return <ListChecks size={14} className="text-amber-600" />;
   return <FileText size={14} className="text-emerald-600" />;
 }
 
@@ -87,7 +90,9 @@ export default function DeskAgentChatPanel({
     refreshFiles,
     privacyMode,
     setPrivacyMode,
+    persona,
   } = useDeskStore();
+  const personaInfo = getPersona(persona);
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -138,6 +143,7 @@ export default function DeskAgentChatPanel({
         tokenBalance,
         freeMode,
         privacyMode,
+        persona,
         onUpdate: ({ steps, reply }) => {
           updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
         },
@@ -160,7 +166,9 @@ export default function DeskAgentChatPanel({
       console.error('Agent execution error:', err);
       if (err.message === 'INSUFFICIENT_TOKENS') {
         updateLastAssistantMessage({
-          content: `Sorry ${teacherSalutationName}, you need at least ${TURN_COST} tokens for this. Please tap Top-up / GCash on the left to continue.`,
+          content: persona === 'luna'
+            ? `I am sorry, ${teacherSalutationName}. This task needs at least ${TURN_COST} tokens. Kindly tap Top-up / GCash on the left to continue.`
+            : `Ay, sorry ${teacherSalutationName}! Kulang na tayo sa tokens, kailangan ng at least ${TURN_COST}. Tap Top-up / GCash sa left para tuloy tayo!`,
           isThinking: false,
         });
         if (typeof window !== 'undefined') {
@@ -254,8 +262,8 @@ export default function DeskAgentChatPanel({
       )}
 
       {/* KaTuro Teaching Assistant Header */}
-      <header className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10">
-        <div className="flex items-center gap-3">
+      <header className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between gap-2 shadow-2xs z-10">
+        <div className="flex items-center gap-3 min-w-0">
           {!showLeftPanel && onToggleLeftPanel && (
             <button
               onClick={onToggleLeftPanel}
@@ -265,21 +273,21 @@ export default function DeskAgentChatPanel({
               <PanelLeftOpen size={16} />
             </button>
           )}
-          <KaTuroAIAvatar size={36} />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-gray-900">KaTuro Teaching Assistant</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <KaTuroAIAvatar persona={persona} size={40} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm font-bold text-gray-900 truncate">{personaInfo.name} <span className="font-medium text-gray-500 hidden xl:inline">· KaTuro Teaching Assistant</span></h1>
+              <span className="hidden lg:inline px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                 Co-Teacher Studio
               </span>
             </div>
-            <p className="text-[11px] text-gray-500 truncate max-w-md">
+            <p className="text-[11px] text-gray-500 truncate">
               Reads, analyzes & creates Word, Excel, PowerPoint & PDF files in your folder
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setPrivacyMode(!privacyMode)}
             title={
@@ -292,7 +300,7 @@ export default function DeskAgentChatPanel({
             }`}
           >
             {privacyMode ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
-            <span className="hidden sm:inline">{privacyMode ? 'Names protected' : 'Names visible to AI'}</span>
+            <span className="hidden xl:inline whitespace-nowrap">{privacyMode ? 'Names protected' : 'Names visible to AI'}</span>
           </button>
           <button
             onClick={clearConversation}
@@ -300,7 +308,7 @@ export default function DeskAgentChatPanel({
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition flex items-center gap-1 text-xs"
           >
             <Trash2 size={14} />
-            <span className="hidden sm:inline">Clear</span>
+            <span className="hidden xl:inline">Clear</span>
           </button>
         </div>
       </header>
@@ -317,7 +325,7 @@ export default function DeskAgentChatPanel({
                 key={msg.id || idx}
                 className={`flex gap-3 max-w-3xl ${isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'}`}
               >
-                <DeskAvatar role={msg.role} photoURL={photoURL || user?.photoURL} name={teacherSalutationName} size={32} />
+                <DeskAvatar role={msg.role} persona={persona} photoURL={photoURL || user?.photoURL} name={teacherSalutationName} size={32} />
 
                 <div
                   className={`flex-1 rounded-xl p-3.5 shadow-xs border min-w-0 ${
@@ -333,9 +341,10 @@ export default function DeskAgentChatPanel({
                         <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                         <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
+                      <span className="text-[11px] text-gray-400 italic">{personaInfo.thinking}</span>
                     </div>
                   ) : isAssistant ? (
-                    msg.content && <DeskFormattedText text={msg.content} />
+                    msg.content && <DeskFormattedText text={msg.id === 'msg-welcome' ? personaInfo.welcome(teacherSalutationName) : msg.content} />
                   ) : (
                     <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans">{msg.content}</div>
                   )}

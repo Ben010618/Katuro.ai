@@ -86,24 +86,35 @@ function headerFor(ctx) {
   return { deped: true, region: ctx.teacher.region || undefined, division: ctx.teacher.division || undefined, school: ctx.teacher.school || undefined };
 }
 
-/** Text of source files for the AI: masked, capped per file and overall. */
-async function gatherSourceText(paths = [], ctx, { perFile = 12000, total = 40000 } = {}) {
+/**
+ * Text of source files for the AI: read in parallel, masked, and the overall budget
+ * shared fairly so a 40-file folder summary sees every file, not just the first few.
+ */
+async function gatherSourceText(paths = [], ctx, { perFile = 12000, total = 48000, maxVision = 4 } = {}) {
+  const unique = [...new Set(paths)];
+  const parsedList = await Promise.all(unique.map((p) => ctx.readParsed(p).then((d) => ({ p, d }), (e) => ({ p, error: e }))));
+  const textual = parsedList.filter((x) => x.d && !x.d.needsVision && x.d.kind !== 'unsupported');
+  const share = Math.max(800, Math.min(perFile, Math.floor(total / Math.max(1, textual.length))));
+
   const chunks = [];
   const visionParts = [];
-  let used = 0;
-  for (const p of paths) {
-    const parsed = await ctx.readParsed(p);
-    if (parsed.needsVision && parsed.vision) {
-      visionParts.push({ inlineData: { mimeType: parsed.vision.mimeType, data: parsed.vision.base64 } });
-      chunks.push(`=== FILE: ${p} (attached as image/scan) ===`);
-      continue;
+  for (const { p, d, error } of parsedList) {
+    if (error || !d) {
+      chunks.push(`=== FILE: ${p} (could not be read) ===`);
+    } else if (d.needsVision && d.vision) {
+      if (visionParts.length < maxVision) {
+        visionParts.push({ inlineData: { mimeType: d.vision.mimeType, data: d.vision.base64 } });
+        chunks.push(`=== FILE: ${p} (attached as image/scan #${visionParts.length}) ===`);
+      } else {
+        chunks.push(`=== FILE: ${p} (scan/photo not included: too many images in one request) ===`);
+      }
+    } else if (d.kind === 'unsupported') {
+      chunks.push(`=== FILE: ${p} (${(d.warnings || []).join(' ') || 'unsupported format'}) ===`);
+    } else {
+      const text = ctx.masker.mask(d.text || '');
+      const clipped = text.length > share ? `${text.slice(0, share)}\n(… ${text.length - share} more characters not shown)` : text;
+      chunks.push(`=== FILE: ${p} (${describeParsed(d)}) ===\n${clipped}`);
     }
-    const room = Math.max(0, Math.min(perFile, total - used));
-    if (!room) break;
-    const text = ctx.masker.mask(parsed.text || '');
-    const clipped = text.length > room ? `${text.slice(0, room)}\n(… file truncated)` : text;
-    used += clipped.length;
-    chunks.push(`=== FILE: ${p} (${describeParsed(parsed)}) ===\n${clipped}`);
   }
   return { text: chunks.join('\n\n'), visionParts };
 }
@@ -375,7 +386,7 @@ export const TOOLS = {
         report('Writing remarks and interventions…');
         const lmc = kind === 'items' ? analysis.leastMastered.map((it) => `Item ${it.number}${it.competency ? ` (${it.competency})` : ''}: ${it.percentCorrect}%`) : [];
         const ai = await ctx.llm({
-          system: ctx.persona,
+          system: ctx.docPersona,
           prompt: `Write DepEd item-analysis remarks. Return JSON {"remarks": [string], "interventions": [string]} (3-5 each, specific, practical, simple English).\nTest: ${meta.testTitle}. ${subject ? `Learning area: ${subject}.` : ''}\nExaminees: ${analysis.examinees}. MPS: ${analysis.mps}% (${analysis.masteryLevel}).${kind === 'items' ? `\nLeast mastered items: ${lmc.join('; ') || 'none'}` : `\nLearners below ${analysis.passPercent}%: ${analysis.belowPass.length}`}`,
           json: true,
           maxTokens: 1500,
@@ -454,7 +465,7 @@ export const TOOLS = {
       if (!focus && !text) throw new Error('Tell me the competency to remediate, or run an item analysis first.');
       report('Writing practice and re-test items…');
       const raw = await ctx.llm({
-        system: `${ctx.persona}\nYou write short, scaffolded remedial materials for struggling learners.`,
+        system: `${ctx.docPersona}\nYou write short, scaffolded remedial materials for struggling learners.`,
         prompt: `Return ONLY JSON:
 {"practice": {"title": string, "competency": string, "instructions": string, "items": [{"question": string, "choices"?: [string], "answer": string}]},
  "retest": {"instructions": string, "items": [{"question": string, "choices": [string], "answer": string}]}}
@@ -601,7 +612,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   encode_scores: {
     label: 'Type scores into my file',
-    description: "Type scores from a source (score sheet, extracted table, or analysis) into the teacher's OWN existing Excel file (e.g. their e-Class Record) by matching learner names, keeping all their formatting and formulas. Saves a copy; never changes the original.",
+    description: "Type scores from a source (score sheet, extracted table, or analysis) into the teacher's OWN existing Excel file (e.g. their e-Class Record) by matching learner names, keeping all their formatting and formulas. Safe-edit SOP: the original is backed up to KaTuro Backups and the scores go into a working copy named <name> (KaTuro edit).xlsx beside it; the original is never changed.",
     args: '{ "sourcePath": string, "targetPath": string, "targetColumn": string (column letter or header text, e.g. "F" or "WW3"), "sheetName"?: string, "nameColumn"?: string, "startRow"?: number, "overwrite"?: boolean }',
     async run({ sourcePath, targetPath, targetColumn, sheetName, nameColumn, startRow, overwrite = false }, ctx, report) {
       if (!targetColumn) throw new Error('Tell me which column to fill (e.g. "column F" or "WW3").');
@@ -625,8 +636,8 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         scores: totals.learners.map((l) => ({ name: l.name, score: l.score })),
         overwrite,
       });
-      const base = targetPath.split('/').pop().replace(/\.[^.]+$/, '');
-      const file = await ctx.saveOutput(`${base} (encoded).xlsx`, result.bytes, 'xlsx');
+      // Safe-edit SOP: original backed up, scores typed into a working clone beside it.
+      const file = await ctx.saveWorkingCopy(targetPath, result.bytes, 'xlsx');
       const parts = [`${result.written.length} score(s) typed into column ${targetColumn}`];
       if (result.unmatched.length) parts.push(`${result.unmatched.length} name(s) not found: ${result.unmatched.slice(0, 5).join(', ')}${result.unmatched.length > 5 ? '…' : ''}`);
       if (result.skippedExisting.length) parts.push(`${result.skippedExisting.length} cell(s) already had a value and were kept`);
@@ -634,7 +645,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         title: `Encoding check — ${file.name}`,
         sheets: [{ name: 'Encoded', columns: [{ header: 'Learner (source)' }, { header: 'Matched name in your file' }, { header: 'Row' }, { header: 'Score' }], rows: result.written.map((w) => [w.name, w.matchedName, w.row, w.score]) }],
       });
-      return { summary: `${parts.join('; ')}. Saved as ${file.name}`, artifacts: [{ type: 'sheet', title: spec.title, subtitle: parts.join(' · '), spec, files: [file], editable: false }] };
+      return { summary: `${parts.join('; ')}. Your original is untouched (backup in ${file.backups[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); edited copy: ${file.name}`, artifacts: [{ type: 'sheet', title: spec.title, subtitle: parts.join(' · '), spec, files: [file], editable: false }] };
     },
   },
 
@@ -650,7 +661,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const { text } = await gatherSourceText(sourcePaths, ctx, { total: 20000 });
       report(`Filling ${tags.length} field(s)…`);
       const values = ctx.masker.unmask(await ctx.llm({
-        system: ctx.persona,
+        system: ctx.docPersona,
         prompt: `Fill these Word template fields. Return ONLY a JSON object whose keys are exactly: ${JSON.stringify(tags)}. Values are plain strings (use "" if unknown).\nTeacher's instructions: ${ctx.masker.mask(instructions)}\nTeacher: ${ctx.teacher.fullName || ''}; School: ${ctx.teacher.school || ''}; Today: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}${text ? `\n\nSource files:\n${text}` : ''}`,
         json: true,
         maxTokens: 3000,
@@ -739,11 +750,14 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
   },
 };
 
-export const TOOL_NAMES = Object.keys(TOOLS);
-
-/** Tool catalog text for the planner prompt. */
-export function toolCatalog() {
-  return TOOL_NAMES.map((name) => `- ${name}: ${TOOLS[name].description}\n  args: ${TOOLS[name].args}`).join('\n');
-}
-
-export { documentSpecToText, base64ToBytes, slug };
+export {
+  documentSpecToText,
+  base64ToBytes,
+  slug,
+  extractTableWithAI,
+  documentArtifact,
+  saveDocumentOutputs,
+  headerFor,
+  teacherSignatures,
+  baseMeta,
+};
