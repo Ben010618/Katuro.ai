@@ -66,7 +66,8 @@ function loadServer(store) {
   return mod.exports;
 }
 
-const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+// Includes models Google really lists that can't do our work (speech, Gemma): they must never be picked.
+const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-3.5-transcribe', 'gemma-4-26b-a4b-it', 'gemini-omni-1.1-flash'];
 const ok = (text) => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] }), clone() { return this; } });
 const busy = () => ({ ok: false, status: 503, statusText: 'Service Unavailable', json: async () => ({ error: { message: 'This model is currently experiencing high demand.' } }), clone() { return this; } });
 
@@ -130,6 +131,19 @@ describe('Gemini "high demand" (503)', () => {
     expect(err.message).toBe(server.__test.BUSY_MESSAGE);
     expect(err.message).not.toMatch(/Gemini 503|gemini-3/);
     expect(err.details).toMatchObject({ busy: true, retryable: true });
+  });
+});
+
+describe('model choice', () => {
+  it('never falls back to speech or Gemma models (Sep 28: "JSON mode is not enabled")', async () => {
+    // Like Sep 28: every general model is already benched (quota spent / congested).
+    const until = Date.now() + 3600000;
+    store.docs.set('adminConfig/modelHealth', { benched: Object.fromEntries(MODELS.filter((m) => !/transcribe|gemma|omni/.test(m)).map((m) => [m, until])) });
+    server = loadServer(store);
+    const calls = stubGemini(() => busy());
+    await server.__test.callGeminiRaw('k', contents, { maxTokens: 512, responseMimeType: 'application/json' }).catch(() => {});
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.filter((m) => /transcribe|gemma|omni/.test(m))).toEqual([]);
   });
 });
 

@@ -163,7 +163,17 @@ async function listGeminiModels(key) {
     .map(m => String(m.name).replace('models/', ''))
     // Preview/experimental builds get withdrawn without notice, and the
     // specialised variants can't serve general text generation.
-    .filter(id => !/(preview|-exp|experimental|tts|image|audio|live|embedding|vision|learnlm)/i.test(id));
+    .filter(id => !/(preview|-exp|experimental|tts|image|audio|live|embedding|vision|learnlm)/i.test(id))
+    // ALLOW-list, not just a block-list: only general Gemini text models. On
+    // 2026-09-28, with the flash models out of quota, resolution fell through
+    // to gemini-3.5-transcribe (speech) and gemma-4-* — neither supports JSON
+    // mode, and 30 ilaw_unpack requests failed with "JSON mode is not enabled
+    // for this model". A new specialised model must never be picked by accident.
+    .filter(isGeneralTextModel);
+}
+
+function isGeneralTextModel(id) {
+  return /^gemini-\d+(\.\d+)?-(flash|flash-lite|pro)$/.test(id) || /^gemini-(flash|flash-lite|pro)-latest$/.test(id);
 }
 
 /**
