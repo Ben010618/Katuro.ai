@@ -1,5 +1,6 @@
 // Shared game worksheet components used by ILAW OutputPage and DLL OutputPage
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared game helper imported by OutputPage/DLLOutputPage/testBuilderDocx; only affects dev HMR
 export const GAME_TYPES = [
   { id: 'matching',   label: 'Matching Type',     desc: 'Match terms to definitions',          color: '#0284c7', bg: '#e0f2fe', defaultCount: 10 },
   { id: 'jumbled',    label: 'Jumbled Letters',    desc: 'Unscramble vocabulary words',         color: '#7c3aed', bg: '#ede9fe', defaultCount: 10 },
@@ -9,6 +10,7 @@ export const GAME_TYPES = [
   { id: 'fillblanks', label: 'Fill in the Blanks', desc: 'Complete sentences with choices',     color: '#be185d', bg: '#fce7f3', defaultCount: 10 },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared game helper imported by OutputPage/DLLOutputPage/testBuilderDocx; only affects dev HMR
 export function gShuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -18,6 +20,7 @@ export function gShuffle(arr) {
   return a;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared game helper imported by OutputPage/DLLOutputPage/testBuilderDocx; only affects dev HMR
 export function gScramble(word) {
   const arr = word.split('');
   for (let i = arr.length - 1; i > 0; i--) {
@@ -28,6 +31,7 @@ export function gScramble(word) {
   return arr.join('');
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared game helper imported by OutputPage/DLLOutputPage/testBuilderDocx; only affects dev HMR
 export function buildWordSearch(wordList, SIZE = 15) {
   const grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(''));
   const placed = [];
@@ -72,6 +76,7 @@ function cwCanPlace(cells, word, r, c, dir, SIZE) {
   return true;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared game helper imported by OutputPage/DLLOutputPage/testBuilderDocx; only affects dev HMR
 export function buildCrossword(pairs) {
   const SIZE = 21;
   const cells = {};

@@ -52,7 +52,7 @@ export default function SettingsPage() {
     section: '',
   });
   const [saving,        setSaving]        = useState(false);
-  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [, setProfileLoaded] = useState(false);
 
 
   useEffect(() => {

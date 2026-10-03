@@ -23,6 +23,7 @@ export function useComments(postId, uid, postAuthorUid, isAdmin = false) {
 
   useEffect(() => {
     if (!postId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sets loading before subscribing to the comments snapshot
     setLoading(true);
     const unsub = subscribeToComments(postId, data => {
       setComments(data);

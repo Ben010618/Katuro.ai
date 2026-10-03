@@ -1108,7 +1108,7 @@ export function balanceCompetencyDays(competencies, targetTotal = 45) {
   const base = Math.floor(targetTotal / count);
   let remainder = targetTotal % count;
 
-  return competencies.map((comp, idx) => {
+  return competencies.map((comp) => {
     const extra = remainder > 0 ? 1 : 0;
     if (remainder > 0) remainder--;
     return {

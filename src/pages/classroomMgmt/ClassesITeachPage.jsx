@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useToast } from '../../context/ToastContext';
 import { subscribeAssignments, subscribeSectionComments } from '../../services/classroomDb';
 import { GraduationCap, ChevronRight, BookOpen, Bell } from 'lucide-react';
 
@@ -23,7 +22,6 @@ function subjectColor(subject) {
 export default function ClassesITeachPage() {
   const { user }      = useAuth();
   const navigate      = useNavigate();
-  const { addToast }  = useToast();
   const [assignments,  setAssignments]  = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [sectionUnread, setSectionUnread] = useState({}); // { [sectionId]: count }

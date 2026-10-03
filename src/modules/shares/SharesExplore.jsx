@@ -8,12 +8,10 @@ import { PostCard }   from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { TeacherCard }  from './components/TeacherCard';
 import { HashtagPill }  from './components/HashtagPill';
-import { useNavigate }  from 'react-router-dom';
 
 export default function SharesExplore({ uid, displayName, initials, photoURL, isAdmin }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
-  const navigate = useNavigate();
 
   const activeTag = searchParams.get('tag') || '';
 

@@ -24,7 +24,7 @@ import {
   normalizeSheetSpec,
   documentSpecToText,
 } from '../docSpec.js';
-import { prepareImageForVision } from './llm.js';
+import { visionPartsFor } from './visionPrep.js';
 
 const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
 {
@@ -103,8 +103,9 @@ async function gatherSourceText(paths = [], ctx, { perFile = 12000, total = 4800
       chunks.push(`=== FILE: ${p} (could not be read) ===`);
     } else if (d.needsVision && d.vision) {
       if (visionParts.length < maxVision) {
-        visionParts.push({ inlineData: { mimeType: d.vision.mimeType, data: d.vision.base64 } });
-        chunks.push(`=== FILE: ${p} (attached as image/scan #${visionParts.length}) ===`);
+        const added = await visionPartsFor(d, () => ctx.readBytes(p));
+        visionParts.push(...added);
+        chunks.push(`=== FILE: ${p} (attached as image/scan${added.length > 1 ? `, ${added.length} page images` : ''}) ===`);
       } else {
         chunks.push(`=== FILE: ${p} (scan/photo not included: too many images in one request) ===`);
       }
@@ -168,10 +169,7 @@ async function extractTableWithAI(path, ctx, what = 'a table') {
   const parsed = await ctx.readParsed(path);
   const parts = [];
   if (parsed.needsVision && parsed.vision) {
-    const v = parsed.kind === 'image'
-      ? await prepareImageForVision(base64ToBytes(parsed.vision.base64), parsed.vision.mimeType)
-      : { mimeType: parsed.vision.mimeType, data: parsed.vision.base64 };
-    parts.push({ inlineData: { mimeType: v.mimeType, data: v.data } });
+    parts.push(...(await visionPartsFor(parsed, () => ctx.readBytes(path))));
   }
   const textContext = parsed.needsVision ? '' : `\n\nDocument text:\n${ctx.masker.mask(parsed.text || '').slice(0, 20000)}`;
   const result = await ctx.llm({
@@ -228,6 +226,7 @@ export const TOOLS = {
         prompt: `${question}\n\nFiles:\n${text}`,
         parts: visionParts,
         maxTokens: 3072,
+        onText: (full) => ctx.streamReply?.(ctx.masker.unmask(full)),
       });
       return { summary: 'Answered from the files', reply: ctx.masker.unmask(answer) };
     },
@@ -242,6 +241,23 @@ export const TOOLS = {
       report(sourcePaths.length ? `Reading ${sourcePaths.length} source file(s)…` : 'Drafting the document…');
       const { text, visionParts } = await gatherSourceText(sourcePaths, ctx);
       const curriculum = ctx.curriculumHint(subject, gradeLevel, instructions);
+
+      // DLL and TOS+test: write the parts in parallel (much faster); fall back to one call if a part fails.
+      if (docType === 'dll' || docType === 'tos_test') {
+        try {
+          const { buildDllParallel, buildTosParallel } = await import('./docBuilders.js');
+          const builder = docType === 'dll' ? buildDllParallel : buildTosParallel;
+          const built = await builder({ ctx, title, instructions, subject, gradeLevel, curriculum, source: { text, visionParts }, report });
+          const spec = normalizeDocumentSpec({ ...built, header: headerFor(ctx), signatures: teacherSignatures(ctx) });
+          report('Building the file…');
+          const files = await saveDocumentOutputs(spec, slug(spec.title), formats, ctx);
+          return { summary: `Created ${files.map((f) => f.name).join(' and ')}`, artifacts: [documentArtifact(spec, files, { docType })] };
+        } catch (err) {
+          if (err?.code === 'AI_UNAVAILABLE') throw err;
+          console.warn(`[KaTuroDesk] Parallel ${docType} failed, using single-call writer:`, err);
+        }
+      }
+
       report('Writing the content…');
       const raw = await ctx.llm({
         system: `You are KaTuro, a DepEd (Philippines) co-teacher who writes official school documents aligned with the MATATAG curriculum, PPST and DepEd orders.\n${DOC_SPEC_GUIDE}`,
@@ -390,6 +406,7 @@ export const TOOLS = {
           prompt: `Write DepEd item-analysis remarks. Return JSON {"remarks": [string], "interventions": [string]} (3-5 each, specific, practical, simple English).\nTest: ${meta.testTitle}. ${subject ? `Learning area: ${subject}.` : ''}\nExaminees: ${analysis.examinees}. MPS: ${analysis.mps}% (${analysis.masteryLevel}).${kind === 'items' ? `\nLeast mastered items: ${lmc.join('; ') || 'none'}` : `\nLearners below ${analysis.passPercent}%: ${analysis.belowPass.length}`}`,
           json: true,
           maxTokens: 1500,
+          tier: 'fast',
         });
         remarks = ctx.masker.unmask((ai.remarks || []).map(String));
         interventions = ctx.masker.unmask((ai.interventions || []).map(String));

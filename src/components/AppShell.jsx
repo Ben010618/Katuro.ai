@@ -78,7 +78,7 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
         photoURL: prof?.photoURL || user.photoURL || null,
         school:   prof?.school || '',
       });
-    } catch (_) {
+    } catch {
       onProfileOpen({ displayName, email: user.email || '', photoURL: user.photoURL || null, school: '' });
     }
   }
@@ -396,7 +396,7 @@ export default function AppShell() {
       await uploadProfilePhoto(user.uid, file);
       const prof = await getTeacherProfile(user.uid);
       if (prof) setProfileData(prev => prev ? { ...prev, photoURL: prof.photoURL } : prev);
-    } catch (_) {}
+    } catch { /* photo upload is best-effort; ignore */ }
     finally { setPhotoUploading(false); }
   }
 

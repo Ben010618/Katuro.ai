@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import { MoreHorizontal, Trash2, Pencil, Share2, MessageCircle, Check, X } from 'lucide-react';
 import { PhotoGrid }    from './PhotoGrid';
 import { PhotoLightbox } from './PhotoLightbox';

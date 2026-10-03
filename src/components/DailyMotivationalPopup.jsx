@@ -45,6 +45,7 @@ export default function DailyMotivationalPopup() {
     if (localStorage.getItem('lastPopupDate') === today) return;
 
     const type = Math.floor(Math.random() * 3) + 1;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- once-per-day popup decided on mount from localStorage and Math.random (client-only)
     if (type === 1)      setPopup({ type: 1, item: pick(QUOTES) });
     else if (type === 2) setPopup({ type: 2, item: pick(VERSES) });
     else                 setPopup({ type: 3 });

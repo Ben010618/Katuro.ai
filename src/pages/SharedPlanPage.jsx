@@ -15,6 +15,7 @@ export default function SharedPlanPage() {
   const [error,   setError]   = useState('');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reports an invalid share link before the async fetch
     if (!shareId) { setError('Invalid link.'); setLoading(false); return; }
     getSharedPlan(shareId)
       .then(data => {

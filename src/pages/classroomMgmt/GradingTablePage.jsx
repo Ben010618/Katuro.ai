@@ -53,6 +53,7 @@ export default function GradingTablePage() {
   // Reset local state when switching terms
   useEffect(() => {
     initializedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets local grading state when switching terms
     setSheet(null);
     setLocalWeights({ ...DEFAULT_WEIGHTS });
     setLocalGrades({});

@@ -24,6 +24,7 @@ export function useQuiz(uid, sessionId) {
     }
   }, [uid, sessionId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- kicks off async data load on mount and when deps change; setState happens inside the fetch
   useEffect(() => { refresh(); }, [refresh]);
 
   async function addQuiz(data) {

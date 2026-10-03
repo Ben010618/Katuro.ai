@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as XLSX from 'xlsx';
 import { callGeminiProxy } from '../../geminiConfig';
-import { runDeskAgentTurn, personaFor, docPersonaFor } from './deskAgent';
+import { runDeskAgentTurn, personaFor, docPersonaFor, clearAnswerMemory } from './deskAgent';
 import { getPersona, PERSONAS, timeOfDay } from '../personas';
 import { runTaskGraph } from './runner';
 import { createNameMasker } from './privacy';
@@ -46,22 +46,69 @@ function sentText(callIndex) {
 
 beforeEach(() => {
   resetTaskActionSupport();
+  clearAnswerMemory();
   callGeminiProxy.mockReset();
 });
 
 describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
-  it('answers a greeting in one AI call with no tasks', async () => {
-    callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify({ reply: 'Hello, Sir Ben! How can I help?', tasks: [] }) });
+  it('answers a greeting instantly in the persona voice with no AI call', async () => {
     const res = await runDeskAgentTurn({
-      prompt: 'hello',
+      prompt: 'hello po!',
+      workspace: createVirtualWorkspace('X'),
+      user: { uid: 'u1' },
+      profile: { firstName: 'Ben', gender: 'male' },
+      persona: 'matt',
+    });
+    expect(res.content).toMatch(/^Yow Sir Ben!/);
+    expect(res.fastPath).toBe('local');
+    expect(callGeminiProxy).not.toHaveBeenCalled();
+  });
+
+  it('answers a general question through the planner on the fast tier, streaming the reply', async () => {
+    callGeminiProxy.mockImplementationOnce(async (req) => {
+      req.onChunk?.('{"reply": "Hello, Sir', '{"reply": "Hello, Sir');
+      req.onChunk?.(' Ben! Use exit tickets."', '{"reply": "Hello, Sir Ben! Use exit tickets."');
+      return { text: JSON.stringify({ reply: 'Hello, Sir Ben! Use exit tickets.', tasks: [] }) };
+    });
+    const updates = [];
+    const res = await runDeskAgentTurn({
+      prompt: 'Any tips for checking understanding in Grade 4?',
+      workspace: createVirtualWorkspace('X'),
+      user: { uid: 'u1' },
+      profile: { firstName: 'Ben', gender: 'male' },
+      onUpdate: (u) => u.reply && updates.push(u.reply),
+    });
+    expect(res.content).toContain('exit tickets');
+    const req = callGeminiProxy.mock.calls[0][0];
+    expect(req).toMatchObject({ action: 'desk_agent_run', tier: 'fast', stream: true, region: 'asia-southeast1' });
+    expect(updates).toContain('Hello, Sir');
+
+    // Asking again with nothing changed is answered from memory (no second AI call).
+    const again = await runDeskAgentTurn({
+      prompt: 'Any tips for checking understanding in Grade 4?',
       workspace: createVirtualWorkspace('X'),
       user: { uid: 'u1' },
       profile: { firstName: 'Ben', gender: 'male' },
     });
-    expect(res.content).toContain('Sir Ben');
-    expect(res.artifacts).toHaveLength(0);
+    expect(again.fastPath).toBe('memory');
     expect(callGeminiProxy).toHaveBeenCalledTimes(1);
-    expect(callGeminiProxy.mock.calls[0][0].action).toBe('desk_agent_run');
+  });
+
+  it('routes an obvious request straight to the tool (no planner call)', async () => {
+    const workspace = workspaceWithScores();
+    callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify({ remarks: ['ok'], interventions: ['ok'] }) });
+    const res = await runDeskAgentTurn({
+      prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.',
+      workspace,
+      attachedPaths: ['Scores/Quiz1_Rizal.xlsx'],
+      user: { uid: 'u1' },
+      persona: 'luna',
+    });
+    expect(res.content).toMatch(/^Certainly, Teacher\. I will take care of the item analysis now\./);
+    expect(res.createdFiles.map((f) => f.format).sort()).toEqual(['docx', 'xlsx']);
+    // Only the remarks call reached the AI; no planner round trip.
+    expect(callGeminiProxy).toHaveBeenCalledTimes(1);
+    expect(callGeminiProxy.mock.calls[0][0].action).toBe('desk_agent_task');
   });
 
   it('runs an item analysis on a real xlsx, saves docx + xlsx, and masks learner names', async () => {
@@ -112,7 +159,8 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
     const err = Object.assign(new Error('unavailable'), { code: 'functions/unavailable' });
     callGeminiProxy.mockRejectedValue(err);
     const res = await runDeskAgentTurn({
-      prompt: 'item analysis',
+      // Not fast-routable ("and then" = multi-step), so it goes to the planner, which is offline.
+      prompt: 'Do the item analysis and then suggest next steps for my class',
       workspace,
       attachedPaths: ['Scores/Quiz1_Rizal.xlsx'],
       user: { uid: 'u1' },

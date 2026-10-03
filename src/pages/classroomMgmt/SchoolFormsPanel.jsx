@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FileText, Settings, Save, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, X,
+  CheckCircle2, Clock,
 } from 'lucide-react';
 import { subscribeSchoolProfile, saveSchoolProfile } from '../../services/schoolFormsDb';
 import SF1Form  from './forms/SF1Form';
@@ -102,6 +102,7 @@ function SchoolProfileEditor({ uid, profile, onSaved }) {
   const [form,   setForm]   = useState(profile || {});
   const [saving, setSaving] = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- re-syncs the editable form when the saved profile prop changes
   useEffect(() => { setForm(profile || {}); }, [profile]);
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }

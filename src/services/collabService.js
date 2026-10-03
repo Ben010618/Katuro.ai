@@ -159,7 +159,7 @@ export function markConversationRead(id) {
     const reads = JSON.parse(localStorage.getItem('collabReads') || '{}');
     reads[id] = Date.now();
     localStorage.setItem('collabReads', JSON.stringify(reads));
-  } catch (_) {}
+  } catch { /* localStorage unavailable/full; ignore */ }
 }
 
 export function subscribeToCollabUnread(uid, cb) {
@@ -175,7 +175,7 @@ export function subscribeToCollabUnread(uid, cb) {
           return (data.lastMessageAt?.toMillis?.() ?? 0) > (reads[d.id] ?? 0);
         }).length;
         cb(count);
-      } catch (_) { cb(0); }
+      } catch { cb(0); }
     }
   );
 }

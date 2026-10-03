@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useCotStore } from '../../store/cotStore';
 import { useAuth } from '../../hooks/useAuth';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
@@ -25,7 +24,6 @@ function Field({ label, required, hint, children }) {
 }
 
 export default function CotStep1() {
-  const navigate = useNavigate();
   const store    = useCotStore();
   const { user } = useAuth();
   const [curriculumModalOpen, setCurriculumModalOpen] = useState(false);

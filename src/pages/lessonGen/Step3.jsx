@@ -18,15 +18,6 @@ function formatDayShort(iso) {
   } catch { return iso; }
 }
 
-const BLOOMS_COLORS = {
-  Remember:   '#0d9488',
-  Understand: '#0284c7',
-  Apply:      '#7c3aed',
-  Analyze:    '#e8a320',
-  Evaluate:   '#e05c5c',
-  Create:     '#16a34a',
-};
-
 const VALID_BLOOMS = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
 function bloomsBaseOf(level) {
   return VALID_BLOOMS.find(l => level.startsWith(l)) ?? level.split(/\s*[-—–]\s*/)[0].trim();

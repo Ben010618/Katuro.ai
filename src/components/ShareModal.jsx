@@ -105,7 +105,7 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch (_) {}
+    } catch { /* clipboard unavailable/denied; ignore */ }
   }
 
   function handlePlatform(p) {
@@ -120,7 +120,7 @@ export default function ShareModal({ url, title, subject, onClose, modalTitle = 
   async function handleNativeShare() {
     try {
       await navigator.share({ title: subject || title, text: shareText, url });
-    } catch (_) {}
+    } catch { /* user cancelled share sheet or unsupported; ignore */ }
   }
 
   const canNativeShare = typeof navigator.share === 'function';

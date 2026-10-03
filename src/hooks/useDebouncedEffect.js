@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 export function useDebouncedEffect(effect, deps, delay = 500) {
   const isFirst = useRef(true);
   const effectRef = useRef(effect);
+  // eslint-disable-next-line react-hooks/refs -- latest-callback ref pattern so the debounced effect always calls the newest closure
   effectRef.current = effect;
 
   useEffect(() => {

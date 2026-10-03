@@ -267,6 +267,7 @@ export default function DLLStep2() {
   // Live timer & progressive status messages during generation
   useEffect(() => {
     if (!generating) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the elapsed timer when generation stops
       setElapsedSec(0);
       return;
     }

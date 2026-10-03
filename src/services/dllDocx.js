@@ -294,7 +294,7 @@ function buildTable(store, profile) {
     ['F. What difficulties did I encounter which my principal or supervisor can help me solve?', false, false],
     ['G. What innovation or localized materials did I use/discover which I wish to share with other teachers?', false, false],
   ];
-  reflRows.forEach(([label, isFirst, isHdr], i) => {
+  reflRows.forEach(([label, , isHdr], i) => {
     rows.push(tr([
       i === 0 ? secStart('VI') : secCont(),
       isHdr

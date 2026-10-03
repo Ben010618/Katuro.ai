@@ -159,6 +159,7 @@ export default function ActionResearchPhase1() {
   }, [urlDocId, user?.uid]);
 
   /* ── Save helper: writes to Firestore, returns docId ─────────────────── */
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- deps intentionally keyed on user?.uid; body uses user.uid (only called when signed in)
   const buildPayload = useCallback((extra = {}) => ({
     userId:        user.uid,
     phase:         1,
@@ -200,6 +201,7 @@ export default function ActionResearchPhase1() {
   /* ── Debounced AI problem suggestion ─────────────────────────────────── */
   useEffect(() => {
     if (problemText.trim().length < 20) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears suggestion/loading when input is too short for the debounced AI request
       setAiSuggestion(null);
       setAiLoading(false);
       return;

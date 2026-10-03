@@ -18,11 +18,13 @@ export function useReactions(postId, uid, initialReactions = {}, postAuthorUid =
   const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets counts to the new post initial reactions when postId changes
     setReactions({ love: 0, clap: 0, star: 0, insight: 0, ...initialReactions });
   }, [postId]);
 
   useEffect(() => {
     if (!postId || !uid) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sets loading before fetching the user reaction
     setLoading(true);
     getMyReaction(postId, uid)
       .then(setMyReaction)
@@ -54,7 +56,7 @@ export function useReactions(postId, uid, initialReactions = {}, postAuthorUid =
         await notifyReaction(uid, '', postId, postAuthorUid, type).catch(() => {});
         trackEvent(uid, 'shares_reaction_added', { type });
       }
-    } catch (_) {
+    } catch {
       // Rollback on failure
       setReactions(prev => {
         const next = { ...prev };

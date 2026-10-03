@@ -189,8 +189,6 @@ const PAD_L = 0.75;
 const PAD_R = 0.75;
 const CONTENT_W = 13.33 - PAD_L - PAD_R; // 11.83 in
 const TOP_NAV_Y = 0.45;
-const BODY_Y    = 1.45;
-const BODY_H    = 5.4;
 const FOOTER_Y  = 7.08;
 
 // ── Clean Modern Slide Canvas ────────────────────────────────────────────────
@@ -857,7 +855,6 @@ export async function exportToPptx({
   subject,
   gradeLevel,
   schoolName,
-  schoolEmail,
   slides,
   references = [],
   includeNotes = true,

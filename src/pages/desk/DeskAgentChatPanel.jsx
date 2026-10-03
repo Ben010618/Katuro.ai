@@ -19,12 +19,13 @@ import {
   Files,
   ListChecks,
 } from 'lucide-react';
-import { useDeskStore } from '../../store/deskStore';
+import { useDeskStore, folderIndex } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
 import DeskFormattedText from './DeskFormattedText';
 import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
 import { getPersona } from '../../services/desk/personas';
+import { QUICK_PROMPTS } from '../../services/desk/agent/fastRoute';
 
 function StepIcon({ status }) {
   if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
@@ -140,6 +141,7 @@ export default function DeskAgentChatPanel({
         profile,
         privacyMode,
         persona,
+        fileIndex: folderIndex,
         onUpdate: ({ steps, reply }) => {
           updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
         },
@@ -193,40 +195,6 @@ export default function DeskAgentChatPanel({
     }
   };
 
-  const QUICK_PROMPTS = [
-    {
-      label: '📊 Item Analysis & LMC',
-      prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.',
-    },
-    {
-      label: '🎯 Remedial Slips & Re-test',
-      prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.',
-    },
-    {
-      label: '📑 e-Class Record',
-      prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.',
-    },
-    {
-      label: '🚨 Attendance & SARDO',
-      prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.',
-    },
-    {
-      label: '📝 DLL from my lesson',
-      prompt: 'Turn the attached lesson file into a complete Daily Lesson Log (Monday to Friday).',
-    },
-    {
-      label: '🖥️ Slides from file',
-      prompt: 'Make a PowerPoint presentation from the attached lesson.',
-    },
-    {
-      label: '📷 Photo to Excel',
-      prompt: 'Read the table in the attached photo and turn it into an Excel file I can check.',
-    },
-    {
-      label: '📎 Merge PDFs',
-      prompt: 'Merge the attached PDFs into one file in the order I attached them.',
-    },
-  ];
 
   return (
     <main

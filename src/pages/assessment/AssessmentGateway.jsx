@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, ClipboardCheck, ArrowRight, CheckCircle2, Sparkles, ScanLine, FileSpreadsheet } from 'lucide-react';
+import { ClipboardList, ClipboardCheck, ArrowRight, CheckCircle2, Sparkles, FileSpreadsheet } from 'lucide-react';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const TYPES = [

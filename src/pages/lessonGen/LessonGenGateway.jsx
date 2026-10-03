@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLessonGenStore } from '../../store/lessonGenStore';
-import { BookOpen, CalendarDays, ArrowRight, RotateCcw, Award, CheckCircle2, Sparkles } from 'lucide-react';
+import { BookOpen, CalendarDays, ArrowRight, RotateCcw, Award, CheckCircle2 } from 'lucide-react';
 import CoTeacherBanner from '../../components/CoTeacherBanner';
 
 const TYPES = [

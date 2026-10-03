@@ -165,6 +165,8 @@ export async function recognizeMap(map, { name, ctx, memory, renderMapForAI, hin
     json: true,
     maxTokens: 6000,
     temperature: 0.1,
+    // Full model on purpose: this runs once per school template (then it's remembered), so accuracy beats speed.
+    tier: 'standard',
   });
   const layout = validateLayout(raw, map);
   if (memory && (layout.tables.length || layout.fields.length) && layout.confidence >= 0.6) {

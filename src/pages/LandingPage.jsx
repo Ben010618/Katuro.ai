@@ -11,11 +11,7 @@ import {
   Presentation,
   GraduationCap,
   ArrowRight,
-  ShieldCheck,
   Zap,
-  Clock,
-  Heart,
-  HelpCircle,
   Palette,
 } from 'lucide-react';
 
@@ -30,7 +26,6 @@ export default function LandingPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let animationFrameId;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -81,7 +76,6 @@ export default function LandingPage() {
 
     return () => {
       window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationFrameId);
     };
   }, []);
 

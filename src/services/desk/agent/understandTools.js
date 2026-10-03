@@ -90,6 +90,7 @@ TARGET columns: ${JSON.stringify(freeTargets.map(describe))}`,
     json: true,
     maxTokens: 2000,
     temperature: 0.1,
+    tier: 'fast',
   });
   return res?.mapping && typeof res.mapping === 'object' ? res.mapping : {};
 }

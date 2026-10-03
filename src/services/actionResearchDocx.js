@@ -1,7 +1,6 @@
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle,
-  PageOrientation,
 } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -18,9 +17,6 @@ const SZ_SM  = 20;  // 10pt
 
 const DSPACE = 480; // double spacing (line height)
 const INDENT = 720; // 0.5 inch first-line
-
-const GREEN = '1a3d2b';
-const GRAY  = '4a6357';
 
 /* ── Paragraph builders ──────────────────────────────────────────────────── */
 
@@ -93,8 +89,6 @@ function labeledPara(label, text) {
 
 /* ── Table builder (for timeline) ───────────────────────────────────────── */
 
-const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'auto' };
-const CELL_BORDER = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER };
 
 function tlCell(text, opts = {}) {
   return new TableCell({

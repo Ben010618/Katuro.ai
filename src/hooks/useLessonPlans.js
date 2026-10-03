@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../firebase";
 import { lessonPlansRef } from "../services/db";
 
 export function useLessonPlans(uid) {
@@ -9,6 +8,7 @@ export function useLessonPlans(uid) {
   const [error,       setError]       = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets loading/error state before subscribing to Firestore snapshot
     if (!uid) { setLoading(false); return; }
     setLoading(true);
     setError("");

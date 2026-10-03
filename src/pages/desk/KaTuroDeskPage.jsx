@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -23,7 +23,13 @@ import { planStatusText } from '../../services/plans';
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
-  const { workspace, activeArtifact, persona } = useDeskStore();
+  const { workspace, activeArtifact, persona, startFolderIndex } = useDeskStore();
+
+  // Index the folder that is open when the desk mounts (later folders index on open/refresh).
+  useEffect(() => {
+    startFolderIndex();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showSettings, setShowSettings] = useState(false);
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);

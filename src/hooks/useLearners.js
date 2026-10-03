@@ -17,6 +17,7 @@ export function useLearners(uid, classId) {
   }, [uid, classId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- kicks off async data load on mount and when deps change; setState happens inside the fetch
     refresh();
   }, [refresh]);
 

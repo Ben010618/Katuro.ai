@@ -32,7 +32,7 @@ function isUnknownActionError(err) {
 }
 
 function isDailyLimitError(err) {
-  return Boolean(err?.dailyLimit || err?.details?.dailyLimit) || err?.status === 429 || err?.code === 'functions/resource-exhausted';
+  return Boolean(err?.dailyLimit || err?.details?.dailyLimit);
 }
 
 function isAuthError(err) {
@@ -105,14 +105,29 @@ export function parseJsonReply(text) {
   throw new Error('The AI reply was not valid JSON.');
 }
 
-async function proxyCall({ action, contents, json, maxTokens, temperature, isRetry }) {
+// KaTuroDesk calls prefer the Singapore deployment (closest to PH); the gateway
+// falls back to us-central1 by itself when asia-southeast1 isn't deployed yet.
+export const DESK_REGION = 'asia-southeast1';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Short-lived Gemini/gateway throttling (not the teacher's daily limit). */
+function isRateLimited(err) {
+  // quotaExhausted = Google's own per-day cap: retrying can't help before midnight.
+  return (err?.status === 429 || err?.code === 'functions/resource-exhausted') && !isDailyLimitError(err) && !err?.quotaExhausted;
+}
+
+async function proxyCall({ action, contents, json, maxTokens, temperature, isRetry, tier, onText }) {
   const res = await callGeminiProxy({
     action,
     contents,
     temperature,
     maxTokens,
+    tier,
+    region: DESK_REGION,
     ...(json ? { responseMimeType: 'application/json' } : {}),
     ...(isRetry ? { isRetry: true } : {}),
+    ...(typeof onText === 'function' ? { stream: true, onChunk: (_delta, full) => onText(full) } : {}),
   });
   const text = typeof res === 'string' ? res : res?.text || '';
   if (!text.trim()) throw new Error('The AI returned an empty reply.');
@@ -133,14 +148,18 @@ export async function callDeskLLM({
   maxTokens = 4096,
   temperature = 0.4,
   kind = 'task', // 'plan' | 'task'
+  tier, // 'fast' (flash-lite, small JSON jobs) | 'standard'; planner defaults to fast
+  onText, // optional: receives the reply text as it streams in
 }) {
   const contents = buildContents({ system, history, prompt, parts });
   let action = kind === 'plan' || !taskActionSupported ? 'desk_agent_run' : 'desk_agent_task';
+  const effectiveTier = tier || (kind === 'plan' ? 'fast' : 'standard');
 
   let lastErr = null;
+  let rateRetries = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { text, finishReason } = await proxyCall({ action, contents, json, maxTokens, temperature, isRetry: attempt > 0 });
+      const { text, finishReason } = await proxyCall({ action, contents, json, maxTokens, temperature, isRetry: attempt > 0 || rateRetries > 0, tier: effectiveTier, onText });
       if (!json) return text;
       try {
         return parseJsonReply(text);
@@ -158,7 +177,16 @@ export async function callDeskLLM({
         continue;
       }
       if (isDailyLimitError(err)) {
-        throw new AIUnavailableError("You've reached today's KaTuroDesk AI limit. It resets tomorrow.", err);
+        const e = new AIUnavailableError(err?.message || "You've reached today's KaTuroDesk AI limit. It resets tomorrow.", err);
+        e.dailyLimit = true;
+        throw e;
+      }
+      // Throttling clears in seconds: back off 1s, 2s, 4s before giving up.
+      if (isRateLimited(err) && rateRetries < 3) {
+        await sleep(1000 * 2 ** rateRetries);
+        rateRetries += 1;
+        attempt -= 1;
+        continue;
       }
       if (isAuthError(err)) {
         throw new AIUnavailableError('Please sign in to your KaTuro account to use the AI features.', err);

@@ -526,7 +526,7 @@ function parseNotesXml(xml) {
 let pdfjsPromise = null;
 
 /** Loads pdfjs once: legacy build under Node (vitest), modern build + worker in the renderer. */
-function loadPdfjs() {
+export function loadPdfjs() {
   if (pdfjsPromise) return pdfjsPromise;
   pdfjsPromise = (async () => {
     if (typeof window === 'undefined') {

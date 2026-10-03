@@ -18,7 +18,7 @@ export function useSearch() {
       try {
         const teachers = await searchTeachers(q);
         setResults(teachers);
-      } catch (_) {}
+      } catch { /* search failure leaves previous results; ignore */ }
       finally { setSearching(false); }
     }, 320);
   }, []);
@@ -27,7 +27,7 @@ export function useSearch() {
     try {
       const tags = await fetchTrendingHashtags();
       setTrending(tags);
-    } catch (_) {}
+    } catch { /* trending tags are optional; ignore */ }
   }, []);
 
   return { results, trending, searching, search, loadTrending };

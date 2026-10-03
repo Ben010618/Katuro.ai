@@ -196,7 +196,7 @@ function trueFalseBlocks(data, profile, lesson, answerKey) {
 
 // ── Crossword Puzzle ──────────────────────────────────────────────────────────
 function crosswordBlocks(data, profile, lesson, answerKey) {
-  const { pairs, layout } = data;
+  const { layout } = data;
   const { cells, placed, SIZE } = layout;
   const out = makeHeader(profile, lesson, 'Crossword Puzzle', answerKey);
 
@@ -349,15 +349,6 @@ function fillBlanksBlocks(data, profile, lesson, answerKey) {
 }
 
 // ── Builder map ───────────────────────────────────────────────────────────────
-const LABELS = {
-  matching:   'Matching Type',
-  jumbled:    'Jumbled Letters',
-  truefalse:  'True or False',
-  crossword:  'Crossword Puzzle',
-  wordhunt:   'Word Hunt',
-  fillblanks: 'Fill in the Blanks',
-};
-
 function buildBlocks(gameData, profile, lesson, answerKey) {
   const { type } = gameData;
   if (type === 'matching')   return matchingBlocks(gameData, profile, lesson, answerKey);

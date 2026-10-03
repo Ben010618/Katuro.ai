@@ -3,17 +3,12 @@ import {
   X,
   Search,
   BookOpen,
-  CheckCircle2,
   Sparkles,
   ShieldCheck,
   Check,
-  ExternalLink,
-  Layers,
   Clock,
-  Filter,
 } from 'lucide-react';
 import {
-  DEPED_CURRICULUM_DATABASE,
   getAvailableDepEdSubjects,
   getAvailableDepEdGrades,
   queryDepEdCompetencies,
@@ -42,6 +37,7 @@ export default function DepEdCurriculumPickerModal({
   // Sync defaults when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs picker defaults from props each time the modal opens
       if (defaultSubject) setSelectedSubject(defaultSubject);
       if (defaultGrade) setSelectedGrade(defaultGrade);
       if (defaultQuarter) {
@@ -113,8 +109,6 @@ export default function DepEdCurriculumPickerModal({
     onSelectCompetencies(finalItems);
     onClose();
   }
-
-  const totalSelectedDays = selectedItems.reduce((acc, curr) => acc + (curr.days || 5), 0);
 
   return (
     <div

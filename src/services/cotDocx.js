@@ -15,7 +15,6 @@ const R_COL    = PAGE_W - L_COL; // right content column = 7866
 
 const CM = { top: 60, bottom: 60, left: 80, right: 80 };
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'auto' };
-const THIN = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
 
 // ── Primitive helpers ─────────────────────────────────────────────────────────
 
@@ -299,12 +298,6 @@ export async function downloadCotDocx({ lessonMeta, plan, teacherProfile }) {
   });
 
   // ── Main content table ────────────────────────────────────────────────────
-  const objText = [
-    `a. ${objectives?.cognitive || ''}`,
-    `b. ${objectives?.affective || ''}`,
-    `c. ${objectives?.psychomotor || ''}`,
-  ].join('\n');
-
   const enabling = Array.isArray(enablingCompetencies)
     ? enablingCompetencies.map((e, i) => `${i + 1}. ${e}`).join('\n')
     : String(enablingCompetencies || '');
@@ -314,16 +307,6 @@ export async function downloadCotDocx({ lessonMeta, plan, teacherProfile }) {
   ).join('\n\n');
 
   const moodSetting = introduction?.moodSetting || {};
-  const moodText    = [
-    `Game Name: ${moodSetting.gameName || ''}`,
-    `Duration: ${moodSetting.duration || '5 minutes'}`,
-    moodSetting.objective ? `Objective: ${moodSetting.objective}` : '',
-    '',
-    moodSetting.instructions || '',
-    moodSetting.callAndResponse
-      ? `\n🎤 Teacher: ${moodSetting.callAndResponse.teacher}\n👥 Students: ${moodSetting.callAndResponse.students}`
-      : '',
-  ].filter(Boolean).join('\n');
 
   const introContent = [
     pBold('CLASSROOM ROUTINES (5 minutes)', 14),

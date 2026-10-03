@@ -25,9 +25,9 @@ export function PostComposer({ uid, displayName, initials, photoURL, school: def
   const [previews,    setPreviews]    = useState([]);
   const [title,       setTitle]       = useState('');
   const [caption,     setCaption]     = useState('');
-  const [school,      setSchool]      = useState(defaultSchool   || '');
-  const [gradeLevel,  setGradeLevel]  = useState(defaultGrade    || '');
-  const [subject,     setSubject]     = useState(defaultSubject  || '');
+  const [school]                     = useState(defaultSchool   || '');
+  const [gradeLevel]                 = useState(defaultGrade    || '');
+  const [subject]                    = useState(defaultSubject  || '');
   const [dragover,    setDragover]    = useState(false);
   const [fileError,   setFileError]   = useState('');
 

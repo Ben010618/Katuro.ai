@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
   query, orderBy, where, onSnapshot, serverTimestamp,
-  updateDoc, deleteDoc, arrayUnion, limit, startAfter,
+  updateDoc, deleteDoc, limit, startAfter,
   increment, runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -133,7 +133,7 @@ export async function deletePost(postId, authorUid, isAdmin = false) {
       const { getFunctions, httpsCallable } = await import('firebase/functions');
       const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteSharePost');
       await fn({ postId, authorUid });
-    } catch (fallbackErr) {
+    } catch {
       throw directErr;
     }
   }
@@ -385,7 +385,7 @@ export async function deleteComment(postId, commentId, isAdmin = false) {
       const { getFunctions, httpsCallable } = await import('firebase/functions');
       const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteShareComment');
       await fn({ postId, commentId });
-    } catch (fallbackErr) {
+    } catch {
       throw directErr;
     }
   }

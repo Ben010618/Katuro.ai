@@ -97,7 +97,7 @@ function Sheet({ numQ, numChoices, cols }) {
   const col1    = Array.from({ length: half },      (_, i) => i + 1);
   const col2    = Array.from({ length: numQ - half }, (_, i) => half + i + 1);
   const cfg     = getCfg(cols);
-  const { ans, fs } = cfg;
+  const { ans } = cfg;
   const ansColW = `calc(${ans.bub} + ${ans.gap})`;
 
   return (
@@ -218,16 +218,18 @@ export function BubbleSheetPreview({ numQ, numChoices, width = 300 }) {
 // ── Default export: full print modal ─────────────────────────────────────────
 
 export default function BubbleSheetPrint({ quiz, onClose, autoprint = false }) {
-  const { numQuestions, numChoices, title } = quiz;
+  const { numQuestions, numChoices } = quiz;
   const layout  = getLayout(numQuestions);
   const sheets  = Array.from({ length: layout.perPage });
 
   const portalEl   = useRef(null);
   const downloadRef = useRef(null);
+  /* eslint-disable react-hooks/refs -- lazily create the portal container once; it must exist during the first render */
   if (!portalEl.current) {
     portalEl.current = document.createElement('div');
     portalEl.current.id = 'bs-portal';
   }
+  /* eslint-enable react-hooks/refs */
 
   useEffect(() => {
     document.body.appendChild(portalEl.current);
@@ -403,6 +405,7 @@ export default function BubbleSheetPrint({ quiz, onClose, autoprint = false }) {
         </div>
       )}
     </>,
+    // eslint-disable-next-line react-hooks/refs -- portal container is created once and is stable for the component lifetime
     portalEl.current
   );
 }

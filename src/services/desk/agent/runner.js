@@ -4,7 +4,8 @@
  * and a failed task skips only the tasks that depend on it.
  */
 
-export const TASK_CONCURRENCY = 3;
+// 5 at once; llm.js backs off automatically if Gemini throttles.
+export const TASK_CONCURRENCY = 5;
 
 /**
  * tasks: [{ id, tool, args, dependsOn?: string[], label? }]

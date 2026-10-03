@@ -14,6 +14,7 @@ const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated }  = require('firebase-functions/v2/firestore');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
+const { createGeminiSseParser } = require('./lib/sse');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -38,6 +39,11 @@ const STATIC_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-
 const MODEL_CACHE_TTL = 60 * 60 * 1000; // 1h per instance
 
 let _modelCache = { name: null, at: 0 };
+// Separate cache for the `tier: 'fast'` resolver (newest flash-lite). `none`
+// marks "this key has no usable lite model" so discovery isn't repeated on
+// every fast call while that is true.
+let _liteModelCache = { name: null, none: false, at: 0 };
+const LITE_NEGATIVE_TTL = 5 * 60 * 1000;
 
 // ListModels is NOT proof a model is usable. Two distinct failures were seen
 // on 2026-08-25, both from models the API happily listed:
@@ -55,6 +61,7 @@ const _benchStrikes = new Map(); // model -> consecutive bench count
 
 function invalidateModelCache() {
   _modelCache = { name: null, at: 0 };
+  _liteModelCache = { name: null, none: false, at: 0 };
 }
 
 /**
@@ -164,7 +171,15 @@ async function listGeminiModels(key) {
  * can actually reach. `exclude` skips models already known to be dead this
  * request (a 404 on the resolved model re-resolves rather than giving up).
  */
-async function resolveGeminiModel(key, exclude = []) {
+async function resolveGeminiModel(key, exclude = [], { preferLite = false } = {}) {
+  // tier:'fast' — try the newest flash-lite first. Anything that goes wrong in
+  // the lite lookup (none listed, all benched/excluded, discovery failed)
+  // returns null and we fall through to the normal resolution below, so the
+  // fast tier can never be LESS available than the standard one.
+  if (preferLite) {
+    const lite = await resolveLiteGeminiModel(key, exclude);
+    if (lite) return lite;
+  }
   await loadSharedBench();
   const skip = id => exclude.includes(id) || isBenched(id);
 
@@ -213,6 +228,55 @@ async function resolveGeminiModel(key, exclude = []) {
   const fallback = STATIC_FALLBACK_MODELS.find(m => !skip(m)) || STATIC_FALLBACK_MODELS[0];
   _modelCache = { name: fallback, at: Date.now() };
   return fallback;
+}
+
+/**
+ * Lite-preferring resolver for `tier: 'fast'` (small JSON jobs: planning,
+ * layout recognition, column mapping, short remarks). Same authority order as
+ * resolveGeminiModel — the admin pin still wins, because a pin is how an admin
+ * steers ALL traffic away from a misbehaving model — then the newest
+ * `gemini-X.Y-flash-lite` from ListModels, then `gemini-flash-lite-latest`.
+ * Benched/excluded models are skipped exactly like the standard path, so a
+ * lite model that 404s/503s/stalls gets benched by callGeminiRaw and the next
+ * call moves on. Returns null when no lite model is usable.
+ */
+async function resolveLiteGeminiModel(key, exclude = []) {
+  await loadSharedBench();
+  const skip = id => exclude.includes(id) || isBenched(id);
+
+  if (!exclude.length && Date.now() - _liteModelCache.at < (_liteModelCache.none ? LITE_NEGATIVE_TTL : MODEL_CACHE_TTL)) {
+    if (_liteModelCache.none) return null;
+    if (_liteModelCache.name && !skip(_liteModelCache.name)) return _liteModelCache.name;
+  }
+
+  try {
+    const pinned = (await db.doc('adminConfig/gemini').get()).data()?.model;
+    if (pinned && !skip(pinned)) {
+      _liteModelCache = { name: pinned, none: false, at: Date.now() };
+      return pinned;
+    }
+  } catch {
+    // Firestore unreachable — fall through to discovery.
+  }
+
+  try {
+    const available = (await listGeminiModels(key)).filter(id => !skip(id));
+    const lite = available
+      .map(id => ({ id, s: scoreFlashModel(id) }))
+      .filter(x => x.s && x.s.lite)
+      .sort((a, b) => b.s.major - a.s.major || b.s.minor - a.s.minor);
+    const picked = lite[0]?.id || available.find(id => id === 'gemini-flash-lite-latest');
+    if (picked) {
+      console.info(`[resolveLiteGeminiModel] Using ${picked} for tier=fast${exclude.length ? ` (excluded: ${exclude.join(', ')})` : ''}`);
+      if (!exclude.length) _liteModelCache = { name: picked, none: false, at: Date.now() };
+      return picked;
+    }
+    console.warn('[resolveLiteGeminiModel] No usable flash-lite model — tier=fast uses the standard model.');
+  } catch (err) {
+    console.warn(`[resolveLiteGeminiModel] Discovery failed (${err.message}) — tier=fast uses the standard model.`);
+  }
+  if (!exclude.length) _liteModelCache = { name: null, none: true, at: Date.now() };
+  return null;
 }
 
 // ── Model capability matrix ───────────────────────────────────────────────────
@@ -484,9 +548,9 @@ function parseJSON(text, label) {
   const raw = m ? (m[1] ?? m[0]).trim() : text.trim();
   if (!raw) throw new HttpsError('internal', `AI returned no JSON for ${label}`);
   // Layer 1: direct parse
-  try { return JSON.parse(raw); } catch {}
+  try { return JSON.parse(raw); } catch { /* not valid JSON yet; try next repair layer */ }
   // Layer 2: trailing-comma strip (most common Gemini quirk)
-  try { return JSON.parse(stripTrailingCommas(raw)); } catch {}
+  try { return JSON.parse(stripTrailingCommas(raw)); } catch { /* still invalid; try next repair layer */ }
   // Layer 3: strip + dangling-quote / bracket close
   try {
     let s = raw.replace(/,(\s*[}\]])/g, '$1').trimEnd();
@@ -506,7 +570,7 @@ function parseJSON(text, label) {
     }
     s += stack.reverse().join('');
     return JSON.parse(s);
-  } catch {}
+  } catch { /* all repair layers failed; fall through to throw below */ }
   throw new HttpsError('internal', `AI returned malformed JSON for ${label}. Please try again.`);
 }
 
@@ -621,9 +685,33 @@ function effectivePlan(teacher, freeForAll, now = Date.now()) {
   return until === null || until >= now ? 'subscription' : 'free';
 }
 
+// Per-instance cache of each teacher's `access` field, so a burst of AI calls
+// (a KaTuroDesk turn fans out ~5 generateAI calls) costs one teachers/{uid}
+// read instead of one per call. Only `access` is cached — effectivePlan() is
+// still evaluated on every call, so the free-for-all switch (its own 5-min
+// cache, busted by adminSetFreeMode) and a subscription's expiry time apply
+// immediately. adminSetAccess deletes the entry on the instance that handles
+// it; OTHER warm instances may serve the old plan for up to PLAN_CACHE_TTL_MS
+// (60s) — acceptable for a daily-limit tier. The usage-counter transaction in
+// checkAndIncrementDailyUsage is deliberately NOT cached.
+const PLAN_CACHE_TTL_MS = 60 * 1000;
+const _planAccessCache = new Map(); // uid -> { access, expiresAt }
+
+function invalidatePlanCache(uid) {
+  _planAccessCache.delete(uid);
+}
+
 async function getPlan(uid) {
+  const now = Date.now();
+  const cached = _planAccessCache.get(uid);
+  if (cached && cached.expiresAt > now) {
+    return effectivePlan({ access: cached.access }, await isFreeForAll(), now);
+  }
   const [teacherSnap, freeForAll] = await Promise.all([db.doc(`teachers/${uid}`).get(), isFreeForAll()]);
-  return effectivePlan(teacherSnap.data(), freeForAll);
+  const teacher = teacherSnap.data();
+  if (_planAccessCache.size > 5000) _planAccessCache.clear(); // bound memory on a long-lived instance
+  _planAccessCache.set(uid, { access: teacher?.access ?? null, expiresAt: now + PLAN_CACHE_TTL_MS });
+  return effectivePlan(teacher, freeForAll, now);
 }
 
 function dailyLimitFor(action, plan) {
@@ -1006,19 +1094,37 @@ function geminiBudgetMs(maxTokens) {
   return Math.min(GEMINI_MAX_BUDGET_MS, Math.max(GEMINI_MIN_BUDGET_MS, scaled));
 }
 
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, model, _attempt = 0, deadlineAt, overallDeadlineAt, _tried = [] } = {}) {
-  const activeModel = model || await resolveGeminiModel(key, _tried);
-  // PREVENTIVE: Only add thinkingConfig for models that support it — sending it
-  // to a model that doesn't causes HTTP 400. Also: thinkingConfig is
-  // incompatible with responseMimeType=application/json on most models — omit
-  // it entirely when a JSON response is requested.
-  const effectiveMaxTokens = withThinkingHeadroom(maxTokens);
-  const genConfig = {
+// PREVENTIVE: Only add thinkingConfig for models that support it — sending it
+// to a model that doesn't causes HTTP 400. Also: thinkingConfig is
+// incompatible with responseMimeType=application/json on most models — omit
+// it entirely when a JSON response is requested.
+//
+// tier:'fast' DECISION (2026-10-03): fast calls get NO extra thinkingConfig.
+// The rules above already decide it, and they are the only evidence this file
+// has: (a) supportsThinking() is a fail-closed allow-list of 2.5 models —
+// flash-lite models are not on it, and the headroom comment below records
+// thinkingBudget:0 returning HTTP 400 on gemini-3.6-flash; (b) fast calls are
+// JSON jobs, and thinkingConfig is omitted with responseMimeType JSON. Lite
+// models do not think by default, so nothing is consumed anyway. Forcing
+// thinkingBudget:0 here could only add a 400 risk, so fast == standard config.
+function buildGenerationConfig(activeModel, { temperature, maxTokens, responseMimeType }) {
+  return {
     temperature,
-    maxOutputTokens: effectiveMaxTokens,
+    maxOutputTokens: withThinkingHeadroom(maxTokens),
     ...(supportsThinking(activeModel) && !responseMimeType ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
     ...(responseMimeType ? { responseMimeType } : {}),
   };
+}
+
+// preferLite (tier:'fast'): only the FIRST attempt prefers flash-lite. Every
+// model-switch below passes preferLite:false, so a lite model that 404s / 503s /
+// stalls / hits its daily cap is benched (by the same logic as any model) and
+// the request continues on the normal standard model — a bad lite model can
+// cost one attempt, never the whole call.
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, preferLite = false, model, _attempt = 0, deadlineAt, overallDeadlineAt, _tried = [] } = {}) {
+  const activeModel = model || await resolveGeminiModel(key, _tried, { preferLite });
+  const effectiveMaxTokens = withThinkingHeadroom(maxTokens);
+  const genConfig = buildGenerationConfig(activeModel, { temperature, maxTokens, responseMimeType });
 
   // BUG-FIX: a flat 20s abort (60s above 8k tokens) aborted essentially every
   // real generation — Gemini's non-streaming generateContent only returns once
@@ -1080,7 +1186,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
       benchModel(activeModel, CONGESTED_COOLDOWN_MS);
       if (tried.length < 4 && overallEndsAt - Date.now() > 20000) {
         console.warn(`[callGeminiRaw] ${activeModel} stalled — switching model (tried: ${tried.join(', ')})`);
-        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
       }
     }
 
@@ -1101,7 +1207,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     benchModel(activeModel, RETIRED_COOLDOWN_MS);
     if (tried.length < 4) {
       console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 (retired) — re-resolving (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt, overallDeadlineAt: overallEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt, overallDeadlineAt: overallEndsAt, _tried: tried });
     }
   }
 
@@ -1118,7 +1224,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     benchModel(activeModel, CONGESTED_COOLDOWN_MS);
     if (tried.length < 4) {
       console.warn(`[callGeminiRaw] Model ${activeModel} is congested (503) — switching model (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
     }
   }
 
@@ -1147,13 +1253,13 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
       benchModel(activeModel, MAX_COOLDOWN_MS);
       if (tried.length < 4) {
         console.warn(`[callGeminiRaw] ${activeModel} hit its per-day quota (${quotaId}) — switching model (tried: ${tried.join(', ')})`);
-        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
       }
     } else if (_attempt < 3) {
       const delay = (2 ** _attempt) * 1000 + Math.random() * 500; // 1s, 2s, 4s + jitter
       if (budgetEndsAt - Date.now() > delay + 5000) {
         await new Promise(r => setTimeout(r, delay));
-        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, overallDeadlineAt: overallEndsAt, _tried });
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite, model: activeModel, _attempt: _attempt + 1, deadlineAt: budgetEndsAt, overallDeadlineAt: overallEndsAt, _tried });
       }
     }
   }
@@ -1203,15 +1309,153 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   return { text, finishReason: candidate?.finishReason ?? null };
 }
 
+function geminiStreamUrl(key, model) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`;
+}
+
+/**
+ * Streams one Gemini generation to a streaming callable client.
+ *
+ * Outcomes:
+ *   { result: { text, finishReason } }  — success (possibly ended by an error
+ *                                         AFTER Gemini reported finishReason)
+ *   { fallback: true, overallEndsAt }   — failed BEFORE any chunk reached the
+ *                                         client; generateAI re-runs the normal
+ *                                         callGeminiRaw path (model switching +
+ *                                         NVIDIA) inside the same overall budget
+ *   throws HttpsError                    — client disconnected ('cancelled'), or
+ *                                         the stream broke mid-way with no
+ *                                         finishReason ('internal', flagged
+ *                                         midStream so generateAI does not run a
+ *                                         second engine after chunks were shown)
+ *
+ * Time budget: same per-model/overall budget as callGeminiRaw's first attempt,
+ * applied to the WHOLE stream (connect + body) via AbortSignal, combined with
+ * the callable's own signal so a client disconnect also stops the Gemini fetch.
+ */
+async function streamGeminiToClient(key, contents, res, { temperature, maxTokens, responseMimeType, preferLite = false }) {
+  const overallEndsAt = Date.now() + OVERALL_GEMINI_MS;
+  const fallback = { fallback: true, overallEndsAt };
+  const clientSignal = res?.signal;
+  const clientGone = () => Boolean(clientSignal?.aborted);
+  const cancelled = () => new HttpsError('cancelled', 'The request was cancelled by the client.');
+
+  let activeModel;
+  try {
+    activeModel = await resolveGeminiModel(key, [], { preferLite });
+  } catch {
+    return fallback;
+  }
+  const genConfig = buildGenerationConfig(activeModel, { temperature, maxTokens, responseMimeType });
+  const perModelCapMs = Math.max(45000, Math.floor((overallEndsAt - Date.now()) * 0.5));
+  const budgetMs = Math.min(geminiBudgetMs(withThinkingHeadroom(maxTokens)), perModelCapMs);
+  const timeoutSignal = AbortSignal.timeout(budgetMs);
+  const signal = clientSignal ? AbortSignal.any([timeoutSignal, clientSignal]) : timeoutSignal;
+
+  let sentAny = false;
+  const parser = createGeminiSseParser();
+  const midStreamError = (message) => {
+    const e = new HttpsError('internal', message);
+    e.midStream = true;
+    return e;
+  };
+
+  let response;
+  try {
+    response = await fetch(geminiStreamUrl(key, activeModel), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents, generationConfig: genConfig }),
+      signal,
+    });
+  } catch (err) {
+    if (clientGone()) throw cancelled();
+    if (timeoutSignal.aborted) benchModel(activeModel, CONGESTED_COOLDOWN_MS); // stall == congested, as in callGeminiRaw
+    console.warn(`[streamGemini] connect failed for ${activeModel} (${err?.name || err?.message}) — falling back to non-streaming`);
+    return fallback;
+  }
+
+  if (!response.ok || !response.body) {
+    // Mirror callGeminiRaw's benching for the unambiguous model-level failures
+    // so the non-streaming retry resolves straight to a different model. 429 and
+    // everything else are left for callGeminiRaw to classify on its own call.
+    if (response.status === 404) benchModel(activeModel, RETIRED_COOLDOWN_MS);
+    else if (response.status === 503) benchModel(activeModel, CONGESTED_COOLDOWN_MS);
+    console.warn(`[streamGemini] ${activeModel} returned ${response.status} before streaming — falling back to non-streaming`);
+    try { await response.body?.cancel(); } catch { /* body already closed */ }
+    return fallback;
+  }
+
+  const decoder = new TextDecoder();
+  try {
+    const reader = response.body.getReader();
+    for (;;) {
+      const { value, done } = await reader.read();
+      const events = done ? parser.end() : parser.push(decoder.decode(value, { stream: true }));
+      for (const ev of events) {
+        if (ev.error) {
+          throw new Error(`Gemini stream error: ${ev.error.message || ev.error.status || 'unknown'}`);
+        }
+        if (ev.text) {
+          sentAny = true;
+          await res.sendChunk({ text: ev.text });
+        }
+      }
+      if (done) break;
+    }
+  } catch (err) {
+    if (clientGone()) throw cancelled();
+    if (!sentAny) {
+      if (timeoutSignal.aborted) benchModel(activeModel, CONGESTED_COOLDOWN_MS);
+      console.warn(`[streamGemini] ${activeModel} failed before the first chunk (${err?.message}) — falling back to non-streaming`);
+      return fallback;
+    }
+    if (parser.finishReason) {
+      console.warn(`[streamGemini] ${activeModel} errored after finishReason=${parser.finishReason} — returning what was streamed`);
+      return { result: { text: parser.text, finishReason: parser.finishReason } };
+    }
+    console.error(`[streamGemini] ${activeModel} broke mid-stream (${err?.message})`);
+    throw midStreamError(
+      timeoutSignal.aborted
+        ? `The AI stopped responding mid-reply (${activeModel}). Please try again.`
+        : `The AI reply was interrupted mid-stream (${activeModel}): ${err?.message || 'connection lost'}. Please try again.`
+    );
+  }
+
+  if (!sentAny && !parser.finishReason) {
+    console.warn(`[streamGemini] ${activeModel} closed the stream with no output — falling back to non-streaming`);
+    return fallback;
+  }
+  if (!parser.finishReason) {
+    throw midStreamError(`The AI reply stream from ${activeModel} ended without finishing. Please try again.`);
+  }
+  clearBenchStrikes(activeModel);
+  return { result: { text: parser.text, finishReason: parser.finishReason } };
+}
+
 exports.generateAI = onCall(
   // BUG-FIX: COT and Action Research plans need up to ~250s — raised from 120s
   // to 300s so DEADLINE_EXCEEDED never interrupts a legitimate generation.
   // 512MiB memory prevents OOM on large parallel slide expansions.
-  { region: 'us-central1', timeoutSeconds: 300, memory: '512MiB' },
-  async (req) => {
+  //
+  // Deployed to TWO regions: asia-southeast1 (Singapore — closest to PH
+  // teachers, used opt-in by KaTuroDesk via the client `region` option) and
+  // us-central1 (every existing caller, unchanged). firebase-functions v7
+  // HttpsOptions.region accepts an array for HTTP/callable functions. Both
+  // regions share this one handler, Firestore and the per-user daily counters.
+  { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 300, memory: '512MiB' },
+  // `res` (CallableResponse: sendChunk/signal) is only used for opt-in streaming.
+  async (req, res) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
     const { action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount } = req.data || {};
+    // Opt-in, additive request fields (absent = exactly the previous behavior):
+    //   tier:   'fast' -> prefer the newest flash-lite model; anything else = standard
+    //   stream: true   -> stream text deltas via res.sendChunk({ text }) when the
+    //                     client used httpsCallable(...).stream(); the return
+    //                     value is the same { text, finishReason } either way
+    const preferLite = req.data?.tier === 'fast';
+    const wantsStream = req.data?.stream === true && req.acceptsStreaming === true && typeof res?.sendChunk === 'function';
 
     if (!action || !(action in PROXY_LIMITS)) {
       throw new HttpsError('invalid-argument', 'Unknown or missing action.');
@@ -1247,12 +1491,31 @@ exports.generateAI = onCall(
     try {
       const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task';
       const key = await getGeminiKey(isDesk);
+      let overallDeadlineAt;
+      if (wantsStream) {
+        const streamed = await streamGeminiToClient(key, contents, res, {
+          temperature: temperature ?? 0.5,
+          maxTokens: clampedMaxTokens,
+          responseMimeType,
+          preferLite,
+        });
+        if (streamed.result) return streamed.result;
+        // Failed before any chunk was sent: the normal path below runs inside
+        // the SAME overall Gemini budget, so the NVIDIA fallback still fits.
+        overallDeadlineAt = streamed.overallEndsAt;
+      }
       return await callGeminiRaw(key, contents, {
         temperature: temperature ?? 0.5,
         maxTokens: clampedMaxTokens,
         responseMimeType,
+        preferLite,
+        ...(overallDeadlineAt ? { overallDeadlineAt } : {}),
       });
     } catch (geminiErr) {
+      // Partial text already reached the client, or the client hung up: running
+      // a second engine now would only produce a reply nobody sees (cancelled)
+      // or one that contradicts what was already shown (midStream).
+      if (geminiErr?.midStream || geminiErr?.code === 'cancelled') throw geminiErr;
       console.warn(`[generateAI] Gemini call failed for action "${action}". Checking NVIDIA fallback:`, geminiErr.message);
       const nvidiaConfig = await getNvidiaConfigServer();
       if (nvidiaConfig?.apiKey) {
@@ -1643,6 +1906,9 @@ exports.adminSetAccess = onCall(
     if (!snap.exists) throw new HttpsError('not-found', 'Teacher not found.');
     const access = buildAccess(plan, subscriptionUntil, req.auth.uid, note);
     await ref.update({ access, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    // Only clears THIS instance's cached plan; other instances expire theirs
+    // within PLAN_CACHE_TTL_MS (60s). See getPlan.
+    invalidatePlanCache(uid);
     await db.collection(`teachers/${uid}/accessLogs`).add({
       plan: access.mode,
       subscriptionUntil: access.subscriptionUntil,

@@ -158,6 +158,7 @@ export default function DashboardPage() {
       const name        = profile.name        || '';
       const designation = profile.designation || '';
       const school      = profile.school      || '';
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init of the form from the async-loaded profile
       setForm({ name, designation, school });
       setProfileInit(true);
       if (name)        localStorage.setItem('teacherName',        name);

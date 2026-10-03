@@ -15,10 +15,6 @@ function proficiencyLevel(avg) {
   return 'A';
 }
 
-function proficiencyLabel(code) {
-  return { B: 'Beginning', D: 'Developing', AP: 'Approaching Proficiency', P: 'Proficient', A: 'Advanced' }[code] || '';
-}
-
 function descriptiveLetter(avg) {
   if (!avg) return '';
   if (avg >= 90) return 'Outstanding';
@@ -45,7 +41,6 @@ const TD = {
   height: 17, color: '#000',
 };
 const TD_LEFT = { ...TD, textAlign: 'left' };
-const TH_GRAY2 = { ...TH, background: '#BFBFBF' };
 
 // ── DepEd logo placeholder ────────────────────────────────────────────────────
 
@@ -93,7 +88,6 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
   const femaleP    = femaleStudents.filter(s => s.ga !== null && s.ga >= 75).length;
   const femaleR    = femaleStudents.filter(s => s.ga !== null && s.ga < 75).length;
 
-  const profCodes = ['B', 'D', 'AP', 'P', 'A'];
   const profCount = (gender, code) => {
     const pool = gender === 'M' ? maleStudents : gender === 'F' ? femaleStudents : studentRows;
     return pool.filter(s => proficiencyLevel(s.ga) === code).length;

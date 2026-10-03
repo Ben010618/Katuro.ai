@@ -115,6 +115,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
     attachedPaths,
     toggleAttachment,
     importFiles,
+    indexStatus,
   } = useDeskStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
@@ -298,7 +299,11 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
               {workspace?.name || 'My DepEd Lessons'}
             </h2>
             <p className="text-[9.5px] text-[#9eb6a6] truncate">
-              {workspace?.isVirtual ? 'Demo files · open your real folder' : `${fileCount} files · stays on this PC`}
+              {workspace?.isVirtual
+                ? 'Demo files · open your real folder'
+                : indexStatus?.running && indexStatus.total > 0
+                  ? `Reading files… ${indexStatus.done}/${indexStatus.total}`
+                  : `${fileCount} files · stays on this PC`}
             </p>
           </div>
           <button

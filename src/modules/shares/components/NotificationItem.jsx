@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import { timeAgo, avatarColor } from '../services/sharesService';
+import { timeAgo } from '../services/sharesService';
 
 const ICONS = {
   follow:   '👤',
@@ -17,7 +17,6 @@ const LABELS = {
 };
 
 export function NotificationItem({ notif, onRead }) {
-  const bg = avatarColor(notif.fromUid || '');
 
   function handleClick() {
     if (!notif.read) onRead?.(notif.id);

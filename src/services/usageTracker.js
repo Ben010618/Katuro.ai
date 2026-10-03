@@ -10,7 +10,7 @@ export async function trackEvent(uid, feature, meta = {}) {
       ts: serverTimestamp(),
       ...meta,
     });
-  } catch (_) {
+  } catch {
     // analytics must never surface errors to the user
   }
 }

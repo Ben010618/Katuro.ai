@@ -17,7 +17,7 @@ function fmtSize(bytes) {
 }
 
 /** Compact file index for the planner: attached/active first, then most recent. */
-export function buildFileIndex(files, { attachedPaths = [], activePath } = {}) {
+export function buildFileIndex(files, { attachedPaths = [], activePath, describe } = {}) {
   // Backups are snapshots, never sources — keep them out of the AI's view of the folder.
   const flat = flattenFileTree(files).filter((f) => !f.path.startsWith('KaTuro Backups/'));
   const priority = new Set([...attachedPaths, activePath].filter(Boolean).map((p) => p.toLowerCase()));
@@ -28,7 +28,15 @@ export function buildFileIndex(files, { attachedPaths = [], activePath } = {}) {
     return (b.lastModified || 0) - (a.lastModified || 0);
   });
   const shown = sorted.slice(0, MAX_INDEX_ENTRIES);
-  const lines = shown.map((f) => `${f.path}${f.size ? ` (${fmtSize(f.size)})` : ''}`);
+  const lines = shown.map((f) => {
+    let info;
+    try {
+      info = describe?.(f.path) || '';
+    } catch {
+      info = '';
+    }
+    return `${f.path}${f.size ? ` (${fmtSize(f.size)})` : ''}${info ? ` — ${info}` : ''}`;
+  });
   if (flat.length > shown.length) lines.push(`(… ${flat.length - shown.length} older files not listed)`);
   return { text: lines.join('\n'), count: flat.length };
 }
@@ -163,6 +171,38 @@ export function planOffline(prompt, { attachedPaths = [], activePath, flatFiles 
     return [mk('convert_to_pdf', { paths: convertible }, 'Convert to PDF', 0)];
   }
   return [];
+}
+
+/**
+ * Reads the "reply" string out of a planner JSON reply that is still streaming in
+ * (e.g. '{"reply": "Sige Sir! I will an'), so the chat can show it word by word.
+ * Returns null until the reply value has started.
+ */
+export function extractPartialReply(jsonPrefix) {
+  const s = String(jsonPrefix || '');
+  const m = s.match(/"reply"\s*:\s*"/);
+  if (!m) return null;
+  let out = '';
+  for (let i = m.index + m[0].length; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"') return out;
+    if (c !== '\\') {
+      out += c;
+      continue;
+    }
+    const n = s[i + 1];
+    if (n === undefined) break; // escape split across chunks — wait for more
+    if (n === 'u') {
+      const hex = s.slice(i + 2, i + 6);
+      if (hex.length < 4) break;
+      out += String.fromCharCode(parseInt(hex, 16));
+      i += 5;
+    } else {
+      out += { n: '\n', t: '\t', r: '', b: '', f: '' }[n] ?? n;
+      i += 1;
+    }
+  }
+  return out;
 }
 
 export { TOOL_NAMES };

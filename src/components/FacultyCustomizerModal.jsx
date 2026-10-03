@@ -20,7 +20,7 @@ export default function FacultyCustomizerModal({ isOpen, onClose }) {
   const [editingName, setEditingName] = useState('');
   const [editingAvatar, setEditingAvatar] = useState('');
   const [editingTone, setEditingTone] = useState('');
-  const [customSeed, setCustomSeed] = useState('');
+  const [, setCustomSeed] = useState('');
   const [avatarCategory, setAvatarCategory] = useState('all');
   const [savedSuccess, setSavedSuccess] = useState(false);
 

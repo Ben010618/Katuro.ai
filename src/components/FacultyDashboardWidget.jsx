@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFacultyStore } from '../store/facultyStore';
 import FacultyCustomizerModal from './FacultyCustomizerModal';
-import { Users, Settings2, ArrowRight, Sparkles } from 'lucide-react';
+import { Users, Settings2, ArrowRight } from 'lucide-react';
 
 export default function FacultyDashboardWidget() {
   const { faculty } = useFacultyStore();

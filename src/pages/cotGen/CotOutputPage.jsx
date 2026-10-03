@@ -47,16 +47,6 @@ function Section({ title, icon, color = '#7c3aed', children, defaultOpen = true 
   );
 }
 
-function Chip({ label, color = '#7c3aed', bg = '#f3e8ff' }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      background: bg, color, borderRadius: 6, padding: '3px 10px',
-      fontSize: 11, fontWeight: 700,
-    }}>{label}</span>
-  );
-}
-
 function ObjectiveCard({ domain, text, color, bg }) {
   return (
     <div style={{ background: bg, borderRadius: 10, padding: '12px 14px' }}>
@@ -163,7 +153,7 @@ export default function CotOutputPage() {
     try {
       let teacherProfile = null;
       if (user?.uid) {
-        try { teacherProfile = await getTeacherProfile(user.uid); } catch {}
+        try { teacherProfile = await getTeacherProfile(user.uid); } catch { /* profile optional; export proceeds without it */ }
       }
       const { downloadCotDocx } = await import('../../services/cotDocx');
       await downloadCotDocx({

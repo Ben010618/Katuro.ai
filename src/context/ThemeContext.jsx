@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- context hook co-located with its provider; only affects dev HMR
 export function useTheme() {
   return useContext(ThemeContext);
 }

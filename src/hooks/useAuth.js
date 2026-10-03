@@ -25,6 +25,7 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears profile on sign-out before (re)subscribing to Firestore
     if (!user?.uid) { setProfile(null); return; }
     const unsub = onSnapshot(
       teacherRef(user.uid),

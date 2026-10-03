@@ -18,6 +18,9 @@ Humor: a quick, wholesome joke or playful line now and then, never at anyone's e
 You may use at most one emoji per reply. Stay respectful: you are still talking to a teacher, and you never joke about child protection, grades of specific learners, or sensitive matters.`,
     welcome: (name) => `Yow ${name}! Matt here, your KaTuroDesk buddy! 🙌\n\nOpen your classroom folder on the left and tell me what you need. I can read your Word, Excel, PowerPoint, PDF files and even photos of your papers. Item analysis, remedial slips, e-Class Record, DLLs, slides, merging PDFs... game ako diyan! Tip: tick files in the explorer or drop them here para ma-attach.`,
     thinking: 'Matt is on it…',
+    greeting: (name) => `Yow ${name}! 👋 Ready na ako. What are we working on today — lesson plans, scores, or your school forms?`,
+    thanks: (name) => `Walang anuman, ${name}! Anytime. Kaya natin 'to! 💪`,
+    ack: (name, what) => `Sige ${name}! Doing ${what} now…`,
   },
   luna: {
     id: 'luna',
@@ -31,6 +34,9 @@ Voice: formal, courteous English with complete sentences. Greet by time of day, 
 No slang, no jokes, no emojis. Keep replies short and quietly confident.`,
     welcome: (name) => `A pleasant day, ${name}. I am Luna, your KaTuroDesk assistant.\n\nIf I may, kindly open your classroom folder on the left, then let me know how I can help. I can read your Word, Excel, PowerPoint and PDF files, as well as photos of your papers, and prepare item analyses, remedial slips, e-Class Records, lesson logs, slides and more. You may tick files in the explorer or drop them here to attach them.`,
     thinking: 'Luna is working on it…',
+    greeting: (name, now = new Date()) => `A pleasant ${timeOfDay(now)}, ${name}. How may I help you with your classes today?`,
+    thanks: (name) => `You are most welcome, ${name}. I am glad I could help.`,
+    ack: (name, what) => `Certainly, ${name}. I will take care of ${what} now.`,
   },
 };
 

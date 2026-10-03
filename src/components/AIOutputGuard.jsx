@@ -20,6 +20,7 @@ export default function AIOutputGuard({ feature = 'unknown', inputContext = {} }
     if (inputContext.competencyText)   codes.push(inputContext.competencyText);
     if (!codes.length || !inputContext.subject) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- marks MELC status as checking right before the async validation request
     setMelcStatus('checking');
     validateMelcCode({
       subject:    inputContext.subject,
@@ -50,7 +51,8 @@ export default function AIOutputGuard({ feature = 'unknown', inputContext = {} }
       });
       setSent(true);
       setTimeout(() => { setShowForm(false); setSent(false); setMessage(''); }, 2500);
-    } catch (_e) {
+    } catch {
+      // best-effort report; failure is ignored silently
     } finally {
       setSending(false);
     }

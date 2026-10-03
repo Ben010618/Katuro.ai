@@ -16,6 +16,7 @@ export function useFollow(myUid, targetUid, myName = '') {
 
   useEffect(() => {
     if (!myUid || !targetUid || myUid === targetUid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- ends loading early when there is no follow relationship to fetch
       setLoading(false);
       return;
     }
@@ -38,7 +39,7 @@ export function useFollow(myUid, targetUid, myName = '') {
         await notifyFollow(myUid, myName, targetUid).catch(() => {});
         trackEvent(myUid, 'shares_follow_added');
       }
-    } catch (_) {
+    } catch {
       setFollowing(wasFollowing);
     } finally {
       setWorking(false);

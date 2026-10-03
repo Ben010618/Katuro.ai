@@ -1,4 +1,4 @@
-import { ChevronRight, ArrowLeft, Download, Loader2, Sparkles, Check } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Download, Loader2, Check } from 'lucide-react';
 import ktLogo from '../assets/KT-Favicon.webp';
 import DownloadProgress from './DownloadProgress';
 import CoTeacherBanner from './CoTeacherBanner';

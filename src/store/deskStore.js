@@ -12,7 +12,18 @@ import {
   saveWorkingCopy,
 } from '../services/localFileSystem';
 
+import { createFileIndex } from '../services/desk/index/fileIndex';
+
 export const IMPORTS_ROOT = 'KaTuro Imports';
+
+// One background index per app window: reads every file once and caches it on this PC,
+// so the agent never re-parses unchanged files and the planner sees what each file is.
+export const folderIndex = createFileIndex();
+
+function workspaceIdOf(ws) {
+  if (!ws) return '';
+  return ws.rootPath || (ws.isVirtual ? `virtual:${ws.name}` : `fsa:${ws.name}`);
+}
 
 const INITIAL_WELCOME_MESSAGE = {
   id: 'msg-welcome',
@@ -50,17 +61,40 @@ export const useDeskStore = create(
       messages: [INITIAL_WELCOME_MESSAGE],
       isGenerating: false,
 
+      // Background folder indexing progress: { running, done, total, failed }
+      indexStatus: { running: false, done: 0, total: 0, failed: 0 },
+
       // Outputs produced this session + what the Canvas shows
       artifacts: [],
       activeArtifact: null, // an output artifact, or { type: 'preview', path, title } for a workspace file
 
       // Actions
-      setWorkspace: (ws) => set({ workspace: ws, activeFile: null, attachedPaths: [] }),
+      setWorkspace: (ws) => {
+        set({ workspace: ws, activeFile: null, attachedPaths: [] });
+        get().startFolderIndex();
+      },
+
+      /** (Re)indexes the current folder in the background; cheap when nothing changed. */
+      startFolderIndex: () => {
+        const { workspace } = get();
+        if (!workspace?.handle) return Promise.resolve();
+        set({ indexStatus: { running: true, done: 0, total: 0, failed: 0 } });
+        const run = folderIndex.start({
+          workspaceId: workspaceIdOf(workspace),
+          files: workspace.files || [],
+          handle: workspace.handle,
+          onProgress: ({ done, total }) => set({ indexStatus: { ...folderIndex.status(), done, total, running: true } }),
+        });
+        return run.then(() => set({ indexStatus: { ...folderIndex.status(), running: false } }));
+      },
 
       restoreLastWorkspace: async () => {
         try {
           const ws = await reopenLastDirectory();
-          if (ws) set({ workspace: ws, activeFile: null, attachedPaths: [] });
+          if (ws) {
+            set({ workspace: ws, activeFile: null, attachedPaths: [] });
+            get().startFolderIndex();
+          }
           return Boolean(ws);
         } catch (err) {
           console.warn('Could not reopen last folder:', err);
@@ -74,6 +108,7 @@ export const useDeskStore = create(
         try {
           const updatedTree = await readDirectoryRecursively(workspace.handle);
           set((state) => ({ workspace: { ...state.workspace, files: updatedTree } }));
+          get().startFolderIndex();
         } catch (err) {
           console.error('Failed to refresh files:', err);
         }

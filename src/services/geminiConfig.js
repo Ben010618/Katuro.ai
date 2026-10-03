@@ -161,7 +161,22 @@ export async function geminiWithRetry(url, opts, attempt = 0) {
  * "Gemini is rate-limited" and "you've hit today's limit" (existing retry
  * loops already treat 429 as "back off, maybe retry"), plus `.dailyLimit ===
  * true` specifically for the daily-limit case so a caller can skip retrying
- * something that won't clear up in the next few seconds.
+ * something that won't clear up in the next few seconds. The original Firebase
+ * error `code` (e.g. 'functions/resource-exhausted') and `details` are also
+ * attached as `e.code` / `e.details`.
+ *
+ * Opt-in options (omit them and the call is exactly what it always was):
+ *   tier     'fast' | 'standard' — forwarded; 'fast' makes the server prefer a
+ *            flash-lite model (small JSON jobs). An older deployed function
+ *            ignores it.
+ *   stream + onChunk(deltaText, fullTextSoFar) — streams the reply through
+ *            httpsCallable(...).stream(); still resolves { text, finishReason }.
+ *            Falls back to the normal call when streaming is unavailable. An
+ *            older deployed function simply sends no chunks, only the result.
+ *   region   default 'us-central1'. Any other region (e.g. 'asia-southeast1')
+ *            is tried first; if the function isn't deployed there, the call is
+ *            retried once on us-central1 and that region is skipped for the
+ *            rest of the session.
  */
 function extractPrompt(contents) {
   if (typeof contents === 'string') return contents;
@@ -179,7 +194,43 @@ function extractPrompt(contents) {
     .join('\n\n');
 }
 
-export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs }) {
+// Regions where generateAI turned out not to be deployed this session (see
+// the `region` option). Module-level on purpose: one discovery per page load.
+const _unavailableRegions = new Set();
+const DEFAULT_REGION = 'us-central1';
+
+const STREAM_NO_RESULT = Symbol('stream-no-result');
+
+/** Firebase-shaped error (the catch path only reads code/message/details). */
+function callableError(code, message, details) {
+  const e = new Error(message || code.replace('functions/', ''));
+  e.code = code;
+  if (details !== undefined) e.details = details;
+  return e;
+}
+
+function isFunctionsError(err) {
+  return typeof err?.code === 'string' && err.code.startsWith('functions/');
+}
+
+/**
+ * Did this failure come from the function simply not existing in that region?
+ *   not-found — the callable endpoint 404'd: certainly never reached the handler.
+ *   internal/unavailable with a bare code-shaped message — no error body came
+ *     back (a missing function's 404 page carries no CORS headers, so the SDK
+ *     sees a network failure). Ambiguous: could also be a crash, see below.
+ * Errors our handler raises always carry a descriptive message, so they never
+ * match and are never retried in another region.
+ */
+function looksLikeMissingRegion(err) {
+  const code = err?.code || '';
+  if (code === 'functions/not-found') return true;
+  const raw = (err?.message || '').toLowerCase();
+  const generic = !raw || raw === code.replace('functions/', '').toLowerCase();
+  return (code === 'functions/internal' || code === 'functions/unavailable') && generic;
+}
+
+export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs, tier, stream = false, onChunk, region }) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   // BUG-FIX: the client used to give up after 50s on every non-COT action.
   // That is SHORTER than the time the server legitimately needs to write a
@@ -192,10 +243,117 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
   const serverBudgetMs = Math.min(180000, Math.max(45000, 30000 + (Number(maxTokens) || 2048) * 10));
   const effectiveTimeout = timeoutMs
     ?? (isHeavy ? 300000 : Math.min(300000, serverBudgetMs + 100000));
-  const call = httpsCallable(getFunctions(app, 'us-central1'), 'generateAI', { timeout: effectiveTimeout });
-  try {
-    const res = await call({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount });
+
+  const wantStream = stream === true && typeof onChunk === 'function';
+  // New fields are only added when used, so a legacy call sends exactly the
+  // same payload as before.
+  const payload = { action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount };
+  if (tier) payload.tier = tier;
+  if (wantStream) payload.stream = true;
+
+  // Streaming path. Returns { text, finishReason }, or { unavailable: true,
+  // data } when the normal call should be used instead (with the payload to
+  // send — isRetry is forced on if the stream attempt may already have been
+  // charged). Throws Firebase-shaped errors
+  // (code/message/details) so the shared catch below treats them exactly like
+  // a non-streaming failure.
+  const callStreaming = async (call, data) => {
+    if (typeof call.stream !== 'function' || typeof ReadableStream === 'undefined') {
+      return { unavailable: true, data };
+    }
+    // .stream() ignores the callable's `timeout` option, so enforce the same
+    // budget with an AbortSignal and report it the way the SDK reports a
+    // non-streaming timeout (deadline-exceeded).
+    const timeoutCtl = new AbortController();
+    const timer = setTimeout(() => timeoutCtl.abort(), effectiveTimeout);
+    let full = '';
+    let gotChunk = false;
+    const fail = (err) => {
+      if (timeoutCtl.signal.aborted) return callableError('functions/deadline-exceeded', 'deadline-exceeded');
+      if (gotChunk) err.afterChunk = true; // the function exists: never retry another region
+      return err;
+    };
+    try {
+      let result;
+      try {
+        result = await call.stream(data, { signal: timeoutCtl.signal });
+      } catch (err) {
+        if (isFunctionsError(err) || timeoutCtl.signal.aborted) throw fail(err);
+        // Non-HTTP failure (old SDK shape, no response body support...). The
+        // request may already have reached the server, so the normal call is
+        // marked isRetry: worst case one call goes uncharged, never twice.
+        console.warn('[callGeminiProxy] Streaming unavailable, using the normal call:', err);
+        return { unavailable: true, data: { ...data, isRetry: true } };
+      }
+      const finalData = Promise.resolve(result.data);
+      finalData.catch(() => {}); // observed below; avoid an unhandled rejection if we bail early
+      try {
+        for await (const chunk of result.stream) {
+          const delta = typeof chunk?.text === 'string' ? chunk.text : '';
+          if (!delta) continue;
+          full += delta;
+          gotChunk = true;
+          try {
+            onChunk(delta, full);
+          } catch (cbErr) {
+            // A rendering bug in the caller must not abort the generation.
+            console.warn('[callGeminiProxy] onChunk threw:', cbErr);
+          }
+        }
+      } catch (err) {
+        if (isFunctionsError(err) || timeoutCtl.signal.aborted || gotChunk) {
+          throw fail(isFunctionsError(err) ? err : callableError('functions/internal', err?.message || 'internal'));
+        }
+        console.warn('[callGeminiProxy] Stream failed before any data, using the normal call:', err);
+        return { unavailable: true, data: { ...data, isRetry: true } };
+      }
+      // The SDK settles `data` while reading the final SSE line, i.e. before the
+      // stream closes. If the response was not an SSE callable response at all
+      // (e.g. a proxy's HTML page) it never settles, so don't wait forever.
+      const final = await Promise.race([
+        finalData,
+        new Promise((r) => setTimeout(() => r(STREAM_NO_RESULT), 50)),
+      ]).catch((err) => { throw fail(err); });
+      if (final === STREAM_NO_RESULT) {
+        if (gotChunk) throw fail(callableError('functions/internal', 'The AI reply stream ended unexpectedly. Please try again.'));
+        return { unavailable: true, data: { ...data, isRetry: true } };
+      }
+      return { text: final?.text ?? full, finishReason: final?.finishReason ?? null };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const invoke = async (rgn, data) => {
+    const call = httpsCallable(getFunctions(app, rgn), 'generateAI', { timeout: effectiveTimeout });
+    let body = data;
+    if (wantStream) {
+      const r = await callStreaming(call, data);
+      if (!r.unavailable) return r;
+      body = { ...r.data };
+      delete body.stream; // plain call: let the server take its non-streaming path
+    }
+    const res = await call(body);
     return { text: res.data?.text ?? '', finishReason: res.data?.finishReason ?? null };
+  };
+
+  const primary = region && region !== DEFAULT_REGION && !_unavailableRegions.has(region) ? region : DEFAULT_REGION;
+
+  try {
+    try {
+      return await invoke(primary, payload);
+    } catch (regionErr) {
+      if (primary === DEFAULT_REGION || regionErr?.afterChunk || !looksLikeMissingRegion(regionErr)) throw regionErr;
+      _unavailableRegions.add(primary);
+      console.warn(`[callGeminiProxy] generateAI unavailable in ${primary} (${regionErr.code}); using ${DEFAULT_REGION} for this session.`);
+      // Daily-usage safety: a 404 never reached the handler (nothing was
+      // counted), so the retry is charged normally. The bare internal/unavailable
+      // case is ambiguous — it could have been a crash AFTER the count — so that
+      // retry is sent as isRetry: at worst one uncharged call per session, never
+      // a double charge.
+      const retryPayload = regionErr.code === 'functions/not-found' ? payload : { ...payload, isRetry: true };
+      return await invoke(DEFAULT_REGION, retryPayload);
+    }
   } catch (err) {
     // Only a transient backend failure is worth re-trying through a client-side
     // engine. A bad request, a missing key, a daily limit or a signed-out user
@@ -309,6 +467,9 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
         : (rawMessage || 'The AI service is unavailable right now. Please try again.');
 
     const e = new Error(message);
+    // Additive: callers used to lose the Firebase code entirely.
+    if (code) e.code = code;
+    if (err?.details !== undefined) e.details = err.details;
     if (code === 'functions/resource-exhausted') {
       e.status = 429;
       if (err?.details?.dailyLimit) e.dailyLimit = true;

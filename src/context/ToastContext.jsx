@@ -3,6 +3,7 @@ import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- context hook co-located with its provider; only affects dev HMR
 export function useToast() {
   return useContext(ToastContext);
 }
