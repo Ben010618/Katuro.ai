@@ -72,11 +72,12 @@ export default function Step3() {
     setStatusMsg(`Generating ${n} session${n !== 1 ? 's' : ''}…`);
 
     const context = {
-      subject:          store.subject          || 'Science',
-      gradeLevel:       store.gradeLevel       || 'Grade 7',
-      term:             store.term             || 'Term 1',
-      weekNumber:       store.weekNumber       || 'Week 1',
-      lessonName:       store.lessonName       || 'My Lesson',
+      // Sent as the teacher gave them; blanks stay blank ("not given" in the prompt), never invented.
+      subject:          store.subject          || '',
+      gradeLevel:       store.gradeLevel       || '',
+      term:             store.term             || '',
+      weekNumber:       store.weekNumber       || '',
+      lessonName:       store.lessonName       || '',
       competencyText:   store.competencyText   || '',
       content:          store.content          || '',
       contentStandards: store.contentStandards || '',

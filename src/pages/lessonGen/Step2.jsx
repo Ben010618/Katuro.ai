@@ -133,7 +133,16 @@ export default function Step2() {
     await runUnpack(0);
   }
 
+  // Step 1 choices are sent to the AI as given; never replaced with a made-up subject or grade.
+  const missingStep1 = [!store.subject && 'subject', !store.gradeLevel && 'grade level', !store.term && 'term'].filter(Boolean);
+
   async function runUnpack(attempt) {
+    if (missingStep1.length) {
+      setUnpackState('error');
+      setUnpackError(`Go back to Step 1 and choose the ${missingStep1.join(', ')}.`);
+      return;
+    }
+    let failedIndex = -1;
     setUnpackState('loading');
     setUnpackError(null);
     setSessions([]);
@@ -156,14 +165,15 @@ export default function Step2() {
         setUnpackProgress(Math.round((ci / competencies.length) * 85));
 
         const comp   = competencies[ci];
+        failedIndex = ci;
         const result = await unpackCompetency({
           competencyText:   comp.text.trim(),
           content:          content.trim(),
           contentStandards: contentStandards.trim(),
           learningContext:  learningContext.trim(),
-          subject:          store.subject    || 'Science',
-          gradeLevel:       store.gradeLevel || 'Grade 7',
-          term:             store.term       || 'Term 1',
+          subject:          store.subject,
+          gradeLevel:       store.gradeLevel,
+          term:             store.term,
           numberOfDays:     comp.days,
           selectedDates:    dateSlices[ci],
           // This whole loop re-runs from competency 1 on retry (attempt 1) —
@@ -204,12 +214,16 @@ export default function Step2() {
 
     } catch (err) {
       console.error('Unpack error (attempt', attempt, '):', err);
-      if (attempt === 0) {
+      // The same text fails the same way: only retry problems that can clear up.
+      const fixable = err.code === 'NOT_A_COMPETENCY';
+      if (attempt === 0 && !fixable && !err.dailyLimit && !err.details?.busy) {
         await new Promise(r => setTimeout(r, 1200));
         return runUnpack(1);
       }
       setUnpackState('error');
-      setUnpackError(err.message);
+      setUnpackError(fixable
+        ? `LC ${failedIndex + 1}: ${err.message} Please paste the learning competency from your Budget of Work or Curriculum Guide (e.g. "Identify the indicators of a chemical reaction").`
+        : err.message);
     }
   }
 
@@ -646,7 +660,7 @@ export default function Step2() {
                 <AlertCircle size={15} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
                 <div>
                   <p style={{ margin: '0 0 2px', fontSize: 13, color: '#e05c5c', fontWeight: 600 }}>
-                    ⚠ AI couldn't process a competency.
+                    Couldn't unpack the competencies.
                   </p>
                   {unpackError && (
                     <p style={{ margin: 0, fontSize: 11, color: '#e05c5c', opacity: 0.8, lineHeight: 1.5, wordBreak: 'break-word' }}>

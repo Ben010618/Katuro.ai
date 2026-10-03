@@ -75,7 +75,7 @@ export async function generateQuizAI(context, numQ, numChoices, customPrompt = "
     : "";
 
   const prompt = `Create a ${numQ}-item multiple choice quiz.
-Subject: ${context.subject} | Topic: ${String(context.topic).slice(0, 150)} | Grade: ${context.gradeLevel}
+Subject: ${context.subject || 'not given'} | Topic: ${String(context.topic).slice(0, 150)} | Grade: ${context.gradeLevel || 'not given'}
 Objectives: ${trunc(context.objectives, 4)}
 Competencies: ${trunc(context.competencies, 4)}${planSection}
 ${customPrompt ? `Teacher instructions: ${String(customPrompt).slice(0, 300)}` : ""}
@@ -125,9 +125,9 @@ export async function unpackCompetency({ competencyText, content, contentStandar
 A teacher has provided this learning competency:
 "${competencyText}"
 ${content          ? `\nContent (Subject Matter): ${content}`          : ''}${contentStandards ? `\nContent Standards: ${contentStandards}` : ''}
-Subject: ${subject}
-Grade Level: ${gradeLevel}
-Term: ${term}
+Subject: ${subject || 'not given'}
+Grade Level: ${gradeLevel || 'not given'}
+Term: ${term || 'not given'}
 Number of teaching days selected: ${numberOfDays}
 Teaching dates: ${selectedDates.join(', ')}
 ${learningContext ? `\nLEARNING CONTEXT (teacher's specific classroom/school/community situation):
@@ -227,6 +227,13 @@ For each session also write:
   "Review and Practice" (extra Review days)
   "Enrichment Activity" (extra Enrichment days)
 
+NOT A COMPETENCY?
+
+If the quoted text is NOT a learning competency (it has no learning action a
+learner performs, e.g. it is an instruction, a heading, a title or random text),
+do not guess. Return exactly:
+{"notACompetency": true, "reason": "one short sentence saying why"}
+
 RETURN FORMAT
 
 Return ONLY this JSON structure.
@@ -280,15 +287,48 @@ Just the raw JSON object:
     throw new Error('AI returned invalid format. Retrying…', { cause: e });
   }
 
+  if (parsed?.notACompetency) {
+    throw notACompetencyError(parsed.reason);
+  }
   if (!parsed.sessions || !Array.isArray(parsed.sessions)) {
     throw new Error('AI response missing sessions array');
   }
-  if (!parsed.competencyCeiling) {
-    throw new Error('AI response missing competencyCeiling');
+  // The ceiling label can be derived from the AI's own session levels (never invented).
+  if (!BLOOM_ORDER.includes(normalizeBloom(parsed.competencyCeiling))) {
+    const derived = highestBloom(parsed.sessions.map((s) => s?.bloomsLevel));
+    if (!derived) throw notACompetencyError("KaTuro couldn't tell which Bloom's level this competency asks for.");
+    parsed.competencyCeiling = derived;
+  } else {
+    parsed.competencyCeiling = normalizeBloom(parsed.competencyCeiling);
+  }
+  if (!Array.isArray(parsed.fullLadder) || !parsed.fullLadder.length) {
+    parsed.fullLadder = BLOOM_ORDER.slice(0, BLOOM_ORDER.indexOf(parsed.competencyCeiling) + 1);
   }
 
   return parsed;
 }
+
+const BLOOM_ORDER = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
+
+/** "apply — Review and Practice" / "ANALYSE" -> "Apply" / "Analyze"; '' when not a Bloom level. */
+function normalizeBloom(level) {
+  const word = String(level || '').trim().split(/[\s—–-]+/)[0].toLowerCase().replace('analyse', 'analyze');
+  return BLOOM_ORDER.find((b) => b.toLowerCase() === word) || '';
+}
+
+function highestBloom(levels) {
+  const idx = Math.max(-1, ...levels.map((l) => BLOOM_ORDER.indexOf(normalizeBloom(l))));
+  return idx >= 0 ? BLOOM_ORDER[idx] : '';
+}
+
+/** A competency the AI could not work with. Retrying the same text cannot fix this. */
+function notACompetencyError(reason) {
+  const e = new Error(String(reason || 'This does not look like a learning competency.').slice(0, 200));
+  e.code = 'NOT_A_COMPETENCY';
+  return e;
+}
+
+export const __test = { normalizeBloom, highestBloom };
 
 /**
  * Generate full ILAW lesson content for ONE session.
@@ -320,8 +360,8 @@ export async function generateIlawSession(session, context, { isRetry } = {}) {
 STYLE RULE — BE BRIEF AND DIRECT. Every field must be short and immediately usable. No filler phrases, no repetition, no long paragraphs. A teacher reading this should get the point in one glance.
 
 FULL LESSON CONTEXT
-Subject: ${subject} | Grade: ${gradeLevel} | Term: ${term} | Week: ${weekNumber}
-Lesson: ${lessonName}${content ? ` | Content: ${content}` : ''}${contentStandards ? ` | Standards: ${contentStandards}` : ''}
+Subject: ${subject || 'not given'} | Grade: ${gradeLevel || 'not given'} | Term: ${term || 'not given'} | Week: ${weekNumber || 'not given'}
+Lesson: ${lessonName || 'not given'}${content ? ` | Content: ${content}` : ''}${contentStandards ? ` | Standards: ${contentStandards}` : ''}
 Competency: ${competencyText}
 ${learningContext ? `\nLEARNING CONTEXT (teacher's specific classroom/school/community):
 ${learningContext}

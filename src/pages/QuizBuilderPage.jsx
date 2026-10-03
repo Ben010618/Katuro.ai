@@ -152,8 +152,8 @@ export default function QuizBuilderPage() {
       : '';
 
     const context = {
-      subject:       selectedLesson.subject     || 'Science',
-      gradeLevel:    selectedLesson.gradeLevel   || selectedLesson.grade || 'Grade 7',
+      subject:       selectedLesson.subject     || '',
+      gradeLevel:    selectedLesson.gradeLevel   || selectedLesson.grade || '',
       topic:         normalizeTitle(selectedLesson),
       objectives,
       competencies:  selectedLesson.competencyText ? [selectedLesson.competencyText] : [],
