@@ -1,8 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-export default defineConfig({
-  base: './', // relative base for both web and electron local execution
+// The website needs ABSOLUTE asset paths: with './', a page like /lesson-gen/step-3
+// asked for /lesson-gen/assets/index.js, got GitHub Pages' 404 page instead, and
+// stayed blank (seen 2026-10-03 after a reload on Step 3). KaTuroDesk loads
+// dist/index.html from disk (file://), which needs RELATIVE paths, so desktop
+// builds use `vite build --mode desk`.
+export const baseFor = (mode) => (mode === 'desk' ? './' : '/')
+
+export default defineConfig(({ mode }) => ({
+  base: baseFor(mode),
   plugins: [
     react(),
     tailwindcss(),
@@ -13,4 +20,4 @@ export default defineConfig({
     // Desk agent tests build real Excel/Word files; on a busy PC 5s was occasionally too short.
     testTimeout: 20000,
   },
-})
+}))
