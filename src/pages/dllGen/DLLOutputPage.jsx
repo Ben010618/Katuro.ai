@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
+import { signatoryList } from '../../services/teacherInfo';
 import { useToast } from '../../context/ToastContext';
 import { useCotStore } from '../../store/cotStore';
 import { createSharedPlan, saveDLLPlan } from '../../services/db';
@@ -338,11 +339,8 @@ export default function DLLOutputPage() {
   const objs        = store.objectives || {};
   const res         = store.resources  || {};
 
-  const sigRows = [
-    ['Prepared by:', profile?.name || null, profile?.designation || profile?.position || 'Teacher'],
-    ['Checked by:', profile?.supervisorName || null, profile?.supervisorPosition || 'Master Teacher / Head Teacher'],
-    ['Noted by:', null, 'School Principal'],
-  ];
+  // Only people whose names are filled in (Settings → Profile) get a signature line.
+  const sigRows = signatoryList(profile, { user }).map((s) => [s.label, s.name, s.position]);
 
   return (
     <>
@@ -669,23 +667,23 @@ export default function DLLOutputPage() {
         </div>
 
         {/* Signature block */}
+        {sigRows.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontFamily: 'Arial, sans-serif' }}>
           <tbody>
             <tr>
               {sigRows.map(([title, name, role]) => (
-                <td key={title} style={{ padding: '4px 10px', width: '33%', verticalAlign: 'top' }}>
+                <td key={title} style={{ padding: '4px 10px', width: `${Math.floor(100 / sigRows.length)}%`, verticalAlign: 'top' }}>
                   <div style={{ fontWeight: 700, fontSize: 10 }}>{title}</div>
                   <div style={{ marginTop: 22, borderTop: '1px solid #000', paddingTop: 3 }}>
-                    <div style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11 }}>
-                      {name || '________________________________'}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>{role}</div>
+                    <div style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11 }}>{name}</div>
+                    {role && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>{role}</div>}
                   </div>
                 </td>
               ))}
             </tr>
           </tbody>
         </table>
+        )}
       </div>
 
       {/* ── COT 4As Modal ──────────────────────────────────────────────── */}

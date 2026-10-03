@@ -43,7 +43,8 @@ const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
   ],
   "signatures"?: [{ "label": "Prepared by:", "name": string, "role": string }]
 }
-Never put markdown symbols (#, ###, |---|) inside text. Use real DepEd terminology. Write complete, classroom-ready content (no placeholders like "insert here").`;
+Never put markdown symbols (#, ###, |---|) inside text. Use real DepEd terminology. Write complete, classroom-ready content (no placeholders like "insert here").
+Never write placeholders for people or places such as [Principal's Name], (School Head), ____ or "Name of School": use only names given in the teacher profile, and leave out anything not given. Do NOT add "signatures": the app adds them from the teacher's profile.`;
 
 const DOC_TYPE_GUIDES = {
   dll: 'Daily Lesson Log (DepEd Order 42, s.2016 format). Landscape. One table with columns ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] and rows for: I. OBJECTIVES, A. Content Standards, B. Performance Standards, C. Learning Competencies/Objectives (with code), II. CONTENT, III. LEARNING RESOURCES (A. References 1. Teacher\'s Guide pages 2. Learner\'s Materials pages 3. Textbook pages 4. Additional Materials from LR portal, B. Other Learning Resources), IV. PROCEDURES (A. Reviewing previous lesson or presenting the new lesson, B. Establishing a purpose for the lesson, C. Presenting examples/instances, D. Discussing new concepts and practicing new skills #1, E. Discussing new concepts and practicing new skills #2, F. Developing mastery, G. Finding practical applications, H. Making generalizations and abstractions, I. Evaluating learning, J. Additional activities for application or remediation), V. REMARKS, VI. REFLECTION (A–G standard reflection questions). Meta: School, Grade Level, Teacher, Learning Area, Teaching Dates and Time, Quarter.',
@@ -66,12 +67,9 @@ function slug(s, max = 60) {
     .replace(/\s/g, '_') || 'KaTuro';
 }
 
+/** Sign-off blocks from the teacher's profile; anyone left blank is not printed. */
 function teacherSignatures(ctx) {
-  return [
-    { label: 'Prepared by:', name: ctx.teacher.fullName || '', role: ctx.teacher.position || 'Teacher' },
-    { label: 'Checked by:', name: '', role: 'Master Teacher / Head Teacher' },
-    { label: 'Noted by:', name: '', role: 'School Head' },
-  ];
+  return ctx.teacher.signatures || [];
 }
 
 function baseMeta(ctx, extra = []) {
@@ -268,7 +266,7 @@ export const TOOLS = {
           gradeLevel ? `Grade level: ${gradeLevel}` : '',
           curriculum,
           `Teacher's instructions: ${ctx.masker.mask(instructions)}`,
-          ctx.teacher.school ? `School: ${ctx.teacher.school}` : '',
+          ctx.teacher.facts,
           text ? `\nSource files (use their actual content):\n${text}` : '',
         ].filter(Boolean).join('\n'),
         parts: visionParts,
@@ -278,7 +276,8 @@ export const TOOLS = {
       const spec = normalizeDocumentSpec({
         ...ctx.masker.unmask(raw),
         header: headerFor(ctx),
-        ...(raw?.signatures?.length ? {} : { signatures: teacherSignatures(ctx) }),
+        // Signatures always come from the teacher's profile — never from the AI (no invented names).
+        signatures: teacherSignatures(ctx),
       });
       if (!spec.blocks.length) throw new Error('The AI returned an empty document. Please try again with more detail.');
       if (title) spec.title = title;
@@ -423,7 +422,8 @@ export const TOOLS = {
           import('../generators/depedTemplates.js'),
           import('../generators/xlsxWriters.js'),
         ]);
-        const base = itemAnalysisReportSpec(analysis, meta, { remarks, interventions });
+        // Signatories come from the teacher's profile (the template's own defaults are placeholders).
+        const base = { ...itemAnalysisReportSpec(analysis, meta, { remarks, interventions }), signatures: teacherSignatures(ctx) };
         const below = analysis.learners.filter((l) => l.percent < 75).sort((a, b) => a.percent - b.percent);
         // Teachers need the names for remediation; the report template only has item statistics.
         const learnerBlocks = below.length
@@ -587,7 +587,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
           learnerName: f.name,
           gradeSection,
           absences: f.longestConsecutive,
-          teacherName: ctx.teacher.fullName || ctx.teacher.salutation,
+          teacherName: ctx.teacher.fullName,
           schoolName: ctx.teacher.school || '',
           date: new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }),
         });

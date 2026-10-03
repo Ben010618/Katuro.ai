@@ -3,6 +3,7 @@ import {
   Table, TableRow, TableCell, WidthType, BorderStyle,
   HeightRule, VerticalAlign, VerticalMergeType, PageOrientation,
 } from 'docx';
+import { signatoryList } from './teacherInfo';
 
 // A4 landscape, Word "Narrow" margins (0.5 inch = 720 DXA each side)
 const PAGE_W = 16838;   // 297 mm landscape
@@ -314,9 +315,12 @@ function buildTable(store, profile) {
 }
 
 // ── Signature block ───────────────────────────────────────────────────────────
+// Only people whose names are filled in (Settings → Profile) get a signature line.
 function signatureBlock(profile) {
-  const colW  = [Math.floor(TBL_W / 3), Math.floor(TBL_W / 3), TBL_W - 2 * Math.floor(TBL_W / 3)];
-  const blank = '________________________';
+  const people = signatoryList(profile);
+  if (!people.length) return null;
+  const each = Math.floor(TBL_W / people.length);
+  const colW = people.map((_, k) => (k === people.length - 1 ? TBL_W - each * (people.length - 1) : each));
 
   function sigCell(lines) {
     return new TableCell({
@@ -331,26 +335,12 @@ function signatureBlock(profile) {
 
   return new Table({
     rows: [
-      new TableRow({ children: [
-        sigCell([
-          { text: 'Prepared by:', bold: true },
-          { text: '' },
-          { text: profile?.name || blank, bold: !!profile?.name },
-          { text: profile?.designation || profile?.position || 'Teacher', italic: true },
-        ]),
-        sigCell([
-          { text: 'Checked by:', bold: true },
-          { text: '' },
-          { text: profile?.supervisorName || blank, bold: !!profile?.supervisorName },
-          { text: profile?.supervisorPosition || 'Master Teacher / Head Teacher', italic: true },
-        ]),
-        sigCell([
-          { text: 'Noted by:', bold: true },
-          { text: '' },
-          { text: blank },
-          { text: 'School Principal', italic: true },
-        ]),
-      ]}),
+      new TableRow({ children: people.map((s) => sigCell([
+        { text: s.label, bold: true },
+        { text: '' },
+        { text: s.name.toUpperCase(), bold: true },
+        ...(s.position ? [{ text: s.position, italic: true }] : []),
+      ])) }),
     ],
     width: { size: TBL_W, type: WidthType.DXA },
     columnWidths: colW,
@@ -374,7 +364,7 @@ export async function downloadDLLDocx({ store, profile }) {
       children: [
         buildTable(store, profile),
         new Paragraph({ children: [], spacing: { before: mm(4), after: mm(4) } }),
-        signatureBlock(profile),
+        ...[signatureBlock(profile)].filter(Boolean),
       ],
     }],
   });

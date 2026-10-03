@@ -3,6 +3,7 @@ import {
   Paragraph, TextRun, AlignmentType, WidthType,
   ShadingType, PageOrientation,
 } from 'docx';
+import { teacherInfo, signatoryList } from './teacherInfo';
 
 // ── Primitive helpers ──────────────────────────────────────────────────────
 
@@ -93,11 +94,10 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
   const n = sessions.length;
 
   // ── Display values ─────────────────────────────────────────────────────
-  const teacherName  = (teacherProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Teacher').toUpperCase();
-  const position     = teacherProfile?.designation || teacherProfile?.position || 'Teacher';
-  const supervisor   = (teacherProfile?.supervisorName || '(School Head / Supervisor)').toUpperCase();
-  const supPosition  = teacherProfile?.supervisorPosition || 'Master Teacher';
-  const gradeSection = `${lessonMeta.gradeLevel || '—'} – ${teacherProfile?.section || '(Section)'}`;
+  // Blank profile fields are left out — no placeholders (Settings → Profile).
+  const teacherName  = teacherInfo(teacherProfile, user).name.toUpperCase();
+  const signers      = signatoryList(teacherProfile, { user });
+  const gradeSection = [lessonMeta.gradeLevel, teacherProfile?.section].filter(Boolean).join(' – ');
   const references   = `MATATAG Curriculum Guide · ${lessonMeta.subject || ''} ${lessonMeta.gradeLevel || ''} · ${lessonMeta.term || ''}`.trim();
   const amber        = { fill: 'FFFBEB', type: ShadingType.CLEAR, color: 'auto' };
 
@@ -173,50 +173,32 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
     ],
   });
 
-  // ── Signature block (2-column table below the main table) ─────────────
-  const sigTable = new Table({
+  // ── Signature block: one column per filled-in signatory (none = no block) ──
+  const noBorders = { top: { size: 0 }, bottom: { size: 0 }, left: { size: 0 }, right: { size: 0 } };
+  const sigTable = signers.length ? new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
       new TableRow({
-        children: [
-          new TableCell({
-            children: [new Paragraph({ children: [r('Prepared by:', { size: 20 })] })],
-            borders:  { top: { size: 0 }, bottom: { size: 0 }, left: { size: 0 }, right: { size: 0 } },
-            margins:  { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-          new TableCell({
-            children: [new Paragraph({ children: [r('Checked by:', { size: 20 })], alignment: AlignmentType.RIGHT })],
-            borders:  { top: { size: 0 }, bottom: { size: 0 }, left: { size: 0 }, right: { size: 0 } },
-            margins:  { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-        ],
+        children: signers.map((sg) => new TableCell({
+          children: [new Paragraph({ children: [r(sg.label, { size: 20 })] })],
+          borders: noBorders,
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        })),
       }),
       new TableRow({
-        children: [
-          new TableCell({
-            children: [
-              new Paragraph({ children: [r('', { size: 20 })] }),
-              new Paragraph({ children: [r('', { size: 20 })] }),
-              new Paragraph({ children: [r(teacherName, { bold: true, size: 22 })] }),
-              new Paragraph({ children: [r(position, { size: 18, color: '6B7280' })] }),
-            ],
-            borders:  { top: { size: 0 }, bottom: { size: 0 }, left: { size: 0 }, right: { size: 0 } },
-            margins:  { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-          new TableCell({
-            children: [
-              new Paragraph({ children: [r('', { size: 20 })] }),
-              new Paragraph({ children: [r('', { size: 20 })] }),
-              new Paragraph({ children: [r(supervisor, { bold: true, size: 22 })], alignment: AlignmentType.RIGHT }),
-              new Paragraph({ children: [r(supPosition, { size: 18, color: '6B7280' })], alignment: AlignmentType.RIGHT }),
-            ],
-            borders:  { top: { size: 0 }, bottom: { size: 0 }, left: { size: 0 }, right: { size: 0 } },
-            margins:  { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-        ],
+        children: signers.map((sg) => new TableCell({
+          children: [
+            new Paragraph({ children: [r('', { size: 20 })] }),
+            new Paragraph({ children: [r('', { size: 20 })] }),
+            new Paragraph({ children: [r(sg.name.toUpperCase(), { bold: true, size: 22 })] }),
+            ...(sg.position ? [new Paragraph({ children: [r(sg.position, { size: 18, color: '6B7280' })] })] : []),
+          ],
+          borders: noBorders,
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        })),
       }),
     ],
-  });
+  }) : null;
 
   const doc = new Document({
     sections: [{
@@ -230,8 +212,7 @@ export async function downloadIlawDocx({ lessonMeta, sessions, teacherProfile, u
       },
       children: [
         table,
-        new Paragraph({ children: [r('')] }),
-        sigTable,
+        ...(sigTable ? [new Paragraph({ children: [r('')] }), sigTable] : []),
       ],
     }],
   });

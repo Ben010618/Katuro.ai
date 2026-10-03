@@ -25,4 +25,11 @@ export default defineConfig([
       sourceType: 'commonjs',
     },
   },
+  {
+    // Emulator-backed tests (npm run test:rules) run in Node.
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
 ])

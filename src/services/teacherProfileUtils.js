@@ -7,7 +7,8 @@
 
 export function getTeacherSalutationName(profile, user) {
   // 1. Get raw name from profile or user
-  let rawName = profile?.givenName || profile?.firstName || '';
+  // 1a. The name the teacher chose to be called (Profile → User name) wins.
+  let rawName = (profile?.userName || '').trim() || profile?.givenName || profile?.firstName || '';
   if (!rawName && profile?.displayName) {
     rawName = profile.displayName.split(' ')[0];
   }
@@ -25,7 +26,9 @@ export function getTeacherSalutationName(profile, user) {
   if (/^sir\b/i.test(rawName)) return rawName;
   if (/^ma'?am\b/i.test(rawName)) return rawName;
 
-  // 3. Determine honorific (Sir vs Ma'am)
+  // 3. Determine honorific. A title the teacher picked (Profile → Title) is used exactly as chosen.
+  const chosen = (profile?.honorific || '').trim();
+  if (chosen && rawName !== 'Teacher') return `${chosen} ${rawName}`;
   let honorific = profile?.salutation || profile?.title || '';
   if (/^mr\.?$/i.test(honorific)) honorific = 'Sir';
   if (/^(ms\.?|mrs\.?)$/i.test(honorific)) honorific = "Ma'am";

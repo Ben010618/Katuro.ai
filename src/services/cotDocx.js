@@ -3,6 +3,7 @@ import {
   Paragraph, TextRun, AlignmentType, WidthType,
   ShadingType, BorderStyle, Header,
 } from 'docx';
+import { signatoryList } from './teacherInfo';
 
 // ── Page geometry (A4 portrait, narrow margins) ───────────────────────────────
 // A4: 210mm × 297mm → 11906 × 16838 DXA
@@ -200,15 +201,15 @@ export async function downloadCotDocx({ lessonMeta, plan, teacherProfile }) {
 
   const selectedIndicators = lessonMeta.selectedIndicators || [];
 
-  const teacherDisplay   = (teacherProfile?.name || teacherName || 'Teacher').toUpperCase();
-  const supervisorName   = (teacherProfile?.supervisorName || '').toUpperCase();
-  const supervisorPos    = teacherProfile?.supervisorPosition || 'Head Teacher I';
-  const principalName    = (teacherProfile?.principalName || '').toUpperCase();
-  const principalPos     = teacherProfile?.principalPosition || 'Principal IV';
+  // Signatories from Settings → Profile; anyone left blank is not printed (no placeholders).
+  const signers          = signatoryList({ ...(teacherProfile || {}), name: teacherProfile?.name || teacherName || '' }, { labels: { principal: 'Noted by:', psds: 'Noted by:' } });
   const schoolName       = school || teacherProfile?.school || '';
   const dateDisplay      = teachingDate || '';
   const subjectUpper     = (subject || '').toUpperCase();
-  const sy               = '2024-2025';
+  // DepEd school year starts in June.
+  const now              = new Date();
+  const syStart          = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+  const sy               = `${syStart}-${syStart + 1}`;
 
   // ── Document page header ─────────────────────────────────────────────────
   const pageHeader = new Header({
@@ -643,49 +644,24 @@ export async function downloadCotDocx({ lessonMeta, plan, teacherProfile }) {
 
   // ── Signature block ───────────────────────────────────────────────────────
   const NB = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER };
-  const sigPrepared = new Table({
-    width: { size: PAGE_W, type: WidthType.DXA },
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            children: [
-              pText('Prepared by:', 14),
-              blank(), blank(),
-              p([r(teacherDisplay, { bold: true, size: 16 })]),
-              p([r(teacherProfile?.designation || 'Teacher III', { size: 14, color: '444444' })]),
-            ],
-            borders: NB, margins: { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-          new TableCell({
-            children: [
-              p([r('Checked by:', { size: 14 })], { align: AlignmentType.CENTER }),
-              blank(), blank(),
-              p([r(supervisorName, { bold: true, size: 16 })], { align: AlignmentType.CENTER }),
-              p([r(supervisorPos, { size: 14, color: '444444' })], { align: AlignmentType.CENTER }),
-            ],
-            borders: NB, margins: { top: 0, bottom: 0, left: 0, right: 0 },
-          }),
-        ],
-      }),
-    ],
+  const sigCell = (sg) => new TableCell({
+    children: sg
+      ? [
+        p([r(sg.label, { size: 14 })], { align: AlignmentType.CENTER }),
+        blank(), blank(),
+        p([r(sg.name.toUpperCase(), { bold: true, size: 16 })], { align: AlignmentType.CENTER }),
+        ...(sg.position ? [p([r(sg.position, { size: 14, color: '444444' })], { align: AlignmentType.CENTER })] : []),
+      ]
+      : [p([r('')])],
+    borders: NB, margins: { top: 0, bottom: 0, left: 0, right: 0 },
   });
-
-  const sigNoted = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 200, after: 0 },
-    children: [r('Noted by:', { size: 14 })],
-  });
-  const sigPrincipal = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 120, after: 0 },
-    children: [r(principalName, { bold: true, size: 16 })],
-  });
-  const sigPrincipalPos = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0 },
-    children: [r(principalPos, { size: 14, color: '444444' })],
-  });
+  const sigRows = [];
+  for (let k = 0; k < signers.length; k += 3) {
+    const chunk = signers.slice(k, k + 3);
+    while (sigRows.length && chunk.length < Math.min(3, signers.length)) chunk.push(null);
+    sigRows.push(new TableRow({ children: chunk.map(sigCell) }));
+  }
+  const sigBlock = sigRows.length ? [new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: sigRows })] : [];
 
   // ── Build document ────────────────────────────────────────────────────────
   const doc = new Document({
@@ -707,10 +683,7 @@ export async function downloadCotDocx({ lessonMeta, plan, teacherProfile }) {
         pmeSubB,
         pmeTable,
         new Paragraph({ children: [r('')], spacing: { before: 0, after: 120 } }),
-        sigPrepared,
-        sigNoted,
-        sigPrincipal,
-        sigPrincipalPos,
+        ...sigBlock,
       ],
     }],
   });

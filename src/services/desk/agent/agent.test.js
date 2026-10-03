@@ -360,3 +360,29 @@ describe('llm helpers', () => {
     expect(contents[2].parts[1].inlineData.mimeType).toBe('image/png');
   });
 });
+
+describe('teacher profile in KaTuroDesk documents', () => {
+  const aiDoc = { title: 'Letter', blocks: [{ type: 'paragraph', text: 'Dear Parents' }], signatures: [{ label: 'Noted by:', name: 'Invented Principal', role: 'Principal' }] };
+  const plan = { reply: 'Writing it.', tasks: [{ id: 't1', tool: 'write_document', args: { docType: 'letter', title: 'Parent Letter', instructions: 'invite parents' } }] };
+
+  it('uses only the profile signatories (AI-invented ones are dropped)', async () => {
+    callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify(plan) }).mockResolvedValueOnce({ text: JSON.stringify(aiDoc) });
+    const profile = { name: 'Ben Cuvinar', designation: 'Teacher VI', principalName: 'Dr. Aida M. Bejo', principalPosition: 'Principal IV', school: 'Dayap NHS', region: '' };
+    const res = await runDeskAgentTurn({ prompt: 'write a letter to parents', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' }, profile });
+    const spec = res.artifacts[0].spec;
+    expect(spec.signatures).toEqual([
+      { label: 'Prepared by:', name: 'Ben Cuvinar', role: 'Teacher VI' },
+      { label: 'Approved by:', name: 'Dr. Aida M. Bejo', role: 'Principal IV' },
+    ]);
+    expect(spec.header).toMatchObject({ school: 'Dayap NHS' });
+    expect(spec.header.region).toBeUndefined();
+    // The AI was told the real names and not to invent any.
+    expect(JSON.stringify(callGeminiProxy.mock.calls[1][0].contents)).toContain('Dr. Aida M. Bejo');
+  });
+
+  it('prints no signature block at all when the profile is empty', async () => {
+    callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify(plan) }).mockResolvedValueOnce({ text: JSON.stringify(aiDoc) });
+    const res = await runDeskAgentTurn({ prompt: 'write a letter to parents', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' }, profile: {} });
+    expect(res.artifacts[0].spec.signatures).toBeUndefined();
+  });
+});

@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { PLAN_LIMITS, planStatusText, manilaToday, SUBSCRIBE_CONTACT_URL } from '../services/plans';
 import { useToast } from '../context/ToastContext';
+import TeacherProfileForm from '../components/TeacherProfileForm';
 import { Loader2, User, CreditCard, Shield, Lock } from 'lucide-react';
 
 const TABS = [
@@ -29,7 +30,7 @@ function LabeledField({ label, children }) {
 
 export default function SettingsPage() {
   const { addToast }  = useToast();
-  const { user, plan } = useAuth();
+  const { user, plan, profile: liveProfile } = useAuth();
   const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'plan' ? 1 : 0));
   const [usageToday, setUsageToday] = useState(null);
 
@@ -77,13 +78,11 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       await updateTeacherProfile(user.uid, {
-        name:    profile.name,
-        school:  profile.school,
         subject: profile.subject,
         grade:   profile.grade,
         section: profile.section,
       });
-      addToast('Profile saved successfully.', 'success');
+      addToast('Teaching defaults saved.', 'success');
     } catch {
       addToast('Failed to save profile. Try again.', 'error');
     } finally {
@@ -170,27 +169,19 @@ export default function SettingsPage() {
 
           {/* Profile tab */}
           {tab === 0 && (
-            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>Profile Information</h2>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)' }}>Update your name, school, and subject information.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>Teacher Profile</h2>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-secondary)' }}>
+                  Fill this in once. KaTuro and KaTuroDesk use it for your DLL, lesson plans, COT and other documents, so you don't retype names and signatories. Signed in as {user?.email}.
+                </p>
               </div>
-
-              <div className="kt-grid-2" style={{ gap: 14 }}>
-                <LabeledField label="Full Name">
-                  <input className="input" value={profile.name}
-                    onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
-                </LabeledField>
-                <LabeledField label="Email Address">
-                  <input className="input" type="email" value={profile.email} readOnly
-                    style={{ opacity: 0.6, cursor: 'not-allowed' }} />
-                </LabeledField>
+              <TeacherProfileForm uid={user?.uid} profile={liveProfile} user={user} onSaved={() => addToast('Profile saved.', 'success')} />
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 16, borderTop: '1px solid var(--kt-border)', paddingTop: 20 }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Teaching defaults</h2>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>Pre-selected subject, grade and section in the generators.</p>
               </div>
-
-              <LabeledField label="School Name">
-                <input className="input" value={profile.school}
-                  onChange={e => setProfile(p => ({ ...p, school: e.target.value }))} />
-              </LabeledField>
 
               <div className="kt-grid-3" style={{ gap: 14 }}>
                 <LabeledField label="Subject">
@@ -214,10 +205,11 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
                 <button type="submit" className="btn-primary" disabled={saving}>
                   {saving && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                  {saving ? 'Saving…' : 'Save Changes'}
+                  {saving ? 'Saving…' : 'Save defaults'}
                 </button>
               </div>
             </form>
+            </div>
           )}
 
           {/* Subscription tab */}

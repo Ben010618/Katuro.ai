@@ -27,6 +27,7 @@ import {
 } from '../../services/localFileSystem';
 import { getFileIcon } from './deskFileIcons';
 import { planStatusText, SUBSCRIBE_CONTACT_URL } from '../../services/plans';
+import { teacherInfo } from '../../services/teacherInfo';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
 
@@ -135,7 +136,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
   }, []);
 
   // Account name: KaTuro profile first (Google sign-in often has no displayName).
-  const accountName = profile?.displayName || [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.email || 'Teacher';
+  const accountName = teacherInfo(profile, user).name || user?.email || 'Teacher';
 
   const flash = (msg) => {
     setNotice(msg);

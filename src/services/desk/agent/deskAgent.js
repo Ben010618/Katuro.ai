@@ -30,6 +30,7 @@ import {
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
+import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 
 export const OUTPUT_ROOT = 'KaTuro Outputs';
 
@@ -54,17 +55,26 @@ export function schoolYearFor(d = new Date()) {
   return d.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
 
+/**
+ * The teacher's profile as the agent sees it (Settings → Profile). Every value is ''
+ * when not filled in, and blank values never reach a document.
+ */
 export function teacherFromProfile(profile = {}, user = {}) {
-  const p = profile || {};
-  const fullName = p.displayName || [p.firstName, p.middleName ? `${String(p.middleName).charAt(0)}.` : '', p.lastName].filter(Boolean).join(' ') || user?.displayName || '';
+  const t = teacherInfo(profile, user);
   return {
     salutation: getTeacherSalutationName(profile, user),
-    fullName,
-    school: p.school || p.schoolName || '',
-    schoolId: p.schoolId || '',
-    region: p.region || '',
-    division: p.division || '',
-    position: p.designation || p.position || '',
+    fullName: t.name,
+    honorific: t.honorific,
+    school: t.school,
+    schoolId: t.schoolId,
+    district: t.district,
+    region: t.region,
+    division: t.division,
+    position: t.designation,
+    // Sign-off blocks: only people whose names were filled in.
+    signatures: signatoryList(profile, { user }).map((s) => ({ label: s.label, name: s.name, role: s.position })),
+    // What the AI may say about the teacher/school/signatories (filled fields only).
+    facts: teacherFactsForAI(profile, user),
   };
 }
 
@@ -278,7 +288,7 @@ export async function runDeskAgentTurn({
     const fileIndex = buildFileIndex(tree, { attachedPaths, activePath, describe: folderIndex ? (p) => folderIndex.describe(p) : undefined });
     const plan = await callDeskLLM({
       kind: 'plan',
-      system: buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() }),
+      system: `${buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() })}\n\n${teacher.facts}`,
       history: history.slice(-8).map((m) => ({ role: m.role, content: masker.mask(m.content) })),
       prompt: buildPlannerPrompt({
         prompt: masker.mask(prompt),

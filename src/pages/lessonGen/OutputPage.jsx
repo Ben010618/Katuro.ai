@@ -13,6 +13,7 @@ import { genMatching, genJumbled, genTrueFalse, genCrossword, genWordHunt, genFi
 import { GAME_TYPES, gShuffle, gScramble, buildWordSearch, buildCrossword, GameWorksheetDisplay } from '../../components/GameWorksheet';
 import AIOutputGuard from '../../components/AIOutputGuard';
 import ShareModal from '../../components/ShareModal';
+import { teacherInfo, signatoryList } from '../../services/teacherInfo';
 import DownloadProgress from '../../components/DownloadProgress';
 
 // ── Defensive Sanitization Loop for Clean Output ──────────────────────────────
@@ -398,11 +399,11 @@ export default function OutputPage() {
 
   if (N === 0) return null;
 
-  const teacherName = (
-    teacherProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Teacher'
-  ).toUpperCase();
+  // Blank profile fields are left out — no placeholders (Settings → Profile).
+  const teacherName = teacherInfo(teacherProfile, user).name.toUpperCase();
+  const signers = signatoryList(teacherProfile, { user });
 
-  const gradeSection = `${store.gradeLevel || '—'} – ${teacherProfile?.section || '(Section)'}`;
+  const gradeSection = [store.gradeLevel, teacherProfile?.section].filter(Boolean).join(' – ');
 
   const references =
     `MATATAG Curriculum Guide · ${store.subject || ''} ${store.gradeLevel || ''} · ${store.term || ''}`.trim();
@@ -994,34 +995,20 @@ export default function OutputPage() {
         </div>
       )}
 
-      {/* Signature block */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
-        <div>
-          <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4b5563' }}>Prepared by:</p>
-          <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#111827', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-            {teacherName}
-          </p>
-          <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>
-            {teacherProfile?.designation || teacherProfile?.position || 'Teacher'}
-          </p>
-          {teacherProfile?.school && (
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
-              {teacherProfile.school}
-            </p>
-          )}
+      {/* Signature block — only people filled in under Settings → Profile */}
+      {signers.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginTop: 28, padding: '0 4px' }}>
+          {signers.map((sg) => (
+            <div key={sg.label} style={{ minWidth: 150 }}>
+              <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4b5563' }}>{sg.label}</p>
+              <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#111827', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                {sg.name}
+              </p>
+              {sg.position && <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>{sg.position}</p>}
+            </div>
+          ))}
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: '0 0 22px', fontSize: 13, fontWeight: 600, color: '#4b5563' }}>Checked by:</p>
-          <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#111827', textDecoration: 'underline', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-            {teacherProfile?.supervisorName
-              ? teacherProfile.supervisorName.toUpperCase()
-              : '(School Head / Supervisor)'}
-          </p>
-          <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>
-            {teacherProfile?.supervisorPosition || 'Master Teacher'}
-          </p>
-        </div>
-      </div>
+      )}
     </div>
 
       {shareUrl && (
