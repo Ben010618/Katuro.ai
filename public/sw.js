@@ -2,6 +2,15 @@
 // so activate()'s cleanup never actually purged anything. Bumping it here
 // forces every existing install to drop its old cache on next activate.
 const CACHE = 'katuro-v2';
+// Old builds' hashed files are never requested again; keep the cache bounded.
+const MAX_ASSETS = 250;
+
+async function trimCache() {
+  const cache = await caches.open(CACHE);
+  const keys = await cache.keys();
+  // Cache.keys() returns insertion order: drop the oldest first.
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_ASSETS)).map(k => cache.delete(k)));
+}
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -42,7 +51,7 @@ self.addEventListener('fetch', e => {
       return fetch(e.request).then(res => {
         if (res.ok) {
           const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          caches.open(CACHE).then(c => c.put(e.request, clone)).then(trimCache).catch(() => {});
         }
         return res;
       });

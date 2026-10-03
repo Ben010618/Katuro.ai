@@ -41,6 +41,7 @@ const CLASSROOM_NAV = [
 ];
 
 const TITLES = {
+  '/settings':                'Settings',
   '/desk':                    'KaTuro Desk',
   '/shares':                  'kaTuro Shares',
   '/protect':                 'kaTuro Protect',
@@ -261,6 +262,23 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
               }}>
                 Preferences
               </div>
+
+              {/* Profile, signatories, plan & daily limits */}
+              <button
+                onClick={() => { setGearOpen(false); navigate('/settings'); if (onClose) onClose(); }}
+                style={{
+                  ...btn,
+                  color: '#FBF7EC',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px', borderRadius: 6,
+                }}
+              >
+                <Settings size={14} color="#DCD0AE" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, textAlign: 'left', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#FBF7EC' }}>My profile & plan</div>
+                  <div style={{ fontSize: 9.5, color: '#DCD0AE' }}>Signatories, daily limits</div>
+                </div>
+              </button>
 
               {/* Option 1: AI Faculty & Avatars Customization */}
               <button

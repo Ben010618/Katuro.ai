@@ -3,15 +3,22 @@ import { AlertTriangle } from 'lucide-react';
 import ktLogo from '../assets/KT-Favicon.webp';
 import { auth } from '../firebase';
 import { reportAIError } from '../services/db';
+import { isStaleChunkError, reloadForNewVersion } from '../utils/staleChunk';
 
 export default class ErrorBoundary extends Component {
-  state = { hasError: false, error: null };
+  state = { hasError: false, error: null, updating: false };
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { hasError: true, error, updating: isStaleChunkError(error) };
   }
 
   componentDidCatch(error, info) {
+    // An old tab asking for files from before the latest deploy: reload to the
+    // current version instead of showing (and reporting) a crash.
+    if (isStaleChunkError(error)) {
+      if (reloadForNewVersion()) return;
+      this.setState({ updating: false }); // reloading already failed once: show the real error
+    }
     reportAIError({
       uid: auth.currentUser?.uid,
       feature: 'app-crash',
@@ -22,6 +29,13 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (!this.state.hasError) return this.props.children;
+    if (this.state.updating) {
+      return (
+        <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7', color:'#4a6357', fontSize:14 }}>
+          Loading the latest version of kaTuro…
+        </div>
+      );
+    }
 
     return (
       <div style={{ display:'flex', minHeight:'100vh', alignItems:'center', justifyContent:'center', background:'#f5faf7', padding: 24 }}>

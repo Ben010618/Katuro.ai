@@ -26,6 +26,13 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Error gate: nothing reaches katuro.website unless lint has no errors
+      # and every test passes. (Warnings are allowed; errors and failures stop
+      # the deploy and the live site keeps the last good version.)
+      - run: npx eslint . --quiet
+      - run: npm test
+
       - run: npm run build
 
       # BrowserRouter needs a fallback for deep links/refreshes -- GitHub Pages

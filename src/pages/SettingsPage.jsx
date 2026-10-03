@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getTeacherProfile, updateTeacherProfile } from '../services/db';
 import { doc, getDoc } from 'firebase/firestore';
@@ -31,7 +32,12 @@ function LabeledField({ label, children }) {
 export default function SettingsPage() {
   const { addToast }  = useToast();
   const { user, plan, profile: liveProfile } = useAuth();
-  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'plan' ? 1 : 0));
+  // The tab follows the address (?tab=plan|account), so the plan badge works even
+  // when Settings is already open.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TAB_KEYS = ['profile', 'plan', 'account'];
+  const tab = Math.max(0, TAB_KEYS.indexOf(searchParams.get('tab') || 'profile'));
+  const setTab = (i) => setSearchParams(i === 0 ? {} : { tab: TAB_KEYS[i] }, { replace: true });
   const [usageToday, setUsageToday] = useState(null);
 
   // Today's AI usage (server-kept counters, read-only for teachers).
@@ -48,8 +54,8 @@ export default function SettingsPage() {
     name:    user?.displayName || '',
     email:   user?.email       || '',
     school:  '',
-    subject: 'Science',
-    grade:   '7',
+    subject: '',
+    grade:   '',
     section: '',
   });
   const [saving,        setSaving]        = useState(false);
@@ -64,8 +70,8 @@ export default function SettingsPage() {
           name:    doc.name    || user.displayName || '',
           email:   user.email  || '',
           school:  doc.school  || '',
-          subject: doc.subject || 'Science',
-          grade:   doc.grade   || '7',
+          subject: doc.subject || '',
+          grade:   doc.grade   || '',
           section: doc.section || '',
         });
       }
@@ -187,12 +193,14 @@ export default function SettingsPage() {
                 <LabeledField label="Subject">
                   <select className="select" value={profile.subject}
                     onChange={e => setProfile(p => ({ ...p, subject: e.target.value }))}>
+                    <option value="">Not set</option>
                     {SUBJECTS.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </LabeledField>
                 <LabeledField label="Grade Level">
                   <select className="select" value={profile.grade}
                     onChange={e => setProfile(p => ({ ...p, grade: e.target.value }))}>
+                    <option value="">Not set</option>
                     {GRADES.map(g => <option key={g}>{g}</option>)}
                   </select>
                 </LabeledField>
@@ -313,13 +321,9 @@ export default function SettingsPage() {
                     <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#e05c5c' }}>Delete Account</p>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: '#e05c5c', opacity: 0.7 }}>All data will be permanently removed.</p>
                   </div>
-                  <button
-                    onClick={() => addToast('Account deletion is disabled in preview mode.', 'warning')}
-                    className="btn-danger"
-                    style={{ fontSize: 12, padding: '7px 14px' }}
-                  >
-                    Delete Account
-                  </button>
+                  <p style={{ margin: 0, fontSize: 12, color: '#e05c5c', fontWeight: 600, maxWidth: 220, textAlign: 'right' }}>
+                    Ask your kaTuro admin to delete your account.
+                  </p>
                 </div>
               </div>
             </div>

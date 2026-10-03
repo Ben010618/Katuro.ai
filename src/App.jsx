@@ -61,6 +61,7 @@ const SharesLayout            = lazy(() => import('./modules/shares/index'));
 const FeatureRequestBoard     = lazy(() => import('./features/feedback/FeatureRequestBoard'));
 const KaturoProtectPage       = lazy(() => import('./features/katuroProtect'));
 const KaTuroDeskPage          = lazy(() => import('./pages/desk/KaTuroDeskPage'));
+const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
 
 function LoadingScreen() {
   return (
@@ -316,6 +317,9 @@ export default function App() {
 
             {/* Request Feature — public read-only board of admin-approved feature requests */}
             <Route path="feature-requests" element={<FeatureRequestBoard />} />
+
+            {/* Profile & signatories, plan and daily limits, account (linked from the plan badge and the Settings menu) */}
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           {/* Public invite route — handles logged-in and not-logged-in */}

@@ -1,0 +1,150 @@
+/**
+ * Runs the real functions/index.js against a fake Firestore and a scripted Gemini,
+ * to check how generateAI behaves when Google is overloaded.
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import { createRequire } from 'module';
+
+const FUNCTIONS_DIR = path.resolve(__dirname, '../functions');
+const requireFromFunctions = createRequire(path.join(FUNCTIONS_DIR, 'index.js'));
+
+class HttpsError extends Error {
+  constructor(code, message, details) {
+    super(message);
+    this.code = code;
+    this.details = details;
+  }
+}
+
+function fakeFirestore() {
+  const docs = new Map();
+  const apply = (prev, data) => {
+    const next = { ...(prev || {}) };
+    for (const [k, v] of Object.entries(data)) next[k] = v && v.__inc !== undefined ? (next[k] || 0) + v.__inc : v;
+    return next;
+  };
+  const docRef = (p) => ({
+    path: p,
+    async get() {
+      const d = docs.get(p);
+      return { exists: Boolean(d), data: () => d };
+    },
+    async set(data, opts) {
+      docs.set(p, opts?.merge ? apply(docs.get(p), data) : apply(null, data));
+    },
+  });
+  const db = {
+    doc: docRef,
+    async runTransaction(fn) {
+      return fn({ get: (ref) => ref.get(), set: (ref, data, opts) => { ref.set(data, opts); } });
+    },
+  };
+  return { db, docs };
+}
+
+/** Loads functions/index.js with Firebase stubbed out. */
+function loadServer(store) {
+  const firestore = () => store.db;
+  firestore.FieldValue = { increment: (n) => ({ __inc: n }), serverTimestamp: () => 'ts' };
+  const admin = { initializeApp() {}, firestore, auth: () => ({}) };
+  const chain = new Proxy(function chainFn() {}, { get: () => chain, apply: () => chain });
+  const stubs = {
+    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, HttpsError },
+    'firebase-functions/v2/scheduler': { onSchedule: () => () => {} },
+    'firebase-functions/v2/firestore': { onDocumentCreated: () => () => {} },
+    'firebase-functions/v1': chain,
+    'firebase-admin': admin,
+  };
+  const req = (id) => (id in stubs ? stubs[id] : requireFromFunctions(id));
+  // Shorter waits so the test runs in milliseconds; everything else is the real code.
+  const src = fs.readFileSync(path.join(FUNCTIONS_DIR, 'index.js'), 'utf8').replace('[4000, 10000]', '[5, 10]')
+    + '\nmodule.exports.__test = { callGeminiRaw, BUSY_MESSAGE };';
+  const mod = { exports: {} };
+  new Function('require', 'module', 'exports', '__dirname', '__filename', src)(req, mod, mod.exports, FUNCTIONS_DIR, path.join(FUNCTIONS_DIR, 'index.js'));
+  return mod.exports;
+}
+
+const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+const ok = (text) => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] }), clone() { return this; } });
+const busy = () => ({ ok: false, status: 503, statusText: 'Service Unavailable', json: async () => ({ error: { message: 'This model is currently experiencing high demand.' } }), clone() { return this; } });
+
+/** script(model, nthCallForThatModel) -> response */
+function stubGemini(script) {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async (url) => {
+    const u = String(url);
+    if (u.includes('/models?')) {
+      return { ok: true, status: 200, json: async () => ({ models: MODELS.map((m) => ({ name: `models/${m}`, supportedGenerationMethods: ['generateContent'] })) }) };
+    }
+    const model = /models\/([^:]+):/.exec(u)[1];
+    calls.push(model);
+    return script(model, calls.filter((m) => m === model).length);
+  }));
+  return calls;
+}
+
+let store;
+let server;
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  store = fakeFirestore();
+  store.docs.set('adminConfig/gemini', { apiKey: 'test-key' });
+  server = loadServer(store);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+const contents = [{ role: 'user', parts: [{ text: 'Make a DLL' }] }];
+const usage = (uid) => {
+  for (const [k, v] of store.docs) if (k.startsWith(`teachers/${uid}/usage/`)) return v;
+  return {};
+};
+
+describe('Gemini "high demand" (503)', () => {
+  it('switches to another model when one is busy', async () => {
+    const calls = stubGemini((m) => (m === 'gemini-3.6-flash' ? busy() : ok('done')));
+    const out = await server.__test.callGeminiRaw('k', contents, { maxTokens: 512 });
+    expect(out.text).toBe('done');
+    expect(calls.slice(0, 2)).toEqual(['gemini-3.6-flash', 'gemini-3.5-flash']);
+  });
+
+  it('when every model is busy, waits and retries instead of failing at once', async () => {
+    // All models 503 on the first round; the preferred one recovers on the retry.
+    const calls = stubGemini((m, n) => (m === 'gemini-3.6-flash' && n === 2 ? ok('recovered') : busy()));
+    const out = await server.__test.callGeminiRaw('k', contents, { maxTokens: 512 });
+    expect(out.text).toBe('recovered');
+    expect(calls.filter((m) => m === 'gemini-3.6-flash')).toHaveLength(2);
+  });
+
+  it('gives the teacher a plain message (not raw Gemini text) when Google stays busy', async () => {
+    stubGemini(() => busy());
+    const err = await server.__test.callGeminiRaw('k', contents, { maxTokens: 512 }).catch((e) => e);
+    expect(err.code).toBe('unavailable');
+    expect(err.message).toBe(server.__test.BUSY_MESSAGE);
+    expect(err.message).not.toMatch(/Gemini 503|gemini-3/);
+    expect(err.details).toMatchObject({ busy: true, retryable: true });
+  });
+});
+
+describe('daily limit is only used by generations that succeed', () => {
+  const call = (data) => server.generateAI({ auth: { uid: 't1' }, data: { action: 'dll_gen', contents, maxTokens: 512, ...data } }, {});
+
+  it('a failed generation gives the unit back', async () => {
+    stubGemini(() => busy());
+    await expect(call()).rejects.toMatchObject({ code: 'unavailable' });
+    expect(usage('t1').dll_gen).toBe(0);
+  });
+
+  it('a successful generation counts once', async () => {
+    stubGemini(() => ok('{"ok":true}'));
+    await expect(call()).resolves.toMatchObject({ text: '{"ok":true}' });
+    expect(usage('t1').dll_gen).toBe(1);
+  });
+});

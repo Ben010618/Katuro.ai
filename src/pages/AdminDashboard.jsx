@@ -11,7 +11,8 @@ import {
   adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
 import { planInfo, planStatusText, formatPlanDate } from '../services/plans';
-import { collection, getDocs, query, orderBy, limit, doc, updateDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, where, Timestamp, onSnapshot, writeBatch } from 'firebase/firestore';
+import { groupReports } from '../services/errorReports';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
@@ -2453,35 +2454,60 @@ function FreeModeSection() {
 }
 
 // ── AI Error reports section ──────────────────────────────────────────────────
+// Repeats are grouped (services/errorReports.js) so one problem is one row with a
+// count, and "Resolve all" closes every open copy of it at once.
+const REPORTS_LIMIT = 200;
+
 function AIErrorSection() {
   const [reports,  setReports]  = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [open,     setOpen]     = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
+  const [busyKey,  setBusyKey]  = useState(null);
+  const [error,    setError]    = useState('');
 
   async function load() {
     setLoading(true);
+    setError('');
     try {
       const snap = await getDocs(
-        query(collection(db, 'aiErrorReports'), orderBy('createdAt', 'desc'), limit(30))
+        query(collection(db, 'aiErrorReports'), orderBy('createdAt', 'desc'), limit(REPORTS_LIMIT))
       );
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch {
-      // Non-fatal: the empty-state below already covers 'no reports'.
+    } catch (e) {
+      setError(`Could not load reports: ${e.message}`);
     } finally { setLoading(false); }
   }
 
-  async function markResolved(id) {
-    await updateDoc(doc(db, 'aiErrorReports', id), { resolved: true }).catch(() => {});
-    setReports(prev => prev.map(r => r.id === id ? { ...r, resolved: true } : r));
+  // Only marks reports resolved after Firestore confirms the write.
+  async function resolveIds(key, ids) {
+    if (!ids.length) return;
+    setBusyKey(key);
+    setError('');
+    try {
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + 400).forEach(id => batch.update(doc(db, 'aiErrorReports', id), { resolved: true }));
+        await batch.commit();
+      }
+      const done = new Set(ids);
+      setReports(prev => prev.map(r => (done.has(r.id) ? { ...r, resolved: true } : r)));
+    } catch (e) {
+      setError(`Could not resolve: ${e.message}`);
+    } finally {
+      setBusyKey(null);
+    }
   }
 
-  function ts(t) {
-    if (!t) return '';
-    const d = t.toDate ? t.toDate() : new Date(t);
-    return d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function ts(ms) {
+    if (!ms) return '';
+    return new Date(ms).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
+  const groups = groupReports(reports);
+  const visible = showResolved ? groups : groups.filter(g => g.openCount > 0);
   const unresolved = reports.filter(r => !r.resolved).length;
+  const allOpenIds = groups.flatMap(g => g.openIds);
 
   return (
     <div style={{ ...card, marginBottom: 16 }}>
@@ -2493,9 +2519,13 @@ function AIErrorSection() {
           <div>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>
               AI Error Reports
-              {unresolved > 0 && <span style={{ marginLeft: 8, fontSize: 11, background: '#fef0f0', color: '#e05c5c', border: '1px solid rgba(224,92,92,0.2)', borderRadius: 20, padding: '1px 8px' }}>{unresolved} open</span>}
+              {unresolved > 0 && (
+                <span style={{ marginLeft: 8, fontSize: 11, background: '#fef0f0', color: '#e05c5c', border: '1px solid rgba(224,92,92,0.2)', borderRadius: 20, padding: '1px 8px' }}>
+                  {unresolved}{reports.length >= REPORTS_LIMIT ? '+' : ''} open · {groups.filter(g => g.openCount > 0).length} problem{groups.filter(g => g.openCount > 0).length === 1 ? '' : 's'}
+                </span>
+              )}
             </h3>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>Teacher-reported AI errors (wrong MELC codes, bad outputs, etc.)</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--kt-text-secondary)' }}>App crashes and AI failures, grouped so repeats show once.</p>
           </div>
         </div>
         <button
@@ -2507,38 +2537,72 @@ function AIErrorSection() {
       </div>
 
       {open && (
-        loading
-          ? <div style={{ textAlign: 'center', padding: 20 }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>
-          : reports.length === 0
-            ? <p style={{ margin: 0, fontSize: 12, color: '#9bb8a5', textAlign: 'center', padding: 16 }}>No error reports yet.</p>
-            : reports.map(r => (
-              <div key={r.id} style={{
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-                padding: '10px 12px', borderRadius: 8, marginBottom: 6,
-                background: r.resolved ? 'var(--kt-surface)' : 'rgba(224,92,92,0.05)',
-                border: `1px solid ${r.resolved ? 'var(--kt-border)' : 'rgba(224,92,92,0.15)'}`,
-                opacity: r.resolved ? 0.65 : 1,
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f7ee', color: '#2d6a4f', borderRadius: 4, padding: '1px 6px' }}>{r.feature}</span>
-                    <span style={{ fontSize: 10, color: '#9bb8a5' }}>{ts(r.createdAt)}</span>
-                    {r.resolved && <span style={{ fontSize: 10, color: '#9bb8a5' }}>✓ Resolved</span>}
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 11, color: 'var(--kt-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showResolved} onChange={e => setShowResolved(e.target.checked)} />
+              Show resolved
+            </label>
+            {allOpenIds.length > 0 && (
+              <button
+                onClick={() => { if (window.confirm(`Mark all ${allOpenIds.length} open reports as resolved?`)) resolveIds('__all__', allOpenIds); }}
+                disabled={busyKey !== null}
+                style={{ ...btnSecondary, fontSize: 10, padding: '4px 10px' }}
+              >
+                <CheckCircle2 size={11} /> Resolve all open
+              </button>
+            )}
+          </div>
+          {error && <p style={{ margin: '0 0 8px', fontSize: 11, color: '#c0392b' }}>{error}</p>}
+          {loading
+            ? <div style={{ textAlign: 'center', padding: 20 }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>
+            : visible.length === 0
+              ? <p style={{ margin: 0, fontSize: 12, color: '#9bb8a5', textAlign: 'center', padding: 16 }}>{reports.length ? 'No open reports.' : 'No error reports yet.'}</p>
+              : visible.map(g => {
+                const r = g.sample;
+                const isOpen = g.openCount > 0;
+                return (
+                  <div key={g.key} style={{
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    padding: '10px 12px', borderRadius: 8, marginBottom: 6,
+                    background: isOpen ? 'rgba(224,92,92,0.05)' : 'var(--kt-surface)',
+                    border: `1px solid ${isOpen ? 'rgba(224,92,92,0.15)' : 'var(--kt-border)'}`,
+                    opacity: isOpen ? 1 : 0.65,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f7ee', color: '#2d6a4f', borderRadius: 4, padding: '1px 6px' }}>{g.feature}</span>
+                        {g.count > 1 && (
+                          <span style={{ fontSize: 10, fontWeight: 700, background: '#fef0f0', color: '#c0392b', borderRadius: 4, padding: '1px 6px' }}>
+                            {g.count}x{g.openCount !== g.count ? ` (${g.openCount} open)` : ''}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 10, color: '#9bb8a5' }}>
+                          {g.count > 1 ? `${ts(g.firstAt)} – ${ts(g.lastAt)}` : ts(g.lastAt)}
+                        </span>
+                        {!isOpen && <span style={{ fontSize: 10, color: '#9bb8a5' }}>Resolved</span>}
+                      </div>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{r.errorMessage || '(no message)'}</p>
+                      {r.inputContext && Object.keys(r.inputContext).length > 0 && (
+                        <p style={{ margin: '3px 0 0', fontSize: 10, color: '#9bb8a5', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {JSON.stringify(r.inputContext).slice(0, 160)}
+                        </p>
+                      )}
+                    </div>
+                    {isOpen && (
+                      <button
+                        onClick={() => resolveIds(g.key, g.openIds)}
+                        disabled={busyKey !== null}
+                        style={{ ...btnSecondary, fontSize: 10, padding: '4px 10px', flexShrink: 0 }}
+                      >
+                        {busyKey === g.key ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={11} />}
+                        {g.openCount > 1 ? ` Resolve all ${g.openCount}` : ' Resolve'}
+                      </button>
+                    )}
                   </div>
-                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-primary)', wordBreak: 'break-word' }}>{r.errorMessage || '(no message)'}</p>
-                  {r.inputContext && Object.keys(r.inputContext).length > 0 && (
-                    <p style={{ margin: '3px 0 0', fontSize: 10, color: '#9bb8a5', fontFamily: 'monospace' }}>
-                      {JSON.stringify(r.inputContext).slice(0, 120)}
-                    </p>
-                  )}
-                </div>
-                {!r.resolved && (
-                  <button onClick={() => markResolved(r.id)} style={{ ...btnSecondary, fontSize: 10, padding: '4px 10px', flexShrink: 0 }}>
-                    <CheckCircle2 size={11} /> Resolve
-                  </button>
-                )}
-              </div>
-            ))
+                );
+              })}
+        </>
       )}
     </div>
   );

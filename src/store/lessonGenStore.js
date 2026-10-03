@@ -85,7 +85,7 @@ export const useLessonGenStore = create(
 
       setGeneratedPlan: (plan) => set({
         generatedPlan: plan,
-        planId: plan.planId ?? 'mock-001',
+        planId: plan.planId ?? null, // unsaved plan: no id (a fake id could be written to later)
         status: 'generated',
         saveStatus: plan.planId ? 'saved' : 'idle',
       }),

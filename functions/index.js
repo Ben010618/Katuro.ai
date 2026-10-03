@@ -721,8 +721,12 @@ function dailyLimitFor(action, plan) {
   return Math.min(full, FREE_DAILY_LIMITS[action] ?? Math.max(1, Math.round(full / 3)));
 }
 
+/**
+ * Counts one use against today's limit. Returns a charge to pass to
+ * refundDailyUsage() if the generation then fails, or null when nothing was counted.
+ */
 async function checkAndIncrementDailyUsage(uid, action) {
-  if (!DAILY_LIMITS[action]) return;
+  if (!DAILY_LIMITS[action]) return null;
   const plan  = await getPlan(uid);
   const limit = dailyLimitFor(action, plan);
   const today = todayInManila();
@@ -745,6 +749,32 @@ async function checkAndIncrementDailyUsage(uid, action) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
+  return { ref, action };
+}
+
+/** A failed generation gives the teacher's unit back (never below zero). */
+async function refundDailyUsage(charge) {
+  if (!charge) return;
+  try {
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(charge.ref);
+      const current = snap.data()?.[charge.action] ?? 0;
+      if (current > 0) tx.set(charge.ref, { [charge.action]: current - 1 }, { merge: true });
+    });
+  } catch (err) {
+    console.warn(`[refundDailyUsage] Could not refund ${charge.action}: ${err.message}`);
+  }
+}
+
+/** Runs `work` with one daily use counted; a failure gives the use back. */
+async function withDailyCharge(uid, action, work) {
+  const charge = await checkAndIncrementDailyUsage(uid, action);
+  try {
+    return await work();
+  } catch (err) {
+    await refundDailyUsage(charge);
+    throw err;
+  }
 }
 
 // ── adminChangePassword ──────────────────────────────────────────────────────
@@ -782,7 +812,7 @@ exports.generateOutline = onCall(
   { region: 'us-central1', timeoutSeconds: 60 },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
-    await checkAndIncrementDailyUsage(req.auth.uid, 'outline_gen');
+    return withDailyCharge(req.auth.uid, 'outline_gen', async () => {
 
     const { subject, gradeLevel, melcCode, topic, slideCount = 12 } = req.data;
     if (!subject || !gradeLevel || !topic) {
@@ -889,6 +919,7 @@ Return ONLY this JSON:
     });
 
     return { outline, cached: false };
+    });
   }
 );
 
@@ -907,7 +938,7 @@ exports.expandSlides = onCall(
       throw new HttpsError('invalid-argument', 'subject, gradeLevel, topic, and slides array are required.');
     }
 
-    await checkAndIncrementDailyUsage(req.auth.uid, 'expand_slides');
+    return withDailyCharge(req.auth.uid, 'expand_slides', async () => {
 
     const lang         = langLabel(subject);
     const nvidiaConfig = await getNvidiaConfigServer();
@@ -1039,6 +1070,7 @@ Return ONLY this JSON (no markdown, no explanation):
     // Return all slides sorted by original id
     const allSlides = [...expanded, ...filled].sort((a, b) => a.id - b.id);
     return { slides: allSlides };
+    });
   }
 );
 
@@ -1121,7 +1153,18 @@ function buildGenerationConfig(activeModel, { temperature, maxTokens, responseMi
 // stalls / hits its daily cap is benched (by the same logic as any model) and
 // the request continues on the normal standard model — a bad lite model can
 // cost one attempt, never the whole call.
-async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, preferLite = false, model, _attempt = 0, deadlineAt, overallDeadlineAt, _tried = [] } = {}) {
+// "High demand" spikes on Gemini usually last seconds. When EVERY model we tried is
+// congested, wait briefly and try the best one again (bounded by the overall budget)
+// instead of failing the teacher on the first round. Seen 2026-09-28..10-02:
+// dll_gen / ilaw_unpack / test_builder_items failing with "Gemini 503 (gemini-3.5-flash)".
+const BUSY_RETRY_DELAYS_MS = [4000, 10000];
+const BUSY_MESSAGE = "Google's AI servers are very busy right now. Please try again in a minute. Nothing was lost, and this try did not count against your daily limit.";
+
+function busyError(activeModel) {
+  return new HttpsError('unavailable', BUSY_MESSAGE, { busy: true, retryable: true, model: activeModel });
+}
+
+async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, preferLite = false, model, _attempt = 0, deadlineAt, overallDeadlineAt, _tried = [], _busyRetry = 0 } = {}) {
   const activeModel = model || await resolveGeminiModel(key, _tried, { preferLite });
   const effectiveMaxTokens = withThinkingHeadroom(maxTokens);
   const genConfig = buildGenerationConfig(activeModel, { temperature, maxTokens, responseMimeType });
@@ -1186,7 +1229,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
       benchModel(activeModel, CONGESTED_COOLDOWN_MS);
       if (tried.length < 4 && overallEndsAt - Date.now() > 20000) {
         console.warn(`[callGeminiRaw] ${activeModel} stalled — switching model (tried: ${tried.join(', ')})`);
-        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+        return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried, _busyRetry });
       }
     }
 
@@ -1207,7 +1250,7 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
     benchModel(activeModel, RETIRED_COOLDOWN_MS);
     if (tried.length < 4) {
       console.warn(`[callGeminiRaw] Model ${activeModel} returned 404 (retired) — re-resolving (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt, overallDeadlineAt: overallEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt, overallDeadlineAt: overallEndsAt, _tried: tried, _busyRetry });
     }
   }
 
@@ -1215,17 +1258,29 @@ async function callGeminiRaw(key, contents, { temperature = 0.5, maxTokens = 204
   // (gemini-3.7-flash sat for 35s before 503ing). One quick retry in case it is
   // a blip, then bench it and move to the next-best model. 429 is handled
   // separately below: that is the key's quota, and switching model won't help.
-  if (res.status === 503) {
+  // 500/502/504 from Gemini are its own transient server faults: same handling as 503.
+  if (res.status === 503 || res.status === 500 || res.status === 502 || res.status === 504) {
     // No same-model retry here on purpose. A congested model takes its time
     // saying so — gemini-3.7-flash measured 35.7s before returning 503 — so a
     // retry burns another 35s of budget to be told the same thing, while a
     // healthy model is sitting right there in the list. Bench it and move on.
     const tried = [..._tried, activeModel];
     benchModel(activeModel, CONGESTED_COOLDOWN_MS);
-    if (tried.length < 4) {
+    // resolveGeminiModel returns an already-tried model once every candidate is
+    // benched, so "nothing new left" is either 4 tries or a repeat.
+    const exhausted = tried.length >= 4 || _tried.includes(activeModel);
+    if (!exhausted) {
       console.warn(`[callGeminiRaw] Model ${activeModel} is congested (503) — switching model (tried: ${tried.join(', ')})`);
-      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried });
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried, _busyRetry });
     }
+    const delay = BUSY_RETRY_DELAYS_MS[_busyRetry];
+    if (delay !== undefined && overallEndsAt - Date.now() > delay + 30000) {
+      const retryModel = tried[0];
+      console.warn(`[callGeminiRaw] Every model is congested (${tried.join(', ')}) — waiting ${delay / 1000}s, then retrying ${retryModel} (busy retry ${_busyRetry + 1}/${BUSY_RETRY_DELAYS_MS.length})`);
+      await new Promise(r => setTimeout(r, delay));
+      return callGeminiRaw(key, contents, { temperature, maxTokens, responseMimeType, preferLite: false, model: retryModel, _attempt: 0, overallDeadlineAt: overallEndsAt, _tried: tried, _busyRetry: _busyRetry + 1 });
+    }
+    throw busyError(activeModel);
   }
 
   // Not all 429s mean the same thing, and the difference decides whether
@@ -1482,12 +1537,19 @@ exports.generateAI = onCall(
     // airtight against a user editing their own request, but this endpoint
     // already trusts authenticated accounts for `action`/`maxTokens` the same
     // way — daily limits here are abuse-prevention, not a security boundary.
-    if (!isRetry) {
-      await checkAndIncrementDailyUsage(req.auth.uid, action);
-    }
+    const charge = isRetry ? null : await checkAndIncrementDailyUsage(req.auth.uid, action);
 
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
 
+    try {
+      return await runGeneration();
+    } catch (err) {
+      // The teacher got nothing usable: don't charge them for it.
+      await refundDailyUsage(charge);
+      throw err;
+    }
+
+    async function runGeneration() {
     try {
       const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task';
       const key = await getGeminiKey(isDesk);
@@ -1544,6 +1606,7 @@ exports.generateAI = onCall(
         }
       }
       throw geminiErr;
+    }
     }
   }
 );
@@ -2072,7 +2135,7 @@ exports.collabAIReply = onCall(
     // BUG-FIX: Add daily rate limiting. Without this, any authenticated user
     // could spam @KaTuro mentions in a loop and exhaust the shared Gemini
     // quota for all teachers. Reuses the protect_chat 40/day bucket.
-    await checkAndIncrementDailyUsage(uid, 'protect_chat');
+    return withDailyCharge(uid, 'protect_chat', async () => {
 
     const { channelId, dmId, messageText } = req.data || {};
     if (!messageText) return { ok: true };
@@ -2125,6 +2188,7 @@ Respond helpfully and concisely as if chatting in a group channel. Rules:
     }
 
     return { ok: true };
+    });
   }
 );
 
@@ -2135,7 +2199,7 @@ exports.validateMelcCode = onCall(
     if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Sign in required.');
     // BUG-FIX: Add daily rate limiting. Previously unlimited — any auth user
     // could call this in a loop and drain shared Gemini API quota.
-    await checkAndIncrementDailyUsage(req.auth.uid, 'melc_validate');
+    return withDailyCharge(req.auth.uid, 'melc_validate', async () => {
     const { subject, gradeLevel, quarter, melcCodes } = req.data || {};
     if (!melcCodes?.length || !subject) return { results: [] };
 
@@ -2185,6 +2249,7 @@ Respond ONLY with valid JSON — no markdown, no explanation outside the JSON:
     } catch {
       return { results: melcCodes.map(code => ({ code, isValid: null, confidence: 'low', suggestedCode: null, note: 'Validation unavailable.' })) };
     }
+    });
   }
 );
 

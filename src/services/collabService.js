@@ -72,7 +72,10 @@ export async function sendChannelMessage(channelId, { uid, displayName, photoURL
 }
 
 export async function createChannel(uid, { name, description }) {
-  const inviteCode = Math.random().toString(36).slice(2, 10).toUpperCase();
+  // Invite codes grant access to a private channel, so they come from the secure RNG
+  // (Math.random is predictable). 8 chars from a 32-letter alphabet without 0/O/1/I.
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const inviteCode = Array.from(crypto.getRandomValues(new Uint8Array(8)), (n) => ALPHABET[n % ALPHABET.length]).join('');
   const cleanName  = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const ref = await addDoc(collection(db, 'collabChannels'), {
     name: cleanName,

@@ -47,7 +47,8 @@ async function callPresentationFn(name, data, timeout) {
     const looksGeneric = !rawMessage || rawMessage.toLowerCase() === code.replace('functions/', '').toLowerCase();
     const isUnexplainedFailure = (code === 'functions/internal' || code === 'functions/unavailable') && looksGeneric;
 
-    if (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded') {
+    // Google-side "high demand" (details.busy) is not a kaTuro bug; keep the inbox for real errors.
+    if (!err?.details?.busy && (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded')) {
       reportAIError({
         uid: auth.currentUser?.uid,
         feature: name,

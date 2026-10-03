@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // Desk agent tests build real Excel/Word files; on a busy PC 5s was occasionally too short.
+    testTimeout: 20000,
   },
 })

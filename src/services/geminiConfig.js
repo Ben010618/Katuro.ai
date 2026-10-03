@@ -230,7 +230,35 @@ function looksLikeMissingRegion(err) {
   return (code === 'functions/internal' || code === 'functions/unavailable') && generic;
 }
 
-export async function callGeminiProxy({ action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs, tier, stream = false, onChunk, region }) {
+/**
+ * Accuracy rules sent with every web AI request (lesson plans, DLL, COT, tests,
+ * action research, scanning...). Generators may write NEW teaching content, but
+ * must never present invented facts as real. KaTuroDesk sends its own stricter
+ * rules (services/desk/agent/grounding.js), so desk actions are skipped.
+ */
+export const WEB_ACCURACY_RULES = `ACCURACY RULES (kaTuro) — follow these with every instruction below:
+1. You may write new teaching content when asked (activities, questions, explanations, rubrics).
+2. Never invent facts and present them as real: DepEd/MATATAG competency codes, DepEd Order or memo numbers, laws, statistics, research citations, names of learners/teachers/schools/officials, scores, or dates.
+3. Copy a competency code only if it appears in this request; otherwise leave the code empty.
+4. If something you need is missing or unreadable (including marks on a scanned sheet), leave it empty or say it is missing. Never fill a gap with a typical or example value.
+5. Keep exactly the output format requested below.`;
+
+const SKIP_ACCURACY_RULES = new Set(['desk_agent_run', 'desk_agent_task']);
+
+/** Puts WEB_ACCURACY_RULES in front of the first user message (once). Never mutates the input. */
+export function withAccuracyRules(action, contents) {
+  if (SKIP_ACCURACY_RULES.has(action) || !Array.isArray(contents) || !contents.length) return contents;
+  const firstUser = contents.findIndex((c) => (c?.role || 'user') === 'user' && Array.isArray(c?.parts));
+  if (firstUser === -1) return contents;
+  const parts = contents[firstUser].parts;
+  if (parts.some((p) => typeof p?.text === 'string' && p.text.startsWith('ACCURACY RULES (kaTuro)'))) return contents;
+  const copy = contents.slice();
+  copy[firstUser] = { ...contents[firstUser], parts: [{ text: WEB_ACCURACY_RULES }, ...parts] };
+  return copy;
+}
+
+export async function callGeminiProxy({ action, contents: rawContents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs, tier, stream = false, onChunk, region }) {
+  const contents = withAccuracyRules(action, rawContents);
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   // BUG-FIX: the client used to give up after 50s on every non-COT action.
   // That is SHORTER than the time the server legitimately needs to write a
@@ -450,7 +478,9 @@ export async function callGeminiProxy({ action, contents, temperature, maxTokens
     // Report any real backend failure (not rate limits / daily limits / bad
     // input, which are expected and already user-facing) so an admin sees it
     // in the AI Error inbox instead of it failing silently for days.
-    if (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded') {
+    // Google-side "high demand" (details.busy) is not a kaTuro bug and the server
+    // already retried every model; reporting it only buried real errors in the inbox.
+    if (!err?.details?.busy && (code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded')) {
       reportAIError({
         uid: auth.currentUser?.uid,
         feature: action,
