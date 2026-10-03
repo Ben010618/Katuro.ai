@@ -23,6 +23,7 @@
  */
 
 import { labelSet } from './fingerprint.js';
+import { GROUNDING_RULES } from '../agent/grounding.js';
 
 export const DOC_TYPES = ['attendance', 'class_record', 'masterlist', 'scores', 'item_analysis', 'grades_summary', 'report_card', 'lesson_plan', 'letter', 'certificate', 'form', 'other'];
 export const MEANINGS = ['learner_name', 'lrn', 'sex', 'date', 'day', 'score', 'hps', 'total', 'average', 'grade', 'remarks', 'absences', 'tardies', 'number', 'other'];
@@ -160,7 +161,7 @@ export async function recognizeMap(map, { name, ctx, memory, renderMapForAI, hin
   ctx.masker.addNames(harvestNames(map));
   const mapText = ctx.masker.mask(renderMapForAI(map, { maxRows: 90, maxChars: 26000 }));
   const raw = await ctx.llm({
-    system: 'You are an expert at reading Philippine DepEd and school documents in ANY school or division format (school forms, class records, attendance, masterlists, test results, letters). You locate where things are in a document precisely.',
+    system: 'You are an expert at reading Philippine DepEd and school documents in ANY school or division format (school forms, class records, attendance, masterlists, test results, letters). You locate where things are in a document precisely. Report only what is in the map; never guess an address or a meaning you cannot see.\n' + GROUNDING_RULES,
     prompt: `${LAYOUT_GUIDE}\n\nFile name: ${name}${hint ? `\nTeacher's note: ${ctx.masker.mask(hint)}` : ''}\n\nDocument map (addresses on the left):\n${mapText}`,
     json: true,
     maxTokens: 6000,

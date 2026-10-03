@@ -37,7 +37,8 @@ describe('buildDllParallel', () => {
       const day = prompt.match(/Write (\w+) only/)[1];
       return { objectives: `Obj ${day}`, content: `Content ${day}`, procedures: Object.fromEntries('ABCDEFGHIJ'.split('').map((k) => [k, `${k}-${day}`])) };
     });
-    const spec = await buildDllParallel({ ctx: ctxWith(llm), instructions: 'Cells', source: { text: '', visionParts: [] } });
+    const { spec, warnings } = await buildDllParallel({ ctx: ctxWith(llm), instructions: 'Cells', source: { text: '', visionParts: [] } });
+    expect(warnings.join(' ')).toMatch(/written by the AI/); // standards not in any source → flagged
     expect(llm).toHaveBeenCalledTimes(6);
     expect(peak).toBe(5); // all five days at once
     const table = spec.blocks[0];
@@ -74,7 +75,8 @@ describe('buildTosParallel', () => {
       const items = wants.flatMap(([, n, level]) => Array.from({ length: Number(n) }, (_, i) => ({ level, question: `${level} q${i}`, choices: ['a', 'b', 'c', 'd'], answer: 'b' })));
       return { items };
     });
-    const spec = await buildTosParallel({ ctx: ctxWith(llm), instructions: '10 items', source: { text: '' } });
+    const { spec, warnings } = await buildTosParallel({ ctx: ctxWith(llm), instructions: '10 items', source: { text: '' } });
+    expect(warnings.join(' ')).toMatch(/60-30-10/); // default Bloom spread is disclosed
     const table = spec.blocks.find((b) => b.type === 'table');
     expect(table.rows[0].slice(0, 4)).toEqual(['Fractions', '3', '60%', '6']);
     expect(table.rows[1].slice(0, 4)).toEqual(['Decimals', '2', '40%', '4']);
@@ -87,5 +89,30 @@ describe('buildTosParallel', () => {
     expect(q.items).toHaveLength(10);
     expect(q.showAnswers).toBe(true);
     expect(BLOOM_LEVELS).toHaveLength(6);
+  });
+});
+
+describe('never assume TOS data', () => {
+  const frameWith = (extra) => vi.fn(async ({ prompt }) => (prompt.includes('"competencies"') ? { title: 'T', competencies: [{ competency: 'Fractions', days: null }, { competency: 'Decimals', days: null }], ...extra } : { items: [] }));
+
+  it('asks for the number of items instead of assuming 30', async () => {
+    await expect(buildTosParallel({ ctx: ctxWith(frameWith({ totalItems: null })), instructions: 'make a TOS', source: { text: '' } }))
+      .rejects.toMatchObject({ code: 'NEEDS_INFO', message: expect.stringMatching(/How many items/) });
+  });
+
+  it('asks which competencies when none are given', async () => {
+    const llm = vi.fn(async () => ({ title: 'T', totalItems: 20, competencies: [] }));
+    await expect(buildTosParallel({ ctx: ctxWith(llm), instructions: 'make a TOS', source: { text: '' } })).rejects.toMatchObject({ code: 'NEEDS_INFO' });
+  });
+
+  it('discloses equal weighting when no days were given', async () => {
+    const llm = vi.fn(async ({ prompt }) => {
+      if (prompt.includes('"competencies"')) return { title: 'T', totalItems: 4, competencies: [{ competency: 'A', days: null }, { competency: 'B', days: null }] };
+      const wants = [...prompt.matchAll(/(\d+) (remembering|understanding|applying|analyzing|evaluating|creating)/g)];
+      return { items: wants.flatMap(([, n, level]) => Array.from({ length: Number(n) }, () => ({ level, question: 'q', choices: ['a', 'b', 'c', 'd'], answer: 'a' }))) };
+    });
+    const { warnings, spec } = await buildTosParallel({ ctx: ctxWith(llm), instructions: '4 items', source: { text: '' } });
+    expect(warnings.join(' ')).toMatch(/equal weight/);
+    expect(spec.blocks.find((b) => b.type === 'table').rows.slice(0, 2).map((r) => r[2])).toEqual(['50%', '50%']);
   });
 });

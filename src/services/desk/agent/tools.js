@@ -25,6 +25,7 @@ import {
   documentSpecToText,
 } from '../docSpec.js';
 import { visionPartsFor } from './visionPrep.js';
+import { GROUNDING_RULES, verifySpec } from './grounding.js';
 
 const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
 {
@@ -44,7 +45,9 @@ const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
   "signatures"?: [{ "label": "Prepared by:", "name": string, "role": string }]
 }
 Never put markdown symbols (#, ###, |---|) inside text. Use real DepEd terminology. Write complete, classroom-ready content (no placeholders like "insert here").
-Never write placeholders for people or places such as [Principal's Name], (School Head), ____ or "Name of School": use only names given in the teacher profile, and leave out anything not given. Do NOT add "signatures": the app adds them from the teacher's profile.`;
+Never write placeholders for people or places such as [Principal's Name], (School Head), ____ or "Name of School": use only names given in the teacher profile, and leave out anything not given. Do NOT add "signatures": the app adds them from the teacher's profile.
+
+${GROUNDING_RULES}`;
 
 const DOC_TYPE_GUIDES = {
   dll: 'Daily Lesson Log (DepEd Order 42, s.2016 format). Landscape. One table with columns ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] and rows for: I. OBJECTIVES, A. Content Standards, B. Performance Standards, C. Learning Competencies/Objectives (with code), II. CONTENT, III. LEARNING RESOURCES (A. References 1. Teacher\'s Guide pages 2. Learner\'s Materials pages 3. Textbook pages 4. Additional Materials from LR portal, B. Other Learning Resources), IV. PROCEDURES (A. Reviewing previous lesson or presenting the new lesson, B. Establishing a purpose for the lesson, C. Presenting examples/instances, D. Discussing new concepts and practicing new skills #1, E. Discussing new concepts and practicing new skills #2, F. Developing mastery, G. Finding practical applications, H. Making generalizations and abstractions, I. Evaluating learning, J. Additional activities for application or remediation), V. REMARKS, VI. REFLECTION (A–G standard reflection questions). Meta: School, Grade Level, Teacher, Learning Area, Teaching Dates and Time, Quarter.',
@@ -171,7 +174,7 @@ async function extractTableWithAI(path, ctx, what = 'a table') {
   }
   const textContext = parsed.needsVision ? '' : `\n\nDocument text:\n${ctx.masker.mask(parsed.text || '').slice(0, 20000)}`;
   const result = await ctx.llm({
-    system: 'You are a meticulous data-entry assistant for a Filipino DepEd teacher. You transcribe tables exactly, including handwritten ones.',
+    system: `You are a meticulous data-entry assistant for a Filipino DepEd teacher. You transcribe tables exactly, including handwritten ones. Never correct, complete, or guess a value: copy what is written; if a cell is unreadable write "?" and list it in notes.\n${GROUNDING_RULES}`,
     prompt: `Transcribe ${what} from this file into JSON: {"title": string, "columns": [string], "rows": [[string]] , "notes": string}. Keep every learner row and every column in order, copy names exactly as written, keep numbers as written, use "" for blank cells, and mention unreadable cells in "notes" (do not guess them).${textContext}`,
     parts,
     json: true,
@@ -188,6 +191,21 @@ function base64ToBytes(b64) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+
+/**
+ * Missing information is never guessed: tools throw this, and the teacher sees the question.
+ * (e.g. no HPS row, total items not stated, learning area unknown, no answer key)
+ */
+/** Everything the AI was allowed to use, for verifySpec(). */
+function allowedTextFor(ctx, ...parts) {
+  return [ctx.teacher.facts, ...parts.map((p) => ctx.masker.unmask(String(p || '')))].join('\n');
+}
+
+export function needsInfo(question) {
+  const e = new Error(question);
+  e.code = 'NEEDS_INFO';
+  return e;
 }
 
 function numberOr(v, fallback) {
@@ -221,7 +239,7 @@ export const TOOLS = {
       const { text, visionParts } = await gatherSourceText(paths, ctx);
       const answer = await ctx.llm({
         system: ctx.persona,
-        prompt: `${question}\n\nFiles:\n${text}`,
+        prompt: `Answer ONLY from the files below. Say which file each fact comes from. If the files do not contain the answer, say so plainly — do not guess or use outside assumptions about this class.\n\nQuestion: ${question}\n\nFiles:\n${text}`,
         parts: visionParts,
         maxTokens: 3072,
         onText: (full) => ctx.streamReply?.(ctx.masker.unmask(full)),
@@ -246,12 +264,14 @@ export const TOOLS = {
           const { buildDllParallel, buildTosParallel } = await import('./docBuilders.js');
           const builder = docType === 'dll' ? buildDllParallel : buildTosParallel;
           const built = await builder({ ctx, title, instructions, subject, gradeLevel, curriculum, source: { text, visionParts }, report });
-          const spec = normalizeDocumentSpec({ ...built, header: headerFor(ctx), signatures: teacherSignatures(ctx) });
+          const checked = verifySpec(built.spec, { allowedText: allowedTextFor(ctx, instructions, curriculum, text), knownNames: ctx.masker.names() });
+          const spec = normalizeDocumentSpec({ ...checked.spec, header: headerFor(ctx), signatures: teacherSignatures(ctx) });
           report('Building the file…');
           const files = await saveDocumentOutputs(spec, slug(spec.title), formats, ctx);
-          return { summary: `Created ${files.map((f) => f.name).join(' and ')}`, artifacts: [documentArtifact(spec, files, { docType })] };
+          return { summary: `Created ${files.map((f) => f.name).join(' and ')}`, warnings: [...built.warnings, ...checked.warnings], artifacts: [documentArtifact(spec, files, { docType })] };
         } catch (err) {
-          if (err?.code === 'AI_UNAVAILABLE') throw err;
+          // Missing information is asked for — never papered over by the single-call writer.
+          if (err?.code === 'AI_UNAVAILABLE' || err?.code === 'NEEDS_INFO') throw err;
           console.warn(`[KaTuroDesk] Parallel ${docType} failed, using single-call writer:`, err);
         }
       }
@@ -273,8 +293,9 @@ export const TOOLS = {
         json: true,
         maxTokens: 12000,
       });
+      const checked = verifySpec(ctx.masker.unmask(raw), { allowedText: allowedTextFor(ctx, instructions, curriculum, text), knownNames: ctx.masker.names() });
       const spec = normalizeDocumentSpec({
-        ...ctx.masker.unmask(raw),
+        ...checked.spec,
         header: headerFor(ctx),
         // Signatures always come from the teacher's profile — never from the AI (no invented names).
         signatures: teacherSignatures(ctx),
@@ -283,7 +304,7 @@ export const TOOLS = {
       if (title) spec.title = title;
       report('Building the file…');
       const files = await saveDocumentOutputs(spec, slug(spec.title), formats, ctx);
-      return { summary: `Created ${files.map((f) => f.name).join(' and ')}`, artifacts: [documentArtifact(spec, files, { docType })] };
+      return { summary: `Created ${files.map((f) => f.name).join(' and ')}`, warnings: checked.warnings, artifacts: [documentArtifact(spec, files, { docType })] };
     },
   },
 
@@ -301,10 +322,11 @@ export const TOOLS = {
         json: true,
         maxTokens: 12000,
       });
-      const spec = normalizeDocumentSpec({ ...ctx.masker.unmask(raw), header: current.spec.header });
+      const checked = verifySpec(ctx.masker.unmask(raw), { allowedText: allowedTextFor(ctx, JSON.stringify(current.spec), instructions), knownNames: ctx.masker.names() });
+      const spec = normalizeDocumentSpec({ ...checked.spec, header: current.spec.header });
       const fmts = formats || [...new Set((current.files || []).map((f) => f.format).filter((f) => ['docx', 'pdf'].includes(f)))];
       const files = await saveDocumentOutputs(spec, `${slug(spec.title)}_revised`, fmts.length ? fmts : ['docx'], ctx);
-      return { summary: `Saved the revised version as ${files.map((f) => f.name).join(' and ')}`, artifacts: [documentArtifact(spec, files)] };
+      return { summary: `Saved the revised version as ${files.map((f) => f.name).join(' and ')}`, warnings: checked.warnings, artifacts: [documentArtifact(spec, files)] };
     },
   },
 
@@ -317,19 +339,21 @@ export const TOOLS = {
       const { text, visionParts } = await gatherSourceText(sourcePaths, ctx);
       report('Writing the slides…');
       const raw = await ctx.llm({
-        system: 'You create clear, engaging DepEd classroom slide decks (MATATAG-aligned). Short bullets (max 6 per slide, max 12 words each), age-appropriate language, include an activity slide, a generalization slide and a short check-for-understanding slide.',
+        system: `You create clear, engaging DepEd classroom slide decks (MATATAG-aligned). Short bullets (max 6 per slide, max 12 words each), age-appropriate language, include an activity slide, a generalization slide and a short check-for-understanding slide.\n${GROUNDING_RULES}`,
         prompt: `Return ONLY JSON: {"title": string, "subtitle": string, "slides": [{"title": string, "layout": "title"|"bullets"|"twoColumn", "bullets": [string], "left"?: [string], "right"?: [string], "notes": string (what the teacher says)}]}\nTopic: ${topic}\n${subject ? `Learning area: ${subject}\n` : ''}${gradeLevel ? `Grade level: ${gradeLevel}\n` : ''}About ${numberOr(slideCount, 10)} slides. ${ctx.masker.mask(instructions)}${text ? `\n\nSource files:\n${text}` : ''}`,
         parts: visionParts,
         json: true,
         maxTokens: 8192,
       });
-      const spec = normalizeSlidesSpec(ctx.masker.unmask(raw));
+      const checkedSlides = verifySpec(ctx.masker.unmask(raw), { allowedText: allowedTextFor(ctx, topic, instructions, text), knownNames: ctx.masker.names() });
+      const spec = normalizeSlidesSpec(checkedSlides.spec);
       if (!spec.slides.length) throw new Error('The AI returned no slides. Please try again.');
       report('Building the PowerPoint…');
       const { buildPptx } = await import('../generators/pptxFromSpec.js');
       const file = await ctx.saveOutput(`${slug(spec.title)}.pptx`, await buildPptx(spec), 'pptx');
       return {
         summary: `Created ${file.name} (${spec.slides.length} slides)`,
+        warnings: checkedSlides.warnings,
         artifacts: [{ type: 'slides', title: spec.title, subtitle: file.name, spec, files: [file], editable: false }],
       };
     },
@@ -343,7 +367,7 @@ export const TOOLS = {
       const { text, visionParts } = await gatherSourceText(sourcePaths, ctx);
       report('Designing the workbook…');
       const raw = await ctx.llm({
-        system: 'You build tidy, ready-to-use Excel workbooks for Filipino DepEd teachers.',
+        system: `You build tidy, ready-to-use Excel workbooks for Filipino DepEd teachers. Put only data the teacher or the files gave you; leave cells blank when a value is unknown.\n${GROUNDING_RULES}`,
         prompt: `Return ONLY JSON: {"title": string, "sheets": [{"name": string, "columns": [{"header": string, "width"?: number}], "rows": [[string|number|null]]}]}\nNumbers must be JSON numbers. Title: ${title}\nInstructions: ${ctx.masker.mask(instructions)}${text ? `\n\nSource files:\n${text}` : ''}`,
         parts: visionParts,
         json: true,
@@ -363,8 +387,8 @@ export const TOOLS = {
   analyze_scores: {
     label: 'Item analysis & LMC',
     description: 'Item analysis of a quiz/test score sheet (Excel/CSV, photo, or scanned PDF): MPS, mastery level, difficulty & discrimination per item, Least Mastered Competencies, learners below 75%. Saves an Item Analysis report (.docx) and workbook (.xlsx). Computed exactly in code.',
-    args: '{ "path": string, "sheet"?: string, "testTitle"?: string, "subject"?: string, "gradeSection"?: string, "quarter"?: string, "competencies"?: [string] (one per item, optional), "lmcThreshold"?: number }',
-    async run({ path, sheet, testTitle, subject, gradeSection, quarter, competencies = [], lmcThreshold = 75 }, ctx, report) {
+    args: '{ "path": string, "sheet"?: string, "testTitle"?: string, "subject"?: string, "gradeSection"?: string, "quarter"?: string, "competencies"?: [string] (one per item, optional), "lmcThreshold"?: number, "totalItems"?: number (ONLY if the teacher stated it) }',
+    async run({ path, sheet, testTitle, subject, gradeSection, quarter, competencies = [], lmcThreshold = 75, totalItems: statedTotal }, ctx, report) {
       report(`Reading scores from ${path}…`);
       const { table, sheetName } = await loadScoreTable(path, ctx, { sheet });
       const meta = {
@@ -379,6 +403,9 @@ export const TOOLS = {
 
       let analysis;
       let kind;
+      if (table.needsAnswerKey) {
+        throw needsInfo(`${path} has letter answers but no answer key. Please add a row labeled KEY with the correct answer for each item, then ask me again.`);
+      }
       if (table.mode === 'items' && table.responses?.length) {
         report(`Analyzing ${table.learners.length} learners × ${table.itemCols.length} items…`);
         const items = table.itemCols.map((c, i) => ({ number: i + 1, competency: competencies[i] || '' }));
@@ -386,7 +413,11 @@ export const TOOLS = {
         kind = 'items';
       } else {
         const totals = toTotals(table);
-        if (!totals.totalItems) throw new Error('I found total scores but not the number of items. Tell me the total items (e.g. "out of 30").');
+        const stated = Number(statedTotal);
+        if (!totals.totalItems && Number.isFinite(stated) && stated > 0) totals.totalItems = stated;
+        if (!totals.totalItems) throw needsInfo(`${path} has total scores but doesn't say how many items the test had. How many items? (e.g. "out of 30")`);
+        const over = totals.learners.filter((l) => l.score > totals.totalItems);
+        if (over.length) throw needsInfo(`${over.length} learner(s) in ${path} scored above ${totals.totalItems} (e.g. ${over[0].name}: ${over[0].score}). Please check the total number of items or those scores.`);
         report(`Analyzing total scores of ${totals.learners.length} learners…`);
         analysis = analyzeTotals(totals.learners, totals.totalItems, { passPercent: numberOr(lmcThreshold, 75) });
         kind = 'totals';
@@ -505,28 +536,47 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         }),
         header: null,
       });
+      const checkedSlips = verifySpec(spec, { allowedText: allowedTextFor(ctx, focus, text, competency), knownNames: ctx.masker.names() });
       report('Building the printable slips…');
-      const files = await saveDocumentOutputs(spec, slug(`Remedial_Slips_${practice.competency || focus || subject}`, 50), formats, ctx);
-      return { summary: `Created remedial slips + 5-item re-test (${files.map((f) => f.name).join(', ')})`, artifacts: [documentArtifact(spec, files)] };
+      const files = await saveDocumentOutputs(checkedSlips.spec, slug(`Remedial_Slips_${practice.competency || focus || subject}`, 50), formats, ctx);
+      return { summary: `Created remedial slips + 5-item re-test (${files.map((f) => f.name).join(', ')})`, warnings: checkedSlips.warnings, artifacts: [documentArtifact(checkedSlips.spec, files)] };
     },
   },
 
   make_class_record: {
     label: 'e-Class Record',
     description: 'Encode raw scores into an official DepEd e-Class Record workbook (DO 8 s.2015: WW/PT/QA, PS, WS, initial and transmuted grades with live Excel formulas) plus a printable grade summary. Source can be an Excel/CSV score sheet, a photo, or scanned PDF.',
-    args: '{ "path": string, "sheet"?: string, "subject"?: string, "gradeLevel"?: string, "gradeSection"?: string, "quarter"?: string, "weights"?: "languages"|"scienceMath"|"mapehEpp"|"shsCore"|"shsAcademic"|"shsImmersion"|"shsTvl" }',
-    async run({ path, sheet, subject = '', gradeLevel = '', gradeSection = '', quarter = '', weights }, ctx, report) {
+    args: '{ "path": string, "sheet"?: string, "subject"?: string, "gradeLevel"?: string, "gradeSection"?: string, "quarter"?: string, "weights"?: "languages"|"scienceMath"|"mapehEpp"|"shsCore"|"shsAcademic"|"shsImmersion"|"shsTvl", "component"?: "ww"|"pt"|"qa" (ONLY if the teacher said which component a single score column is), "hps"?: number (ONLY if the teacher stated the highest possible score) }',
+    async run({ path, sheet, subject = '', gradeLevel = '', gradeSection = '', quarter = '', weights, component, hps: statedHps }, ctx, report) {
+      // DO 8 weights depend on the learning area — never guess it.
+      if (!WEIGHT_PRESETS[weights] && !String(subject).trim()) {
+        throw needsInfo('Which learning area is this class record for? (DepEd Order 8 uses different weights: e.g. Math/Science 40-40-20, Languages/AP/EsP 30-50-20, MAPEH/EPP/TLE 20-60-20.) Tell me the subject and grade level.');
+      }
       report(`Reading scores from ${path}…`);
       const { table, sheetName } = await loadScoreTable(path, ctx, { sheet });
       let learners;
       let hps;
       if (table.mode === 'components') {
+        if (table.hpsMissing) {
+          throw needsInfo(`${path} is missing some highest possible scores (HPS). Please add an HPS row above the learners with the perfect score of every Written Work, Performance Task and Quarterly Assessment, then ask me again.`);
+        }
         ({ learners, hps } = toComponentLearners(table));
       } else {
-        // Only one set of scores: treat it as a single Written Work entry the teacher can extend.
+        // A single column of scores: the teacher must say which component it is and its HPS.
         const totals = toTotals(table);
-        learners = table.learners.map((l, i) => ({ name: l.name, gender: l.gender, ww: { scores: [totals.learners[i]?.score ?? null] }, pt: { scores: [] }, qa: { scores: [] } }));
-        hps = { ww: [totals.totalItems || Math.max(...totals.learners.map((x) => x.score || 0), 0)], pt: [], qa: [] };
+        const total = totals.totalItems || (Number(statedHps) > 0 ? Number(statedHps) : null);
+        if (!['ww', 'pt', 'qa'].includes(component) || !total) {
+          throw needsInfo(`${path} has only one column of scores. Which component are they (Written Work, Performance Task, or Quarterly Assessment)${total ? '' : ', and what is the highest possible score'}?`);
+        }
+        const byName = new Map(totals.learners.map((l) => [l.name, l.score]));
+        learners = table.learners.map((l) => ({
+          name: l.name,
+          gender: l.gender,
+          ww: { scores: component === 'ww' ? [byName.get(l.name) ?? null] : [] },
+          pt: { scores: component === 'pt' ? [byName.get(l.name) ?? null] : [] },
+          qa: { scores: component === 'qa' ? [byName.get(l.name) ?? null] : [] },
+        }));
+        hps = { ww: component === 'ww' ? [total] : [], pt: component === 'pt' ? [total] : [], qa: component === 'qa' ? [total] : [] };
       }
       const presetKey = WEIGHT_PRESETS[weights] ? weights : weightPresetFor(subject, gradeLevel);
       const preset = WEIGHT_PRESETS[presetKey];
@@ -553,7 +603,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const spec = normalizeDocumentSpec({ ...classRecordSummarySpec({ meta, rows }), header: headerFor(ctx), signatures: teacherSignatures(ctx) });
       const docs = await saveDocumentOutputs(spec, slug(`Grade_Summary_${subject || sheetName}`), ['docx'], ctx);
       const failing = rows.filter((r) => r.quarterlyGrade < 75).length;
-      const summary = `${learners.length} learners encoded; ${failing} below 75 (weights WW ${preset.ww * 100}% / PT ${preset.pt * 100}% / QA ${preset.qa * 100}%)`;
+      const summary = `${learners.length} learners encoded; ${failing} below 75. DO 8 weights used: ${preset.label} — WW ${Math.round(preset.ww * 100)}% / PT ${Math.round(preset.pt * 100)}% / QA ${Math.round(preset.qa * 100)}%${WEIGHT_PRESETS[weights] ? '' : ` (from the subject "${subject}"${gradeLevel ? `, ${gradeLevel}` : ''}; tell me if these weights are wrong)`}`;
       return { summary, artifacts: [documentArtifact(spec, [xlsx, ...docs], { subtitle: summary })] };
     },
   },

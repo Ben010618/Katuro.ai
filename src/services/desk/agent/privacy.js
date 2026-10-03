@@ -61,6 +61,10 @@ export function createNameMasker({ enabled = true } = {}) {
       }
       if (changed) rebuild();
     },
+    /** Learner names read from files this turn (also used to spot names the AI made up). */
+    names() {
+      return [...codeByName.keys()];
+    },
     codeFor(name) {
       return codeByName.get(String(name || '').replace(/\s+/g, ' ').trim()) || name;
     },

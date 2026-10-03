@@ -5,8 +5,8 @@
  * desk does. Here a short "frame" call plans the document, then each day (DLL) or
  * each competency (TOS) is written at the same time, and code assembles the exact
  * DepEd layout. All counts and item numbers are computed in code.
- * Each builder returns a DocumentSpec, or throws so the caller can fall back to
- * the single-call path.
+ * Each builder returns { spec, warnings }, or throws so the caller can fall back to
+ * the single-call path. Missing data (e.g. number of items) throws NEEDS_INFO: never assumed.
  */
 
 import { normalizeDocumentSpec } from '../docSpec.js';
@@ -40,6 +40,12 @@ const BLOOM_LABELS = ['Remembering', 'Understanding', 'Applying', 'Analyzing', '
 export const DEFAULT_BLOOM_PERCENT = { remembering: 30, understanding: 30, applying: 15, analyzing: 15, evaluating: 5, creating: 5 };
 
 const str = (v) => (v === null || v === undefined ? '' : String(v).trim());
+
+function needsInfo(question) {
+  const e = new Error(question);
+  e.code = 'NEEDS_INFO';
+  return e;
+}
 
 /** Splits `total` into integer parts proportional to `weights` (largest remainder; parts sum exactly to total). */
 export function apportion(total, weights) {
@@ -85,11 +91,11 @@ export async function buildDllParallel({ ctx, title, instructions, subject, grad
   const frame = await ctx.llm({
     system: `${ctx.docPersona}\nYou plan DepEd Daily Lesson Logs (DO 42, s. 2016) aligned with the MATATAG curriculum.`,
     prompt: `Plan one week of a Daily Lesson Log. Return ONLY JSON:
-{"title": string, "gradeLevel": string, "learningArea": string, "quarter": string, "teachingDates": string,
+{"title": string, "gradeLevel": string, "learningArea": string, "quarter": string, "teachingDates": string ("" unless the teacher gave dates),
  "contentStandard": string, "performanceStandard": string,
  "days": [{"day": "Monday", "competency": string (with code if known), "topic": string}],
  "resources": {"teachersGuide": string, "learnersMaterials": string, "textbook": string, "additional": string, "other": string}}
-Use 5 days (Monday–Friday) unless the teacher asks for fewer.
+Use 5 days (Monday–Friday) unless the teacher asks for fewer. Use "" for anything not given (quarter, dates, resource page numbers). Put a competency code only if it appears in the official list or the source files.
 ${subject ? `Learning area: ${subject}\n` : ''}${gradeLevel ? `Grade level: ${gradeLevel}\n` : ''}${curriculum ? `${curriculum}\n` : ''}Teacher's instructions: ${ctx.masker.mask(instructions)}${source.text ? `\n\nSource files (use their actual content):\n${source.text}` : ''}`,
     parts: source.visionParts,
     json: true,
@@ -141,7 +147,13 @@ Each procedure: 1-3 sentences, specific to this day's topic "${str(d.topic)}". N
     ...REFLECTION.map((q) => [q, ...blank()]),
   ];
 
-  return normalizeDocumentSpec({
+  const warnings = [];
+  const given = `${curriculum || ''}\n${source.text || ''}`.toLowerCase();
+  const csGiven = str(frame.contentStandard) && given.includes(str(frame.contentStandard).toLowerCase().slice(0, 40));
+  if (str(frame.contentStandard) && !csGiven) {
+    warnings.push('The content and performance standards were written by the AI (they were not in your files or the official list I have). Please check them against your curriculum guide.');
+  }
+  const spec = normalizeDocumentSpec({
     title: title || unmask(frame.title) || 'Daily Lesson Log',
     orientation: 'landscape',
     meta: [
@@ -154,6 +166,7 @@ Each procedure: 1-3 sentences, specific to this day's topic "${str(d.topic)}". N
     ].filter((m) => m.value),
     blocks: [{ type: 'table', columns: ['', ...dayNames], rows, widths: [2.2, ...days.map(() => 1)] }],
   });
+  return { spec, warnings };
 }
 
 // ─────────────────────────── TOS + test ───────────────────────────
@@ -197,19 +210,30 @@ export async function buildTosParallel({ ctx, title, instructions, subject, grad
   const frame = await ctx.llm({
     system: `${ctx.docPersona}\nYou prepare DepEd Tables of Specifications based on Bloom's Revised Taxonomy.`,
     prompt: `Return ONLY JSON:
-{"title": string, "learningArea": string, "gradeLevel": string, "quarter": string, "totalItems": number,
- "competencies": [{"competency": string, "code": string, "days": number}],
+{"title": string, "learningArea": string, "gradeLevel": string, "quarter": string, "totalItems": number or null,
+ "competencies": [{"competency": string, "code": string, "days": number or null}],
  "bloomPercent": {"remembering": n, "understanding": n, "applying": n, "analyzing": n, "evaluating": n, "creating": n} or null}
-Use the teacher's number of items (default 30) and their Bloom distribution if they gave one (else null). Days = instructional days per competency.
+totalItems = the number of test items the teacher stated, or null if they did not say. bloomPercent = the teacher's Bloom distribution, or null if not given. days = instructional days per competency ONLY if the teacher or the files give them, else null. code = only if it appears in the official list or the files, else "".
 ${subject ? `Learning area: ${subject}\n` : ''}${gradeLevel ? `Grade level: ${gradeLevel}\n` : ''}${curriculum ? `${curriculum}\n` : ''}Teacher's instructions: ${ctx.masker.mask(instructions)}${source.text ? `\n\nSource files:\n${source.text}` : ''}`,
     parts: source.visionParts,
     json: true,
     maxTokens: 2000,
   });
   const comps = (Array.isArray(frame?.competencies) ? frame.competencies : []).filter((c) => c && str(c.competency)).slice(0, 15);
-  const totalItems = Math.min(100, Math.max(5, Math.round(Number(frame?.totalItems) || 30)));
-  if (!comps.length) throw new Error('TOS plan had no competencies');
-  const plan = allocateTos(comps, totalItems, frame?.bloomPercent);
+  if (!comps.length) throw needsInfo('Which learning competencies should the test cover? Attach your lesson/curriculum file or list them.');
+  const statedItems = Math.round(Number(frame?.totalItems));
+  if (!Number.isFinite(statedItems) || statedItems < 1) throw needsInfo('How many items should the test have? (e.g. 30 or 50)');
+  const totalItems = Math.min(100, statedItems);
+  const warnings = [];
+  if (statedItems > 100) warnings.push(`I capped the test at 100 items (you asked for ${statedItems}).`);
+  const daysGiven = comps.every((c) => Number(c.days) > 0);
+  if (!daysGiven) {
+    comps.forEach((c) => { c.days = 1; });
+    warnings.push('No instructional days were given, so every competency has equal weight. Tell me the days per competency to weight them properly.');
+  }
+  const bloomGiven = frame?.bloomPercent && BLOOM_LEVELS.some((l) => Number(frame.bloomPercent[l]) > 0);
+  if (!bloomGiven) warnings.push("Bloom's levels use the common DepEd 60-30-10 spread (easy 60%, average 30%, difficult 10%). Tell me if your school uses a different distribution.");
+  const plan = allocateTos(comps, totalItems, bloomGiven ? frame.bloomPercent : DEFAULT_BLOOM_PERCENT);
 
   report?.(`Writing items for ${plan.filter((p) => p.items).length} competencies at the same time…`);
   const groups = await parallel(plan, 5, async (row) => {
@@ -263,7 +287,8 @@ ${source.text ? `Base the items on this material:\n${source.text.slice(0, 6000)}
     widths: [3, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 1.2],
   };
 
-  return normalizeDocumentSpec({
+  if (written < totalItems) warnings.push(`Only ${written} of the ${totalItems} requested items could be written; the TOS shows the items actually in the test.`);
+  const spec = normalizeDocumentSpec({
     title: title || str(frame.title) || 'Table of Specifications and Test',
     orientation: 'landscape',
     meta: [
@@ -282,4 +307,5 @@ ${source.text ? `Base the items on this material:\n${source.text.slice(0, 6000)}
       { type: 'questions', items: allItems.map(({ question, choices, answer }) => ({ question, choices, answer })), showAnswers: true },
     ],
   });
+  return { spec, warnings };
 }

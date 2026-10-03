@@ -31,6 +31,7 @@ import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
+import { GROUNDING_RULES } from './grounding.js';
 
 export const OUTPUT_ROOT = 'KaTuro Outputs';
 
@@ -83,12 +84,12 @@ const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${t
 /** Chat voice: the persona the teacher picked in Settings (Matt / Luna). */
 export function personaFor(teacher, personaId, now = new Date()) {
   const p = getPersona(personaId);
-  return `${baseRole(teacher)}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.`;
+  return `${baseRole(teacher)}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.\n\n${GROUNDING_RULES}`;
 }
 
 /** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
 export function docPersonaFor(teacher) {
-  return `${baseRole(teacher)} Write in formal, clear, professional DepEd English suitable for official school documents. No slang, jokes or emojis.`;
+  return `${baseRole(teacher)} Write in formal, clear, professional DepEd English suitable for official school documents. No slang, jokes or emojis.\n\n${GROUNDING_RULES}`;
 }
 
 function curriculumHint(subject, gradeLevel, text = '') {
@@ -349,10 +350,14 @@ export async function runDeskAgentTurn({
       const r = results.get(t.id);
       if (r?.status === 'done') {
         lines.push(`✓ ${t.label}: ${r.result?.summary || 'done'}`);
+        for (const w of r.result?.warnings || []) lines.push(`⚠ Please check: ${w}`);
         if (r.result?.reply) extraReplies.push(cleanReply(r.result.reply));
         for (const a of r.result?.artifacts || []) {
           artifacts.push({ id: `art-${Date.now()}-${artifacts.length}`, createdAt: Date.now(), sourceTool: t.tool, ...a });
         }
+      } else if (r?.status === 'error' && r.code === 'NEEDS_INFO') {
+        // Missing information is asked for, never guessed.
+        lines.push(`❓ ${t.label}: ${r.error}`);
       } else if (r?.status === 'error') {
         lines.push(`✗ ${t.label}: ${r.error}`);
       } else if (r?.status === 'skipped') {

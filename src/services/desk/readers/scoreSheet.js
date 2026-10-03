@@ -368,18 +368,17 @@ export function detectScoreTable(rows) {
     trimTrailingEmpty(learners, rows, allCols, afterBreak);
     const components = {};
     for (const k of ['ww', 'pt', 'qa']) {
-      const hps = comp[k].map((c) => {
-        const h = toNumber(hpsRow[c]);
-        if (h !== null) return h;
-        return learners.reduce((m, l) => Math.max(m, toNumber(rows[l.row][c]) ?? 0), 0);
-      });
+      // Never estimate an HPS from learners' scores: a missing HPS stays null and is reported.
+      const hps = comp[k].map((c) => toNumber(hpsRow[c]));
       components[k] = { cols: comp[k], hps };
     }
-    if (hpsRowIndex === null) notes.push('HPS estimated from the highest score in each column.');
+    const hpsMissing = ['ww', 'pt', 'qa'].some((k) => components[k].hps.some((h) => h === null));
+    if (hpsMissing) notes.push('Some highest possible scores (HPS) are missing.');
     return {
       mode: 'components',
       ...base,
       components,
+      hpsMissing,
       componentScores: learners.map((l) => ({
         ww: comp.ww.map((c) => toNumber(rows[l.row][c])),
         pt: comp.pt.map((c) => toNumber(rows[l.row][c])),
@@ -456,12 +455,11 @@ export function detectScoreTable(rows) {
     const scores = learners.map((l) => toNumber(rows[l.row][c]));
     let totalItems = totalFromLabel(total.label) ?? toNumber(hpsRow[c]);
     if (totalItems === null && itemCols.length >= 3) totalItems = itemCols.length;
-    if (totalItems === null) {
-      totalItems = Math.max(0, ...scores.filter((s) => s !== null));
-      notes.push('Total items not stated — using the highest score as the total.');
-    }
+    // Never use the top score as the total: an unstated total stays null and is reported.
+    const totalItemsMissing = totalItems === null;
+    if (totalItemsMissing) notes.push('Total number of items is not stated in the file.');
     if (lettersWithoutKey) notes.push('Letter answers found but no answer key row — using the total score column.');
-    return { mode: 'totals', ...base, totalCol: c, totalItems, scores };
+    return { mode: 'totals', ...base, totalCol: c, totalItems, totalItemsMissing, scores };
   }
 
   if (lettersWithoutKey) {

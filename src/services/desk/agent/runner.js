@@ -66,7 +66,7 @@ export async function runTaskGraph(tasks, execute, { concurrency = TASK_CONCURRE
           }))
           .then(
             (result) => settle(t.id, { status: 'done', result, detail: result?.summary }),
-            (error) => settle(t.id, { status: 'error', error: error?.message || String(error) }),
+            (error) => settle(t.id, { status: 'error', error: error?.message || String(error), code: error?.code }),
           )
           .finally(() => {
             running -= 1;

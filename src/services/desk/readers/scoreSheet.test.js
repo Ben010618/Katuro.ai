@@ -153,7 +153,9 @@ describe('detectScoreTable — totals', () => {
     const t = detectScoreTable(rows);
     expect(t.mode).toBe('totals');
     expect(t.learners).toHaveLength(3);
-    expect(t.totalItems).toBe(15);
+    // The top score (15) is NOT assumed to be the total — it is reported as missing.
+    expect(t.totalItems).toBeNull();
+    expect(t.totalItemsMissing).toBe(true);
   });
 });
 
