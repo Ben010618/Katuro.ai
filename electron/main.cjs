@@ -1,8 +1,32 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, Notification, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+// Scheduled tasks run inside the window, so only ONE KaTuroDesk may run at a time
+// (two copies would run every task twice). A second launch just shows the first window.
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) app.quit();
+
+// Theme colors of the top studio bar, used for the window controls area.
+const TITLE_BAR = { color: '#16211a', symbolColor: '#c9d8ce', height: 40 };
+
+// Background mode: keep running in the tray when the window is closed, so scheduled
+// tasks still run on time. Saved on this PC; off until the teacher turns it on.
+const backgroundFile = () => path.join(app.getPath('userData'), 'background.json');
+function readBackgroundSettings() {
+  try {
+    const s = JSON.parse(fs.readFileSync(backgroundFile(), 'utf-8'));
+    return { keepRunning: s.keepRunning === true, openAtLogin: s.keepRunning === true && s.openAtLogin === true };
+  } catch (e) {
+    return { keepRunning: false, openAtLogin: false };
+  }
+}
+let backgroundSettings = { keepRunning: false, openAtLogin: false };
+const startedHidden = process.argv.includes('--background');
 
 // Every fs IPC call must target a folder the teacher picked in this session
 // (or the one restored from last session). The renderer never gets raw disk access.
@@ -80,26 +104,94 @@ function toBuffer(content) {
   throw new Error('Unsupported file content type');
 }
 
+const appIconPath = () => path.join(__dirname, '../dist/favicon.png');
+
+function showMainWindow() {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function ensureTray() {
+  if (tray || !backgroundSettings.keepRunning) return;
+  const icon = nativeImage.createFromPath(appIconPath()).resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.setToolTip('KaTuroDesk — running in the background for your scheduled tasks');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open KaTuroDesk', click: showMainWindow },
+    { type: 'separator' },
+    { label: 'Quit KaTuroDesk', click: () => { isQuitting = true; app.quit(); } },
+  ]));
+  tray.on('click', showMainWindow);
+}
+
+function removeTray() {
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
+
+function applyBackgroundSettings(next) {
+  backgroundSettings = {
+    keepRunning: next.keepRunning === true,
+    openAtLogin: next.keepRunning === true && next.openAtLogin === true,
+  };
+  try {
+    fs.writeFileSync(backgroundFile(), JSON.stringify(backgroundSettings));
+  } catch (e) {}
+  if (app.isPackaged) {
+    app.setLoginItemSettings({ openAtLogin: backgroundSettings.openAtLogin, args: ['--background'] });
+  }
+  if (backgroundSettings.keepRunning) ensureTray();
+  else removeTray();
+  return backgroundSettings;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'KaTuroDesk — DepEd Co-Teacher Studio',
-    backgroundColor: '#1b2620',
-    icon: path.join(__dirname, '../dist/favicon.png'),
+    title: 'KaTuroDesk',
+    backgroundColor: '#16211a',
+    icon: appIconPath(),
+    // The Windows title bar is replaced by the app's own dark top bar (same theme);
+    // the minimize / maximize / close buttons stay, drawn in the bar's colors.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: TITLE_BAR,
+    show: !(startedHidden && backgroundSettings.keepRunning),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
       plugins: true, // built-in Chromium PDF viewer for the Canvas preview
+      backgroundThrottling: false, // scheduled tasks keep their timing while hidden in the tray
     },
   });
 
   // Remove default menu bar for clean app feel
   mainWindow.setMenuBarVisibility(false);
+
+  // Keep "KaTuroDesk" as the window/taskbar name instead of the web page title.
+  mainWindow.on('page-title-updated', (event) => event.preventDefault());
+
+  // In background mode, closing the window hides it to the tray (tasks keep running).
+  mainWindow.on('close', (event) => {
+    if (backgroundSettings.keepRunning && !isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
   const consoleLogFile = path.join(app.getPath('userData'), 'desk-console.log');
   try {
@@ -242,8 +334,41 @@ ipcMain.handle('doc:htmlToPdf', async (_, html, options = {}) => {
   }
 });
 
+// ── Background mode, notifications, window ───────────────────
+ipcMain.handle('app:getBackground', async () => ({ ...backgroundSettings, supported: true }));
+
+ipcMain.handle('app:setBackground', async (_, next = {}) => applyBackgroundSettings(next || {}));
+
+ipcMain.handle('app:notify', async (_, title, body) => {
+  if (!Notification.isSupported()) return { shown: false };
+  const n = new Notification({
+    title: String(title || 'KaTuroDesk').slice(0, 120),
+    body: String(body || '').slice(0, 300),
+    icon: appIconPath(),
+  });
+  n.on('click', showMainWindow);
+  n.show();
+  return { shown: true };
+});
+
+ipcMain.handle('app:showWindow', async () => {
+  showMainWindow();
+  return { success: true };
+});
+
+app.on('second-instance', () => showMainWindow());
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.whenReady().then(() => {
+  if (!hasInstanceLock) return;
+  // Windows shows notifications under the app's ID (must match build.appId).
+  if (process.platform === 'win32') app.setAppUserModelId('ai.katuro.desk');
+  backgroundSettings = readBackgroundSettings();
   createWindow();
+  if (backgroundSettings.keepRunning) ensureTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -251,5 +376,5 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' && !backgroundSettings.keepRunning) app.quit();
 });

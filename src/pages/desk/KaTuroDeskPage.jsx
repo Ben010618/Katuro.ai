@@ -4,12 +4,12 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
   FileText,
   Settings,
+  CalendarClock,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
@@ -20,20 +20,37 @@ import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
 import { getPersona } from '../../services/desk/personas';
 import { planStatusText } from '../../services/plans';
+import DeskScheduleModal from './DeskScheduleModal';
+import ktLogo from '../../assets/KT-Favicon.webp';
+import { useDeskScheduler } from './deskScheduler';
+
+const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
+// In the desktop app the Windows title bar is hidden: the top bar is the drag area and
+// leaves room on the right for the minimize / maximize / close buttons.
+const IN_DESKTOP_WINDOW = Boolean(deskApi?.isElectron);
+const WINDOW_CONTROLS_PX = deskApi?.platform === 'darwin' ? 0 : 146;
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
-  const { workspace, activeArtifact, persona, startFolderIndex } = useDeskStore();
+  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks } = useDeskStore();
 
-  // Index the folder that is open when the desk mounts (later folders index on open/refresh).
   useEffect(() => {
-    startFolderIndex();
+    // Desktop: reopen the folder from last session so teachers don't re-pick it every day
+    // (and so scheduled tasks find their folder after a background start).
+    if (IN_DESKTOP_WINDOW && useDeskStore.getState().workspace?.isVirtual) restoreLastWorkspace();
+    // Index the folder that is open when the desk mounts (later folders index on open/refresh).
+    else startFolderIndex();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [showSettings, setShowSettings] = useState(false);
+  // null = closed; {} = open on the list; { prompt, attachedPaths } = open on a new task
+  const [schedule, setSchedule] = useState(null);
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+
+  useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
+  const activeTasks = scheduledTasks.filter((t) => t.enabled).length;
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
@@ -41,8 +58,20 @@ export default function KaTuroDeskPage() {
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
       <DeskSettingsModal open={showSettings} onClose={() => setShowSettings(false)} user={user} profile={profile} />
-      {/* Top Studio Bar */}
-      <div className="h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none">
+      {schedule && (
+        <DeskScheduleModal
+          prefill={schedule.prompt !== undefined ? schedule : null}
+          onClose={() => setSchedule(null)}
+          user={user}
+          profile={profile}
+          onOpenCanvas={() => setShowRightPanel(true)}
+        />
+      )}
+      {/* Top Studio Bar (also the window's title bar in the desktop app) */}
+      <div
+        className={`h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none ${IN_DESKTOP_WINDOW ? 'desk-titlebar' : ''}`}
+        style={IN_DESKTOP_WINDOW ? { paddingRight: WINDOW_CONTROLS_PX } : undefined}
+      >
         <div className="flex items-center gap-2">
           {/* Toggle Left Panel */}
           <button
@@ -54,8 +83,8 @@ export default function KaTuroDeskPage() {
           </button>
 
           <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <Sparkles size={14} /> KaTuroDesk
+            <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+              <img src={ktLogo} alt="" className="w-4 h-4 object-contain" draggable={false} /> KaTuroDesk
             </span>
             <span className="text-gray-500">/</span>
             <span className="text-gray-300 truncate max-w-[200px]" title={workspace?.name}>
@@ -101,6 +130,16 @@ export default function KaTuroDeskPage() {
             {plan.plan === 'subscription' && <BadgeCheck size={12} />}
             <span className="font-semibold">{plan.label}</span>
           </span>
+
+          <button
+            onClick={() => setSchedule({})}
+            title="Scheduled tasks"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <CalendarClock size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">Scheduled</span>
+            {activeTasks > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">{activeTasks}</span>}
+          </button>
 
           <button
             onClick={() => setShowSettings(true)}
@@ -156,6 +195,7 @@ export default function KaTuroDeskPage() {
             photoURL={photoURL}
             plan={plan}
             onOpenCanvas={() => setShowRightPanel(true)}
+            onSchedule={(draft) => setSchedule(draft)}
             onToggleLeftPanel={() => setShowLeftPanel(!showLeftPanel)}
             showLeftPanel={showLeftPanel}
           />
@@ -215,6 +255,7 @@ export default function KaTuroDeskPage() {
                 photoURL={photoURL}
                 plan={plan}
                 onOpenCanvas={() => setActiveMobileTab('canvas')}
+                onSchedule={(draft) => setSchedule(draft)}
               />
             </div>
           )}

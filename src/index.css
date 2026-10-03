@@ -514,3 +514,16 @@ h1, h2, h3, .doc-heading, .editorial-heading {
   body { background: white !important; color: black !important; }
 }
 
+
+/* KaTuroDesk desktop window: the top studio bar doubles as the title bar (drag to move,
+   double-click to maximize). Buttons and fields inside it stay clickable. */
+.desk-titlebar {
+  -webkit-app-region: drag;
+}
+.desk-titlebar button,
+.desk-titlebar a,
+.desk-titlebar input,
+.desk-titlebar [role='button'],
+.desk-titlebar [title] {
+  -webkit-app-region: no-drag;
+}

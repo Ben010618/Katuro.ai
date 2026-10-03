@@ -69,7 +69,7 @@ describe('tools ask instead of assuming', () => {
 
   it('item analysis: asks for the number of items instead of using the top score', async () => {
     const res = await turnWithTask({ tool: 'analyze_scores', args: { path: 'Scores/s.xlsx' } }, totalsOnly);
-    expect(res.content).toMatch(/❓ .*How many items\?/);
+    expect(res.content).toMatch(/Needs your input.*How many items\?/);
     expect(res.createdFiles).toHaveLength(0);
   });
 
@@ -78,17 +78,17 @@ describe('tools ask instead of assuming', () => {
     const ok = await turnWithTask({ tool: 'analyze_scores', args: { path: 'Scores/s.xlsx', totalItems: 20 } }, totalsOnly);
     expect(ok.createdFiles.length).toBeGreaterThan(0);
     const bad = await turnWithTask({ tool: 'analyze_scores', args: { path: 'Scores/s.xlsx', totalItems: 10 } }, totalsOnly);
-    expect(bad.content).toMatch(/❓ .*scored above 10/);
+    expect(bad.content).toMatch(/Needs your input.*scored above 10/);
   });
 
   it('class record: asks for the learning area instead of guessing DO 8 weights', async () => {
     const res = await turnWithTask({ tool: 'make_class_record', args: { path: 'Scores/s.xlsx' } }, totalsOnly);
-    expect(res.content).toMatch(/❓ .*Which learning area/);
+    expect(res.content).toMatch(/Needs your input.*Which learning area/);
   });
 
   it('class record: asks which component a single score column is', async () => {
     const res = await turnWithTask({ tool: 'make_class_record', args: { path: 'Scores/s.xlsx', subject: 'Mathematics' } }, totalsOnly);
-    expect(res.content).toMatch(/❓ .*Which component are they/);
+    expect(res.content).toMatch(/Needs your input.*Which component are they/);
   });
 
   it('class record: asks for missing HPS instead of estimating it from scores', async () => {
@@ -103,7 +103,7 @@ describe('tools ask instead of assuming', () => {
       ['Santos, Maria', 10, 19, 14, 43, null, 20, 28, 48, 96, null, 47],
     ];
     const res = await turnWithTask({ tool: 'make_class_record', args: { path: 'Scores/s.xlsx', subject: 'Mathematics' } }, ecrNoHps);
-    expect(res.content).toMatch(/❓ .*highest possible scores \(HPS\)/);
+    expect(res.content).toMatch(/Needs your input.*highest possible scores \(HPS\)/);
     expect(res.createdFiles).toHaveLength(0);
   });
 

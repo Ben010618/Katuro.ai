@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   FolderOpen,
   FolderPlus,
@@ -110,7 +110,6 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
     workspace,
     setWorkspace,
     refreshFiles,
-    restoreLastWorkspace,
     activeFile,
     openPreview,
     attachedPaths,
@@ -128,12 +127,6 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
   const [expanded, setExpanded] = useState({});
   const [notice, setNotice] = useState('');
   const importInputRef = useRef(null);
-
-  // Desktop: reopen the folder from last session so teachers don't re-pick it every day.
-  useEffect(() => {
-    if (isElectron && workspace?.isVirtual) restoreLastWorkspace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Account name: KaTuro profile first (Google sign-in often has no displayName).
   const accountName = teacherInfo(profile, user).name || user?.email || 'Teacher';

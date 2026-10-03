@@ -13,6 +13,7 @@ import {
 } from '../services/localFileSystem';
 
 import { createFileIndex } from '../services/desk/index/fileIndex';
+import { createTask, updateTask, recoverInterrupted } from '../services/desk/schedule/schedule';
 
 export const IMPORTS_ROOT = 'KaTuro Imports';
 
@@ -20,7 +21,7 @@ export const IMPORTS_ROOT = 'KaTuro Imports';
 // so the agent never re-parses unchanged files and the planner sees what each file is.
 export const folderIndex = createFileIndex();
 
-function workspaceIdOf(ws) {
+export function workspaceIdOf(ws) {
   if (!ws) return '';
   return ws.rootPath || (ws.isVirtual ? `virtual:${ws.name}` : `fsa:${ws.name}`);
 }
@@ -63,6 +64,9 @@ export const useDeskStore = create(
 
       // Background folder indexing progress: { running, done, total, failed }
       indexStatus: { running: false, done: 0, total: 0, failed: 0 },
+
+      // Scheduled tasks (saved on this PC): see services/desk/schedule/schedule.js
+      scheduledTasks: [],
 
       // Outputs produced this session + what the Canvas shows
       artifacts: [],
@@ -155,6 +159,29 @@ export const useDeskStore = create(
 
       setActiveAgent: (agentId) => set({ activeAgentId: agentId }),
 
+      /** Creates a scheduled task for the open folder. Throws a teacher-friendly message when invalid. */
+      addScheduledTask: (input) => {
+        const { workspace } = get();
+        const task = createTask({ ...input, workspaceId: workspaceIdOf(workspace), workspaceName: workspace?.name || '' });
+        set((state) => ({ scheduledTasks: [...state.scheduledTasks, task] }));
+        return task;
+      },
+
+      /** Edits a task (name, prompt, files, schedule, enabled). Throws when the new schedule is invalid. */
+      updateScheduledTask: (id, patch) => {
+        const task = get().scheduledTasks.find((t) => t.id === id);
+        if (!task) throw new Error('That task no longer exists.');
+        const next = updateTask(task, patch);
+        set((state) => ({ scheduledTasks: state.scheduledTasks.map((t) => (t.id === id ? next : t)) }));
+        return next;
+      },
+
+      /** Low-level replace used by the scheduler while a task runs. */
+      replaceScheduledTask: (id, fn) =>
+        set((state) => ({ scheduledTasks: state.scheduledTasks.map((t) => (t.id === id ? fn(t) : t)) })),
+
+      deleteScheduledTask: (id) => set((state) => ({ scheduledTasks: state.scheduledTasks.filter((t) => t.id !== id) })),
+
       addMessage: (msg) => {
         set((state) => ({
           messages: [
@@ -169,6 +196,7 @@ export const useDeskStore = create(
               artifacts: msg.artifacts || [],
               attachments: msg.attachments || [],
               ...(msg.isThinking ? { isThinking: true } : {}),
+              ...(msg.scheduled ? { scheduled: msg.scheduled } : {}),
             },
           ],
         }));
@@ -284,10 +312,17 @@ export const useDeskStore = create(
     }),
     {
       name: 'katuro-desk-store-v1',
+      // A task that was running when the app closed is shown as interrupted, never stuck "running".
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted || {}),
+        scheduledTasks: recoverInterrupted(Array.isArray(persisted?.scheduledTasks) ? persisted.scheduledTasks : []),
+      }),
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
         privacyMode: state.privacyMode,
         persona: state.persona,
+        scheduledTasks: state.scheduledTasks,
         // Don't persist native handles or file bytes (not serializable / private)
       }),
     }

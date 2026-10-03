@@ -142,6 +142,9 @@ function cleanReply(text) {
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
+    // No emoji or pictographs in chat: the assistant should read as professional.
+    .replace(/(?![©®™])\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|\u{FE0F}|\u{200D}/gu, '')
+    .replace(/(\S)[ \t]{2,}/g, '$1 ')
     .trim();
 }
 
@@ -349,19 +352,19 @@ export async function runDeskAgentTurn({
     for (const t of tasks) {
       const r = results.get(t.id);
       if (r?.status === 'done') {
-        lines.push(`✓ ${t.label}: ${r.result?.summary || 'done'}`);
-        for (const w of r.result?.warnings || []) lines.push(`⚠ Please check: ${w}`);
+        lines.push(`**Done** — ${t.label}: ${r.result?.summary || 'finished'}`);
+        for (const w of r.result?.warnings || []) lines.push(`**Please check:** ${w}`);
         if (r.result?.reply) extraReplies.push(cleanReply(r.result.reply));
         for (const a of r.result?.artifacts || []) {
           artifacts.push({ id: `art-${Date.now()}-${artifacts.length}`, createdAt: Date.now(), sourceTool: t.tool, ...a });
         }
       } else if (r?.status === 'error' && r.code === 'NEEDS_INFO') {
         // Missing information is asked for, never guessed.
-        lines.push(`❓ ${t.label}: ${r.error}`);
+        lines.push(`**Needs your input** — ${t.label}: ${r.error}`);
       } else if (r?.status === 'error') {
-        lines.push(`✗ ${t.label}: ${r.error}`);
+        lines.push(`**Not finished** — ${t.label}: ${r.error}`);
       } else if (r?.status === 'skipped') {
-        lines.push(`– ${t.label}: ${r.error}`);
+        lines.push(`**Skipped** — ${t.label}: ${r.error}`);
       }
     }
   }

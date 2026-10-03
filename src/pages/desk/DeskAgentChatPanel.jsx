@@ -18,9 +18,10 @@ import {
   Circle,
   Files,
   ListChecks,
+  CalendarClock,
 } from 'lucide-react';
-import { useDeskStore, folderIndex } from '../../store/deskStore';
-import { runDeskAgentTurn } from '../../services/deskAgentAI';
+import { useDeskStore } from '../../store/deskStore';
+import { runChatTurn } from './runChatTurn';
 import DeskFormattedText from './DeskFormattedText';
 import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
@@ -67,26 +68,20 @@ export default function DeskAgentChatPanel({
   profile,
   photoURL,
   onOpenCanvas,
+  onSchedule,
   onToggleLeftPanel,
   showLeftPanel,
 }) {
   const {
     messages,
-    addMessage,
-    updateLastAssistantMessage,
     isGenerating,
-    setIsGenerating,
     workspace,
-    activeFile,
-    activeArtifact,
     setActiveArtifact,
-    addArtifacts,
     clearConversation,
     attachedPaths,
     toggleAttachment,
     clearAttachments,
     importFiles,
-    refreshFiles,
     privacyMode,
     setPrivacyMode,
     persona,
@@ -120,64 +115,9 @@ export default function DeskAgentChatPanel({
     if (!textToSend || isGenerating) return;
 
     const attachmentsForTurn = [...attachedPaths];
-    const history = messages
-      .filter((m) => m.id !== 'msg-welcome' && m.content && !m.isThinking)
-      .map((m) => ({ role: m.role, content: m.content }));
-
     setInputPrompt('');
-    addMessage({ role: 'user', content: textToSend, attachments: attachmentsForTurn });
-    addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
-    setIsGenerating(true);
-
-    try {
-      const result = await runDeskAgentTurn({
-        prompt: textToSend,
-        workspace,
-        activeFile,
-        activeArtifact: activeArtifact?.type === 'preview' ? null : activeArtifact,
-        attachedPaths: attachmentsForTurn,
-        history,
-        user,
-        profile,
-        privacyMode,
-        persona,
-        fileIndex: folderIndex,
-        onUpdate: ({ steps, reply }) => {
-          updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
-        },
-      });
-
-      updateLastAssistantMessage({
-        content: result.content,
-        steps: result.steps,
-        isThinking: false,
-        artifacts: result.artifacts,
-      });
-      if (result.artifacts.length) {
-        addArtifacts(result.artifacts);
-        setActiveArtifact(result.artifacts[0]);
-        onOpenCanvas?.();
-      }
-      if (result.createdFiles.length) await refreshFiles();
-      clearAttachments();
-    } catch (err) {
-      console.error('Agent execution error:', err);
-      if (err.dailyLimit || err.status === 429) {
-        updateLastAssistantMessage({
-          content: persona === 'luna'
-            ? `I am sorry, ${teacherSalutationName}. We have reached today's limit for your plan. It resets at midnight, or you may ask the KaTuro admin about a Subscription for higher limits.`
-            : `Ay, sorry ${teacherSalutationName}! Naubos na natin ang daily limit ng plan mo. Babalik 'yan pag midnight — or ask the KaTuro admin about a Subscription para mas marami!`,
-          isThinking: false,
-        });
-      } else {
-        updateLastAssistantMessage({
-          content: `Something went wrong: ${err.message || 'Unknown error'}. Please try again.`,
-          isThinking: false,
-        });
-      }
-    } finally {
-      setIsGenerating(false);
-    }
+    const outcome = await runChatTurn({ text: textToSend, attachments: attachmentsForTurn, user, profile, onOpenCanvas });
+    if (outcome.status !== 'error' || outcome.files.length) clearAttachments();
   };
 
   const handleKeyDown = (e) => {
@@ -284,15 +224,20 @@ export default function DeskAgentChatPanel({
             return (
               <div
                 key={msg.id || idx}
-                className={`flex gap-3 max-w-3xl ${isAssistant ? 'mr-auto' : 'ml-auto flex-row-reverse'}`}
+                className={`flex gap-3 w-full ${isAssistant ? 'justify-start' : 'flex-row-reverse'}`}
               >
                 <DeskAvatar role={msg.role} persona={persona} photoURL={photoURL || user?.photoURL} name={teacherSalutationName} size={32} />
 
                 <div
-                  className={`flex-1 rounded-xl p-3.5 shadow-xs border min-w-0 ${
-                    isAssistant ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#2d6a4f] text-white border-emerald-800'
+                  className={`rounded-xl shadow-xs border min-w-0 max-w-[calc(100%-2.75rem)] md:max-w-[85%] ${
+                    isAssistant ? 'bg-white border-gray-200 text-gray-800 px-3.5 py-3' : 'bg-[#2d6a4f] text-white border-emerald-800 px-3.5 py-2.5'
                   }`}
                 >
+                  {!isAssistant && msg.scheduled && (
+                    <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-100/90">
+                      <CalendarClock size={10} /> Scheduled task · {msg.scheduled.name}
+                    </div>
+                  )}
                   {isAssistant && <StepList steps={msg.steps} />}
 
                   {showThinking ? (
@@ -410,6 +355,25 @@ export default function DeskAgentChatPanel({
               className="w-full bg-transparent text-gray-800 text-xs px-2 py-1 resize-none focus:outline-none placeholder-gray-400"
             />
             <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+              {onSchedule && (
+                <button
+                  onClick={() => onSchedule({
+                    prompt: inputPrompt.trim(),
+                    attachedPaths: [...attachedPaths],
+                    // Once the task is saved, the request leaves the chat box.
+                    onSaved: () => {
+                      setInputPrompt('');
+                      clearAttachments();
+                    },
+                  })}
+                  disabled={!workspace?.handle}
+                  title={workspace?.handle ? 'Schedule this request for a date and time' : 'Open your classroom folder first'}
+                  className="p-2 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition flex items-center gap-1 text-xs font-medium disabled:opacity-40"
+                >
+                  <CalendarClock size={15} />
+                  <span className="hidden lg:inline">Schedule</span>
+                </button>
+              )}
               <button
                 onClick={() => handleSendPrompt()}
                 disabled={isGenerating || !inputPrompt.trim()}

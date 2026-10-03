@@ -19,14 +19,14 @@ const stem = (p) => base(p).replace(/\.[^.]+$/, '');
 
 /** Quick-prompt buttons in the chat. `route` lets fastRoute skip the planner when the text is sent unchanged. */
 export const QUICK_PROMPTS = [
-  { route: 'item_analysis', label: '📊 Item Analysis & LMC', prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.' },
-  { route: 'remedial', label: '🎯 Remedial Slips & Re-test', prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.' },
-  { route: 'class_record', label: '📑 e-Class Record', prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.' },
-  { route: 'attendance', label: '🚨 Attendance & SARDO', prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.' },
-  { route: 'dll', label: '📝 DLL from my lesson', prompt: 'Turn the attached lesson file into a complete Daily Lesson Log (Monday to Friday).' },
-  { route: 'slides', label: '🖥️ Slides from file', prompt: 'Make a PowerPoint presentation from the attached lesson.' },
-  { route: 'photo_table', label: '📷 Photo to Excel', prompt: 'Read the table in the attached photo and turn it into an Excel file I can check.' },
-  { route: 'merge_pdfs', label: '📎 Merge PDFs', prompt: 'Merge the attached PDFs into one file in the order I attached them.' },
+  { route: 'item_analysis', label: 'Item Analysis & LMC', prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.' },
+  { route: 'remedial', label: 'Remedial Slips & Re-test', prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.' },
+  { route: 'class_record', label: 'e-Class Record', prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.' },
+  { route: 'attendance', label: 'Attendance & SARDO', prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.' },
+  { route: 'dll', label: 'DLL from my lesson', prompt: 'Turn the attached lesson file into a complete Daily Lesson Log (Monday to Friday).' },
+  { route: 'slides', label: 'Slides from file', prompt: 'Make a PowerPoint presentation from the attached lesson.' },
+  { route: 'photo_table', label: 'Photo to Excel', prompt: 'Read the table in the attached photo and turn it into an Excel file I can check.' },
+  { route: 'merge_pdfs', label: 'Merge PDFs', prompt: 'Merge the attached PDFs into one file in the order I attached them.' },
 ];
 
 const GREETING = /^(hi+|hello+|hey+|helo|hellow|yo+|yow|kumusta|musta|kamusta|good\s*(morning|afternoon|evening|day)|magandang\s*(umaga|hapon|gabi|araw))\b[\s,!.]*(po|sir|ma'?am|matt|luna|teacher|katuro)?[\s,!.?😊👋🙂]*$/iu;

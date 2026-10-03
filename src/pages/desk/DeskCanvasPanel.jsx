@@ -11,7 +11,6 @@ import {
   Presentation,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   PanelRightClose,
   ExternalLink,
   FolderSearch,
@@ -231,8 +230,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
     return (
       <aside className="w-80 lg:w-96 xl:w-[460px] flex-shrink-0 flex flex-col h-full bg-[#f1f5f3] border-l border-gray-200 select-none">
         <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between">
-          <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-            <Sparkles size={12} className="text-emerald-600" />
+          <span className="text-[11px] font-bold text-gray-700">
             Document Canvas
           </span>
           <div className="flex items-center gap-1">
@@ -252,8 +250,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
           <p className="text-[11px] text-gray-500 max-w-xs leading-relaxed mb-5">
             Click a file on the left to preview it, or ask your Co-Teacher to create a document. Generated Word, Excel, PowerPoint and PDF files appear here.
           </p>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-gray-200 text-[10.5px] font-medium text-emerald-800 shadow-2xs">
-            <Sparkles size={11} className="text-emerald-600" />
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-white border border-gray-200 text-[10.5px] font-medium text-emerald-800 shadow-2xs">
             DepEd Long Bond Paper (8.5" × 13")
           </div>
         </div>
