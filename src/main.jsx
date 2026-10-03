@@ -5,6 +5,8 @@ import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { reloadForNewVersion } from './utils/staleChunk.js'
 import { installGlobalErrorReporter } from './utils/globalErrorReporter.js'
+import { reportAIError } from './services/db.js'
+import { auth } from './firebase.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -38,7 +40,6 @@ window.addEventListener('vite:preloadError', (event) => {
 // Errors outside React rendering (handlers, timers, un-awaited promises) go to the
 // admin's AI Error Reports too, deduplicated (see utils/globalErrorReporter.js).
 installGlobalErrorReporter(window, async (entry) => {
-  const [{ reportAIError }, { auth }] = await Promise.all([import('./services/db.js'), import('./firebase.js')])
   if (!auth.currentUser) return // the reports collection only accepts signed-in writes
   await reportAIError({ uid: auth.currentUser.uid, ...entry })
 })

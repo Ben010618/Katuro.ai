@@ -1,3 +1,4 @@
+import { manilaToday } from '../services/plans';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, PenLine } from 'lucide-react';
@@ -17,7 +18,7 @@ function pick(arr) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return manilaToday(new Date());
 }
 
 export default function SharesReminderPopup() {
@@ -27,9 +28,15 @@ export default function SharesReminderPopup() {
 
   useEffect(() => {
     const today = todayStr();
-    if (localStorage.getItem(STORAGE_KEY) === today) return;
-    localStorage.setItem(STORAGE_KEY, today);
-    const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
+    let seen = null;
+    try { seen = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
+    if (seen === today) return undefined;
+    // Count the day as "shown" only when the reminder actually appears (leaving the
+    // page within the delay used to lose that day's reminder).
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(STORAGE_KEY, today); } catch { /* storage blocked */ }
+      setVisible(true);
+    }, SHOW_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

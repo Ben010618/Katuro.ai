@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   subscribeAssignments, subscribeStudents, subscribeGradeWeights, subscribeGradeSheet,
-  saveGradeSheet, TERMS,
-} from '../services/classroomDb';
+  saveGradeSheet, TERMS, ensureMembership } from '../services/classroomDb';
 import { updateScan } from '../services/scansDb';
 import { useToast } from '../context/ToastContext';
 import { trackEvent } from '../services/usageTracker';
@@ -44,11 +43,18 @@ export default function SendToGradebookModal({ uid, quiz, scans, onClose, onReco
   }, [uid]);
 
   useEffect(() => {
-    if (!assignment) return;
-    const unsubStudents = subscribeStudents(assignment.sectionId, setStudents);
-    const unsubWeights  = subscribeGradeWeights(assignment.sectionId, assignment.subject, setWeights, term);
-    const unsubSheet    = subscribeGradeSheet(uid, assignment.sectionId, assignment.subject, term, setGradeSheet);
-    return () => { unsubStudents(); unsubWeights(); unsubSheet(); };
+    if (!assignment) return undefined;
+    let alive = true;
+    let unsubs = [];
+    ensureMembership(assignment.sectionId, uid).catch(() => false).then(() => {
+      if (!alive) return;
+      unsubs = [
+        subscribeStudents(assignment.sectionId, setStudents),
+        subscribeGradeWeights(assignment.sectionId, assignment.subject, setWeights, term),
+        subscribeGradeSheet(uid, assignment.sectionId, assignment.subject, term, setGradeSheet),
+      ];
+    });
+    return () => { alive = false; unsubs.forEach(u => u()); };
   }, [uid, assignment, term]);
 
   // Auto-match scans to roster students by normalized Student No — a pure

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCotStore, ALL_INDICATORS } from '../../store/cotStore';
 import { useToast } from '../../context/ToastContext';
@@ -32,6 +32,9 @@ export default function CotStep3() {
   const shownProgress = useSmoothProgress({ active: generating, value: progress, estimateSec: 150 });
   const [genError,   setGenError]   = useState(null);
   const activeRef    = useRef(0);
+  // Leaving this page abandons the run: a plan that finishes later is still saved to
+  // My Lessons, but must not pull the teacher back here or overwrite another COT.
+  useEffect(() => () => { activeRef.current++; }, []);
 
   const selectedIndicators = ALL_INDICATORS.filter(ind =>
     (store.selectedIndicators || []).includes(ind.id)
@@ -84,9 +87,10 @@ export default function CotStep3() {
       }
     }
 
-    if (activeRef.current !== genId) return;
+    const abandoned = () => activeRef.current !== genId;
 
     if (!plan) {
+      if (abandoned()) return;
       setGenerating(false);
       setGenError(
         lastErr?.dailyLimit
@@ -99,17 +103,18 @@ export default function CotStep3() {
       return;
     }
 
-    setProgress(85);
-    setStatusMsg('Formatting COT document…');
-    await new Promise(r => setTimeout(r, 400));
-
-    store.setGeneratedPlan({ plan, planId: null });
-
-    setStatusMsg('✓ Lesson plan generated!');
-    setProgress(100);
-    await new Promise(r => setTimeout(r, 500));
-
-    navigate('/cot-gen/output');
+    if (!abandoned()) {
+      setProgress(85);
+      setStatusMsg('Formatting COT document…');
+      await new Promise(r => setTimeout(r, 400));
+    }
+    if (!abandoned()) {
+      store.setGeneratedPlan({ plan, planId: null });
+      setStatusMsg('✓ Lesson plan generated!');
+      setProgress(100);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    if (!abandoned()) navigate('/cot-gen/output');
     trackEvent(user.uid, 'cot_generated', { subject: store.subject, grade: store.grade });
     trackGeneration(user.uid, 'cot', { success: true, durationMs: elapsedMs() });
 
@@ -125,6 +130,10 @@ export default function CotStep3() {
         materials:          store.materials,
         teachingDate:       store.teachingDate,
         selectedIndicators: store.selectedIndicators,
+        // Kept so a reopened plan regenerates with the same standards and objectives.
+        objectives:           store.objectives           || '',
+        contentStandards:     store.contentStandards     || '',
+        performanceStandards: store.performanceStandards || '',
         plan,
       };
       // Retried with backoff -- a dropped hotspot connection right after
@@ -133,11 +142,13 @@ export default function CotStep3() {
       // even though generation itself succeeded.
       retryAsync(() => saveCotPlan(user.uid, planData))
         .then(docId => {
+          if (abandoned()) return; // saved to My Lessons; don't touch the store of another COT
           store.setGeneratedPlan({ plan, planId: docId });
           store.setSaveStatus('saved');
         })
         .catch(err => {
           console.error('Firestore save failed after retries:', err);
+          if (abandoned()) return;
           store.setSaveStatus('failed');
           addToast('Plan generated but not saved to cloud yet — download it now, then retry saving from this page.', 'warning', 6000);
         });

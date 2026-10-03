@@ -46,11 +46,13 @@ export async function updateScan(uid, qid, scanId, data) {
 }
 
 /** Locks in the teacher-reviewed answers/score and marks the scan confirmed. */
-export async function confirmScan(uid, qid, scanId, { reviewedAnswers, score, total }) {
+export async function confirmScan(uid, qid, scanId, { reviewedAnswers, score, total, studentName }) {
   return updateDoc(scanRef(uid, qid, scanId), {
     reviewedAnswers,
     score,
     total,
+    // The teacher's corrected name/number is what the gradebook matches on.
+    ...(typeof studentName === 'string' ? { studentName: studentName.trim() } : {}),
     status: 'confirmed',
     updatedAt: serverTimestamp(),
   });

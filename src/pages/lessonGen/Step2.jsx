@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, AlertCircle, Plus, X } from 'lucide-react';
 import { useLessonGenStore } from '../../store/lessonGenStore';
 import { unpackCompetency } from '../../services/ai';
@@ -63,7 +63,6 @@ export default function Step2() {
   const [lessonName,       setLessonName]       = useState(store.lessonName       || '');
   const [lnError,          setLnError]          = useState(false);
   const [lnShake,          setLnShake]          = useState(false);
-  const [contribute,       setContribute]       = useState(false);
 
   // ── Unpack state ────────────────────────────────────────────────────────────
   const [unpackState,    setUnpackState]    = useState(store.unpackedSessions?.length > 0 ? 'success' : 'idle');
@@ -77,20 +76,36 @@ export default function Step2() {
   const canAddMore    = competencies.length < 5 && daysRemaining > 0;
   const atLimit       = daysRemaining <= 0;
 
+  // Text fields go to the store as they are typed, so edits made AFTER unpacking
+  // reach Step 3 and the saved plan (they used to be written only by a successful unpack).
+  useEffect(() => {
+    store.setStep2({ content, contentStandards, learningContext });
+    store.setLessonName(lessonName.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, contentStandards, learningContext, lessonName]);
+
+  // Changing a competency or its days makes the unpacked sessions wrong: start over.
+  function invalidateUnpack() {
+    if (unpackState === 'success') handleReunpack();
+  }
+
   // ── Competency row operations ───────────────────────────────────────────────
   function addCompetency() {
     if (!canAddMore) return;
+    invalidateUnpack();
     setCompetencies(prev => [...prev, { text: '', days: 1 }]);
     setCompErrors(prev => [...prev, false]);
   }
 
   function removeCompetency(idx) {
     if (competencies.length === 1) return;
+    invalidateUnpack();
     setCompetencies(prev => prev.filter((_, i) => i !== idx));
     setCompErrors(prev => prev.filter((_, i) => i !== idx));
   }
 
   function updateText(idx, text) {
+    invalidateUnpack();
     setCompetencies(prev => prev.map((c, i) => i === idx ? { ...c, text } : c));
     if (compErrors[idx] && text.trim())
       setCompErrors(prev => prev.map((e, i) => i === idx ? false : e));
@@ -99,6 +114,7 @@ export default function Step2() {
   function updateDays(idx, newDays) {
     const oldDays = competencies[idx].days;
     if (totalDaysUsed - oldDays + newDays > n) return;
+    invalidateUnpack();
     setCompetencies(prev => prev.map((c, i) => i === idx ? { ...c, days: newDays } : c));
   }
 
@@ -140,6 +156,11 @@ export default function Step2() {
     if (missingStep1.length) {
       setUnpackState('error');
       setUnpackError(`Go back to Step 1 and choose the ${missingStep1.join(', ')}.`);
+      return;
+    }
+    if (totalDaysUsed > n) {
+      setUnpackState('error');
+      setUnpackError(`The competencies use ${totalDaysUsed} days but only ${n} teaching day${n === 1 ? ' is' : 's are'} selected in Step 1. Reduce the days per competency.`);
       return;
     }
     let failedIndex = -1;
@@ -838,17 +859,6 @@ export default function Step2() {
               </div>
             </div>
 
-            {/* Contribute checkbox */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 18 }}>
-              <input
-                type="checkbox" id="contribute" checked={contribute}
-                onChange={e => setContribute(e.target.checked)}
-                style={{ accentColor: '#1a3d2b', marginTop: 2, flexShrink: 0 }}
-              />
-              <label htmlFor="contribute" style={{ fontSize: 13, color: '#4a6357', cursor: 'pointer', lineHeight: 1.65 }}>
-                Help other teachers — contribute these competencies to kaTuro's library
-              </label>
-            </div>
           </div>
         )}
 

@@ -62,7 +62,13 @@ const STEPS = [
     headerTip: 'Confirm your specifications before generating the final Word (.docx) exam.',
     isValid: () => true,
     primaryLabel: () => 'Confirm and Save',
-    onPrimary: async ({ store, uid, sessionId, onSessionFinalized, addToast }) => {
+    onPrimary: async ({ store, uid, sessionId: currentId, onSessionFinalized, addToast }) => {
+      // No cloud session yet (it failed to start offline): create it now.
+      let sessionId = currentId;
+      if (!sessionId) {
+        sessionId = await createTestSession(uid, {});
+        store.setField('sessionId', sessionId);
+      }
       await updateTestSession(uid, sessionId, {
         ...pickSessionFields(store),
         status: 'tos_generated',
@@ -124,7 +130,8 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
   const [activeStep,   setActiveStep]   = useState(0);
   const [furthestStep, setFurthestStep] = useState(0);
   const [ready,        setReady]        = useState(false);
-  const [saveState,    setSaveState]    = useState('idle'); // idle | saving | saved
+  const [saveState,    setSaveState]    = useState('idle'); // idle | saving | saved | error
+  const [busy,         setBusy]         = useState(false);
   const initRef = useRef(false);
 
   // ── Resolve / create the Firestore session on mount ──────────────────────
@@ -137,7 +144,9 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
         if (store.sessionId) {
           const existing = await getTestSession(user.uid, store.sessionId);
           if (existing) {
-            store.loadSession(existing);
+            // Edits made while offline are newer than the cloud copy: keep them
+            // (autosave pushes them up) instead of overwriting them with old data.
+            if (!store.unsyncedAt) store.loadSession(existing);
             setReady(true);
             return;
           }
@@ -167,8 +176,8 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
     if (!ready || !user?.uid || !store.sessionId) return;
     setSaveState('saving');
     updateTestSession(user.uid, store.sessionId, pickSessionFields(store))
-      .then(() => setSaveState('saved'))
-      .catch(() => setSaveState('idle'));
+      .then(() => { setSaveState('saved'); store.setField('unsyncedAt', null); })
+      .catch(() => { setSaveState('error'); store.setField('unsyncedAt', Date.now()); });
   }, [
     ready, store.gradeLevel, store.subject, store.testType, store.itemCeilingOverride, store.terms, store.questionFormats,
     store.contextNotes, JSON.stringify(store.competencies), JSON.stringify(store.cognitiveWeights), JSON.stringify(store.tos),
@@ -199,10 +208,18 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
   }
 
   async function handlePrimary() {
-    await step.onPrimary({
-      store, goNext, goBack, uid: user?.uid, sessionId: store.sessionId,
-      onSessionFinalized, addToast,
-    });
+    if (busy) return;
+    setBusy(true);
+    try {
+      await step.onPrimary({
+        store, goNext, goBack, uid: user?.uid, sessionId: store.sessionId,
+        onSessionFinalized, addToast,
+      });
+    } catch (err) {
+      addToast(`Could not save: ${err.message || 'check your connection'}. Your work is kept on this device; try again.`, 'error');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!ready) {
@@ -241,7 +258,9 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
           }}>
             {saveState === 'saving'
               ? <><Loader2 size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Saving…</>
-              : <><Save size={12} /> Saved</>}
+              : saveState === 'error'
+                ? <span style={{ color: '#fca5a5' }}>Not saved (offline?) · kept on this device</span>
+                : <><Save size={12} /> Saved</>}
           </div>
         </div>
 
@@ -339,13 +358,13 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
               }
               return (
                 <span style={{ fontSize: 11, color: 'var(--kt-accent-amber)', fontWeight: 600 }}>
-                  ⚠ Fill in required fields to continue
+                  Fill in the required fields to continue
                 </span>
               );
             })()}
             <button
               onClick={handlePrimary}
-              disabled={!isValid}
+              disabled={!isValid || busy}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7,
                 background: isValid ? 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)' : 'var(--kt-green-tint)',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { subscribeAssignments, subscribeSectionComments } from '../../services/classroomDb';
+import { subscribeAssignments, subscribeSectionComments, ensureMembership } from '../../services/classroomDb';
 import { GraduationCap, ChevronRight, BookOpen, Bell } from 'lucide-react';
 
 const SUBJECT_COLORS = {
@@ -49,15 +49,21 @@ export default function ClassesITeachPage() {
   useEffect(() => {
     if (!user?.uid || assignments.length === 0) return;
     const seen = new Set();
-    const unsubs = assignments
+    let alive = true;
+    const unsubs = [];
+    assignments
       .filter(a => { if (seen.has(a.sectionId)) return false; seen.add(a.sectionId); return true; })
-      .map(a =>
-        subscribeSectionComments(a.sectionId, comments => {
-          const count = comments.filter(c => !(c.readBy || []).includes(user.uid)).length;
-          setSectionUnread(prev => ({ ...prev, [a.sectionId]: count }));
-        })
-      );
-    return () => unsubs.forEach(fn => fn());
+      .forEach(a => {
+        // Membership first: the rules only let section members read its comments.
+        ensureMembership(a.sectionId, user.uid).catch(() => false).then(() => {
+          if (!alive) return;
+          unsubs.push(subscribeSectionComments(a.sectionId, comments => {
+            const count = comments.filter(c => !(c.readBy || []).includes(user.uid)).length;
+            setSectionUnread(prev => ({ ...prev, [a.sectionId]: count }));
+          }));
+        });
+      });
+    return () => { alive = false; unsubs.forEach(fn => fn()); };
   }, [user?.uid, assignments.map(a => a.sectionId).join(',')]);
 
   return (

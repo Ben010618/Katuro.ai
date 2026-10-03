@@ -212,6 +212,9 @@ export default function OutputPage() {
         competencyText:     store.competencyText,
         content:            store.content            || '',
         contentStandards:   store.contentStandards   || '',
+        // Reopening the plan restores each competency row and the learning context.
+        learningContext:    store.learningContext    || '',
+        competencies:       store.competencies       || [],
         competencyCeiling:  store.competencyCeiling,
         fullLadder:         store.fullLadder,
         selectedDays:       store.selectedDays,
@@ -236,9 +239,8 @@ export default function OutputPage() {
     const sessionMelc = s.competencyText || store.competencyText || '';
     const topic = s.keyContentFocus || store.content || displayLessonTitle;
     const rawRes = s.resources;
-    const materials = typeof rawRes === 'string' && rawRes.trim()
-      ? rawRes
-      : "Learner's Module, Printed worksheets, Chalk and board";
+    // Only the materials the lesson actually lists; never assume worksheets or modules.
+    const materials = typeof rawRes === 'string' && rawRes.trim() ? rawRes : '';
     cotStore.reset();
     cotStore.setStep1({
       subject:              store.subject              || '',

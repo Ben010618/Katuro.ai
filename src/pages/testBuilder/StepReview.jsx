@@ -38,13 +38,18 @@ export default function StepReview() {
   const itemCeiling = resolveItemCeiling(keyStage, store.testType, store.itemCeilingOverride);
   const hotsFloor = keyStage ? deriveHotsFloor(keyStage) : 0;
 
-  // Auto-heal TOS if it's empty or out-of-sync but competencies exist
+  // Always rebuild the TOS from the current Setup and Bloom's choices. It used to be
+  // rebuilt only when empty, so going back to Setup (e.g. 20 -> 30 items) and jumping
+  // to Review via the step rail kept the old TOS, and generated/downloaded the old test.
   useEffect(() => {
-    if ((!store.tos?.rows || store.tos.rows.length === 0) && store.competencies?.length > 0 && itemCeiling > 0) {
-      const computed = computeTOS(store.competencies, store.cognitiveWeights, itemCeiling);
-      store.setTos(computed);
-    }
-  }, [store.competencies, store.cognitiveWeights, itemCeiling]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!store.competencies?.length || itemCeiling <= 0) return;
+    const computed = computeTOS(store.competencies, store.cognitiveWeights, itemCeiling);
+    if (JSON.stringify(computed) === JSON.stringify(store.tos)) return;
+    const hadTos = Boolean(store.tos?.rows?.length);
+    store.setTos(computed);
+    // Items written for the old TOS no longer match it.
+    if (hadTos && store.generatedParts) store.setGeneratedParts(null);
+  }, [JSON.stringify(store.competencies), JSON.stringify(store.cognitiveWeights), itemCeiling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const grandTotal = (store.tos?.columnTotals || []).reduce((a, b) => a + b, 0);
   const hotsOk = (store.tos?.hotsPct || 0) >= hotsFloor;

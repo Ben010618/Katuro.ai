@@ -123,14 +123,6 @@ export async function getNvidiaConfig() {
 }
 
 /**
- * Helper to get just the key or null if not set.
- */
-export async function getNvidiaKey() {
-  const config = await getNvidiaConfig();
-  return config.apiKey;
-}
-
-/**
  * Admin-only: Save NVIDIA configuration to Firestore.
  */
 /**

@@ -51,14 +51,14 @@ This lesson plan is designed for a CLASSROOM OBSERVATION TOOL (COT) evaluation. 
 ═══════════════════════════════════════════════════════
 LESSON INFORMATION
 ═══════════════════════════════════════════════════════
-Teacher: ${teacherName || 'Teacher'}
-School: ${school || 'School'}
+Teacher: ${teacherName || 'not given'}
+School: ${school || 'not given'}
 Subject: ${subject}
 Grade Level: ${grade}
 Quarter: ${quarter}
 Topic / Lesson: ${topic}
 MELC Competency: ${melc}
-Available Materials: ${materials || 'Textbook, chalk, board, printed worksheets'}
+Available Materials: ${materials || 'not given (use only simple materials any classroom has, and list them)'}
 ${contentStandards     ? `Content Standards: ${contentStandards}` : ''}
 ${performanceStandards ? `Performance Standards: ${performanceStandards}` : ''}
 ${objectives

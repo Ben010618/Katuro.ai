@@ -106,7 +106,15 @@ const blur = e => {
 
 /* ── Component ───────────────────────────────────────────────────────────── */
 
-export default function ActionResearchPhase1() {
+// Each study gets its own component instance. "New study" (/phase-1) and "resume
+// study A" (/phase-1/A) used to share one, so starting a new study from the sidebar
+// kept docId A and overwrote study A's problem and title.
+export default function ActionResearchPhase1Route() {
+  const { docId } = useParams();
+  return <ActionResearchPhase1 key={docId || 'new'} />;
+}
+
+function ActionResearchPhase1() {
   const { user } = useAuth();
   const navigate   = useNavigate();
   const { docId: urlDocId } = useParams();
@@ -130,6 +138,9 @@ export default function ActionResearchPhase1() {
   const [statusMsg,      setStatusMsg]      = useState('');
   const [loadingResume,  setLoadingResume]  = useState(!!urlDocId);
   const debounceRef = useRef(null);
+  // Text + theme just restored from a saved study: reopening must not spend a daily
+  // AI use or replace the saved suggestion.
+  const restoredRef = useRef(null);
 
   const currentTheme = BERA_THEMES.find(t => t.id === selectedTheme);
 
@@ -149,6 +160,7 @@ export default function ActionResearchPhase1() {
           if (saved.researchTitles) setResearchTitles(saved.researchTitles);
           if (saved.selectedTitle)  setSelectedTitle(saved.selectedTitle);
           if (saved.aiSuggestion)   setAiSuggestion(saved.aiSuggestion);
+          restoredRef.current = `${saved.problemText || ''}|${saved.beraTheme || 'teaching-learning'}`;
         }
       } catch (err) {
         console.error('Failed to load saved action research:', err);
@@ -200,6 +212,7 @@ export default function ActionResearchPhase1() {
 
   /* ── Debounced AI problem suggestion ─────────────────────────────────── */
   useEffect(() => {
+    if (restoredRef.current === `${problemText}|${selectedTheme}`) return;
     if (problemText.trim().length < 20) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears suggestion/loading when input is too short for the debounced AI request
       setAiSuggestion(null);

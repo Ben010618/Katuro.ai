@@ -53,8 +53,11 @@ export default function ActionResearchPhase4() {
         setDocData(d);
         if (d.actionPlan) setActionPlan(d.actionPlan);
       }
-      setPageLoading(false);
-    });
+    }).catch(err => {
+      // Offline / no permission: say so instead of an endless loading skeleton.
+      console.error('Could not load this action research:', err);
+      setError('Could not load your research. Check your connection and reload the page.');
+    }).finally(() => setPageLoading(false));
   }, [user?.uid, docId]);
 
   async function handleGenerate() {

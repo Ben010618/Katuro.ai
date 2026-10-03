@@ -4,7 +4,7 @@ import { subscribeSubjectGrades } from '../../../services/classroomDb';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TERMS = ['term1', 'term2', 'term3'];
+import { TERMS, studentFinals, generalAverage, actionTaken } from '../../../services/gradeRules';
 
 function proficiencyLevel(avg) {
   if (!avg || avg < 60) return '';
@@ -62,31 +62,24 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
   const sp = schoolProfile || {};
 
   // Compute per-student general average
-  const computeGA = (studentId) => {
-    const grades = allSubjects.map(subj => {
-      const termGrades = TERMS.map(t => allGrades[t]?.[subj]?.[studentId]?.finalGrade).filter(g => g !== undefined && g !== null && g > 0);
-      if (!termGrades.length) return null;
-      return termGrades.reduce((a, b) => a + b, 0) / termGrades.length;
-    }).filter(g => g !== null);
-    if (!grades.length) return null;
-    return roundTwo(grades.reduce((a, b) => a + b, 0) / grades.length);
-  };
-
-  const studentRows = students.map(s => ({
-    ...s,
-    ga: computeGA(s.id),
-  }));
+  // General average and status only from complete data (all subjects, all terms).
+  const studentRows = students.map(s => {
+    const finals = studentFinals(allGrades, allSubjects, s.id);
+    const ga = generalAverage(finals);
+    return { ...s, ga: ga === null ? null : roundTwo(ga), status: actionTaken(finals) };
+  });
 
   const maleStudents   = studentRows.filter(s => s.gender === 'Male');
   const femaleStudents = studentRows.filter(s => s.gender === 'Female');
 
   // Summary counts
-  const promoted   = studentRows.filter(s => s.ga !== null && s.ga >= 75).length;
-  const retained   = studentRows.filter(s => s.ga !== null && s.ga < 75).length;
-  const maleP      = maleStudents.filter(s => s.ga !== null && s.ga >= 75).length;
-  const maleR      = maleStudents.filter(s => s.ga !== null && s.ga < 75).length;
-  const femaleP    = femaleStudents.filter(s => s.ga !== null && s.ga >= 75).length;
-  const femaleR    = femaleStudents.filter(s => s.ga !== null && s.ga < 75).length;
+  // Only PROMOTED is decided automatically; irregular/retained are the teacher's call.
+  const promoted   = studentRows.filter(s => s.status === 'PROMOTED').length;
+  const retained   = 0;
+  const maleP      = maleStudents.filter(s => s.status === 'PROMOTED').length;
+  const maleR      = 0;
+  const femaleP    = femaleStudents.filter(s => s.status === 'PROMOTED').length;
+  const femaleR    = 0;
 
   const profCount = (gender, code) => {
     const pool = gender === 'M' ? maleStudents : gender === 'F' ? femaleStudents : studentRows;
@@ -102,11 +95,7 @@ function SF5TableContent({ section, students, allGrades, allSubjects, schoolProf
         <td style={{ ...TD_LEFT, fontSize: 7 }}>{[s.surname, s.givenName, s.middleInitial].filter(Boolean).join(', ')}</td>
         <td style={{ ...TD, fontWeight: s.ga ? 700 : 400 }}>{s.ga !== null ? s.ga?.toFixed(2) : '—'}</td>
         <td style={TD}>
-          {s.ga !== null ? (
-            <span style={{ fontSize: 6.5 }}>
-              {s.ga >= 75 ? 'PROMOTED' : 'RETAINED'}
-            </span>
-          ) : ''}
+          {s.status ? <span style={{ fontSize: 6.5 }}>{s.status}</span> : ''}
         </td>
         <td style={TD}></td>
         <td style={TD}></td>
@@ -375,12 +364,10 @@ export default function SF5Form({ section, students, allSubjects, schoolProfile,
   async function downloadExcel() {
     const XLSX = await import('xlsx');
     const sp = schoolProfile || {};
+    const finalsOf = (studentId) => studentFinals(allGrades, allSubjects, studentId);
     const computeGA = (studentId) => {
-      const grades = allSubjects.map(subj => {
-        const tg = TERMS.map(t => allGrades[t]?.[subj]?.[studentId]?.finalGrade).filter(g => g !== undefined && g !== null && g > 0);
-        return tg.length ? tg.reduce((a, b) => a + b, 0) / tg.length : null;
-      }).filter(g => g !== null);
-      return grades.length ? roundTwo(grades.reduce((a, b) => a + b, 0) / grades.length) : null;
+      const ga = generalAverage(finalsOf(studentId));
+      return ga === null ? null : roundTwo(ga);
     };
 
     const rows = [
@@ -395,7 +382,7 @@ export default function SF5Form({ section, students, allSubjects, schoolProfile,
           s.gender === 'Male' ? 'M' : s.gender === 'Female' ? 'F' : '',
           ga !== null ? ga.toFixed(2) : '',
           ga !== null ? descriptiveLetter(ga) : '',
-          ga !== null ? (ga >= 75 ? 'PROMOTED' : 'RETAINED') : '',
+          actionTaken(finalsOf(s.id)),
         ];
       }),
     ];

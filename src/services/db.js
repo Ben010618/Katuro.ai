@@ -25,28 +25,13 @@ import {
   onSnapshot,
   serverTimestamp,
 } from "firebase/firestore";
-import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
-import { db, auth, firebaseConfig } from "../firebase";
+
+import { updatePassword } from "firebase/auth";
+import { db } from "../firebase";
 
 // ─── Collection refs ──────────────────────────────────────────────────────────
 
 export const teacherRef = (uid) => doc(db, "teachers", uid);
-
-export const sessionsRef = (uid) => collection(db, "teachers", uid, "sessions");
-export const sessionRef = (uid, sid) => doc(db, "teachers", uid, "sessions", sid);
-
-export const classesRef = (uid) => collection(db, "teachers", uid, "classes");
-export const classRef = (uid, cid) => doc(db, "teachers", uid, "classes", cid);
-
-export const learnersRef = (uid, cid) => collection(db, "teachers", uid, "classes", cid, "learners");
-export const learnerRef = (uid, cid, lid) => doc(db, "teachers", uid, "classes", cid, "learners", lid);
-
-export const uploadsRef = (uid) => collection(db, "teachers", uid, "uploads");
-export const uploadRef = (uid, upid) => doc(db, "teachers", uid, "uploads", upid);
-
-export const sheetsRef = (uid) => collection(db, "teachers", uid, "sheets");
-export const sheetRef = (uid, shid) => doc(db, "teachers", uid, "sheets", shid);
 
 export const scansRef = (uid) => collection(db, "teachers", uid, "scans");
 export const scanRef = (uid, scid) => doc(db, "teachers", uid, "scans", scid);
@@ -72,158 +57,10 @@ export async function getTeacherProfile(uid) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-// ─── Sessions ─────────────────────────────────────────────────────────────────
-
-export async function createSession(uid, data) {
-  return addDoc(sessionsRef(uid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getSessions(uid) {
-  const q = query(sessionsRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function updateSession(uid, sid, data) {
-  return updateDoc(sessionRef(uid, sid), data);
-}
-
-export async function deleteSession(uid, sid) {
-  return deleteDoc(sessionRef(uid, sid));
-}
-
-// ─── Classes ──────────────────────────────────────────────────────────────────
-
-export async function createClass(uid, data) {
-  return addDoc(classesRef(uid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getClasses(uid) {
-  const q = query(classesRef(uid), orderBy("createdAt", "asc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function updateClass(uid, cid, data) {
-  return updateDoc(classRef(uid, cid), data);
-}
-
-export async function deleteClass(uid, cid) {
-  return deleteDoc(classRef(uid, cid));
-}
-
-// ─── Learners ─────────────────────────────────────────────────────────────────
-
-export async function createLearner(uid, cid, data) {
-  return addDoc(learnersRef(uid, cid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getLearners(uid, cid) {
-  const q = query(learnersRef(uid, cid), orderBy("createdAt", "asc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function updateLearner(uid, cid, lid, data) {
-  return updateDoc(learnerRef(uid, cid, lid), data);
-}
-
-export async function deleteLearner(uid, cid, lid) {
-  return deleteDoc(learnerRef(uid, cid, lid));
-}
-
-// ─── Uploads ──────────────────────────────────────────────────────────────────
-
-export async function createUpload(uid, data) {
-  return addDoc(uploadsRef(uid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getUploads(uid) {
-  const q = query(uploadsRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function deleteUpload(uid, upid) {
-  return deleteDoc(uploadRef(uid, upid));
-}
-
-// ─── Sheets (generated bubble sheet configs) ──────────────────────────────────
-
-export async function createSheet(uid, data) {
-  return addDoc(sheetsRef(uid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getSheets(uid) {
-  const q = query(sheetsRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function deleteSheet(uid, shid) {
-  return deleteDoc(sheetRef(uid, shid));
-}
-
-// ─── Scores ───────────────────────────────────────────────────────────────────
-
-export const scoresRef = (uid) => collection(db, "teachers", uid, "scores");
-
-/**
- * Replace all scores for a given session+class pair, then write the new set.
- * scores: [{ learnerId, learnerName, rawScore, numQuestions, percentage }]
- */
-export async function saveScores(uid, sessionId, classId, scores) {
-  const q = query(
-    scoresRef(uid),
-    where("sessionId", "==", sessionId),
-    where("classId", "==", classId)
-  );
-  const snap = await getDocs(q);
-  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
-  await Promise.all(
-    scores.map((s) =>
-      addDoc(scoresRef(uid), { ...s, sessionId, classId, createdAt: serverTimestamp() })
-    )
-  );
-}
-
-export async function getAllScores(uid) {
-  const q = query(scoresRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function getScoresBySession(uid, sessionId) {
-  const q = query(scoresRef(uid), where("sessionId", "==", sessionId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-// ─── Quiz Scan Results ────────────────────────────────────────────────────────
-
-export const quizResultsRef = (uid) => collection(db, "teachers", uid, "quizResults");
-export const quizResultRef  = (uid, rid) => doc(db, "teachers", uid, "quizResults", rid);
-
-export async function saveQuizResult(uid, data) {
-  return addDoc(quizResultsRef(uid), { ...data, scannedAt: serverTimestamp() });
-}
-
-export async function getQuizResults(uid, quizId) {
-  const q = query(quizResultsRef(uid), where("quizId", "==", quizId), orderBy("scannedAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
 // ─── Scans ────────────────────────────────────────────────────────────────────
 
 export async function createScan(uid, data) {
   return addDoc(scansRef(uid), { ...data, createdAt: serverTimestamp() });
-}
-
-export async function getScans(uid) {
-  const q = query(scansRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function updateScan(uid, scid, data) {
@@ -243,92 +80,19 @@ export async function createQuiz(uid, data) {
   return addDoc(quizzesRef(uid), { ...data, createdAt: serverTimestamp() });
 }
 
-export async function getQuizzes(uid) {
-  const q = query(quizzesRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-export async function getQuizzesBySession(uid, sessionId) {
-  const q = query(quizzesRef(uid), where("sessionId", "==", sessionId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
 export async function getQuiz(uid, qid) {
   const snap = await getDoc(quizRef(uid, qid));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-
-export async function updateQuiz(uid, qid, data) {
-  return updateDoc(quizRef(uid, qid), data);
-}
-
-export async function deleteQuiz(uid, qid) {
-  return deleteDoc(quizRef(uid, qid));
-}
-
-// ─── Lesson Contexts (AI-extracted) ──────────────────────────────────────────
-
-export const contextsRef = (uid) => collection(db, "teachers", uid, "contexts");
-
-export async function saveContext(uid, sessionId, data) {
-  const q = query(contextsRef(uid), where("sessionId", "==", sessionId));
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    await updateDoc(snap.docs[0].ref, { ...data, updatedAt: serverTimestamp() });
-    return snap.docs[0].id;
-  }
-  const ref = await addDoc(contextsRef(uid), {
-    ...data,
-    sessionId,
-    createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
-export async function getContextBySession(uid, sessionId) {
-  const q = query(contextsRef(uid), where("sessionId", "==", sessionId));
-  const snap = await getDocs(q);
-  return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
 // ─── Lesson Plans ─────────────────────────────────────────────────────────────
 
 export const lessonPlansRef = (uid) => collection(db, "teachers", uid, "lessonPlans");
 
-// meta: { weekNumber, weekLabel, weekStartDate, weekEndDate, subject, topic, grade }
-export async function saveLessonPlan(uid, sessionId, content, meta = {}) {
-  if (sessionId) {
-    const q = query(lessonPlansRef(uid), where("sessionId", "==", sessionId));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      await updateDoc(snap.docs[0].ref, { content, sessionId, ...meta, updatedAt: serverTimestamp() });
-      return snap.docs[0].id;
-    }
-  }
-  const ref = await addDoc(lessonPlansRef(uid), {
-    content, sessionId: sessionId || null, ...meta, createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
 export async function updateLessonPlan(uid, planId, data) {
   return updateDoc(doc(db, "teachers", uid, "lessonPlans", planId), {
     ...data, updatedAt: serverTimestamp(),
   });
-}
-
-export async function getLessonPlanBySession(uid, sessionId) {
-  const q = query(lessonPlansRef(uid), where("sessionId", "==", sessionId));
-  const snap = await getDocs(q);
-  return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
-}
-
-export async function getAllLessonPlans(uid) {
-  const q = query(lessonPlansRef(uid), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 // ─── ILAW Plan (new 3-step structure) ────────────────────────────────────────
@@ -461,18 +225,6 @@ export async function deleteLessonPlan(uid, planId) {
   return deleteDoc(doc(db, "teachers", uid, "lessonPlans", planId));
 }
 
-/**
- * Real-time subscription to all lesson plans (ordered newest first).
- * Returns the unsubscribe function.
- * callback(plans[]) is called immediately and on every change.
- */
-export function subscribeLessonPlans(uid, callback) {
-  const q = query(lessonPlansRef(uid), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  });
-}
-
 // ─── Teacher profile (extended fields) ───────────────────────────────────────
 
 /**
@@ -480,18 +232,6 @@ export function subscribeLessonPlans(uid, callback) {
  */
 export async function updateTeacherProfile(uid, data) {
   return updateDoc(teacherRef(uid), { ...data, updatedAt: serverTimestamp() });
-}
-
-// ─── Scores (from scanner mobile app) ────────────────────────────────────────
-
-/**
- * Real-time subscription to all scan scores for a teacher.
- */
-export function subscribeScores(uid, callback) {
-  const q = query(scoresRef(uid), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  });
 }
 
 // ─── Admin: read all teachers ─────────────────────────────────────────────────
@@ -560,13 +300,6 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
 
 // ─── Admin notifications ──────────────────────────────────────────────────────
 
-export async function getAdminNotifications() {
-  const snap = await getDocs(
-    query(collection(db, 'adminNotifications'), orderBy('createdAt', 'desc'))
-  );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
 export function subscribeAdminNotifications(cb) {
   return onSnapshot(
     query(collection(db, 'adminNotifications'), orderBy('createdAt', 'desc')),
@@ -601,34 +334,14 @@ export async function adminDeleteUser(targetUid) {
 }
 
 // ─── Admin: change a user's password ─────────────────────────────────────────
-// For admin-created accounts (stored password): signs in via secondary app and
-// updates Firebase Auth immediately, then updates stored password in Firestore.
-// For self-registered accounts (no stored password): saves a pendingPassword in
-// Firestore; it is applied to Firebase Auth the next time that user signs in.
-
+// Done on the server with the Firebase Auth admin API: it works at once for every
+// account (self-registered too) and the password is never stored in Firestore.
+// (The old client path queued self-registered passwords until the teacher signed
+// in with the OLD password, and kept them as plain text on the teacher document.)
 export async function adminChangePassword(targetUid, newPassword) {
-  const snap = await getDoc(teacherRef(targetUid));
-  if (!snap.exists()) throw new Error('User not found.');
-  const { email, password: storedPassword } = snap.data();
-
-  if (storedPassword) {
-    // Admin-created account — change Firebase Auth password directly.
-    const tempApp  = initializeApp(firebaseConfig, 'admin-pw-' + Date.now());
-    const tempAuth = getAuth(tempApp);
-    try {
-      const cred = await signInWithEmailAndPassword(tempAuth, email, storedPassword);
-      await updatePassword(cred.user, newPassword);
-    } catch (err) {
-      throw new Error(err.message || 'Password change failed.', { cause: err });
-    } finally {
-      await tempAuth.signOut().catch(() => {});
-      await deleteApp(tempApp).catch(() => {});
-    }
-    await updateDoc(teacherRef(targetUid), { password: newPassword, pendingPassword: null, updatedAt: serverTimestamp() });
-  } else {
-    // Self-registered account — queue password for next login.
-    await updateDoc(teacherRef(targetUid), { pendingPassword: newPassword, updatedAt: serverTimestamp() });
-  }
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  await httpsCallable(getFunctions(app, 'us-central1'), 'adminChangePassword')({ uid: targetUid, password: newPassword });
 }
 
 // Called on login: if admin queued a new password, apply it now and clear the queue.
@@ -643,10 +356,6 @@ export async function applyPendingPassword(user) {
   } catch {
     // Silent — will retry on next login
   }
-}
-
-export async function adminSendPasswordReset(email) {
-  await sendPasswordResetEmail(auth, email);
 }
 
 export async function adminSetFreeMode(enabled, note = '') {

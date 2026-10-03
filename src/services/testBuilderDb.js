@@ -2,17 +2,7 @@
 // Stored at teachers/{uid}/testSessions/{sessionId} (not a top-level collection)
 // so it inherits the existing `teachers/{uid}/{document=**}` security rule.
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  orderBy,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   deriveKeyStage,
@@ -66,8 +56,3 @@ export async function updateTestSession(uid, sessionId, data) {
   return updateDoc(testSessionRef(uid, sessionId), { ...data, updatedAt: serverTimestamp() });
 }
 
-export async function getAllTestSessions(uid) {
-  const q = query(testSessionsRef(uid), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}

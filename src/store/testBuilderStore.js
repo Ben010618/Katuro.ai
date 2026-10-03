@@ -68,6 +68,8 @@ export const useTestBuilderStore = create(
         tos:              s.tos,
         generatedParts:   s.generatedParts,
         status:           s.status,
+        // Set while local edits have not reached the cloud (see TestBuilderWizard).
+        unsyncedAt:       s.unsyncedAt,
       }),
     }
   )

@@ -29,10 +29,3 @@ export async function uploadFile(uid, file, onProgress) {
   });
 }
 
-export async function deleteFile(storagePath) {
-  const { getStorage, ref, deleteObject } = await import("firebase/storage");
-  const app = (await import("../firebase")).default;
-  const storage = getStorage(app);
-  const storageRef = ref(storage, storagePath);
-  await deleteObject(storageRef);
-}

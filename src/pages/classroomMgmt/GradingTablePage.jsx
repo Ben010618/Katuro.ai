@@ -5,8 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import {
   subscribeGradeSheet, saveGradeSheet, submitGradeSheet, computeFinalGrade,
   subscribeStudents, subscribeSectionComments, TERMS,
-  sumComponentWeights, reshapeItemCount, updateMaxScore,
-} from '../../services/classroomDb';
+  sumComponentWeights, reshapeItemCount, updateMaxScore, ensureMembership } from '../../services/classroomDb';
 import { thumbUrl } from '../../services/cloudinaryUpload';
 import { trackEvent } from '../../services/usageTracker';
 import StudentCardModal from '../../components/StudentCardModal';
@@ -29,6 +28,9 @@ const DEFAULT_WEIGHTS = {
   ptMax: [100, 100],
   stMax: [100, 100],
 };
+// A blank score stays blank (not 0): a student with no scores has no grade yet.
+const keepBlank = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? '' : Number(v));
+
 export default function GradingTablePage() {
   const { sectionId, subject } = useParams();
   const decodedSubject = decodeURIComponent(subject);
@@ -46,6 +48,7 @@ export default function GradingTablePage() {
   const [showConfirm,     setShowConfirm]     = useState(false);
   const [loading,         setLoading]         = useState(true);
   const [liveStudents,    setLiveStudents]    = useState([]);
+  const [liveLoaded, setLiveLoaded] = useState(false);
   const [unreadCounts,    setUnreadCounts]    = useState({});
   const [openStudentCard, setOpenStudentCard] = useState(null);
   const initializedRef = useRef(false);
@@ -96,28 +99,44 @@ export default function GradingTablePage() {
       setSheet(s);
       setLoading(false);
     });
-    const timer = setTimeout(() => { initializedRef.current = true; setLoading(false); }, 3000);
+    // Only stops the spinner. It must NOT mark the sheet loaded: on a slow connection
+    // the real snapshot arrives later, and treating the empty grid as loaded let the
+    // next Save overwrite every saved score.
+    const timer = setTimeout(() => setLoading(false), 3000);
     return () => { unsub(); clearTimeout(timer); };
   }, [user?.uid, sectionId, decodedSubject, activeTerm]);
 
   // Subscribe to live student data (photos) and section comments (unread counts)
   useEffect(() => {
-    const unsubStudents = subscribeStudents(sectionId, setLiveStudents);
-    const unsubComments = subscribeSectionComments(sectionId, comments => {
-      const counts = {};
-      comments.forEach(c => {
-        if (user?.uid && !(c.readBy || []).includes(user.uid)) {
-          counts[c.studentId] = (counts[c.studentId] || 0) + 1;
-        }
-      });
-      setUnreadCounts(counts);
+    if (!user?.uid) return undefined;
+    let alive = true;
+    let unsubs = [];
+    // The rules let a subject teacher read the roster only as a section member.
+    ensureMembership(sectionId, user.uid).catch(() => false).then(() => {
+      if (!alive) return;
+      unsubs = [
+        subscribeStudents(sectionId, (list) => { setLiveStudents(list); setLiveLoaded(true); }),
+        subscribeSectionComments(sectionId, comments => {
+          const counts = {};
+          comments.forEach(c => {
+            if (!(c.readBy || []).includes(user.uid)) counts[c.studentId] = (counts[c.studentId] || 0) + 1;
+          });
+          setUnreadCounts(counts);
+        }),
+      ];
     });
-    return () => { unsubStudents(); unsubComments(); };
+    return () => { alive = false; unsubs.forEach(u => u()); };
   }, [sectionId, user?.uid]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const students  = sheet?.students || [];
+  // The live section roster (students added or removed after the invitation was
+  // accepted included). The roster copied into the invitation is only a fallback
+  // until the live list arrives — it was never refreshed, so transferees never
+  // appeared and could not be graded.
+  const students  = liveLoaded
+    ? liveStudents.map(({ id, surname = '', givenName = '', middleInitial = '' }) => ({ id, surname, givenName, middleInitial }))
+    : (sheet?.students || []);
   const photoMap  = Object.fromEntries(liveStudents.map(s => [s.id, s]));
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
 
@@ -199,15 +218,16 @@ export default function GradingTablePage() {
 
   async function handleSave() {
     if (!dirty || !user?.uid) return;
+    if (!initializedRef.current) { addToast('Still loading your saved grades. Please wait a moment.', 'warning'); return; }
     setSaving(true);
     try {
       // Compute and store final grades before saving
       const updatedGrades = {};
       students.forEach(s => {
         const g = localGrades[s.id] || {};
-        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
-        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
-        const st = (g.summativeTests  || []).slice(0, 2).map(v => Number(v) || 0);
+        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(keepBlank);
+        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(keepBlank);
+        const st = (g.summativeTests  || []).slice(0, 2).map(keepBlank);
         updatedGrades[s.id] = {
           writtenWorks: ww, performanceTask: pt, summativeTests: st,
           finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, summativeTests: st, ...localWeights }),
@@ -230,6 +250,7 @@ export default function GradingTablePage() {
 
   async function handleSubmit() {
     if (!user?.uid) return;
+    if (!initializedRef.current) { addToast('Still loading your saved grades. Please wait a moment.', 'warning'); return; }
     setShowConfirm(false);
     setSubmitting(true);
     try {
@@ -237,9 +258,9 @@ export default function GradingTablePage() {
       const updatedGrades = {};
       students.forEach(s => {
         const g = localGrades[s.id] || {};
-        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(v => Number(v) || 0);
-        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(v => Number(v) || 0);
-        const st = (g.summativeTests  || []).slice(0, 2).map(v => Number(v) || 0);
+        const ww = (g.writtenWorks    || []).slice(0, localWeights.wwCount).map(keepBlank);
+        const pt = (g.performanceTask || []).slice(0, localWeights.ptCount).map(keepBlank);
+        const st = (g.summativeTests  || []).slice(0, 2).map(keepBlank);
         updatedGrades[s.id] = {
           writtenWorks: ww, performanceTask: pt, summativeTests: st,
           finalGrade: computeFinalGrade({ writtenWorks: ww, performanceTask: pt, summativeTests: st, ...localWeights }),
@@ -518,7 +539,7 @@ export default function GradingTablePage() {
                 {students.length === 0 ? (
                   <tr>
                     <td colSpan={3 + localWeights.wwCount + localWeights.ptCount + 3} style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: 13 }}>
-                      No students in roster. Ask the adviser to regenerate the invitation link.
+                      No students in this section yet. The adviser adds them in Classroom Management.
                     </td>
                   </tr>
                 ) : students.map(s => {

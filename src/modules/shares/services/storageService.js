@@ -1,4 +1,4 @@
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import app from '../../../firebase';
 import imageCompression from 'browser-image-compression';
 
@@ -57,19 +57,6 @@ export async function uploadPostPhotos(uid, postId, files, onProgress) {
     if (onProgress) onProgress(i + 1, files.length);
   }
   return urls;
-}
-
-/**
- * Delete all photos for a post from Firebase Storage.
- * Silently ignores missing files.
- */
-export async function deletePostPhotos(uid, postId, count) {
-  const deletions = [];
-  for (let i = 0; i < count; i++) {
-    const path = `shares/${uid}/${postId}/${i}.jpg`;
-    deletions.push(deleteObject(ref(storage, path)).catch(() => {}));
-  }
-  await Promise.all(deletions);
 }
 
 /**

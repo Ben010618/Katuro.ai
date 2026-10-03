@@ -6,6 +6,11 @@ import { teacherRef, applyPendingPassword } from '../services/db';
 import { trackEvent } from '../services/usageTracker';
 import { planInfo } from '../services/plans';
 
+// useAuth runs in ~47 components; each subscribes to auth. The "login" event and the
+// pending-password check must happen once per page load per account, not once per
+// component (that inflated Site Visits / Top Visitors several times per page).
+let lastSignedInUid = null;
+
 export function useAuth() {
   const [user,     setUser]     = useState(null);
   const [profile,  setProfile]  = useState(null);
@@ -17,9 +22,12 @@ export function useAuth() {
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
       clearTimeout(timeout);
       setUser(currentUser);
-      if (!currentUser) { setLoading(false); return; }
-      applyPendingPassword(currentUser).catch(() => {});
-      trackEvent(currentUser.uid, 'login');
+      if (!currentUser) { lastSignedInUid = null; setLoading(false); return; }
+      if (lastSignedInUid !== currentUser.uid) {
+        lastSignedInUid = currentUser.uid;
+        applyPendingPassword(currentUser).catch(() => {});
+        trackEvent(currentUser.uid, 'login');
+      }
     });
     return () => { unsubAuth(); clearTimeout(timeout); };
   }, []);

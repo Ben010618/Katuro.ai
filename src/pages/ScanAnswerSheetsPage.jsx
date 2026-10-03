@@ -237,10 +237,11 @@ export default function ScanAnswerSheetsPage() {
   }
 
   async function handleConfirm(scan, { answers, name, score, total }) {
-    await confirmScan(user.uid, quizId, scan.id, { reviewedAnswers: answers, score, total });
-    if (name !== scan.studentName) {
-      // studentName is display-only metadata, kept alongside reviewedAnswers
-      scan.studentName = name;
+    try {
+      await confirmScan(user.uid, quizId, scan.id, { reviewedAnswers: answers, score, total, studentName: name });
+    } catch (err) {
+      addToast(`Could not save this scan: ${err.message}`, 'error');
+      return;
     }
     await refreshScans();
     addToast('Scan confirmed and scored.', 'success');

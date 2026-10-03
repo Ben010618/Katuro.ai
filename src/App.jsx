@@ -184,7 +184,13 @@ function AdminRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/shares" replace />;
+  if (user) {
+    // Signed in from an invite link: go back to the invitation, not to Shares.
+    let invite = null;
+    try { invite = sessionStorage.getItem('kt-invite-code'); } catch { /* storage blocked */ }
+    if (invite) return <Navigate to={`/invite/${encodeURIComponent(invite)}`} replace />;
+    return <Navigate to="/shares" replace />;
+  }
   return children;
 }
 

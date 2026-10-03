@@ -809,6 +809,9 @@ exports.adminChangePassword = onCall(
     // client that can read the teacher doc (including the teacher themselves).
     await admin.auth().updateUser(uid, { password });
     await db.doc(`teachers/${uid}`).update({
+      // Remove plain-text copies written by the old client-side flow.
+      password:        admin.firestore.FieldValue.delete(),
+      pendingPassword: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 

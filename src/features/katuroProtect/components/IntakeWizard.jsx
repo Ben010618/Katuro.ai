@@ -1,3 +1,4 @@
+import { manilaToday } from '../../../services/plans';
 import { useState, useEffect } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Info, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
@@ -115,10 +116,10 @@ export default function IntakeWizard({ chatHistory, onCreated }) {
     try {
       const finalForm = {
         ...form,
-        date_reported: form.date_reported || new Date().toISOString().slice(0, 10),
+        date_reported: form.date_reported || manilaToday(new Date()),
         received_by: {
           name: form.received_by.name.trim() || profile?.displayName || user?.email || '',
-          position: form.received_by.position || 'Class Adviser',
+          position: form.received_by.position || '', // blank stays blank on the official record
         },
       };
       const caseId = await createCase(finalForm, user?.uid);

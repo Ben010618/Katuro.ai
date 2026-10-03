@@ -30,21 +30,30 @@ describe('ILAW unpacking: "AI response missing competencyCeiling"', () => {
   });
 
   it('refuses when neither the ceiling nor any session level is a Bloom level', async () => {
-    reply({ competencyCeiling: '', sessions: [{ day: 1, bloomsLevel: '', objective: 'x' }] });
+    reply({ competencyCeiling: '', sessions: [{ day: 1, bloomsLevel: 'Recall facts', objective: 'x' }, { day: 2, bloomsLevel: '???', objective: 'y' }] });
     await expect(unpackCompetency(base)).rejects.toMatchObject({ code: 'NOT_A_COMPETENCY' });
   });
 
   it('keeps a valid ceiling and normalizes spelling', async () => {
-    reply({ competencyCeiling: 'analyse', fullLadder: ['Remember', 'Understand', 'Apply', 'Analyze'], sessions: [{ day: 1, bloomsLevel: 'Analyze' }] });
+    reply({ competencyCeiling: 'analyse', fullLadder: ['Remember', 'Understand', 'Apply', 'Analyze'], sessions: [{ day: 1, bloomsLevel: 'Apply', objective: 'a' }, { day: 2, bloomsLevel: 'Analyze', objective: 'b' }] });
     expect((await unpackCompetency(base)).competencyCeiling).toBe('Analyze');
   });
 
   it('never sends a made-up subject, grade or term', async () => {
-    reply({ competencyCeiling: 'Apply', sessions: [{ day: 1, bloomsLevel: 'Apply' }] });
+    reply({ competencyCeiling: 'Apply', sessions: [{ day: 1, bloomsLevel: 'Understand', objective: 'a' }, { day: 2, bloomsLevel: 'Apply', objective: 'b' }] });
     await unpackCompetency({ ...base, subject: '', gradeLevel: '', term: '' });
     const prompt = callGeminiProxy.mock.calls[0][0].contents[0].parts[0].text;
     expect(prompt).toMatch(/Subject: not given\nGrade Level: not given\nTerm: not given/);
     expect(prompt).not.toMatch(/Subject: Science/);
+  });
+
+  it('one session per teaching day: extras are dropped, missing ones are retried', async () => {
+    reply({ competencyCeiling: 'Apply', sessions: [{ bloomsLevel: 'Remember', objective: 'a' }, { bloomsLevel: 'Apply', objective: 'b' }, { bloomsLevel: 'Apply', objective: 'c' }] });
+    expect((await unpackCompetency(base)).sessions).toHaveLength(2);
+    reply({ competencyCeiling: 'Apply', sessions: [{ bloomsLevel: 'Apply', objective: 'a' }] });
+    await expect(unpackCompetency(base)).rejects.toThrow(/1 of 2 sessions/);
+    reply({ competencyCeiling: 'Apply', sessions: [{ bloomsLevel: 'Apply', objective: 'a' }, { bloomsLevel: '', objective: 'b' }] });
+    await expect(unpackCompetency(base)).rejects.toThrow(/without a Bloom level/);
   });
 
   it('normalizes Bloom levels', () => {

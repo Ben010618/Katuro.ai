@@ -10,7 +10,7 @@ import {
   subscribeAdminNotifications, markAllNotificationsRead,
   adminSetFreeMode, subscribeFreeModeStatus,
 } from '../services/db';
-import { planInfo, planStatusText, formatPlanDate } from '../services/plans';
+import { planInfo, planStatusText, formatPlanDate , manilaToday } from '../services/plans';
 import { collection, getDocs, query, orderBy, limit, doc, where, Timestamp, onSnapshot, writeBatch } from 'firebase/firestore';
 import { groupReports } from '../services/errorReports';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
@@ -285,7 +285,6 @@ function SetPlanModal({ target, onClose, onSuccess }) {
 // ── Change Password modal ─────────────────────────────────────────────────────
 function ChangePasswordModal({ target, onClose, onSuccess }) {
   const [newPassword, setNewPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew,     setShowNew]     = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [err,         setErr]         = useState('');
@@ -297,7 +296,7 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
     setSaving(true); setErr('');
     try {
       await adminChangePassword(target.id, newPassword);
-      onSuccess(target.id, target.password ? newPassword : null);
+      onSuccess(target.id);
       setDone(true);
     } catch (ex) {
       setErr(ex.message || 'Failed to change password.');
@@ -310,40 +309,17 @@ function ChangePasswordModal({ target, onClose, onSuccess }) {
     <Modal onClose={onClose} title={`Password — ${target.email}`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Current stored password */}
-        <div>
-          <label style={labelStyle}>Current Password</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              readOnly
-              type={showCurrent ? 'text' : 'password'}
-              value={target.password || ''}
-              placeholder={target.password ? '' : '(self-registered — not stored)'}
-              style={{ ...inputStyle, paddingRight: 42, fontFamily: '"DM Mono", monospace', fontSize: 13, color: target.password ? '#163828' : '#9BB8A5' }}
-            />
-            {target.password && (
-              <button
-                type="button"
-                onClick={() => setShowCurrent(v => !v)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--kt-text-secondary)', padding: 0 }}
-              >
-                {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            )}
-          </div>
-        </div>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
+          Passwords are never stored or shown. Set a new one below; it works immediately, and the teacher signs in with it.
+        </p>
 
         {done ? (
           <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#d8f3dc', border: '1px solid rgba(45,106,79,0.2)', borderRadius: 8, padding: '12px 14px' }}>
               <CheckCircle2 size={15} color="#2d6a4f" style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
-                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Password set successfully.</p>
-                {!target.password && (
-                  <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>
-                    This user self-registered — the new password will take effect the next time they sign in.
-                  </p>
-                )}
+                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Password changed.</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-text-secondary)' }}>The teacher can sign in with the new password now.</p>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -542,12 +518,12 @@ function buildDailyData(events, days = 30) {
   const now = Date.now();
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(now - i * 86400000);
-    const key = d.toISOString().slice(0, 10);
+    const key = manilaToday(d);
     buckets[key] = { count: 0, uids: new Set() };
   }
   events.forEach(e => {
     const d = e.ts?.toDate ? e.ts.toDate() : new Date(e.ts);
-    const key = d.toISOString().slice(0, 10);
+    const key = manilaToday(d);
     if (key in buckets) {
       buckets[key].count++;
       buckets[key].uids.add(e.uid);
@@ -677,13 +653,13 @@ function buildSignupData(teachers, days = 30) {
   const buckets = {};
   const now = Date.now();
   for (let i = days - 1; i >= 0; i--) {
-    const key = new Date(now - i * 86400000).toISOString().slice(0, 10);
+    const key = manilaToday(new Date(now - i * 86400000));
     buckets[key] = 0;
   }
   teachers.forEach(t => {
     const ms = teacherCreatedMs(t);
     if (!ms) return;
-    const key = new Date(ms).toISOString().slice(0, 10);
+    const key = manilaToday(new Date(ms));
     if (key in buckets) buckets[key]++;
   });
   return Object.entries(buckets).map(([date, count]) => ({ date: date.slice(5), count }));
@@ -1137,7 +1113,7 @@ function AnalyticsSection({ teachers = [] }) {
         doc.text(`Page ${i} of ${pageCount}`, pageW - marginX, pageH - 8, { align: 'right' });
       }
 
-      doc.save(`katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.pdf`);
+      doc.save(`katuro-analytics-${range}d-${manilaToday(new Date())}.pdf`);
     } catch (err) {
       console.error('Analytics PDF export failed:', err);
     } finally {
@@ -1199,7 +1175,7 @@ function AnalyticsSection({ teachers = [] }) {
     }
 
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `katuro-analytics-${range}d-${new Date().toISOString().slice(0, 10)}.csv`);
+    saveAs(blob, `katuro-analytics-${range}d-${manilaToday(new Date())}.csv`);
   }
 
   // Guards against out-of-order responses: switching the range quickly (or
@@ -2680,8 +2656,12 @@ export default function AdminDashboard() {
   }, [notifications]);
 
   async function handleMarkAllRead() {
-    await markAllNotificationsRead().catch(() => {});
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await markAllNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (ex) {
+      console.warn('Could not mark notifications read:', ex);
+    }
   }
 
   const fetchTeachers = useCallback(async () => {
@@ -2738,7 +2718,12 @@ export default function AdminDashboard() {
     setTogglingUid(teacher.id);
     try {
       await adminSetDisabled(teacher.id, !teacher.disabled);
-      setTeachers(prev => prev.map(t => t.id === teacher.id ? { ...t, disabled: !t.disabled } : t));
+      // Enabling also approves a pending account on the server; mirror both.
+      setTeachers(prev => prev.map(t => t.id === teacher.id
+        ? { ...t, disabled: !t.disabled, ...(t.disabled ? { pendingApproval: false } : {}) }
+        : t));
+    } catch (ex) {
+      setListErr(`Could not ${teacher.disabled ? 'enable' : 'disable'} ${teacher.email || 'this account'}: ${ex.message || 'unknown error'}`);
     } finally {
       setTogglingUid(null);
     }
@@ -3339,9 +3324,9 @@ export default function AdminDashboard() {
         <ChangePasswordModal
           target={pwTarget}
           onClose={() => setPwTarget(null)}
-          onSuccess={(uid, newPw) => {
-            setTeachers(prev => prev.map(t => t.id === uid ? { ...t, password: newPw } : t));
-            setPwTarget(prev => prev ? { ...prev, password: newPw } : null);
+          onSuccess={(uid) => {
+            // The server removed any stored plain-text password.
+            setTeachers(prev => prev.map(t => t.id === uid ? { ...t, password: undefined, pendingPassword: undefined } : t));
           }}
         />
       )}

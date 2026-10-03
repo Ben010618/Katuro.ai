@@ -34,7 +34,26 @@ describe('computeFinalGrade', () => {
       writtenWorksWeight: 35, performanceTaskWeight: 35,
       wwMax: [100, 100, 100], ptMax: [100, 100], stMax: [], qeMax: 100,
     });
-    expect(grade).toBeCloseTo(92.96, 2);
+    // IG = 80x0.35 + 80x0.35 + 88x0.30 = 82.4 -> DO 8 table -> 89
+    expect(grade).toBe(89);
+  });
+
+  it('uses the DepEd Order 8 transmutation table (failing initial grades stay failing)', () => {
+    const g = (score) => computeFinalGrade({
+      writtenWorks: [score], performanceTask: [score], summativeTests: [score],
+      wwMax: [100], ptMax: [100], stMax: [100], wwCount: 1, ptCount: 1,
+    });
+    expect(g(50)).toBe(72);  // old formula said 80 (passing)
+    expect(g(60)).toBe(75);
+    expect(g(59.99)).toBe(74);
+    expect(g(98.4)).toBe(99);
+    expect(g(85)).toBe(90);
+    expect(Number.isInteger(g(77.3))).toBe(true);
+  });
+
+  it('a student with no scores has no grade (not 60)', () => {
+    expect(computeFinalGrade({ writtenWorks: ['', ''], performanceTask: [], summativeTests: ['', ''], wwMax: [100, 100], ptMax: [100], stMax: [100, 100] })).toBeNull();
+    expect(computeFinalGrade({ writtenWorks: [0], performanceTask: [], summativeTests: [], wwMax: [100], ptMax: [100], stMax: [100], wwCount: 1, ptCount: 1 })).toBe(60); // a real 0 still counts
   });
 
   it('only sums the first wwCount/ptCount entries even when the arrays hold extra values', () => {

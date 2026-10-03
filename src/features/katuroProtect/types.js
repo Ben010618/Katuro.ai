@@ -108,8 +108,6 @@ export function makeEmptyIntakeForm() {
  * @property {string[]} access_roles
  */
 
-export const ESCALATION_TIERS = ['T1_first', 'T2_repeat', 'T3_pattern', 'T_RED'];
-
 // ─── Part N2 — Case Action File export ──────────────────────────────────────
 /**
  * @typedef {Object} NextMoveStep

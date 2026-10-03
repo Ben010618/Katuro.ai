@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  addDoc, collection, serverTimestamp,
-  query, where, orderBy, onSnapshot, updateDoc, doc,
-} from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { X, Send, Loader2, Inbox } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -23,12 +20,16 @@ function MyFeedbackList({ user }) {
 
   useEffect(() => {
     const unsub = onSnapshot(
-      query(collection(db, 'feedback_inbox'), where('createdBy.uid', '==', user.uid), orderBy('createdAt', 'desc')),
+      // Sorted here instead of with orderBy: equality + orderBy needs a composite index
+      // that firestore.indexes.json does not define, and without it the list failed
+      // silently ("no feedback yet") and replies were never marked read.
+      query(collection(db, 'feedback_inbox'), where('createdBy.uid', '==', user.uid)),
       (snap) => {
-        setEntries(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const ms = (t) => (t?.toMillis ? t.toMillis() : 0);
+        setEntries(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)));
         setLoading(false);
       },
-      () => setLoading(false),
+      (err) => { console.warn('My Feedback could not load:', err); setLoading(false); },
     );
     return unsub;
   }, [user.uid]);

@@ -1,3 +1,4 @@
+import { manilaToday } from '../services/plans';
 import { useState, useEffect } from 'react';
 import { X, Clock, BookOpenText, Sparkles, CheckCircle2, MessageCircle, ShoppingCart } from 'lucide-react';
 
@@ -34,7 +35,7 @@ function pick(arr) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return manilaToday(new Date());
 }
 
 export default function DailyMotivationalPopup() {

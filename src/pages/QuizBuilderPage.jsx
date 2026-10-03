@@ -127,6 +127,8 @@ export default function QuizBuilderPage() {
     setGenerating(true);
     setGenError(null);
     setGenStatus('');
+    // A new quiz must never stay linked to the previous quiz's answer key.
+    setSavedQuizId(null);
 
     trackEvent(user.uid, 'quiz_generated', { subject: selectedLesson?.subject });
     const elapsedMs = startTimer();
@@ -222,6 +224,7 @@ export default function QuizBuilderPage() {
       setSavedQuizId(ref.id);
     } catch (e) {
       console.warn('Quiz auto-save failed:', e.message);
+      addToast('This quiz could not be saved, so answer sheets cannot be auto-graded yet. Check your connection and generate again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -653,7 +656,7 @@ export default function QuizBuilderPage() {
 
             {/* Bottom actions */}
             <div style={{ display: 'flex', gap: 10, marginTop: 20, borderTop: '1px solid rgba(45,106,79,0.08)', paddingTop: 16 }}>
-              <button className="btn-outline" onClick={() => { setStep(1); setQuestions([]); }}>
+              <button className="btn-outline" onClick={() => { setStep(1); setQuestions([]); setSavedQuizId(null); }}>
                 ← Back to Settings
               </button>
               <button className="btn-outline" onClick={handleReset}>

@@ -52,7 +52,9 @@ export default function InvitePage() {
       return;
     }
 
-    // Logged in — fetch invite data to show confirmation screen
+    // Logged in: the saved code has done its job (it brought the teacher back here).
+    try { sessionStorage.removeItem('kt-invite-code'); } catch { /* storage blocked */ }
+    // Fetch invite data to show confirmation screen
     getInvitationByCode(inviteCode)
       .then(inv => {
         if (!inv) { setPhase('not_found'); return; }

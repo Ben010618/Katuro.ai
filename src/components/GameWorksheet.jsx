@@ -261,9 +261,12 @@ function WordHuntDisplay({ data }) {
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, color: '#15803d', textTransform: 'uppercase', margin: '0 0 8px' }}>Find these words:</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 14px' }}>
-            {words.map((w, i) => (
-              <div key={i} style={{ fontSize: 11, color: '#1e3a8a', fontWeight: 700 }}>□ {w.word}</div>
-            ))}
+            {/* Only words actually hidden in the grid (too-long or unplaceable words are skipped). */}
+            {words
+              .filter(w => (wsGrid.placed || []).some(p => p.word === String(w.word || w).toUpperCase().replace(/[^A-Z]/g, '')))
+              .map((w, i) => (
+                <div key={i} style={{ fontSize: 11, color: '#1e3a8a', fontWeight: 700 }}>□ {w.word || w}</div>
+              ))}
           </div>
         </div>
       </div>

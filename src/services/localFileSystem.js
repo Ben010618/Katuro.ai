@@ -386,28 +386,6 @@ export function findEntryByPath(entries = [], relPath) {
 }
 
 /**
- * Finds files matching one or more search queries/filenames.
- */
-export function findFilesByNames(entries = [], names = []) {
-  const allFiles = flattenFileTree(entries);
-  return allFiles.filter((f) =>
-    names.some((n) => f.name.toLowerCase().includes(n.toLowerCase().trim()))
-  );
-}
-
-/**
- * Reads plain text content from a file object (virtual or native handle).
- * For real Office/PDF parsing use services/desk/readers instead.
- */
-export async function readWorkspaceFileContent(fileObj) {
-  if (!fileObj) return '';
-  if (fileObj.content) return fileObj.content;
-  if (fileObj.handle) return readFileText(fileObj.handle);
-  if (fileObj.fullPath && desk()) return desk().readFile(fileObj.fullPath);
-  return '';
-}
-
-/**
  * Creates an initial virtual workspace with sample DepEd lesson folders
  * when running in demo mode or browsers without File System Access API.
  * Files with a `content` string are plain-text stand-ins (clearly marked demo data).

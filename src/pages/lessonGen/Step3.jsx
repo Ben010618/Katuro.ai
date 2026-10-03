@@ -192,6 +192,9 @@ export default function Step3() {
         competencyText:     store.competencyText,
         content:            store.content            || '',
         contentStandards:   store.contentStandards   || '',
+        // Reopening the plan restores each competency row and the learning context.
+        learningContext:    store.learningContext    || '',
+        competencies:       store.competencies       || [],
         competencyCeiling:  store.competencyCeiling,
         fullLadder:         store.fullLadder,
         selectedDays:       store.selectedDays,

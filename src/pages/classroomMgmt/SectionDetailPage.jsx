@@ -143,7 +143,9 @@ const CSV_MAP = {
 };
 
 function mapCsvRow(raw) {
-  const s = { ...BLANK_STUDENT };
+  // Gender starts blank: a CSV without a Gender/Sex column must be flagged, not
+  // silently saved as Male (that corrupted SF1/SF5 male/female counts).
+  const s = { ...BLANK_STUDENT, gender: '' };
   Object.entries(raw).forEach(([h, v]) => {
     const field = CSV_MAP[h.toLowerCase()];
     if (field) s[field] = v;
@@ -800,6 +802,7 @@ export default function SectionDetailPage() {
   const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('roster');
   const [loadingSec, setLoadingSec] = useState(true);
+  const [noAccess,   setNoAccess]   = useState(false);
 
   // Student modal
   const [studentModal,  setStudentModal]  = useState(null); // null | {} (blank) | student doc
@@ -821,7 +824,13 @@ export default function SectionDetailPage() {
   const [inviteSubject, setInviteSubject] = useState(null);
 
   useEffect(() => {
-    const unsub = subscribeSection(sectionId, d => { setSection(d); setLoadingSec(false); });
+    // Only the adviser may open a section page; anyone else gets "not your section"
+    // instead of an endless spinner (the rules refuse the read).
+    const unsub = subscribeSection(
+      sectionId,
+      d => { setSection(d); setNoAccess(false); setLoadingSec(false); },
+      err => { setSection(null); setNoAccess(err?.code === 'permission-denied'); setLoadingSec(false); },
+    );
     return unsub;
   }, [sectionId]);
 
@@ -905,7 +914,11 @@ export default function SectionDetailPage() {
     return <div style={{ textAlign: 'center', padding: 60, color: 'var(--kt-text-secondary)', fontSize: 14 }}>Loading…</div>;
   }
   if (!section) {
-    return <div style={{ textAlign: 'center', padding: 60, color: '#e05c5c', fontSize: 14 }}>Section not found.</div>;
+    return (
+      <div style={{ textAlign: 'center', padding: 60, color: '#e05c5c', fontSize: 14 }}>
+        {noAccess ? 'This section belongs to another adviser. Subject teachers open their classes from Classes I Teach.' : 'Section not found.'}
+      </div>
+    );
   }
 
   const allSubjects  = [...(section.subjects || []), ...(section.specialSubjects || [])];

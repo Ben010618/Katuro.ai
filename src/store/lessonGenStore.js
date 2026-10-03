@@ -38,9 +38,18 @@ export const useLessonGenStore = create(
       saveStatus:    'idle',
 
       // ── Actions ─────────────────────────────────────────
-      setStep1: (data) => set({
-        ...data,
-        sessionCount: (data.selectedDays || []).length,
+      setStep1: (data) => set((state) => {
+        // Sessions were unpacked for a specific subject/grade/term/days. If any of
+        // those change, the old sessions (dates, objectives) no longer apply.
+        const changed = ['subject', 'gradeLevel', 'term'].some((k) => k in data && data[k] !== state[k])
+          || ('selectedDays' in data && JSON.stringify(data.selectedDays || []) !== JSON.stringify(state.selectedDays || []));
+        return {
+          ...data,
+          sessionCount: (data.selectedDays || []).length,
+          ...(changed && state.unpackedSessions?.length
+            ? { unpackedSessions: [], competencyCeiling: '', fullLadder: [], generatedPlan: null }
+            : {}),
+        };
       }),
 
       setStep2: (data) => set(data),

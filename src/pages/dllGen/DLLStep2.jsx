@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDLLStore } from '../../store/dllStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -7,6 +7,7 @@ import { saveDLLPlan } from '../../services/db';
 import { trackEvent, trackGeneration, startTimer } from '../../services/usageTracker';
 import { generateDLLProcedure } from '../../services/dllAI';
 import { retryAsync } from '../../utils/retry';
+import { balanceCompetencyDays } from '../../data/depedMatatagCurriculum';
 import { Sparkles, ArrowRight, ArrowLeft, CalendarDays, Plus, X } from 'lucide-react';
 import { useSmoothProgress } from '../../hooks/useSmoothProgress';
 import DepEdCurriculumPickerModal from '../../components/DepEdCurriculumPickerModal';
@@ -100,7 +101,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
         <div style={{ display: 'flex', gap: 5 }}>
           {Array.from({ length: MAX_DAYS }, (_, i) => {
             const ri    = rowIdxForSlot(i);
-            const color = ri >= 0 ? ROW_COLORS[ri] : null;
+            const color = ri >= 0 ? ROW_COLORS[ri % ROW_COLORS.length] : null;
             return (
               <div key={i} style={{
                 flex: 1, borderRadius: 7, overflow: 'hidden',
@@ -131,7 +132,7 @@ function BowSection({ label, sublabel, rowLabel, placeholder, list, onChange }) 
       {/* Rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
         {list.map((row, idx) => {
-          const color   = ROW_COLORS[idx];
+          const color   = ROW_COLORS[idx % ROW_COLORS.length];
           const maxDays = maxDaysForRow(idx);
           return (
             <div key={idx} style={{
@@ -244,8 +245,15 @@ export default function DLLStep2() {
   // driven purely by elapsed time against a ~70s expectation.
   const shownProgress = useSmoothProgress({ active: generating, estimateSec: 70 });
 
-  function handleSelectCurriculumForDLL(selectedList) {
-    if (!selectedList || selectedList.length === 0) return;
+  function handleSelectCurriculumForDLL(pickedList) {
+    if (!pickedList || pickedList.length === 0) return;
+    // A DLL covers one 5-day week: at most 5 competencies, at most 5 days in total.
+    // (Picking a whole quarter used to load 8+ rows and crash this page on every visit.)
+    let selectedList = pickedList.slice(0, 5);
+    if (selectedList.reduce((sum, item) => sum + (Number(item.days) || 0), 0) > 5) {
+      selectedList = balanceCompetencyDays(selectedList, 5);
+    }
+    if (pickedList.length > 5) addToast(`A DLL covers one week, so only the first 5 of ${pickedList.length} competencies were added.`, 'warning');
     const newMelcs = selectedList.map(item => ({
       text: item.text,
       days: item.days,
@@ -295,8 +303,14 @@ export default function DLLStep2() {
     store.performanceStandards.trim() &&
     melcFilled && contentFilled;
 
+  // Leaving the page abandons a running generation (see handleGenerate).
+  const activeRef = useRef(0);
+  useEffect(() => () => { activeRef.current++; }, []);
+
   async function handleGenerate() {
     if (!canGenerate || generating) return;
+    const genId = ++activeRef.current;
+    const abandoned = () => activeRef.current !== genId;
     setGenerating(true);
     setGenError('');
     setStatusMsg('Preparing lesson parameters…');
@@ -333,6 +347,19 @@ export default function DLLStep2() {
       if (!result) throw lastErr || new Error('Generation failed. Please try again.');
 
       const { objectives, procedure, resources } = result;
+
+      // The teacher left while this was running: keep the DLL (save it to My Lessons)
+      // but don't overwrite the DLL they may be working on now or pull them back here.
+      if (abandoned()) {
+        retryAsync(() => saveDLLPlan(user.uid, {
+          subject: store.subject, gradeLevel: store.gradeLevel, term: store.term, section: store.section,
+          teachingDates: store.teachingDates, contentStandards: store.contentStandards,
+          performanceStandards: store.performanceStandards,
+          melc: melcList.map(m => m.text.trim()).join('; '), melcList, contentList,
+          objectives, procedure, resources,
+        })).catch(e => console.warn('Background DLL save failed:', e.message));
+        return;
+      }
 
       store.setObjectives(objectives);
       store.setProcedure(procedure);

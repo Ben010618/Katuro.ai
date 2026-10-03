@@ -195,6 +195,9 @@ export default function CotOutputPage() {
         materials:          store.materials,
         teachingDate:       store.teachingDate,
         selectedIndicators: store.selectedIndicators,
+        objectives:           store.objectives           || '',
+        contentStandards:     store.contentStandards     || '',
+        performanceStandards: store.performanceStandards || '',
         plan,
       }));
       store.setGeneratedPlan({ plan, planId: docId });

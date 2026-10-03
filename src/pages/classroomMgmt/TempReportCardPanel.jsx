@@ -3,7 +3,7 @@ import { Download, ClipboardList } from 'lucide-react';
 import { subscribeSubjectGrades } from '../../services/classroomDb';
 import { subscribeSchoolProfile } from '../../services/schoolFormsDb';
 
-const TERMS = ['term1', 'term2', 'term3'];
+import { TERMS, subjectFinal, generalAverage } from '../../services/gradeRules';
 
 const PRINT_OPTIONS = [
   { key: 'term1', label: 'End of Term 1', show: ['term1'] },
@@ -37,19 +37,16 @@ function ReportCard({ student, grades, section, schoolProfile, showTerms, subjec
   const getGrade = (subj, term) =>
     grades[term]?.[subj]?.[student.id]?.finalGrade ?? '';
 
+  // Final rating needs ALL terms; a missing term leaves it blank (never averaged away).
   const getFinal = (subj) => {
     if (!showFinal) return '';
-    const vals = showTerms
-      .map(t => grades[t]?.[subj]?.[student.id]?.finalGrade)
-      .filter(g => g !== undefined && g !== null && g > 0);
-    if (!vals.length) return '';
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+    const f = subjectFinal(TERMS.map(t => grades[t]?.[subj]?.[student.id]?.finalGrade));
+    return f === null ? '' : +f.toFixed(1);
   };
 
-  const finals = showFinal ? subjects.map(s => getFinal(s)).filter(g => g !== '') : [];
-  const GA = finals.length
-    ? +(finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1)
-    : '';
+  const finals = showFinal ? subjects.map(s => getFinal(s)) : [];
+  const ga = showFinal ? generalAverage(finals.map(f => (f === '' ? null : f))) : null;
+  const GA = ga === null ? '' : +ga.toFixed(1);
 
   // ── Cell style factories ────────────────────────────────────────────────────
   const th = (extra = {}) => ({

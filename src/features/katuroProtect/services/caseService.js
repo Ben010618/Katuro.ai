@@ -101,14 +101,6 @@ export async function advanceCaseState(caseId, currentState, nextState, note, by
   });
 }
 
-/** Manual escalation-tier override (auto-computation from incident_registry is a later phase). */
-export async function setEscalationTier(caseId, tier) {
-  await updateDoc(doc(db, 'protect_cases', caseId), {
-    escalationTier: tier,
-    updatedAt: serverTimestamp(),
-  });
-}
-
 // ── Archiving ─────────────────────────────────────────────────────────────
 // Every case is already permanently stored in Firestore (protect_cases) —
 // nothing is ever deleted by the app itself. Archiving is purely a display

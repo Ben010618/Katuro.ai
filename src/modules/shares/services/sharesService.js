@@ -2,7 +2,7 @@ import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
   query, orderBy, where, onSnapshot, serverTimestamp,
   updateDoc, deleteDoc, limit, startAfter,
-  increment, runTransaction,
+  increment, runTransaction, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
@@ -413,16 +413,26 @@ export async function isFollowing(uid, targetUid) {
 
 /** Follow a teacher. Updates both sides and increments profile counters. */
 export async function followTeacher(uid, targetUid) {
-  await setDoc(doc(db, 'shares_follows', uid, 'following', targetUid), { createdAt: serverTimestamp() });
-  await setDoc(doc(db, 'shares_follows', targetUid, 'followers', uid), { createdAt: serverTimestamp() });
-  await updateDoc(doc(db, 'shares_profiles', uid),       { followingCount: increment(1) });
-  await updateDoc(doc(db, 'shares_profiles', targetUid), { followerCount:  increment(1) });
+  // Both sides in one batch: all-or-nothing (a failure used to leave half a follow).
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'shares_follows', uid, 'following', targetUid), { createdAt: serverTimestamp() });
+  batch.set(doc(db, 'shares_follows', targetUid, 'followers', uid), { createdAt: serverTimestamp() });
+  await batch.commit();
+  // Counters are cosmetic; a profile that doesn't exist yet must not undo the follow.
+  await Promise.allSettled([
+    updateDoc(doc(db, 'shares_profiles', uid),       { followingCount: increment(1) }),
+    updateDoc(doc(db, 'shares_profiles', targetUid), { followerCount:  increment(1) }),
+  ]);
 }
 
 /** Unfollow a teacher. Updates both sides and decrements profile counters. */
 export async function unfollowTeacher(uid, targetUid) {
-  await deleteDoc(doc(db, 'shares_follows', uid, 'following', targetUid));
-  await deleteDoc(doc(db, 'shares_follows', targetUid, 'followers', uid));
-  await updateDoc(doc(db, 'shares_profiles', uid),       { followingCount: increment(-1) });
-  await updateDoc(doc(db, 'shares_profiles', targetUid), { followerCount:  increment(-1) });
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'shares_follows', uid, 'following', targetUid));
+  batch.delete(doc(db, 'shares_follows', targetUid, 'followers', uid));
+  await batch.commit();
+  await Promise.allSettled([
+    updateDoc(doc(db, 'shares_profiles', uid),       { followingCount: increment(-1) }),
+    updateDoc(doc(db, 'shares_profiles', targetUid), { followerCount:  increment(-1) }),
+  ]);
 }

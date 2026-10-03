@@ -45,18 +45,6 @@ const trunc = (arr, n, maxChars = 120) =>
   (arr || []).slice(0, n).map((s) => String(s).slice(0, maxChars)).join("; ");
 
 /**
- * Suggest a short quiz title from lesson context. Returns a plain string.
- */
-export async function suggestQuizTitle(context) {
-  const text = await call(
-    'quiz_title',
-    `Suggest a short, specific quiz title (6 words max) for a ${context.gradeLevel} ${context.subject} quiz on "${context.topic}". Return ONLY the title text, no quotes, no punctuation at the end.`,
-    { temperature: 0.7, maxOutputTokens: 30 }
-  );
-  return text.trim().replace(/^["']|["']$/g, "");
-}
-
-/**
  * Generate quiz questions + answer key from a saved context object.
  * lessonPlan (optional) is the parsed 4As plan object — used for richer question content.
  * Returns { questions: [{ num, text, choices:{A,B,C,D[,E]}, answer, competency }] }
@@ -113,7 +101,6 @@ Return ONLY JSON (no markdown fences):
   }
   throw lastErr;
 }
-
 
 /**
  * Unpack a MATATAG learning competency across N teaching days using Bloom's Taxonomy.
@@ -292,6 +279,15 @@ Just the raw JSON object:
   }
   if (!parsed.sessions || !Array.isArray(parsed.sessions)) {
     throw new Error('AI response missing sessions array');
+  }
+  // One session per teaching day: extra sessions would shift every later date and
+  // day number; too few, or a session without a level/objective, is retried.
+  if (parsed.sessions.length > numberOfDays) parsed.sessions = parsed.sessions.slice(0, numberOfDays);
+  if (parsed.sessions.length < numberOfDays) {
+    throw new Error(`AI returned ${parsed.sessions.length} of ${numberOfDays} sessions. Retrying…`);
+  }
+  if (parsed.sessions.some((s) => !String(s?.bloomsLevel || '').trim() || !String(s?.objective || '').trim())) {
+    throw new Error('AI returned a session without a Bloom level or objective. Retrying…');
   }
   // The ceiling label can be derived from the AI's own session levels (never invented).
   if (!BLOOM_ORDER.includes(normalizeBloom(parsed.competencyCeiling))) {
