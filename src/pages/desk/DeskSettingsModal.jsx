@@ -4,11 +4,14 @@ import { useDeskStore } from '../../store/deskStore';
 import { PERSONAS } from '../../services/desk/personas';
 import { KaTuroAIAvatar } from './DeskAvatar';
 import TeacherProfileForm from '../../components/TeacherProfileForm';
+import { useDeskUpdate, updateStatusText } from './useDeskUpdate';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
   const { persona, setPersona, privacyMode, setPrivacyMode } = useDeskStore();
   const [tab, setTab] = useState(initialTab);
+  const { status: update, appVersion, check, install } = useDeskUpdate();
+  const busy = update.state === 'checking' || update.state === 'downloading';
 
   useEffect(() => {
     if (!open) return undefined;
@@ -108,7 +111,17 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         </div>
         )}
 
-        <div className="px-5 py-3 border-t border-gray-200 flex justify-end bg-[#f6f8f7]">
+        <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-between gap-3 bg-[#f6f8f7]">
+          <div className="min-w-0 text-[11px] text-gray-500">
+            <span className="font-semibold text-gray-700">KaTuroDesk{appVersion ? ` ${appVersion}` : ''}</span>
+            <span className="mx-1">·</span>
+            <span>{updateStatusText(update)}</span>
+            {update.state === 'ready' ? (
+              <button onClick={install} className="ml-2 font-semibold text-emerald-700 hover:underline">Restart now</button>
+            ) : update.state !== 'unsupported' && (
+              <button onClick={check} disabled={busy} className="ml-2 font-semibold text-emerald-700 hover:underline disabled:opacity-40 disabled:no-underline">Check for updates</button>
+            )}
+          </div>
           <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-[#2d6a4f] hover:bg-[#235841] text-white text-xs font-semibold">
             Done
           </button>

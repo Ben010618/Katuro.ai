@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
   CalendarClock,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
@@ -23,6 +24,7 @@ import { planStatusText } from '../../services/plans';
 import DeskScheduleModal from './DeskScheduleModal';
 import ktLogo from '../../assets/KT-Favicon.webp';
 import { useDeskScheduler } from './deskScheduler';
+import { useDeskUpdate } from './useDeskUpdate';
 
 const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
 // In the desktop app the Windows title bar is hidden: the top bar is the drag area and
@@ -32,7 +34,8 @@ const WINDOW_CONTROLS_PX = deskApi?.platform === 'darwin' ? 0 : 146;
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
-  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks } = useDeskStore();
+  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating } = useDeskStore();
+  const { status: update, install: installUpdate } = useDeskUpdate();
 
   useEffect(() => {
     // Desktop: reopen the folder from last session so teachers don't re-pick it every day
@@ -123,6 +126,21 @@ export default function KaTuroDeskPage() {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2">
+          {update.state === 'ready' && (
+            <button
+              onClick={installUpdate}
+              disabled={isGenerating}
+              title={isGenerating ? 'Wait for the current request to finish, then restart.' : `Install KaTuroDesk ${update.version} now. Your files and settings stay.`}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition disabled:opacity-50"
+            >
+              <RefreshCw size={12} /> Restart to update
+            </button>
+          )}
+          {update.state === 'downloading' && (
+            <span className="text-[11px] text-[#a4baa9] hidden lg:inline" title={`Downloading KaTuroDesk ${update.version || ''}`}>
+              Updating… {update.percent || 0}%
+            </span>
+          )}
           <span
             className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${plan.plan === 'subscription' ? 'bg-[#243429] text-amber-300 border-amber-500/30' : 'bg-[#1f2b23] text-emerald-200 border-[#2d3e33]'}`}
             title={planStatusText(plan)}

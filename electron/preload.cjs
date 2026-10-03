@@ -3,7 +3,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('katuroDeskApi', {
   isElectron: true,
   platform: process.platform,
-  version: '1.4.0',
   titleBarHeight: 40,
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   reopenLastFolder: () => ipcRenderer.invoke('workspace:reopenLast'),
@@ -20,4 +19,13 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   setBackground: (settings) => ipcRenderer.invoke('app:setBackground', settings),
   notify: (title, body) => ipcRenderer.invoke('app:notify', title, body),
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:getStatus'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (callback) => {
+    const listener = (_, status) => callback(status);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.removeListener('update:status', listener);
+  },
 });

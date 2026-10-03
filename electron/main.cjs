@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, Notification, na
 const path = require('path');
 const fs = require('fs');
 
+// QA only: run on a separate profile (e.g. to test updates without touching the teacher's data).
+if (process.env.KATURO_DESK_USER_DATA) app.setPath('userData', process.env.KATURO_DESK_USER_DATA);
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -27,6 +30,66 @@ function readBackgroundSettings() {
 }
 let backgroundSettings = { keepRunning: false, openAtLogin: false };
 const startedHidden = process.argv.includes('--background');
+
+// ── Auto-update (GitHub Releases) ─────────────────────────────
+// New versions download quietly in the background. They install when the teacher
+// clicks "Restart to update" or the next time KaTuroDesk quits, never mid-task.
+// Each download is checked against the SHA-512 published with the release.
+const UPDATE_CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
+let updater = null;
+let updateStatus = { state: app.isPackaged ? 'idle' : 'unsupported', version: null, percent: 0, error: null };
+
+function sendUpdateStatus(patch) {
+  updateStatus = { ...updateStatus, ...patch };
+  // Small log for support: what the updater did and when (kept under ~50 KB).
+  try {
+    const logFile = path.join(app.getPath('userData'), 'update.log');
+    if (fs.existsSync(logFile) && fs.statSync(logFile).size > 50000) fs.writeFileSync(logFile, '');
+    if (patch.state !== 'downloading' || patch.percent === 0 || patch.percent === 100 || patch.percent % 25 === 0) {
+      fs.appendFileSync(logFile, `${new Date().toISOString()} v${app.getVersion()} ${JSON.stringify(updateStatus)}\n`);
+    }
+  } catch (e) {}
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', updateStatus);
+  if (tray) refreshTrayMenu();
+}
+
+function setupAutoUpdate() {
+  if (!app.isPackaged || process.platform !== 'win32') return;
+  try {
+    ({ autoUpdater: updater } = require('./vendor/updater.cjs'));
+  } catch (e) {
+    sendUpdateStatus({ state: 'unsupported', error: 'Updater not bundled' });
+    return;
+  }
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.allowPrerelease = false;
+  updater.allowDowngrade = false;
+  updater.logger = null;
+  updater.on('checking-for-update', () => sendUpdateStatus({ state: 'checking', error: null }));
+  updater.on('update-available', (info) => sendUpdateStatus({ state: 'downloading', version: info.version, percent: 0 }));
+  updater.on('update-not-available', () => sendUpdateStatus({ state: 'current', percent: 0 }));
+  updater.on('download-progress', (p) => sendUpdateStatus({ state: 'downloading', percent: Math.round(p.percent || 0) }));
+  updater.on('update-downloaded', (info) => sendUpdateStatus({ state: 'ready', version: info.version, percent: 100 }));
+  updater.on('error', (err) => {
+    // Offline or GitHub unreachable: stay quiet, try again at the next check.
+    if (updateStatus.state !== 'ready') sendUpdateStatus({ state: 'error', error: String((err && err.message) || err).slice(0, 200) });
+  });
+  const check = () => {
+    if (updateStatus.state === 'ready' || updateStatus.state === 'downloading') return;
+    updater.checkForUpdates().catch(() => {});
+  };
+  setTimeout(check, 15000);
+  setInterval(check, UPDATE_CHECK_EVERY_MS);
+}
+
+function installUpdateNow() {
+  if (!updater || updateStatus.state !== 'ready') return false;
+  isQuitting = true;
+  // Silent install, then KaTuroDesk opens again on the new version.
+  setImmediate(() => updater.quitAndInstall(true, true));
+  return true;
+}
 
 // Every fs IPC call must target a folder the teacher picked in this session
 // (or the one restored from last session). The renderer never gets raw disk access.
@@ -121,12 +184,18 @@ function ensureTray() {
   const icon = nativeImage.createFromPath(appIconPath()).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
   tray.setToolTip('KaTuroDesk — running in the background for your scheduled tasks');
+  refreshTrayMenu();
+  tray.on('click', showMainWindow);
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Open KaTuroDesk', click: showMainWindow },
+    ...(updateStatus.state === 'ready' ? [{ label: `Restart to update (v${updateStatus.version})`, click: installUpdateNow }] : []),
     { type: 'separator' },
     { label: 'Quit KaTuroDesk', click: () => { isQuitting = true; app.quit(); } },
   ]));
-  tray.on('click', showMainWindow);
 }
 
 function removeTray() {
@@ -356,6 +425,24 @@ ipcMain.handle('app:showWindow', async () => {
   return { success: true };
 });
 
+ipcMain.handle('app:getVersion', async () => app.getVersion());
+
+ipcMain.handle('update:getStatus', async () => updateStatus);
+
+ipcMain.handle('update:check', async () => {
+  if (!updater) return updateStatus;
+  if (updateStatus.state !== 'ready' && updateStatus.state !== 'downloading') {
+    try {
+      await updater.checkForUpdates();
+    } catch (e) {
+      sendUpdateStatus({ state: 'error', error: String((e && e.message) || e).slice(0, 200) });
+    }
+  }
+  return updateStatus;
+});
+
+ipcMain.handle('update:install', async () => ({ started: installUpdateNow() }));
+
 app.on('second-instance', () => showMainWindow());
 
 app.on('before-quit', () => {
@@ -369,6 +456,7 @@ app.whenReady().then(() => {
   backgroundSettings = readBackgroundSettings();
   createWindow();
   if (backgroundSettings.keepRunning) ensureTray();
+  setupAutoUpdate();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
