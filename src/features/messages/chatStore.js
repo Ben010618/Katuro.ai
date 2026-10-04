@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { create } from 'zustand';
-import { subscribeInbox, subscribeConversation, isUnread } from '../../services/messages/chatService';
+import { subscribeInbox, subscribeConversation, isUnread, clearFileCache } from '../../services/messages/chatService';
 
 export const useChatStore = create(() => ({ uid: null, inbox: [], conversations: {}, ready: false, error: '' }));
 
@@ -59,6 +59,7 @@ export function useChats(uid) {
       if (users <= 0) {
         users = 0;
         stopAll();
+        clearFileCache(); // signed out / left: no cached images of the previous user
         currentUid = null;
         useChatStore.setState({ uid: null, inbox: [], conversations: {}, ready: false, error: '' });
       }

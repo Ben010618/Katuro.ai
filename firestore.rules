@@ -403,6 +403,7 @@ service cloud.firestore {
         // Deleting your own message blanks it ("message deleted"); nothing else changes.
         allow update: if request.auth != null &&
           resource.data.senderUid == request.auth.uid &&
+          !('attachment' in resource.data) &&   // file messages: deleteChatMessage removes the file too
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'deleted']) &&
           request.resource.data.deleted == true &&
           request.resource.data.text == '';
@@ -428,6 +429,10 @@ service cloud.firestore {
           request.resource.data.url is string && request.resource.data.url.size() <= 2000 &&
           request.resource.data.url.matches('^https?://.+') &&
           request.resource.data.domain is string && request.resource.data.domain.size() <= 255 &&
+          request.resource.data.senderName == myDir().displayName &&
+          !dmBlocked(cid) &&
+          // Only together with a brand-new message of the sender (same batch).
+          !exists(/databases/$(database)/documents/conversations/$(cid)/messages/$(request.resource.data.messageId)) &&
           getAfter(/databases/$(database)/documents/conversations/$(cid)/messages/$(request.resource.data.messageId)).data.senderUid == request.auth.uid;
         allow update, delete: if false;   // removed by deleteChatMessage
       }

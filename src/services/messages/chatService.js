@@ -76,7 +76,9 @@ const URL_RE = /\bhttps?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]]/gi;
 
 /** http(s) links in a message (deduplicated, at most 5). */
 export function extractLinks(text) {
-  return [...new Set(String(text || '').match(URL_RE) || [])].slice(0, MAX_LINKS_PER_MESSAGE);
+  // Phones often capitalise "Https://"; links are saved with a lowercase scheme.
+  const found = (String(text || '').match(URL_RE) || []).map((u) => u.replace(/^https?/i, (s) => s.toLowerCase()));
+  return [...new Set(found)].slice(0, MAX_LINKS_PER_MESSAGE);
 }
 
 export function linkDomain(url) {
@@ -395,11 +397,37 @@ export function uploadChatFile(cid, file, onProgress) {
   return { promise, cancel: () => { aborted = true; xhr?.abort(); } };
 }
 
-const blobCache = new Map(); // assetId -> Blob (images shown in the chat)
+// Images shown in the chat, least recently used first out; bounded by total size.
+const blobCache = new Map(); // assetId -> Blob
+const CACHE_MAX_BYTES = 80 * 1024 * 1024;
+const CACHE_MAX_ITEM = 5 * 1024 * 1024;
+let cacheBytes = 0;
+
+function cacheImage(assetId, blob) {
+  if (blob.size > CACHE_MAX_ITEM) return;
+  blobCache.set(assetId, blob);
+  cacheBytes += blob.size;
+  for (const [key, b] of blobCache) {
+    if (cacheBytes <= CACHE_MAX_BYTES) break;
+    blobCache.delete(key);
+    cacheBytes -= b.size;
+  }
+}
+
+/** Forget cached images (on sign-out). */
+export function clearFileCache() {
+  blobCache.clear();
+  cacheBytes = 0;
+}
 
 /** Fetches a shared file through the server (members / admin only). */
 export async function fetchChatFile(cid, attachment, { download = false } = {}) {
-  if (!download && blobCache.has(attachment.assetId)) return blobCache.get(attachment.assetId);
+  if (!download && blobCache.has(attachment.assetId)) {
+    const hit = blobCache.get(attachment.assetId);
+    blobCache.delete(attachment.assetId); // refresh its place (most recently used)
+    blobCache.set(attachment.assetId, hit);
+    return hit;
+  }
   const token = await idToken();
   const res = await fetch(`${functionsBase}/downloadChatFile?cid=${encodeURIComponent(cid)}&asset=${encodeURIComponent(attachment.assetId)}${download ? '&download=1' : ''}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -409,7 +437,7 @@ export async function fetchChatFile(cid, attachment, { download = false } = {}) 
     throw new Error(data.error || 'Could not open the file.');
   }
   const blob = await res.blob();
-  if (attachment.kind === 'image' && blobCache.size < 200) blobCache.set(attachment.assetId, blob);
+  if (attachment.kind === 'image' && !blobCache.has(attachment.assetId)) cacheImage(attachment.assetId, blob);
   return blob;
 }
 

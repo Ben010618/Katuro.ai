@@ -2462,7 +2462,8 @@ function sendChatError(res, err, label) {
   return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 }
 
-exports.uploadChatFile = onRequest({ region: 'us-central1', timeoutSeconds: 540, memory: '1GiB', maxInstances: 20 }, async (req, res) => {
+// concurrency 8: each upload holds its file (up to 25 MB) in memory twice; 8 x ~50 MB fits 1 GiB.
+exports.uploadChatFile = onRequest({ region: 'us-central1', timeoutSeconds: 540, memory: '1GiB', maxInstances: 20, concurrency: 8 }, async (req, res) => {
   if (chatCors(req, res)) return;
   try {
     if (req.method !== 'POST') throw new ChatHttpError(405, 'Use POST.');

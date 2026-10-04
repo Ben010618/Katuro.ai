@@ -11,7 +11,7 @@ import {
   renameTeam, subscribeMembers, subscribeMessages, sendMessage, markRead, deleteMyMessage, reportMessage,
   getDirectoryCard, MAX_MESSAGE_LENGTH, MAX_TEAM_MEMBERS,
   uploadChatFile, fetchChatFile, saveBlobAs, subscribeAssets, subscribeBlocks, blockTeacher, unblockTeacher,
-  setChatMuted, fileProblem, fileExtension, formatBytes, FILE_ACCEPT, FILE_KINDS,
+  setChatMuted, fileProblem, fileExtension, formatBytes, linkDomain, FILE_ACCEPT, FILE_KINDS,
 } from '../../services/messages/chatService';
 import { useChats } from './chatStore';
 
@@ -305,17 +305,36 @@ function useFileActions(cid, deskFiles, setError) {
   };
   return {
     busy,
-    open: (a) => run(`open-${a.assetId}`, async () => {
-      const blob = await fetchChatFile(cid, a);
+    open: (a) => {
       if (deskFiles) {
-        const path = await deskFiles.save(a.name, new Uint8Array(await blob.arrayBuffer()));
-        await deskFiles.open(path);
-      } else {
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank', 'noopener');
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return run(`open-${a.assetId}`, async () => {
+          const blob = await fetchChatFile(cid, a);
+          const path = await deskFiles.save(a.name, new Uint8Array(await blob.arrayBuffer()));
+          await deskFiles.open(path);
+        });
       }
-    }),
+      const viewable = a.kind === 'image' || a.contentType === 'application/pdf';
+      if (!viewable) {
+        return run(`open-${a.assetId}`, async () => saveBlobAs(await fetchChatFile(cid, a, { download: true }), a.name));
+      }
+      // Open the tab now, on the click (a tab opened after the download is blocked as a pop-up).
+      const tab = window.open('', '_blank');
+      return run(`open-${a.assetId}`, async () => {
+        try {
+          const url = URL.createObjectURL(await fetchChatFile(cid, a));
+          if (tab && !tab.closed) {
+            tab.opener = null;
+            tab.location.href = url;
+          } else {
+            saveBlobAs(await fetchChatFile(cid, a, { download: true }), a.name); // tab was blocked
+          }
+          setTimeout(() => URL.revokeObjectURL(url), 120000);
+        } catch (err) {
+          tab?.close();
+          throw err;
+        }
+      });
+    },
     download: (a) => run(`dl-${a.assetId}`, async () => saveBlobAs(await fetchChatFile(cid, a, { download: true }), a.name)),
     save: (a) => run(`save-${a.assetId}`, async () => {
       const blob = await fetchChatFile(cid, a, { download: true });
@@ -478,7 +497,7 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
         ))}
         {tab === 'links' && items.map((l) => (
           <a key={l.id} href={l.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 0', borderBottom: `1px solid ${C.border}`, textDecoration: 'none', color: C.text }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><ExternalLink size={12} /> {l.domain || 'Link'}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><ExternalLink size={12} /> {linkDomain(l.url) || 'Link'}</span>
             <span style={{ display: 'block', fontSize: 11, color: C.muted, wordBreak: 'break-all' }}>{l.url}</span>
             <span style={{ display: 'block', fontSize: 10.5, color: C.muted }}>{l.senderName} · {when(l.createdAt)}</span>
           </a>
@@ -647,9 +666,13 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
         {error && <p style={{ margin: 0, padding: '6px 14px', fontSize: 12, color: error.startsWith('Saved to your folder') ? C.green : C.red }}>{error}</p>}
         {upload && (
           <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
-            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Sending {upload.name}… {Math.round((upload.progress || 0) * 100)}%</span>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {(upload.progress || 0) >= 1 ? `Processing ${upload.name}…` : `Sending ${upload.name}… ${Math.round((upload.progress || 0) * 100)}%`}
+            </span>
             <span style={{ width: 120, height: 6, borderRadius: 6, background: 'rgba(0,0,0,0.1)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${Math.round((upload.progress || 0) * 100)}%`, background: C.green }} /></span>
-            <button onClick={() => upload.cancel()} style={{ ...btn, padding: '2px 8px', fontSize: 11, background: 'transparent', color: C.red, border: `1px solid ${C.border}` }}>Cancel</button>
+            {(upload.progress || 0) < 1 && (
+              <button onClick={() => upload.cancel()} style={{ ...btn, padding: '2px 8px', fontSize: 11, background: 'transparent', color: C.red, border: `1px solid ${C.border}` }}>Cancel</button>
+            )}
           </div>
         )}
         {composerLocked ? (

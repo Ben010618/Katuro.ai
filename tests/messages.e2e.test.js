@@ -225,6 +225,9 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
 
     await signIn('carl');
     await expect(svc.fetchChatFile(cid, sent.attachment, { download: true })).rejects.toThrow(/not a member/);
+    await signIn('adm');
+    const adminCopy = await svc.fetchChatFile(cid, photo.attachment, { download: true });
+    expect(adminCopy.size).toBe(PNG.byteLength); // the admin can open every shared file
 
     await signIn('ana');
     await expect(svc.deleteMyMessage(cid, (await adminDb.collection(`conversations/${cid}/messages`).where('senderUid', '==', users.ben.uid).get()).docs[0].id)).rejects.toBeTruthy(); // not mine

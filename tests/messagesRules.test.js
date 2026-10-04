@@ -196,6 +196,36 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     await assertSucceeds(getDocs(collection(as('admin1'), `conversations/${cid}/files`)));
   });
 
+  it('links: no fake sender name, no reuse of an older message, none in a blocked chat', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    const db = as('teacher1');
+    const withMessage = (linkOver = {}) => {
+      const msg = doc(collection(db, `conversations/${cid}/messages`));
+      const b = writeBatch(db);
+      b.set(msg, { senderUid: 'teacher1', senderName: 'Ana', text: 'https://a.ph', createdAt: serverTimestamp() });
+      b.set(doc(collection(db, `conversations/${cid}/links`)), { url: 'https://a.ph', domain: 'a.ph', messageId: msg.id, senderUid: 'teacher1', senderName: 'Ana', createdAt: serverTimestamp(), ...linkOver });
+      b.update(doc(db, `conversations/${cid}`), { lastMessage: { text: 'x', senderUid: 'teacher1', senderName: 'Ana' }, lastMessageAt: serverTimestamp() });
+      return { msg, commit: () => b.commit() };
+    };
+    await assertFails(withMessage({ senderName: 'DepEd Admin' }).commit());
+    const first = withMessage();
+    await assertSucceeds(first.commit());
+    // A link pointing at an already existing message (even one's own) is refused.
+    await assertFails(setDoc(doc(collection(db, `conversations/${cid}/links`)), { url: 'https://evil.ph', domain: 'deped.gov.ph', messageId: first.msg.id, senderUid: 'teacher1', senderName: 'Ana', createdAt: serverTimestamp() }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher2/blocked/teacher1'), { at: 1 }));
+    await assertFails(withMessage().commit());
+  });
+
+  it('a message with a file cannot be blanked by the client (the server deletes it with its file)', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `conversations/${cid}/messages/m1`), {
+      senderUid: 'teacher1', senderName: 'Ana', text: '', attachment: { assetId: 'a1', kind: 'file', name: 'TOS.pdf', size: 10 }, createdAt: 1,
+    }));
+    await assertFails(updateDoc(doc(as('teacher1'), `conversations/${cid}/messages/m1`), { text: '', deleted: true }));
+  });
+
   it('a teacher can only mark their own inbox as read and only delete their own messages', async () => {
     const { cid, commit } = startDm('teacher2');
     await commit();
