@@ -2299,6 +2299,9 @@ exports.createSharedPlan = onCall(
 // (username, name, school, division, photo) that teachers at the same school or
 // division can read; teacher documents themselves stay private. Clients cannot
 // write either collection (see firestore.rules).
+// Modular import: works in production and in the emulator (where the legacy
+// admin.firestore.FieldValue namespace is not always present).
+const { FieldValue: MsgFieldValue } = require('firebase-admin/firestore');
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9._]{1,18})[a-z0-9]$/; // 3-20 chars
 const RESERVED_USERNAMES = new Set([
   'admin', 'administrator', 'katuro', 'katuroai', 'support', 'help', 'deped', 'system',
@@ -2364,9 +2367,9 @@ exports.claimUsername = onCall({ region: 'us-central1' }, async (req) => {
     const oldSnap = oldRef ? await tx.get(oldRef) : null;
 
     const entry = directoryEntry(uid, teacherSnap.data(), username);
-    tx.set(nameRef, { uid, username, claimedAt: admin.firestore.FieldValue.serverTimestamp() });
+    tx.set(nameRef, { uid, username, claimedAt: MsgFieldValue.serverTimestamp() });
     if (oldSnap?.exists && oldSnap.data().uid === uid) tx.delete(oldRef); // free the previous name
-    tx.set(dirRef, { ...entry, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    tx.set(dirRef, { ...entry, updatedAt: MsgFieldValue.serverTimestamp() });
     return entry;
   });
 });
@@ -2381,6 +2384,6 @@ exports.syncDirectory = onCall({ region: 'us-central1' }, async (req) => {
   const entry = directoryEntry(uid, teacherSnap.data(), dirSnap.data().usernameKey);
   const old = dirSnap.data();
   const changed = Object.keys(entry).some((k) => old[k] !== entry[k]);
-  if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: MsgFieldValue.serverTimestamp() });
   return { entry };
 });

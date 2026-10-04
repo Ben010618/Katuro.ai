@@ -55,6 +55,7 @@ function loadServer(store) {
     'firebase-functions/v2/scheduler': { onSchedule: () => () => {} },
     'firebase-functions/v2/firestore': { onDocumentCreated: () => () => {} },
     'firebase-functions/v1': chain,
+    'firebase-admin/firestore': { FieldValue: firestore.FieldValue },
     'firebase-admin': admin,
   };
   const req = (id) => (id in stubs ? stubs[id] : requireFromFunctions(id));

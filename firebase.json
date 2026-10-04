@@ -8,6 +8,26 @@
   "functions": {
     "source": "functions",
     "codebase": "default",
-    "ignore": ["node_modules", ".git", "**/*.log", "**/*.test.mjs"]
+    "ignore": [
+      "node_modules",
+      ".git",
+      "**/*.log",
+      "**/*.test.mjs"
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }
