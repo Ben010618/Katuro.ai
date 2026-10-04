@@ -19,5 +19,7 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     // Desk agent tests build real Excel/Word files; on a busy PC 5s was occasionally too short.
     testTimeout: 20000,
+    // In-memory localStorage/sessionStorage for stores that persist (see the file).
+    setupFiles: ['./tests/setup/browserStorage.js'],
   },
 }))
