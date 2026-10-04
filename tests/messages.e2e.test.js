@@ -26,7 +26,7 @@ vi.mock('../src/firebase.js', async () => {
   const auth = getAuth(app);
   connectAuthEmulator(auth, `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099'}`, { disableWarnings: true });
   connectFunctionsEmulator(getFunctions(app, 'us-central1'), '127.0.0.1', 5001);
-  return { default: app, db, auth, firebaseConfig: {} };
+  return { default: app, db, auth, firebaseConfig: {}, USE_EMULATORS: false };
 });
 
 const users = {
@@ -183,4 +183,85 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     const all = await getDocs(query(collection(fb.db, 'conversations'), orderBy('lastMessageAt', 'desc'), limit(100)));
     expect(all.size).toBeGreaterThanOrEqual(2); // the admin can see every chat
   }, 90000);
+
+  // ── Phase 2 ────────────────────────────────────────────────────────────────
+  const PDF = new TextEncoder().encode('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]);
+
+  it('files: members send and open; types checked by content; outsiders refused; delete removes the file', async () => {
+    svc.setChatFunctionsBase('http://127.0.0.1:5001/demo-katuro/us-central1');
+    await signIn('ana');
+    const ana = await svc.syncDirectory();
+    const cid = await svc.openDirectChat(ana, users.ben.uid);
+
+    const sent = await svc.uploadChatFile(cid, { name: 'TOS Quarter 1.pdf', bytes: PDF }).promise;
+    expect(sent.attachment).toMatchObject({ kind: 'file', name: 'TOS Quarter 1.pdf', size: PDF.byteLength, contentType: 'application/pdf' });
+    const photo = await svc.uploadChatFile(cid, { name: 'board.png', bytes: PNG }).promise;
+    expect(photo.attachment.kind).toBe('image');
+
+    await expect(svc.uploadChatFile(cid, { name: 'fake.pdf', bytes: new TextEncoder().encode('not really a pdf') }).promise).rejects.toThrow(/does not look like a real PDF/);
+    await expect(svc.uploadChatFile(cid, { name: 'setup.exe', bytes: PDF }).promise).rejects.toThrow(/Only Word, Excel, PowerPoint, PDF and images/);
+    expect(svc.fileProblem('big.pdf', 26 * 1024 * 1024)).toMatch(/25 MB/);
+    // The server refuses wrong types even when the app's check is skipped.
+    const token = await fb.auth.currentUser.getIdToken();
+    const raw = await fetch('http://127.0.0.1:5001/demo-katuro/us-central1/uploadChatFile', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Chat-Id': cid, 'X-File-Name': 'setup.exe', 'Content-Type': 'application/octet-stream' }, body: PDF,
+    });
+    expect(raw.status).toBe(415);
+
+    await signIn('ben');
+    const ben = await svc.syncDirectory();
+    const blob = await svc.fetchChatFile(cid, sent.attachment, { download: true });
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(PDF);
+    const files = await new Promise((resolve, reject) => { const off = svc.subscribeAssets(cid, 'files', 30, (l) => { if (l.length) { off(); resolve(l); } }, reject); });
+    expect(files[0]).toMatchObject({ name: 'TOS Quarter 1.pdf', senderName: 'Ana Reyes' });
+    const media = await new Promise((resolve, reject) => { const off = svc.subscribeAssets(cid, 'media', 30, (l) => { if (l.length) { off(); resolve(l); } }, reject); });
+    expect(media[0].name).toBe('board.png');
+
+    await svc.sendMessage(cid, ben, 'Here: https://www.deped.gov.ph/2024/orders/ and https://example.org/test.');
+    const links = await new Promise((resolve, reject) => { const off = svc.subscribeAssets(cid, 'links', 30, (l) => { if (l.length >= 2) { off(); resolve(l); } }, reject); });
+    expect(links.map((l) => l.domain).sort()).toEqual(['deped.gov.ph', 'example.org']);
+    expect(links.find((l) => l.domain === 'example.org').url).toBe('https://example.org/test'); // trailing "." not part of the link
+
+    await signIn('carl');
+    await expect(svc.fetchChatFile(cid, sent.attachment, { download: true })).rejects.toThrow(/not a member/);
+    await signIn('adm');
+    const adminCopy = await svc.fetchChatFile(cid, photo.attachment, { download: true });
+    expect(adminCopy.size).toBe(PNG.byteLength); // the admin can open every shared file
+
+    await signIn('ana');
+    await expect(svc.deleteMyMessage(cid, (await adminDb.collection(`conversations/${cid}/messages`).where('senderUid', '==', users.ben.uid).get()).docs[0].id)).rejects.toBeTruthy(); // not mine
+    await svc.deleteMyMessage(cid, sent.messageId);
+    expect((await adminDb.doc(`conversations/${cid}/files/${sent.attachment.assetId}`).get()).exists).toBe(false);
+    expect((await adminDb.doc(`conversations/${cid}/messages/${sent.messageId}`).get()).data()).toMatchObject({ deleted: true, text: '' });
+    await signIn('ben');
+    await expect(svc.fetchChatFile(cid, sent.attachment, { download: true })).rejects.toThrow(/deleted/);
+  }, 120000);
+
+  it('block stops a one-to-one chat (texts and files) both ways; mute is saved; unblock restores', async () => {
+    await signIn('ana');
+    const ana = await svc.syncDirectory();
+    const cid = svc.directChatId(ana.uid, users.ben.uid);
+    await svc.blockTeacher(ana.uid, users.ben.uid);
+    await expect(svc.sendMessage(cid, ana, 'still there?')).rejects.toBeTruthy();
+    await svc.setChatMuted(ana.uid, cid, true);
+    expect((await adminDb.doc(`chatInbox/${ana.uid}/chats/${cid}`).get()).data().muted).toBe(true);
+
+    await signIn('ben');
+    const ben = await svc.syncDirectory();
+    await expect(svc.sendMessage(cid, ben, 'hello?')).rejects.toBeTruthy();
+    await expect(svc.uploadChatFile(cid, { name: 'notes.pdf', bytes: PDF }).promise).rejects.toThrow(/cannot send messages/);
+
+    await signIn('ana');
+    await svc.unblockTeacher(ana.uid, users.ben.uid);
+    await svc.sendMessage(cid, ana, 'Unblocked, sorry!');
+  }, 90000);
+
+  it('division suggestions come from what teachers actually entered', async () => {
+    await signIn('ben');
+    const divisions = await svc.listDivisions();
+    const laguna = divisions.find((d) => /laguna/i.test(d.name));
+    expect(laguna.count).toBe(2); // "Schools Division of Laguna" and "SDO Laguna" are one division
+    expect(divisions.some((d) => /cebu/i.test(d.name))).toBe(true);
+  }, 60000);
 });

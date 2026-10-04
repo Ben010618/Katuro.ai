@@ -300,6 +300,15 @@ service cloud.firestore {
     function validTeamName(n) {
       return n is string && n.size() > 0 && n.size() <= 60;
     }
+    // Either teacher of a pair has blocked the other (Phase 2: one-to-one chats only).
+    function blockedPair(a, b) {
+      return exists(/databases/$(database)/documents/chatBlocks/$(a)/blocked/$(b)) ||
+             exists(/databases/$(database)/documents/chatBlocks/$(b)/blocked/$(a));
+    }
+    function dmBlocked(cid) {
+      let c = get(/databases/$(database)/documents/conversations/$(cid)).data;
+      return c.type == 'dm' && blockedPair(c.members[0], c.members[1]);
+    }
 
     match /usernames/{name} {
       allow get:          if request.auth != null;   // "is this username free?"
@@ -330,6 +339,7 @@ service cloud.firestore {
             request.resource.data.members[0] < request.resource.data.members[1] &&
             request.auth.uid in request.resource.data.members &&
             cid == 'dm_' + request.resource.data.members[0] + '_' + request.resource.data.members[1] &&
+            !blockedPair(request.resource.data.members[0], request.resource.data.members[1]) &&
             sameOrgWith(request.resource.data.members[0] == request.auth.uid
               ? request.resource.data.members[1] : request.resource.data.members[0]) &&
             request.resource.data.keys().hasOnly(['type', 'members', 'createdBy', 'createdAt', 'lastMessage', 'lastMessageAt']))
@@ -388,15 +398,49 @@ service cloud.firestore {
           request.resource.data.text is string &&
           request.resource.data.text.size() > 0 &&
           request.resource.data.text.size() <= 4000 &&
-          request.resource.data.createdAt == request.time;
+          request.resource.data.createdAt == request.time &&
+          !dmBlocked(cid);
         // Deleting your own message blanks it ("message deleted"); nothing else changes.
         allow update: if request.auth != null &&
           resource.data.senderUid == request.auth.uid &&
+          !('attachment' in resource.data) &&   // file messages: deleteChatMessage removes the file too
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'deleted']) &&
           request.resource.data.deleted == true &&
           request.resource.data.text == '';
         allow delete: if false;
       }
+
+      // "Media, files and links" of a chat. Media and files are written only by the
+      // uploadChatFile function; links by the sender together with their message.
+      match /media/{assetId} {
+        allow read: if isChatMember(cid) || isAdmin();
+        allow write: if false;
+      }
+      match /files/{assetId} {
+        allow read: if isChatMember(cid) || isAdmin();
+        allow write: if false;
+      }
+      match /links/{linkId} {
+        allow read: if isChatMember(cid) || isAdmin();
+        allow create: if isChatMember(cid) &&
+          request.resource.data.keys().hasOnly(['url', 'domain', 'messageId', 'senderUid', 'senderName', 'createdAt']) &&
+          request.resource.data.senderUid == request.auth.uid &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.url is string && request.resource.data.url.size() <= 2000 &&
+          request.resource.data.url.matches('^https?://.+') &&
+          request.resource.data.domain is string && request.resource.data.domain.size() <= 255 &&
+          request.resource.data.senderName == myDir().displayName &&
+          !dmBlocked(cid) &&
+          // Only together with a brand-new message of the sender (same batch).
+          !exists(/databases/$(database)/documents/conversations/$(cid)/messages/$(request.resource.data.messageId)) &&
+          getAfter(/databases/$(database)/documents/conversations/$(cid)/messages/$(request.resource.data.messageId)).data.senderUid == request.auth.uid;
+        allow update, delete: if false;   // removed by deleteChatMessage
+      }
+    }
+
+    // Teachers you blocked (only you see or change your list).
+    match /chatBlocks/{uid}/blocked/{otherUid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     // Each teacher's list of chats (and when they last read each one).
@@ -410,7 +454,8 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)).data.addedBy == request.auth.uid
         );
       allow update: if request.auth != null && request.auth.uid == uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt', 'muted']) &&
+        (!('muted' in request.resource.data) || request.resource.data.muted is bool);
       allow delete: if request.auth != null && (
         request.auth.uid == uid ||
         (!existsAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)) && isChatAdmin(cid))

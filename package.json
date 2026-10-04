@@ -14,7 +14,7 @@
     "electron:build": "vite build --mode desk && node scripts/bundle-desk-updater.mjs && electron-builder --win",
     "test:rules": "firebase emulators:exec --only firestore --project katuro-rules-test \"vitest run tests/firestoreRules.test.js tests/messagesRules.test.js\"",
     "desk:dist": "vite build --mode desk && node scripts/bundle-desk-updater.mjs && electron-builder --win --publish never",
-    "test:e2e:messages": "firebase emulators:exec --only auth,firestore,functions --project demo-katuro \"vitest run tests/messages.e2e.test.js\""
+    "test:e2e:messages": "firebase emulators:exec --only auth,firestore,functions,storage --project demo-katuro \"vitest run tests/messages.e2e.test.js\""
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",

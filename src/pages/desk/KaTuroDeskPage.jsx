@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -29,6 +29,7 @@ import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
 import MessagesPanel from '../../features/messages/MessagesPanel';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
+import { flattenFileTree, findEntryByPath, readFileBytes, writeFileToDirectory, openInDefaultApp } from '../../services/localFileSystem';
 
 const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
 // In the desktop app the Windows title bar is hidden: the top bar is the drag area and
@@ -66,6 +67,24 @@ export default function KaTuroDeskPage() {
 
   useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
 
+  // Messages ↔ classroom folder (desktop app with a real folder open): send files from
+  // the folder; "Open" / "Save to my folder" put received files in "KaTuro Messages/".
+  const folderHandle = workspace?.handle?.kind === 'electron' ? workspace.handle : null;
+  const deskFiles = useMemo(() => (folderHandle ? {
+    list: () => flattenFileTree(useDeskStore.getState().workspace?.files || []),
+    read: async (path) => {
+      const ws = useDeskStore.getState().workspace;
+      const bytes = await readFileBytes(ws.handle, findEntryByPath(ws.files || [], path) || path);
+      return { name: path.split('/').pop(), bytes };
+    },
+    save: async (name, bytes) => {
+      const res = await writeFileToDirectory(folderHandle, `KaTuro Messages/${name}`, bytes, 'application/octet-stream', { overwrite: false });
+      useDeskStore.getState().refreshFiles();
+      return res.path;
+    },
+    open: (path) => openInDefaultApp(folderHandle, path),
+  } : null), [folderHandle]);
+
   // Messages: unread badge + Windows notification for new messages.
   const chatState = useChats(user?.uid);
   useChatNotifications({
@@ -96,6 +115,7 @@ export default function KaTuroDeskPage() {
             </button>
             <MessagesPanel
               user={user}
+              deskFiles={deskFiles}
               onOpenChatChange={setOpenChatId}
               onOpenProfile={() => { setShowMessages(false); setSettingsTab('profile'); setShowSettings(true); }}
             />

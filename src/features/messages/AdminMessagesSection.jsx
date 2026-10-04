@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, updateDoc } from 'firebase/firestore';
 import { MessageSquare, Loader2, CheckCircle2, X } from 'lucide-react';
 import { db } from '../../firebase';
+import { fetchChatFile, saveBlobAs, deleteMyMessage, formatBytes } from '../../services/messages/chatService';
 
 const box = { background: 'var(--kt-card)', border: '1px solid var(--kt-border)', borderRadius: 12, padding: 16, marginBottom: 16, color: 'var(--kt-text-primary)' };
 const small = { display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid var(--kt-border)', background: 'transparent', color: 'var(--kt-text-primary)', borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
@@ -44,7 +45,16 @@ function ChatViewer({ cid, onClose }) {
           <div key={m.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--kt-border)', fontSize: 12.5 }}>
             <span style={{ fontWeight: 700 }}>{m.senderName}</span>
             <span style={{ color: 'var(--kt-text-secondary)', fontSize: 11, marginLeft: 6 }}>{when(m.createdAt)}</span>
-            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontStyle: m.deleted ? 'italic' : 'normal' }}>{m.deleted ? 'Message deleted' : m.text}</div>
+            {m.deleted ? (
+              <div style={{ fontStyle: 'italic' }}>Message deleted</div>
+            ) : m.attachment ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span>{m.attachment.kind === 'image' ? 'Photo' : 'File'}: {m.attachment.name} ({formatBytes(m.attachment.size)})</span>
+                <button style={small} onClick={() => fetchChatFile(cid, m.attachment, { download: true }).then((b) => saveBlobAs(b, m.attachment.name)).catch((e) => alert(e.message))}>Open</button>
+              </div>
+            ) : (
+              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.text}</div>
+            )}
           </div>
         ))}
       </div>
@@ -72,6 +82,16 @@ export default function AdminMessagesSection() {
       }
     } catch (e) {
       setError(`Could not load: ${e.message}`);
+    }
+  }
+
+  async function removeMessage(r) {
+    if (!window.confirm('Remove this message (and its file) for everyone in the chat?')) return;
+    try {
+      await deleteMyMessage(r.cid, r.messageId); // the server allows the admin to delete any message
+      await resolve(r.id);
+    } catch (e) {
+      setError(`Could not remove: ${e.message}`);
     }
   }
 
@@ -114,6 +134,7 @@ export default function AdminMessagesSection() {
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                 <button style={small} onClick={() => setViewing(r.cid)}>View chat</button>
                 {r.status === 'open' && <button style={small} onClick={() => resolve(r.id)}><CheckCircle2 size={11} /> Resolve</button>}
+                {r.status === 'open' && <button style={{ ...small, color: '#c0392b' }} onClick={() => removeMessage(r)}>Remove message</button>}
               </div>
             </div>
           )))}

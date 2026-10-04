@@ -351,6 +351,11 @@ ipcMain.handle('fs:writeFile', async (_, filePath, content) => {
   const target = resolveInsideRoot(filePath);
   await fs.promises.mkdir(path.dirname(target), { recursive: true });
   await fs.promises.writeFile(target, toBuffer(content));
+  // Files received in Messages are marked as downloaded from the internet (Windows
+  // Zone.Identifier), so Office opens them in Protected View, like a browser download.
+  if (process.platform === 'win32' && target.split(path.sep).includes('KaTuro Messages')) {
+    await fs.promises.writeFile(`${target}:Zone.Identifier`, '[ZoneTransfer]\r\nZoneId=3\r\n').catch(() => {});
+  }
   return { success: true };
 });
 

@@ -9,7 +9,7 @@
  *   cd .. && firebase deploy --only functions
  */
 
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated }  = require('firebase-functions/v2/firestore');
 const admin                  = require('firebase-admin');
@@ -2310,12 +2310,16 @@ const RESERVED_USERNAMES = new Set([
 
 const tidy = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '');
 
-/** "Schools Division of Laguna" / "SDO Laguna" / "laguna" -> "laguna". */
+/**
+ * Division key: "Schools Division of Laguna" / "SDO Laguna" / "Province of Laguna" -> "laguna".
+ * "City" is kept but moved to the end, so "City of San Pablo" = "San Pablo City" ("sanpablocity")
+ * while "Cebu City" and "Cebu Province" stay different divisions.
+ */
 function orgKey(text) {
-  return String(text || '')
-    .toLowerCase()
-    .replace(/\b(schools?|division|of|the|sdo|deped)\b/g, ' ')
-    .replace(/[^a-z0-9]/g, '');
+  const t = String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+  const isCity = /\bcity\b/.test(t);
+  const core = t.replace(/\b(schools?|divisions?|of|the|sdo|deped|province|city)\b/g, ' ').replace(/[^a-z0-9]/g, '');
+  return core ? core + (isCity ? 'city' : '') : '';
 }
 
 function normalizeUsername(raw) {
@@ -2386,4 +2390,224 @@ exports.syncDirectory = onCall({ region: 'us-central1' }, async (req) => {
   const changed = Object.keys(entry).some((k) => old[k] !== entry[k]);
   if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: MsgFieldValue.serverTimestamp() });
   return { entry };
+});
+
+// ── Messages Phase 2: files, media, links, blocks, division suggestions ─────
+// Files travel through these functions, never straight between the app and
+// storage: the server checks membership, blocks, type (by extension AND content),
+// and the 25 MB limit, writes the file message itself, and streams files back only
+// to chat members (or the admin). No public download links are ever created.
+const CHAT_FILE_MAX = 25 * 1024 * 1024;
+const isZip = (b) => b.length > 4 && b[0] === 0x50 && b[1] === 0x4b; // docx/xlsx/pptx
+const isOle = (b) => b.length > 8 && b.readUInt32BE(0) === 0xd0cf11e0 && b.readUInt32BE(4) === 0xa1b11ae1; // doc/xls/ppt
+const isJpeg = (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+const CHAT_FILE_TYPES = {
+  pdf:  { mime: 'application/pdf', kind: 'file', ok: (b) => b.slice(0, 5).toString('latin1') === '%PDF-' },
+  doc:  { mime: 'application/msword', kind: 'file', ok: isOle },
+  xls:  { mime: 'application/vnd.ms-excel', kind: 'file', ok: isOle },
+  ppt:  { mime: 'application/vnd.ms-powerpoint', kind: 'file', ok: isOle },
+  docx: { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', kind: 'file', ok: isZip },
+  xlsx: { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', kind: 'file', ok: isZip },
+  pptx: { mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', kind: 'file', ok: isZip },
+  jpg:  { mime: 'image/jpeg', kind: 'image', ok: isJpeg },
+  jpeg: { mime: 'image/jpeg', kind: 'image', ok: isJpeg },
+  png:  { mime: 'image/png', kind: 'image', ok: (b) => b.length > 8 && b.readUInt32BE(0) === 0x89504e47 },
+  webp: { mime: 'image/webp', kind: 'image', ok: (b) => b.length > 12 && b.slice(0, 4).toString('latin1') === 'RIFF' && b.slice(8, 12).toString('latin1') === 'WEBP' },
+};
+
+class ChatHttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+function chatCors(req, res) {
+  res.set('Access-Control-Allow-Origin', '*'); // auth is a bearer token, never a cookie
+  res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Chat-Id, X-File-Name');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length');
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return true;
+  }
+  return false;
+}
+
+async function chatCaller(req) {
+  const m = /^Bearer (.+)$/.exec(req.get('Authorization') || '');
+  if (!m) throw new ChatHttpError(401, 'Please sign in again.');
+  try {
+    return await admin.auth().verifyIdToken(m[1]);
+  } catch {
+    throw new ChatHttpError(401, 'Please sign in again.');
+  }
+}
+
+/** Windows-safe, path-free file name (keeps the extension). */
+function safeChatFileName(raw) {
+  const base = String(raw || '').split(/[\\/]/).pop();
+  // Drop control characters and characters Windows does not allow in file names.
+  const name = [...base].filter((ch) => ch.charCodeAt(0) >= 32 && !'<>:"|?*'.includes(ch)).join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return name.slice(-120) || 'file';
+}
+
+async function blockedBetween(a, b) {
+  const [x, y] = await Promise.all([db.doc(`chatBlocks/${a}/blocked/${b}`).get(), db.doc(`chatBlocks/${b}/blocked/${a}`).get()]);
+  return x.exists || y.exists;
+}
+
+function sendChatError(res, err, label) {
+  if (err instanceof ChatHttpError) return res.status(err.status).json({ error: err.message });
+  console.error(`[${label}]`, err);
+  return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+}
+
+// concurrency 8: each upload holds its file (up to 25 MB) in memory twice; 8 x ~50 MB fits 1 GiB.
+exports.uploadChatFile = onRequest({ region: 'us-central1', timeoutSeconds: 540, memory: '1GiB', maxInstances: 20, concurrency: 8 }, async (req, res) => {
+  if (chatCors(req, res)) return;
+  try {
+    if (req.method !== 'POST') throw new ChatHttpError(405, 'Use POST.');
+    const caller = await chatCaller(req);
+    const uid = caller.uid;
+    const cid = String(req.get('X-Chat-Id') || '');
+    if (!/^[A-Za-z0-9_-]{1,120}$/.test(cid)) throw new ChatHttpError(400, 'Unknown chat.');
+    let rawName = '';
+    try { rawName = decodeURIComponent(req.get('X-File-Name') || ''); } catch { rawName = ''; }
+    const name = safeChatFileName(rawName);
+    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    const type = CHAT_FILE_TYPES[ext];
+    if (!type) throw new ChatHttpError(415, 'Only Word, Excel, PowerPoint, PDF and images (JPG, PNG, WEBP) can be sent.');
+    const body = req.rawBody;
+    if (!body || !body.length) throw new ChatHttpError(400, 'The file is empty.');
+    if (body.length > CHAT_FILE_MAX) throw new ChatHttpError(413, 'Files can be at most 25 MB.');
+    if (!type.ok(body)) throw new ChatHttpError(415, `This file does not look like a real ${ext.toUpperCase()} file.`);
+
+    const convRef = db.doc(`conversations/${cid}`);
+    const [convSnap, memberSnap, dirSnap] = await Promise.all([
+      convRef.get(), convRef.collection('chatMembers').doc(uid).get(), db.doc(`directory/${uid}`).get(),
+    ]);
+    if (!convSnap.exists || !memberSnap.exists || !dirSnap.exists) throw new ChatHttpError(403, 'You are not a member of this chat.');
+    const conv = convSnap.data();
+    if (conv.type === 'dm') {
+      const other = (conv.members || []).find((u) => u !== uid);
+      if (other && await blockedBetween(uid, other)) throw new ChatHttpError(403, 'You cannot send messages in this chat.');
+    }
+
+    const assetRef = convRef.collection(type.kind === 'image' ? 'media' : 'files').doc();
+    const storagePath = `chatFiles/${cid}/${assetRef.id}/${name}`;
+    const file = admin.storage().bucket().file(storagePath);
+    await file.save(body, { contentType: type.mime, resumable: false, metadata: { metadata: { uploaderUid: uid, cid } } });
+
+    const msgRef = convRef.collection('messages').doc();
+    const senderName = dirSnap.data().displayName;
+    const attachment = { assetId: assetRef.id, kind: type.kind, name, size: body.length, contentType: type.mime };
+    const now = MsgFieldValue.serverTimestamp();
+    const batch = db.batch();
+    batch.set(msgRef, { senderUid: uid, senderName, text: '', attachment, createdAt: now });
+    batch.set(assetRef, { ...attachment, path: storagePath, messageId: msgRef.id, senderUid: uid, senderName, createdAt: now });
+    batch.update(convRef, {
+      lastMessage: { text: (type.kind === 'image' ? 'Sent a photo' : `Sent a file: ${name}`).slice(0, 140), senderUid: uid, senderName },
+      lastMessageAt: now,
+    });
+    try {
+      await batch.commit();
+    } catch (err) {
+      await file.delete().catch(() => {}); // never leave an orphan file behind
+      throw err;
+    }
+    res.json({ messageId: msgRef.id, attachment });
+  } catch (err) {
+    sendChatError(res, err, 'uploadChatFile');
+  }
+});
+
+exports.downloadChatFile = onRequest({ region: 'us-central1', timeoutSeconds: 300, memory: '512MiB', maxInstances: 40 }, async (req, res) => {
+  if (chatCors(req, res)) return;
+  try {
+    if (req.method !== 'GET') throw new ChatHttpError(405, 'Use GET.');
+    const caller = await chatCaller(req);
+    const cid = String(req.query.cid || '');
+    const assetId = String(req.query.asset || '');
+    if (!/^[A-Za-z0-9_-]{1,120}$/.test(cid) || !/^[A-Za-z0-9]{1,60}$/.test(assetId)) throw new ChatHttpError(400, 'Unknown file.');
+    const convRef = db.doc(`conversations/${cid}`);
+    const [memberSnap, teacherSnap, mediaSnap, fileSnap] = await Promise.all([
+      convRef.collection('chatMembers').doc(caller.uid).get(),
+      db.doc(`teachers/${caller.uid}`).get(),
+      convRef.collection('media').doc(assetId).get(),
+      convRef.collection('files').doc(assetId).get(),
+    ]);
+    if (!memberSnap.exists && teacherSnap.data()?.isAdmin !== true) throw new ChatHttpError(403, 'You are not a member of this chat.');
+    const asset = mediaSnap.exists ? mediaSnap.data() : fileSnap.exists ? fileSnap.data() : null;
+    if (!asset) throw new ChatHttpError(404, 'This file was deleted.');
+    const file = admin.storage().bucket().file(asset.path);
+    const [exists] = await file.exists();
+    if (!exists) throw new ChatHttpError(404, 'This file was deleted.');
+    const inline = req.query.download !== '1' && (asset.kind === 'image' || asset.contentType === 'application/pdf');
+    res.set('Content-Type', asset.contentType);
+    res.set('Content-Length', String(asset.size));
+    res.set('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(asset.name)}`);
+    res.set('Cache-Control', 'private, no-store');
+    await new Promise((resolve, reject) => {
+      file.createReadStream().on('error', reject).on('end', resolve).pipe(res);
+    });
+  } catch (err) {
+    if (!res.headersSent) sendChatError(res, err, 'downloadChatFile');
+    else res.end();
+  }
+});
+
+/** The sender (or the admin) deletes a message: text, file, and its Media/Files/Links entries. */
+exports.deleteChatMessage = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const { cid, messageId } = req.data || {};
+  if (typeof cid !== 'string' || typeof messageId !== 'string' || !cid || !messageId) throw new HttpsError('invalid-argument', 'Missing message.');
+  const convRef = db.doc(`conversations/${cid}`);
+  const msgRef = convRef.collection('messages').doc(messageId);
+  const [msgSnap, teacherSnap] = await Promise.all([msgRef.get(), db.doc(`teachers/${req.auth.uid}`).get()]);
+  if (!msgSnap.exists) throw new HttpsError('not-found', 'That message no longer exists.');
+  const msg = msgSnap.data();
+  const isAdminCaller = teacherSnap.data()?.isAdmin === true;
+  if (msg.senderUid !== req.auth.uid && !isAdminCaller) throw new HttpsError('permission-denied', 'You can only delete your own messages.');
+
+  const batch = db.batch();
+  let storagePath = null;
+  if (msg.attachment?.assetId) {
+    const col = msg.attachment.kind === 'image' ? 'media' : 'files';
+    const assetSnap = await convRef.collection(col).doc(msg.attachment.assetId).get();
+    if (assetSnap.exists) {
+      storagePath = assetSnap.data().path;
+      batch.delete(assetSnap.ref);
+    }
+  }
+  const links = await convRef.collection('links').where('messageId', '==', messageId).get();
+  links.docs.forEach((d) => batch.delete(d.ref));
+  batch.update(msgRef, { text: '', deleted: true, attachment: MsgFieldValue.delete() });
+  await batch.commit();
+  if (storagePath) await admin.storage().bucket().file(storagePath).delete().catch(() => {});
+  return { ok: true };
+});
+
+// Division names teachers already use, the most common spelling per division.
+// Only names and counts leave the server (no teacher details). Cached for an hour.
+let _divisionCache = { at: 0, list: [] };
+exports.listDivisions = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  if (Date.now() - _divisionCache.at < 60 * 60 * 1000) return { divisions: _divisionCache.list };
+  const snap = await db.collection('teachers').select('division').get();
+  const groups = new Map(); // key -> { total, spellings }
+  snap.docs.forEach((d) => {
+    const name = tidy(d.get('division'));
+    const key = orgKey(name);
+    if (!key) return;
+    const g = groups.get(key) || { total: 0, spellings: new Map() };
+    g.total += 1;
+    g.spellings.set(name, (g.spellings.get(name) || 0) + 1);
+    groups.set(key, g);
+  });
+  const list = [...groups.values()]
+    .map((g) => ({ name: [...g.spellings.entries()].sort((a, b) => b[1] - a[1])[0][0], count: g.total }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, 300);
+  _divisionCache = { at: Date.now(), list };
+  return { divisions: list };
 });

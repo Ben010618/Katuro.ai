@@ -51,7 +51,7 @@ function loadServer(store) {
   const admin = { initializeApp() {}, firestore, auth: () => ({}) };
   const chain = new Proxy(function chainFn() {}, { get: () => chain, apply: () => chain });
   const stubs = {
-    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, HttpsError },
+    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, onRequest: (opts, fn) => fn || opts, HttpsError },
     'firebase-functions/v2/scheduler': { onSchedule: () => () => {} },
     'firebase-functions/v2/firestore': { onDocumentCreated: () => () => {} },
     'firebase-functions/v1': chain,

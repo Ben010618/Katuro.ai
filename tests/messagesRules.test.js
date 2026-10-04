@@ -151,6 +151,81 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     await assertFails(getDocs(collection(as('teacher1'), 'chatReports')));
   });
 
+  it('blocking stops one-to-one chats in both directions; only the owner sees their block list', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    await assertSucceeds(setDoc(doc(as('teacher2'), 'chatBlocks/teacher2/blocked/teacher1'), { at: 1 }));
+    await assertFails(send(cid, 'teacher1', 'Ana'));                     // blocked by Ben
+    await assertFails(send(cid, 'teacher2', 'Ben'));                     // Ben blocked Ana: no sending either
+    await assertFails(getDoc(doc(as('teacher1'), 'chatBlocks/teacher2/blocked/teacher1')));
+    await assertFails(setDoc(doc(as('teacher1'), 'chatBlocks/teacher2/blocked/teacher3'), { at: 1 }));
+    await assertSucceeds(deleteDoc(doc(as('teacher2'), 'chatBlocks/teacher2/blocked/teacher1')));
+    await assertSucceeds(send(cid, 'teacher1', 'Ana'));                  // unblocked
+  });
+
+  it('a new one-to-one chat cannot be started with someone who blocked you', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher2/blocked/teacher1'), { at: 1 }));
+    await assertFails(startDm('teacher2').commit());
+  });
+
+  it('mute is a boolean on your own inbox only', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    await assertSucceeds(updateDoc(doc(as('teacher1'), `chatInbox/teacher1/chats/${cid}`), { muted: true }));
+    await assertFails(updateDoc(doc(as('teacher1'), `chatInbox/teacher1/chats/${cid}`), { muted: 'yes' }));
+    await assertFails(updateDoc(doc(as('teacher1'), `chatInbox/teacher2/chats/${cid}`), { muted: true }));
+  });
+
+  it('links are written by the sender with their own message; media/files are server-only', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    const db = as('teacher1');
+    const msg = doc(collection(db, `conversations/${cid}/messages`));
+    const link = (over = {}) => ({ url: 'https://www.deped.gov.ph/orders', domain: 'deped.gov.ph', messageId: msg.id, senderUid: 'teacher1', senderName: 'Ana', createdAt: serverTimestamp(), ...over });
+    const b = writeBatch(db);
+    b.set(msg, { senderUid: 'teacher1', senderName: 'Ana', text: 'See https://www.deped.gov.ph/orders', createdAt: serverTimestamp() });
+    b.set(doc(collection(db, `conversations/${cid}/links`)), link());
+    b.update(doc(db, `conversations/${cid}`), { lastMessage: { text: 'See', senderUid: 'teacher1', senderName: 'Ana' }, lastMessageAt: serverTimestamp() });
+    await assertSucceeds(b.commit());
+    await assertFails(setDoc(doc(collection(db, `conversations/${cid}/links`)), link({ url: 'javascript:alert(1)' })));
+    await assertFails(setDoc(doc(collection(as('teacher2'), `conversations/${cid}/links`)), { ...link({ senderUid: 'teacher2', senderName: 'Ben' }) })); // not Ben's message
+    await assertFails(setDoc(doc(db, `conversations/${cid}/files/f1`), { name: 'x.pdf' }));
+    await assertFails(setDoc(doc(db, `conversations/${cid}/media/m1`), { name: 'x.png' }));
+    await assertSucceeds(getDocs(collection(as('teacher2'), `conversations/${cid}/links`)));
+    await assertFails(getDocs(collection(as('teacher3'), `conversations/${cid}/links`)));
+    await assertSucceeds(getDocs(collection(as('admin1'), `conversations/${cid}/files`)));
+  });
+
+  it('links: no fake sender name, no reuse of an older message, none in a blocked chat', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    const db = as('teacher1');
+    const withMessage = (linkOver = {}) => {
+      const msg = doc(collection(db, `conversations/${cid}/messages`));
+      const b = writeBatch(db);
+      b.set(msg, { senderUid: 'teacher1', senderName: 'Ana', text: 'https://a.ph', createdAt: serverTimestamp() });
+      b.set(doc(collection(db, `conversations/${cid}/links`)), { url: 'https://a.ph', domain: 'a.ph', messageId: msg.id, senderUid: 'teacher1', senderName: 'Ana', createdAt: serverTimestamp(), ...linkOver });
+      b.update(doc(db, `conversations/${cid}`), { lastMessage: { text: 'x', senderUid: 'teacher1', senderName: 'Ana' }, lastMessageAt: serverTimestamp() });
+      return { msg, commit: () => b.commit() };
+    };
+    await assertFails(withMessage({ senderName: 'DepEd Admin' }).commit());
+    const first = withMessage();
+    await assertSucceeds(first.commit());
+    // A link pointing at an already existing message (even one's own) is refused.
+    await assertFails(setDoc(doc(collection(db, `conversations/${cid}/links`)), { url: 'https://evil.ph', domain: 'deped.gov.ph', messageId: first.msg.id, senderUid: 'teacher1', senderName: 'Ana', createdAt: serverTimestamp() }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher2/blocked/teacher1'), { at: 1 }));
+    await assertFails(withMessage().commit());
+  });
+
+  it('a message with a file cannot be blanked by the client (the server deletes it with its file)', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `conversations/${cid}/messages/m1`), {
+      senderUid: 'teacher1', senderName: 'Ana', text: '', attachment: { assetId: 'a1', kind: 'file', name: 'TOS.pdf', size: 10 }, createdAt: 1,
+    }));
+    await assertFails(updateDoc(doc(as('teacher1'), `conversations/${cid}/messages/m1`), { text: '', deleted: true }));
+  });
+
   it('a teacher can only mark their own inbox as read and only delete their own messages', async () => {
     const { cid, commit } = startDm('teacher2');
     await commit();
