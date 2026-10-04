@@ -45,7 +45,7 @@ function loadServer(store) {
   firestore.FieldValue = { increment: (n) => ({ __inc: n }), serverTimestamp: () => 'ts', delete: () => undefined };
   const chain = new Proxy(function chainFn() {}, { get: () => chain, apply: () => chain });
   const stubs = {
-    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, HttpsError },
+    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, onRequest: (opts, fn) => fn || opts, HttpsError },
     'firebase-functions/v2/scheduler': { onSchedule: () => () => {} },
     'firebase-functions/v2/firestore': { onDocumentCreated: () => () => {} },
     'firebase-functions/v1': chain,
@@ -118,5 +118,8 @@ describe('unique usernames', () => {
     expect(orgKey('SDO - LAGUNA')).toBe('laguna');
     expect(orgKey('DepEd Division of San Pablo City')).toBe('sanpablocity');
     expect(orgKey('')).toBe('');
+    expect(orgKey('Province of Laguna')).toBe('laguna');
+    expect(orgKey('City of San Pablo')).toBe(orgKey('San Pablo City'));
+    expect(orgKey('Cebu City')).not.toBe(orgKey('Cebu Province'));
   });
 });

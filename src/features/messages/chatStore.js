@@ -75,13 +75,14 @@ export function useChats(uid) {
     return inbox
       .map((item) => {
         const conv = conversations[item.id];
-        return { cid: item.id, type: item.type, inbox: item, conv, unread: isUnread(item, conv, uid) };
+        return { cid: item.id, type: item.type, inbox: item, conv, muted: item.muted === true, unread: isUnread(item, conv, uid) };
       })
       .filter((c) => c.conv !== null) // no longer readable (removed from the team)
       .sort((a, b) => (ms(b.conv?.lastMessageAt) || ms(b.inbox.addedAt)) - (ms(a.conv?.lastMessageAt) || ms(a.inbox.addedAt)));
   }, [inbox, conversations, uid]);
 
-  const unreadCount = chats.filter((c) => c.unread).length;
+  // Muted chats still show as unread in the list, but not in the badge.
+  const unreadCount = chats.filter((c) => c.unread && !c.muted).length;
   return { chats, unreadCount, ready, error };
 }
 
@@ -102,7 +103,7 @@ export function useChatNotifications({ uid, chats, ready, openCid, panelOpen, no
       const at = ms(c.conv?.lastMessageAt);
       const before = seen.current.get(c.cid) || 0;
       seen.current.set(c.cid, at);
-      if (!at || at <= before || !c.unread) continue;
+      if (!at || at <= before || !c.unread || c.muted) continue;
       const looking = panelOpen && openCid === c.cid && typeof document !== 'undefined' && document.visibilityState === 'visible';
       if (looking) continue;
       const who = c.conv?.lastMessage?.senderName || 'New message';

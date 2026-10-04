@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, CheckCircle2 } from 'lucide-react';
 import { updateTeacherProfile } from '../services/db';
 import { HONORIFICS, SIGNATORY_ROLES, PROFILE_FIELDS, teacherInfo } from '../services/teacherInfo';
+import { listDivisions } from '../services/messages/chatService';
 
 /**
  * Teacher profile + signatories form. Shared by Settings (web) and KaTuroDesk → Settings.
@@ -45,6 +46,9 @@ export default function TeacherProfileForm({ uid, profile, user, onSaved, compac
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
+  // Division names other teachers already use (so teachers of one division match in Messages).
+  const [divisions, setDivisions] = useState([]);
+  const loadDivisions = () => { if (!divisions.length) listDivisions().then(setDivisions).catch(() => {}); };
 
   // Load the saved profile when it arrives, unless the teacher is mid-edit.
   useEffect(() => {
@@ -121,7 +125,10 @@ export default function TeacherProfileForm({ uid, profile, user, onSaved, compac
             <input style={inputStyle} value={form.district} onChange={set('district')} placeholder="Calauan District" />
           </Field>
           <Field label="Division">
-            <input style={inputStyle} value={form.division} onChange={set('division')} placeholder="Province of Laguna" />
+            <input style={inputStyle} value={form.division} onChange={set('division')} onFocus={loadDivisions} list="kt-division-suggestions" autoComplete="off" placeholder="Schools Division of Laguna" />
+            <datalist id="kt-division-suggestions">
+              {divisions.map((d) => <option key={d.name} value={d.name} />)}
+            </datalist>
           </Field>
           <Field label="Region">
             <input style={inputStyle} value={form.region} onChange={set('region')} placeholder="Region IV-A (CALABARZON)" />

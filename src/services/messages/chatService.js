@@ -12,15 +12,80 @@
  *   conversations/{cid}/messages/{id}   { senderUid, senderName, text, createdAt, deleted? }
  *   chatInbox/{uid}/chats/{cid}         { cid, type, addedAt, lastReadAt }
  *   chatReports/{id}                    reported messages (admin only)
+ * Phase 2:
+ *   conversations/{cid}/media|files/{id} shared images / documents (written by uploadChatFile)
+ *   conversations/{cid}/links/{id}      web links found in messages (written with the message)
+ *   chatBlocks/{uid}/blocked/{otherUid} teachers I blocked (one-to-one chats)
+ *   chatInbox/{uid}/chats/{cid}.muted   no notifications / badge for that chat
+ * Files are uploaded and downloaded through the uploadChatFile / downloadChatFile
+ * functions (membership, block, type and size checked on the server; no public links).
  */
 import {
   collection, doc, getDoc, getDocs, onSnapshot, query, where, orderBy, limit,
   writeBatch, serverTimestamp, updateDoc, addDoc,
 } from 'firebase/firestore';
-import app, { db } from '../../firebase';
+import app, { db, auth, firebaseConfig, USE_EMULATORS } from '../../firebase';
 
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_TEAM_MEMBERS = 50;
+export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_LINKS_PER_MESSAGE = 5;
+
+/** Allowed attachments: extension -> kind (same list as the server). */
+export const FILE_KINDS = {
+  pdf: 'file', doc: 'file', docx: 'file', xls: 'file', xlsx: 'file', ppt: 'file', pptx: 'file',
+  jpg: 'image', jpeg: 'image', png: 'image', webp: 'image',
+};
+export const FILE_ACCEPT = Object.keys(FILE_KINDS).map((e) => `.${e}`).join(',');
+const MIME = {
+  pdf: 'application/pdf', doc: 'application/msword', xls: 'application/vnd.ms-excel', ppt: 'application/vnd.ms-powerpoint',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+};
+
+export function fileExtension(name) {
+  const n = String(name || '');
+  return n.includes('.') ? n.split('.').pop().toLowerCase() : '';
+}
+
+/** A reason this file can't be sent, or '' (the server checks again, including content). */
+export function fileProblem(name, size) {
+  if (!FILE_KINDS[fileExtension(name)]) return 'Only Word, Excel, PowerPoint, PDF and images (JPG, PNG, WEBP) can be sent.';
+  if (!size) return 'The file is empty.';
+  if (size > MAX_FILE_BYTES) return 'Files can be at most 25 MB.';
+  return '';
+}
+
+export function formatBytes(n) {
+  if (!n) return '0 KB';
+  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+let functionsBase = USE_EMULATORS
+  ? 'http://127.0.0.1:5001/demo-katuro/us-central1'
+  : `https://us-central1-${firebaseConfig?.projectId || 'katuro-ai'}.cloudfunctions.net`;
+/** Tests point this at the functions emulator. */
+export function setChatFunctionsBase(url) {
+  functionsBase = url;
+}
+
+const URL_RE = /\bhttps?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]]/gi;
+
+/** http(s) links in a message (deduplicated, at most 5). */
+export function extractLinks(text) {
+  return [...new Set(String(text || '').match(URL_RE) || [])].slice(0, MAX_LINKS_PER_MESSAGE);
+}
+
+export function linkDomain(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9._]{1,18})[a-z0-9]$/;
 const RESERVED = new Set(['admin', 'administrator', 'katuro', 'katuroai', 'support', 'help', 'deped', 'system', 'moderator', 'mod', 'root', 'official', 'staff', 'security', 'teacher', 'principal']);
 
@@ -229,7 +294,14 @@ export async function sendMessage(cid, me, rawText) {
   if (!text) return;
   if (text.length > MAX_MESSAGE_LENGTH) throw new Error(`Messages can be at most ${MAX_MESSAGE_LENGTH} characters.`);
   const batch = writeBatch(db);
-  batch.set(doc(collection(db, 'conversations', cid, 'messages')), { senderUid: me.uid, senderName: me.displayName, text, createdAt: serverTimestamp() });
+  const msgRef = doc(collection(db, 'conversations', cid, 'messages'));
+  batch.set(msgRef, { senderUid: me.uid, senderName: me.displayName, text, createdAt: serverTimestamp() });
+  for (const url of extractLinks(text)) {
+    if (url.length > 2000) continue;
+    batch.set(doc(collection(db, 'conversations', cid, 'links')), {
+      url, domain: linkDomain(url).slice(0, 255), messageId: msgRef.id, senderUid: me.uid, senderName: me.displayName, createdAt: serverTimestamp(),
+    });
+  }
   batch.update(doc(db, 'conversations', cid), {
     lastMessage: { text: text.slice(0, 140), senderUid: me.uid, senderName: me.displayName },
     lastMessageAt: serverTimestamp(),
@@ -241,8 +313,9 @@ export async function markRead(uid, cid) {
   await updateDoc(doc(db, 'chatInbox', uid, 'chats', cid), { lastReadAt: serverTimestamp() });
 }
 
+/** Deletes my message, its file and its Media/Files/Links entries (the admin may delete any). */
 export async function deleteMyMessage(cid, messageId) {
-  await updateDoc(doc(db, 'conversations', cid, 'messages', messageId), { text: '', deleted: true });
+  await callFunction('deleteChatMessage', { cid, messageId });
 }
 
 export async function reportMessage(cid, message, me, reason) {
@@ -251,7 +324,7 @@ export async function reportMessage(cid, message, me, reason) {
     messageId: message.id,
     reporterUid: me.uid,
     reason: String(reason || '').trim().slice(0, 500),
-    messageText: String(message.text || '').slice(0, 1000),
+    messageText: String(message.text || (message.attachment ? `[${message.attachment.kind === 'image' ? 'Photo' : 'File'}] ${message.attachment.name}` : '')).slice(0, 1000),
     senderUid: message.senderUid,
     senderName: message.senderName || '',
     createdAt: serverTimestamp(),
@@ -268,3 +341,123 @@ export function isUnread(inboxItem, conversation, myUid) {
   return ms(conversation.lastMessageAt) > ms(inboxItem?.lastReadAt);
 }
 
+// ── Phase 2: files, media, links, block, mute, divisions ─────────────────────
+
+async function idToken() {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Please sign in again.');
+  return user.getIdToken();
+}
+
+/**
+ * Sends a file to a chat. `file` is a File/Blob with a name, or { name, bytes }.
+ * Returns { promise, cancel }; onProgress(0..1) while uploading (browser only).
+ */
+export function uploadChatFile(cid, file, onProgress) {
+  const name = file.name;
+  const body = file instanceof Blob ? file : new Blob([file.bytes], { type: MIME[fileExtension(name)] || 'application/octet-stream' });
+  const problem = fileProblem(name, body.size);
+  if (problem) return { promise: Promise.reject(new Error(problem)), cancel: () => {} };
+  let xhr = null;
+  let aborted = false;
+  const promise = (async () => {
+    const token = await idToken();
+    const url = `${functionsBase}/uploadChatFile`;
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': MIME[fileExtension(name)] || 'application/octet-stream',
+      'X-Chat-Id': cid,
+      'X-File-Name': encodeURIComponent(name),
+    };
+    if (typeof XMLHttpRequest === 'undefined') { // Node (tests): no progress events
+      const res = await fetch(url, { method: 'POST', headers, body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed. Please try again.');
+      return data;
+    }
+    return new Promise((resolve, reject) => {
+      if (aborted) { reject(Object.assign(new Error('Upload cancelled.'), { cancelled: true })); return; }
+      xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
+      xhr.onload = () => {
+        let data;
+        try { data = JSON.parse(xhr.responseText || '{}'); } catch { data = {}; }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(new Error(data.error || 'Upload failed. Please try again.'));
+      };
+      xhr.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
+      xhr.onabort = () => reject(Object.assign(new Error('Upload cancelled.'), { cancelled: true }));
+      xhr.send(body);
+    });
+  })();
+  return { promise, cancel: () => { aborted = true; xhr?.abort(); } };
+}
+
+const blobCache = new Map(); // assetId -> Blob (images shown in the chat)
+
+/** Fetches a shared file through the server (members / admin only). */
+export async function fetchChatFile(cid, attachment, { download = false } = {}) {
+  if (!download && blobCache.has(attachment.assetId)) return blobCache.get(attachment.assetId);
+  const token = await idToken();
+  const res = await fetch(`${functionsBase}/downloadChatFile?cid=${encodeURIComponent(cid)}&asset=${encodeURIComponent(attachment.assetId)}${download ? '&download=1' : ''}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Could not open the file.');
+  }
+  const blob = await res.blob();
+  if (attachment.kind === 'image' && blobCache.size < 200) blobCache.set(attachment.assetId, blob);
+  return blob;
+}
+
+/** Saves a blob through the browser's download. */
+export function saveBlobAs(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+/** Media ('media'), files ('files') or links ('links') of a chat, newest first. */
+export function subscribeAssets(cid, kind, count, cb, onError) {
+  return onSnapshot(query(collection(db, 'conversations', cid, kind), orderBy('createdAt', 'desc'), limit(count)),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })), snap.size >= count),
+    (err) => onError?.(err));
+}
+
+export function subscribeBlocks(uid, cb) {
+  return onSnapshot(collection(db, 'chatBlocks', uid, 'blocked'), (snap) => cb(new Set(snap.docs.map((d) => d.id))), () => cb(new Set()));
+}
+
+export async function blockTeacher(myUid, otherUid) {
+  const { setDoc } = await import('firebase/firestore');
+  await setDoc(doc(db, 'chatBlocks', myUid, 'blocked', otherUid), { blockedAt: serverTimestamp() });
+}
+
+export async function unblockTeacher(myUid, otherUid) {
+  const { deleteDoc } = await import('firebase/firestore');
+  await deleteDoc(doc(db, 'chatBlocks', myUid, 'blocked', otherUid));
+}
+
+export async function setChatMuted(uid, cid, muted) {
+  await updateDoc(doc(db, 'chatInbox', uid, 'chats', cid), { muted: Boolean(muted) });
+}
+
+let divisionsPromise = null;
+/** Division names teachers already use (for the profile's Division field). */
+export function listDivisions() {
+  if (!divisionsPromise) {
+    divisionsPromise = callFunction('listDivisions').then((r) => r?.divisions || []).catch(() => {
+      divisionsPromise = null;
+      return [];
+    });
+  }
+  return divisionsPromise;
+}
