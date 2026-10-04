@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests run in Node, which has no localStorage/sessionStorage. Stores that persist
  * (zustand persist) then log "storage is currently unavailable" asynchronously, and a
@@ -20,3 +21,14 @@ for (const name of ['localStorage', 'sessionStorage']) {
     Object.defineProperty(globalThis, name, { value: new MemoryStorage(), configurable: true, writable: true });
   }
 }
+
+// zustand persist reads `window.localStorage` by default, and Node has no `window`
+// (defining one would change every `typeof window` check in the code under test).
+// Stores without their own storage option use the in-memory storage above instead.
+vi.mock('zustand/middleware', async (importOriginal) => {
+  const mod = await importOriginal();
+  return {
+    ...mod,
+    persist: (initializer, options) => mod.persist(initializer, { storage: mod.createJSONStorage(() => globalThis.localStorage), ...options }),
+  };
+});
