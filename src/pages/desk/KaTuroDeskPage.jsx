@@ -11,6 +11,8 @@ import {
   Settings,
   CalendarClock,
   RefreshCw,
+  MessageSquare,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
@@ -25,12 +27,19 @@ import DeskScheduleModal from './DeskScheduleModal';
 import ktLogo from '../../assets/KT-Favicon.webp';
 import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
+import MessagesPanel from '../../features/messages/MessagesPanel';
+import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 
 const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
 // In the desktop app the Windows title bar is hidden: the top bar is the drag area and
 // leaves room on the right for the minimize / maximize / close buttons.
 const IN_DESKTOP_WINDOW = Boolean(deskApi?.isElectron);
 const WINDOW_CONTROLS_PX = deskApi?.platform === 'darwin' ? 0 : 146;
+
+function deskNotify(title, body) {
+  const desk = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
+  if (desk?.notify) desk.notify(title, String(body || '').slice(0, 140)).catch(() => {});
+}
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
@@ -46,6 +55,9 @@ export default function KaTuroDeskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('assistant');
+  const [showMessages, setShowMessages] = useState(false);
+  const [openChatId, setOpenChatId] = useState(null);
   // null = closed; {} = open on the list; { prompt, attachedPaths } = open on a new task
   const [schedule, setSchedule] = useState(null);
 
@@ -53,6 +65,17 @@ export default function KaTuroDeskPage() {
   const [showRightPanel, setShowRightPanel] = useState(true);
 
   useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
+
+  // Messages: unread badge + Windows notification for new messages.
+  const chatState = useChats(user?.uid);
+  useChatNotifications({
+    uid: user?.uid,
+    chats: chatState.chats,
+    ready: chatState.ready,
+    openCid: openChatId,
+    panelOpen: showMessages,
+    notify: deskNotify,
+  });
   const activeTasks = scheduledTasks.filter((t) => t.enabled).length;
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
@@ -60,7 +83,25 @@ export default function KaTuroDeskPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
-      <DeskSettingsModal open={showSettings} onClose={() => setShowSettings(false)} user={user} profile={profile} />
+      <DeskSettingsModal key={settingsTab} initialTab={settingsTab} open={showSettings} onClose={() => setShowSettings(false)} user={user} profile={profile} />
+      {showMessages && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowMessages(false)}>
+          <div className="w-full max-w-5xl relative" style={{ height: '85vh' }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Messages">
+            <button
+              onClick={() => setShowMessages(false)}
+              title="Close Messages"
+              className="absolute -top-3 -right-3 z-10 w-7 h-7 rounded-full bg-white border border-gray-300 shadow flex items-center justify-center text-gray-600 hover:text-gray-900"
+            >
+              <X size={14} />
+            </button>
+            <MessagesPanel
+              user={user}
+              onOpenChatChange={setOpenChatId}
+              onOpenProfile={() => { setShowMessages(false); setSettingsTab('profile'); setShowSettings(true); }}
+            />
+          </div>
+        </div>
+      )}
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}
@@ -160,7 +201,17 @@ export default function KaTuroDeskPage() {
           </button>
 
           <button
-            onClick={() => setShowSettings(true)}
+            onClick={() => setShowMessages(true)}
+            title="Messages: chat with teachers from your school or division"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <MessageSquare size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">Messages</span>
+            {chatState.unreadCount > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">{chatState.unreadCount > 99 ? '99+' : chatState.unreadCount}</span>}
+          </button>
+
+          <button
+            onClick={() => { setSettingsTab('assistant'); setShowSettings(true); }}
             title="Settings: choose your assistant (Matt or Luna)"
             className="flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >

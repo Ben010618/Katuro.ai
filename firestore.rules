@@ -368,5 +368,163 @@ service cloud.firestore {
         resource.data.adviserUid == request.auth.uid || isAdmin()
       );
     }
+
+    // ── Messages: usernames, directory, chats (Phase 1, 2026-10-04) ──────────
+    // Teachers message teachers from the same school or division. Usernames and
+    // directory cards are written only by the claimUsername / syncDirectory
+    // functions. The kaTuro admin can read every chat (teachers are told so).
+    function myDir() {
+      return get(/databases/$(database)/documents/directory/$(request.auth.uid)).data;
+    }
+    function hasDir() {
+      return request.auth != null && exists(/databases/$(database)/documents/directory/$(request.auth.uid));
+    }
+    function sameOrgWith(otherUid) {
+      let a = myDir();
+      let b = get(/databases/$(database)/documents/directory/$(otherUid)).data;
+      return (a.divisionKey != '' && a.divisionKey == b.divisionKey) ||
+             (a.schoolKey != '' && a.schoolKey == b.schoolKey);
+    }
+    function isChatMember(cid) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(request.auth.uid));
+    }
+    function isChatAdmin(cid) {
+      return isChatMember(cid) &&
+        get(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(request.auth.uid)).data.role == 'admin';
+    }
+    function validTeamName(n) {
+      return n is string && n.size() > 0 && n.size() <= 60;
+    }
+
+    match /usernames/{name} {
+      allow get:          if request.auth != null;   // "is this username free?"
+      allow list, write:  if false;                  // no browsing; claimed by the server only
+    }
+
+    match /directory/{uid} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid || isAdmin() ||
+        (hasDir() && myDir().divisionKey != '' && resource.data.divisionKey == myDir().divisionKey) ||
+        (hasDir() && myDir().schoolKey != '' && resource.data.schoolKey == myDir().schoolKey)
+      );
+      allow write: if false;
+    }
+
+    match /conversations/{cid} {
+      allow read: if isChatMember(cid) || isAdmin();
+      allow create: if hasDir() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.lastMessage == null && (
+          (request.resource.data.type == 'team' &&
+            validTeamName(request.resource.data.name) &&
+            request.resource.data.keys().hasOnly(['type', 'name', 'createdBy', 'createdAt', 'lastMessage', 'lastMessageAt'])) ||
+          (request.resource.data.type == 'dm' &&
+            request.resource.data.members is list &&
+            request.resource.data.members.size() == 2 &&
+            request.resource.data.members[0] < request.resource.data.members[1] &&
+            request.auth.uid in request.resource.data.members &&
+            cid == 'dm_' + request.resource.data.members[0] + '_' + request.resource.data.members[1] &&
+            sameOrgWith(request.resource.data.members[0] == request.auth.uid
+              ? request.resource.data.members[1] : request.resource.data.members[0]) &&
+            request.resource.data.keys().hasOnly(['type', 'members', 'createdBy', 'createdAt', 'lastMessage', 'lastMessageAt']))
+        );
+      allow update: if isChatMember(cid) && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt']) &&
+          request.resource.data.lastMessageAt == request.time &&
+          request.resource.data.lastMessage.senderUid == request.auth.uid) ||
+        (resource.data.type == 'team' && isChatAdmin(cid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) &&
+          validTeamName(request.resource.data.name))
+      );
+      allow delete: if false;
+
+      match /chatMembers/{memberUid} {
+        allow read: if isChatMember(cid) || isAdmin();
+        allow create: if request.auth != null &&
+          request.resource.data.uid == memberUid &&
+          request.resource.data.addedBy == request.auth.uid &&
+          request.resource.data.joinedAt == request.time &&
+          request.resource.data.keys().hasOnly(['uid', 'role', 'addedBy', 'joinedAt']) && (
+            // The creator joins their new team as its admin (same batch that creates it).
+            (memberUid == request.auth.uid && request.resource.data.role == 'admin' &&
+              !exists(/databases/$(database)/documents/conversations/$(cid)) &&
+              getAfter(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
+              getAfter(/databases/$(database)/documents/conversations/$(cid)).data.createdBy == request.auth.uid) ||
+            // Both people of a new one-to-one chat, written by the person starting it.
+            (request.resource.data.role == 'member' &&
+              !exists(/databases/$(database)/documents/conversations/$(cid)) &&
+              getAfter(/databases/$(database)/documents/conversations/$(cid)).data.type == 'dm' &&
+              getAfter(/databases/$(database)/documents/conversations/$(cid)).data.createdBy == request.auth.uid &&
+              memberUid in getAfter(/databases/$(database)/documents/conversations/$(cid)).data.members) ||
+            // A team admin adds a teacher from the same school or division.
+            (request.resource.data.role == 'member' && memberUid != request.auth.uid &&
+              get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
+              isChatAdmin(cid) && sameOrgWith(memberUid))
+          );
+        // A team admin may make another member an admin (e.g. before leaving).
+        allow update: if isChatAdmin(cid) &&
+          get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']) &&
+          request.resource.data.role in ['admin', 'member'];
+        allow delete: if request.auth != null &&
+          get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' && (
+            request.auth.uid == memberUid ||                       // leave a team
+            (memberUid != request.auth.uid && isChatAdmin(cid))     // an admin removes a member
+          );
+      }
+
+      match /messages/{messageId} {
+        allow read: if isChatMember(cid) || isAdmin();
+        allow create: if isChatMember(cid) &&
+          request.resource.data.keys().hasOnly(['senderUid', 'senderName', 'text', 'createdAt']) &&
+          request.resource.data.senderUid == request.auth.uid &&
+          request.resource.data.senderName == myDir().displayName &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 4000 &&
+          request.resource.data.createdAt == request.time;
+        // Deleting your own message blanks it ("message deleted"); nothing else changes.
+        allow update: if request.auth != null &&
+          resource.data.senderUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'deleted']) &&
+          request.resource.data.deleted == true &&
+          request.resource.data.text == '';
+        allow delete: if false;
+      }
+    }
+
+    // Each teacher's list of chats (and when they last read each one).
+    match /chatInbox/{uid}/chats/{cid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create: if request.auth != null &&
+        request.resource.data.keys().hasOnly(['cid', 'type', 'addedAt', 'lastReadAt']) &&
+        request.resource.data.cid == cid &&
+        existsAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)) && (
+          request.auth.uid == uid ||
+          getAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)).data.addedBy == request.auth.uid
+        );
+      allow update: if request.auth != null && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
+      allow delete: if request.auth != null && (
+        request.auth.uid == uid ||
+        (!existsAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)) && isChatAdmin(cid))
+      );
+    }
+
+    // Reported messages: any member reports; only the admin reads them.
+    match /chatReports/{reportId} {
+      allow create: if request.auth != null &&
+        isChatMember(request.resource.data.cid) &&
+        request.resource.data.keys().hasOnly(['cid', 'messageId', 'reporterUid', 'reason', 'messageText', 'senderUid', 'senderName', 'createdAt', 'status']) &&
+        request.resource.data.reporterUid == request.auth.uid &&
+        request.resource.data.status == 'open' &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.reason is string && request.resource.data.reason.size() <= 500 &&
+        get(/databases/$(database)/documents/conversations/$(request.resource.data.cid)/messages/$(request.resource.data.messageId)).data.senderUid == request.resource.data.senderUid;
+      allow read, update, delete: if isAdmin();
+    }
+
   }
 }

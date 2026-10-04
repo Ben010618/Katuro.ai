@@ -5,6 +5,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
+import { useChats, useChatNotifications } from '../features/messages/chatStore';
 import img1 from '../assets/1.webp';
 import img2 from '../assets/2.webp';
 import img3 from '../assets/3.webp';
@@ -22,13 +23,14 @@ import {
   ShieldCheck, BadgeCheck, FlaskConical, ClipboardCheck,
   School, GraduationCap, Moon, Sun,
   Settings, Camera, Loader2, Images, Lightbulb,
-  Users,
+  Users, MessageSquare,
 } from 'lucide-react';
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
   { to: '/protect',                  label: 'kaTuro Protect',       Icon: ShieldCheck, highlight: 'red' },
   { to: '/dashboard',               label: 'Dashboard',            Icon: LayoutDashboard },
+  { to: '/messages',                label: 'Messages',             Icon: MessageSquare, badge: 'messages' },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
   { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck, isNew: true },
@@ -41,6 +43,7 @@ const CLASSROOM_NAV = [
 ];
 
 const TITLES = {
+  '/messages':                'Messages',
   '/settings':                'Settings',
   '/desk':                    'KaTuro Desk',
   '/shares':                  'kaTuro Shares',
@@ -59,6 +62,7 @@ const TITLES = {
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
 function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, onProfileOpen, onFacultyOpen }) {
+  const { unreadCount } = useChats(user?.uid);
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -117,7 +121,7 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
 
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight }) => (
+        {MAIN_NAV.filter(item => !item.adminOnly || isAdmin).map(({ to, label, Icon, isNew, highlight, badge }) => (
           <NavLink key={to} to={to} onClick={onClose}
             style={({ isActive }) => highlight ? {
               display: 'flex', alignItems: 'center', gap: 9,
@@ -174,6 +178,12 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
             <span style={{ flex: 1 }}>{label}</span>
+            {badge === 'messages' && unreadCount > 0 && (
+              <span title={`${unreadCount} unread chat${unreadCount === 1 ? '' : 's'}`} style={{
+                background: '#E4D5AC', color: '#262119', borderRadius: 10, fontSize: 10,
+                padding: '0 6px', fontWeight: 800, lineHeight: '16px', minWidth: 16, textAlign: 'center',
+              }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+            )}
             {isNew && (
               <span style={{
                 background: '#E4D5AC',
@@ -388,11 +398,32 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
 }
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
+function notifyBrowser(title, body) {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if (document.visibilityState === 'visible' && window.location.pathname.startsWith('/messages')) return;
+    new Notification(title, { body: String(body || '').slice(0, 140) });
+  } catch {
+    // Notifications are optional; the unread badge still shows.
+  }
+}
+
 export default function AppShell() {
   const { user, plan, isAdmin, photoURL } = useAuth();
   const { dark, toggle } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  // New-message notifications (browser), only when the teacher allowed them and
+  // is not already looking at Messages.
+  const chatState = useChats(user?.uid);
+  useChatNotifications({
+    uid: user?.uid,
+    chats: chatState.chats,
+    ready: chatState.ready,
+    openCid: null,
+    panelOpen: location.pathname.startsWith('/messages'),
+    notify: notifyBrowser,
+  });
   const [mobileOpen,     setMobileOpen]     = useState(false);
   const [slideIdx,       setSlideIdx]       = useState(0);
   const [profileData,    setProfileData]    = useState(null); // lifted out of sidebar

@@ -2292,3 +2292,95 @@ exports.createSharedPlan = onCall(
     return { shareId: shareRef.id };
   }
 );
+
+// ── Messages: unique usernames + school/division directory ───────────────────
+// Usernames are claimed here, inside a transaction, so two teachers can never hold
+// the same one ("That username is taken."). The directory is a small public card
+// (username, name, school, division, photo) that teachers at the same school or
+// division can read; teacher documents themselves stay private. Clients cannot
+// write either collection (see firestore.rules).
+const USERNAME_RE = /^[a-z0-9](?:[a-z0-9._]{1,18})[a-z0-9]$/; // 3-20 chars
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'katuro', 'katuroai', 'support', 'help', 'deped', 'system',
+  'moderator', 'mod', 'root', 'official', 'staff', 'security', 'teacher', 'principal',
+]);
+
+const tidy = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '');
+
+/** "Schools Division of Laguna" / "SDO Laguna" / "laguna" -> "laguna". */
+function orgKey(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\b(schools?|division|of|the|sdo|deped)\b/g, ' ')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeUsername(raw) {
+  return String(raw || '').trim().toLowerCase().replace(/^@+/, '');
+}
+
+function directoryEntry(uid, t, username) {
+  const name = tidy(t.name) || tidy(t.fullName) || tidy(t.displayName)
+    || [tidy(t.givenName), tidy(t.surname)].filter(Boolean).join(' ');
+  const schoolId = String(t.schoolId || '').replace(/\D/g, '');
+  const school = tidy(t.school) || tidy(t.schoolName);
+  const division = tidy(t.division);
+  const divisionKey = orgKey(division);
+  // School names keep every word ("High School" matters); only case and punctuation are ignored.
+  const schoolNameKey = school.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return {
+    uid,
+    username,
+    usernameKey: username,
+    displayName: name || username,
+    school,
+    schoolId,
+    division,
+    schoolKey: schoolId ? `id:${schoolId}` : (schoolNameKey ? `name:${schoolNameKey}` : ''),
+    divisionKey,
+    photoURL: typeof t.photoURL === 'string' ? t.photoURL : '',
+  };
+}
+
+exports.claimUsername = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const uid = req.auth.uid;
+  const username = normalizeUsername(req.data?.username);
+  if (!USERNAME_RE.test(username) || /[._]{2}/.test(username)) {
+    throw new HttpsError('invalid-argument', 'Use 3 to 20 letters, numbers, dots or underscores. Start and end with a letter or number.');
+  }
+  if (RESERVED_USERNAMES.has(username)) {
+    throw new HttpsError('already-exists', 'That username is taken.');
+  }
+  return db.runTransaction(async (tx) => {
+    const nameRef = db.doc(`usernames/${username}`);
+    const dirRef = db.doc(`directory/${uid}`);
+    const teacherRef = db.doc(`teachers/${uid}`);
+    const [nameSnap, dirSnap, teacherSnap] = await Promise.all([tx.get(nameRef), tx.get(dirRef), tx.get(teacherRef)]);
+    if (!teacherSnap.exists) throw new HttpsError('failed-precondition', 'Your teacher profile was not found.');
+    if (nameSnap.exists && nameSnap.data().uid !== uid) throw new HttpsError('already-exists', 'That username is taken.');
+    const oldKey = dirSnap.exists ? dirSnap.data().usernameKey : null;
+    const oldRef = oldKey && oldKey !== username ? db.doc(`usernames/${oldKey}`) : null;
+    const oldSnap = oldRef ? await tx.get(oldRef) : null;
+
+    const entry = directoryEntry(uid, teacherSnap.data(), username);
+    tx.set(nameRef, { uid, username, claimedAt: admin.firestore.FieldValue.serverTimestamp() });
+    if (oldSnap?.exists && oldSnap.data().uid === uid) tx.delete(oldRef); // free the previous name
+    tx.set(dirRef, { ...entry, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return entry;
+  });
+});
+
+/** Refreshes the caller's directory card from their profile (school/division/name may have changed). */
+exports.syncDirectory = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const uid = req.auth.uid;
+  const [dirSnap, teacherSnap] = await Promise.all([db.doc(`directory/${uid}`).get(), db.doc(`teachers/${uid}`).get()]);
+  if (!dirSnap.exists) return { entry: null };
+  if (!teacherSnap.exists) throw new HttpsError('failed-precondition', 'Your teacher profile was not found.');
+  const entry = directoryEntry(uid, teacherSnap.data(), dirSnap.data().usernameKey);
+  const old = dirSnap.data();
+  const changed = Object.keys(entry).some((k) => old[k] !== entry[k]);
+  if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  return { entry };
+});

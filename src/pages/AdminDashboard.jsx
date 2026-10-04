@@ -13,6 +13,7 @@ import {
 import { planInfo, planStatusText, formatPlanDate , manilaToday } from '../services/plans';
 import { collection, getDocs, query, orderBy, limit, doc, where, Timestamp, onSnapshot, writeBatch } from 'firebase/firestore';
 import { groupReports } from '../services/errorReports';
+import AdminMessagesSection from '../features/messages/AdminMessagesSection';
 import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
@@ -3045,6 +3046,9 @@ export default function AdminDashboard() {
 
         {/* AI Error Reports */}
         <AIErrorSection />
+
+        {/* Messages: reported messages + read-only access to chats */}
+        <AdminMessagesSection />
 
         {/* Users table */}
         <div style={card}>
