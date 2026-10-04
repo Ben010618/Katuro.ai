@@ -17,14 +17,7 @@ import InactivityAnnouncementModal from './InactivityAnnouncementModal';
 import FacultyCustomizerModal from './FacultyCustomizerModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
-import {
-  LayoutDashboard, Sparkles, BookOpen,
-  LogOut, Menu, X, ChevronRight, ChevronDown,
-  ShieldCheck, BadgeCheck, FlaskConical, ClipboardCheck,
-  School, GraduationCap, Moon, Sun,
-  Settings, Camera, Loader2, Images, Lightbulb,
-  Users, MessageSquare,
-} from 'lucide-react';
+import { LayoutDashboard, Sparkles, BookOpen, LogOut, Menu, X, ChevronRight, ChevronDown, ShieldCheck, BadgeCheck, FlaskConical, ClipboardCheck, Moon, Sun, Settings, Camera, Loader2, Images, Lightbulb, Users, MessageSquare } from 'lucide-react';
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
@@ -35,11 +28,6 @@ const MAIN_NAV = [
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
   { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck, isNew: true },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
-];
-
-const CLASSROOM_NAV = [
-  { to: '/classroom-management', label: 'Classroom Management', Icon: School       },
-  { to: '/classes-i-teach',      label: 'Classes I Teach',      Icon: GraduationCap },
 ];
 
 const TITLES = {
@@ -56,8 +44,6 @@ const TITLES = {
   '/quiz-builder':            'Quiz Builder',
   '/test-builder':            'Test Builder',
   '/action-research/phase-1': 'Action Research',
-  '/classroom-management':    'Classroom Management',
-  '/classes-i-teach':         'Classes I Teach',
 };
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
@@ -194,29 +180,6 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
             )}
           </NavLink>
         ))}
-
-        {/* Classroom box */}
-        <div style={{ marginTop: 10, borderRadius: 6, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(220,208,174,0.15)', padding: '10px 8px 8px' }}>
-          <p style={{ margin: '0 0 7px 7px', fontSize: 9.5, fontWeight: 700, color: '#E4D5AC', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Classroom</p>
-          {CLASSROOM_NAV.map(({ to, label, Icon }) => (
-            <NavLink key={to} to={to} onClick={onClose}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 9,
-                padding: '8px 10px', borderRadius: 6, textDecoration: 'none', marginBottom: 2,
-                background: isActive ? '#E4D5AC' : 'transparent',
-                color: isActive ? '#262119' : 'rgba(251,247,236,0.85)',
-                fontWeight: isActive ? 700 : 500, fontSize: 13,
-                border: isActive ? '1px solid #C9B583' : '1px solid transparent',
-                transition: 'background 0.14s, color 0.14s',
-              })}
-              onMouseEnter={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'rgba(228,213,172,0.12)', color: '#FBF7EC' }); }}
-              onMouseLeave={e => { if (e.currentTarget.getAttribute('aria-current') !== 'page') Object.assign(e.currentTarget.style, { background: 'transparent', color: 'rgba(251,247,236,0.85)' }); }}
-            >
-              <Icon size={15} style={{ flexShrink: 0 }} />
-              {label}
-            </NavLink>
-          ))}
-        </div>
 
         {isAdmin && (
           <NavLink to="/admin" onClick={onClose}

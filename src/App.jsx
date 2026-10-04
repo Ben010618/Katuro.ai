@@ -50,12 +50,6 @@ const CotOutputPage = lazy(() => import('./pages/cotGen/CotOutputPage'));
 // Test Builder
 const TestBuilderWizard = lazy(() => import('./pages/testBuilder/TestBuilderWizard'));
 
-// Classroom Management Module
-const ClassroomManagementPage = lazy(() => import('./pages/classroomMgmt/ClassroomManagementPage'));
-const SectionDetailPage       = lazy(() => import('./pages/classroomMgmt/SectionDetailPage'));
-const ClassesITeachPage       = lazy(() => import('./pages/classroomMgmt/ClassesITeachPage'));
-const GradingTablePage        = lazy(() => import('./pages/classroomMgmt/GradingTablePage'));
-const InvitePage              = lazy(() => import('./pages/classroomMgmt/InvitePage'));
 const SharedPlanPage          = lazy(() => import('./pages/SharedPlanPage'));
 const SharesLayout            = lazy(() => import('./modules/shares/index'));
 const FeatureRequestBoard     = lazy(() => import('./features/feedback/FeatureRequestBoard'));
@@ -185,13 +179,7 @@ function AdminRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) {
-    // Signed in from an invite link: go back to the invitation, not to Shares.
-    let invite = null;
-    try { invite = sessionStorage.getItem('kt-invite-code'); } catch { /* storage blocked */ }
-    if (invite) return <Navigate to={`/invite/${encodeURIComponent(invite)}`} replace />;
-    return <Navigate to="/shares" replace />;
-  }
+  if (user) return <Navigate to="/shares" replace />;
   return children;
 }
 
@@ -316,12 +304,6 @@ export default function App() {
             {/* Test Builder — DepEd-compliant Table of Specifications wizard */}
             <Route path="test-builder" element={<TestBuilderWizard />} />
 
-            {/* Classroom Management Module */}
-            <Route path="classroom-management" element={<ClassroomManagementPage />} />
-            <Route path="classroom-management/section/:sectionId" element={<SectionDetailPage />} />
-            <Route path="classes-i-teach" element={<ClassesITeachPage />} />
-            <Route path="classes-i-teach/grade/:sectionId/:subject" element={<GradingTablePage />} />
-
             {/* Request Feature — public read-only board of admin-approved feature requests */}
             <Route path="feature-requests" element={<FeatureRequestBoard />} />
 
@@ -331,9 +313,6 @@ export default function App() {
             {/* Teacher-to-teacher chats (same school or division) */}
             <Route path="messages" element={<MessagesPage />} />
           </Route>
-
-          {/* Public invite route — handles logged-in and not-logged-in */}
-          <Route path="/invite/:inviteCode" element={<InvitePage />} />
 
           {/* Public shared plan preview — no auth required */}
           <Route path="/shared/:shareId" element={<SharedPlanPage />} />

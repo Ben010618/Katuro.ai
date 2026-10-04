@@ -39,17 +39,6 @@ service cloud.firestore {
       );
     }
 
-    // Adviser cascade-delete: allow read + delete on a teacher's assignments/gradeSheets
-    // when the document's adviserUid matches the requesting user (the section's adviser).
-    match /teachers/{userId}/assignments/{assignmentId} {
-      allow read, delete: if request.auth != null &&
-        resource.data.adviserUid == request.auth.uid;
-    }
-    match /teachers/{userId}/gradeSheets/{sheetId} {
-      allow read, delete: if request.auth != null &&
-        resource.data.adviserUid == request.auth.uid;
-    }
-
     // ── Admin config — API key lives here, BLOCKED from regular users ───────
     // billing doc holds the global "free for everyone" promo switch — every teacher reads it
     match /adminConfig/billing {
@@ -210,71 +199,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Classroom Management Module ──────────────────────────────────────────
-
-    // A section belongs to its adviser. Subject teachers who accepted an invitation
-    // get a members/{uid} record and can then read the roster and read/write grades.
-    // (Before 2026-10-04 every signed-in teacher could edit any section's roster and
-    // grades.)
-    function isAdviserOf(sectionId) {
-      return request.auth != null &&
-        get(/databases/$(database)/documents/sections/$(sectionId)).data.adviserUid == request.auth.uid;
-    }
-    function isMemberOf(sectionId) {
-      return request.auth != null &&
-        exists(/databases/$(database)/documents/sections/$(sectionId)/members/$(request.auth.uid));
-    }
-    function canUseSection(sectionId) {
-      return isAdviserOf(sectionId) || isMemberOf(sectionId) || isAdmin();
-    }
-
-    match /sections/{sectionId} {
-      allow read:   if request.auth != null && (
-        resource.data.adviserUid == request.auth.uid || isMemberOf(sectionId) || isAdmin()
-      );
-      allow create: if request.auth != null && request.resource.data.adviserUid == request.auth.uid;
-      allow update: if request.auth != null && (
-        resource.data.adviserUid == request.auth.uid || isAdmin()
-      );
-      allow delete: if request.auth != null && (
-        resource.data.adviserUid == request.auth.uid || isAdmin()
-      );
-
-      // Subject-teacher membership. Created only together with (or after) accepting
-      // this section's invitation as yourself.
-      match /members/{memberUid} {
-        allow read:   if isAdviserOf(sectionId) || (request.auth != null && request.auth.uid == memberUid) || isAdmin();
-        allow create: if request.auth != null && request.auth.uid == memberUid &&
-          getAfter(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.sectionId == sectionId &&
-          getAfter(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status == 'accepted' &&
-          getAfter(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.teacherUid == request.auth.uid;
-        allow update: if false;
-        allow delete: if isAdviserOf(sectionId) || (request.auth != null && request.auth.uid == memberUid) || isAdmin();
-      }
-
-      // Student roster — the adviser manages it; assigned subject teachers read it.
-      match /students/{studentId} {
-        allow read:  if canUseSection(sectionId);
-        allow write: if isAdviserOf(sectionId) || isAdmin();
-      }
-
-      // Notes about a learner — adviser and assigned subject teachers.
-      match /studentComments/{commentId} {
-        allow read, write: if canUseSection(sectionId);
-      }
-
-      // Grade weights and grades — adviser and assigned subject teachers.
-      match /gradeWeights/{subject} {
-        allow read, write: if canUseSection(sectionId);
-      }
-      match /grades/{gradeGroupId} {
-        allow read, write: if canUseSection(sectionId);
-      }
-      match /grades/{gradeGroupId}/students/{studentId} {
-        allow read, write: if canUseSection(sectionId);
-      }
-    }
-
     // ── kaTuro Shares ─────────────────────────────────────────────────────────
 
     match /shares_posts/{postId} {
@@ -348,26 +272,6 @@ service cloud.firestore {
       allow create:      if request.auth != null; // other users write notifications to your inbox
     }
 
-    // invitations — the section's adviser creates them; any signed-in teacher can look
-    // one up by code; a teacher may only ACCEPT a pending, unexpired invitation for
-    // themselves (it used to be editable by anyone while pending, and never expired).
-    match /invitations/{invitationId} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null &&
-        request.resource.data.adviserUid == request.auth.uid &&
-        isAdviserOf(request.resource.data.sectionId);
-      allow update: if request.auth != null && (
-        resource.data.adviserUid == request.auth.uid ||
-        (resource.data.status == 'pending' &&
-         request.resource.data.status == 'accepted' &&
-         request.resource.data.teacherUid == request.auth.uid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'teacherUid', 'teacherName']) &&
-         (!('expiresAt' in resource.data) || resource.data.expiresAt > request.time))
-      );
-      allow delete: if request.auth != null && (
-        resource.data.adviserUid == request.auth.uid || isAdmin()
-      );
-    }
 
     // ── Messages: usernames, directory, chats (Phase 1, 2026-10-04) ──────────
     // Teachers message teachers from the same school or division. Usernames and

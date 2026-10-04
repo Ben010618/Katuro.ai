@@ -8,12 +8,8 @@ import { uploadFile } from '../services/storageService';
 import { gradeScan } from '../utils/scanGrading';
 import { trackEvent } from '../services/usageTracker';
 import { useToast } from '../context/ToastContext';
-import SendToGradebookModal from '../components/SendToGradebookModal';
 import CoTeacherBanner from '../components/CoTeacherBanner';
-import {
-  Camera, Loader2, CheckCircle, AlertCircle, ArrowLeft,
-  Trash2, ImageOff, ScanLine, X, Send,
-} from 'lucide-react';
+import { Camera, Loader2, CheckCircle, AlertCircle, ArrowLeft, Trash2, ImageOff, ScanLine, X } from 'lucide-react';
 
 const LETTERS = { 4: ['A', 'B', 'C', 'D'], 5: ['A', 'B', 'C', 'D', 'E'] };
 
@@ -163,7 +159,6 @@ export default function ScanAnswerSheetsPage() {
   const [loadingQuiz,  setLoadingQuiz] = useState(true);
   const [scans,        setScans]      = useState([]);
   const [processing,   setProcessing] = useState([]);
-  const [showGradebookModal, setShowGradebookModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,22 +287,7 @@ export default function ScanAnswerSheetsPage() {
         title="Scan Answer Sheets"
         description={`${quiz.title} · ${quiz.numQuestions} Questions · ${scans.length} scanned${scans.length > 0 ? ` · ${confirmedCount} confirmed` : ''}`}
         tip="Position bubble sheets steadily within camera view for rapid optical recognition."
-        actions={confirmedCount > 0 ? (
-          <button className="btn-primary" onClick={() => setShowGradebookModal(true)} style={{ fontSize: 13 }}>
-            <Send size={14} /> Send to Gradebook
-          </button>
-        ) : null}
       />
-
-      {showGradebookModal && (
-        <SendToGradebookModal
-          uid={user.uid}
-          quiz={quiz}
-          scans={scans.filter(s => s.status === 'confirmed')}
-          onClose={() => setShowGradebookModal(false)}
-          onRecorded={refreshScans}
-        />
-      )}
 
       {/* Upload control */}
       <div style={{

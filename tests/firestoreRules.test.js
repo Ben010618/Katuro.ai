@@ -6,7 +6,7 @@
 import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
@@ -103,69 +103,5 @@ describe.skipIf(!hasEmulator)('firestore.rules', () => {
     await assertFails(updateDoc(doc(db, 'shares_profiles/teacher2'), { followerCount: 50 }));   // only by one
     await assertFails(updateDoc(doc(db, 'shares_profiles/teacher2'), { bio: 'hacked' }));       // no other fields
     await assertFails(setDoc(doc(db, 'shares_follows/teacher2/followers/admin1'), { at: 1 }));  // not on behalf of others
-  });
-
-  describe('classroom sections (adviser teacher1, subject teacher teacher2, stranger teacher3)', () => {
-    const later = () => Timestamp.fromMillis(Date.now() + 7 * 864e5);
-    beforeEach(async () => {
-      await env.withSecurityRulesDisabled(async (ctx) => {
-        const db = ctx.firestore();
-        await setDoc(doc(db, 'teachers/teacher3'), { displayName: 'Stranger', isAdmin: false });
-        await setDoc(doc(db, 'sections/s1'), { adviserUid: 'teacher1', sectionName: 'Rizal' });
-        await setDoc(doc(db, 'sections/s1/students/st1'), { surname: 'Cruz', givenName: 'Juan' });
-        await setDoc(doc(db, 'invitations/inv1'), { sectionId: 's1', subject: 'Math', adviserUid: 'teacher1', status: 'pending', teacherUid: null, teacherName: null, expiresAt: later() });
-      });
-    });
-    const as = (uid) => env.authenticatedContext(uid).firestore();
-    const accept = (uid, inv = 'inv1') => {
-      const db = as(uid);
-      const b = writeBatch(db);
-      b.update(doc(db, `invitations/${inv}`), { status: 'accepted', teacherUid: uid, teacherName: 'T' });
-      b.set(doc(db, `sections/s1/members/${uid}`), { uid, invitationId: inv, subject: 'Math' });
-      return b.commit();
-    };
-
-    it('a stranger cannot read or change the roster or grades of another adviser', async () => {
-      const db = as('teacher3');
-      await assertFails(getDoc(doc(db, 'sections/s1')));
-      await assertFails(getDoc(doc(db, 'sections/s1/students/st1')));
-      await assertFails(setDoc(doc(db, 'sections/s1/students/st1'), { surname: 'Hacked' }));
-      await assertFails(setDoc(doc(db, 'sections/s1/grades/term1_math/students/st1'), { finalGrade: 99 }));
-      await assertFails(setDoc(doc(db, 'sections/s1/members/teacher3'), { uid: 'teacher3', invitationId: 'inv1' }));
-    });
-
-    it('the adviser manages the roster and reads grades', async () => {
-      const db = as('teacher1');
-      await assertSucceeds(getDoc(doc(db, 'sections/s1')));
-      await assertSucceeds(setDoc(doc(db, 'sections/s1/students/st2'), { surname: 'Reyes' }));
-      await assertSucceeds(getDoc(doc(db, 'sections/s1/grades/term1_math/students/st1')));
-    });
-
-    it('a subject teacher who accepted can read the roster and write grades, not edit the roster', async () => {
-      await assertSucceeds(accept('teacher2'));
-      const db = as('teacher2');
-      await assertSucceeds(getDoc(doc(db, 'sections/s1/students/st1')));
-      await assertSucceeds(setDoc(doc(db, 'sections/s1/grades/term1_math/students/st1'), { finalGrade: 85 }));
-      await assertSucceeds(setDoc(doc(db, 'sections/s1/gradeWeights/term1_math'), { writtenWorksWeight: 40 }));
-      await assertFails(setDoc(doc(db, 'sections/s1/students/st1'), { surname: 'Changed' }));
-    });
-
-    it('an invitation is accepted once, by yourself, before it expires', async () => {
-      await assertSucceeds(accept('teacher2'));
-      await assertFails(accept('teacher3'));                                     // already accepted
-      await assertFails(updateDoc(doc(as('teacher3'), 'invitations/inv1'), { status: 'pending' }));
-      await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'invitations/inv2'), {
-        sectionId: 's1', subject: 'Science', adviserUid: 'teacher1', status: 'pending', teacherUid: null, expiresAt: Timestamp.fromMillis(Date.now() - 1000),
-      }));
-      await assertFails(accept('teacher3', 'inv2'));                             // expired
-      await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), 'invitations/inv2'), { expiresAt: later() }));
-      await assertFails(updateDoc(doc(as('teacher3'), 'invitations/inv2'), { status: 'accepted', teacherUid: 'teacher2' })); // not as someone else
-      await assertFails(updateDoc(doc(as('teacher3'), 'invitations/inv2'), { status: 'accepted', teacherUid: 'teacher3', sectionId: 'other' })); // no other fields
-    });
-
-    it('only the adviser of a section can create its invitations', async () => {
-      await assertSucceeds(setDoc(doc(as('teacher1'), 'invitations/inv3'), { sectionId: 's1', adviserUid: 'teacher1', status: 'pending' }));
-      await assertFails(setDoc(doc(as('teacher3'), 'invitations/inv4'), { sectionId: 's1', adviserUid: 'teacher3', status: 'pending' }));
-    });
   });
 });

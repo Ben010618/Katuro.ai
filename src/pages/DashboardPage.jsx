@@ -13,11 +13,7 @@ import SharesReminderPopup from '../components/SharesReminderPopup';
 import FacultyDashboardWidget from '../components/FacultyDashboardWidget';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
-import {
-  Sparkles, BookOpen, ClipboardList,
-  ArrowRight, Plus, Save, CheckCircle, User,
-  FlaskConical, Trash2, School, GraduationCap,
-} from 'lucide-react';
+import { Sparkles, BookOpen, ClipboardList, ArrowRight, Plus, Save, CheckCircle, User, FlaskConical, Trash2 } from 'lucide-react';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -338,48 +334,6 @@ export default function DashboardPage() {
 
       {/* ── AI Co-Teacher Faculty Team Hub ─────────────────────────────────── */}
       <FacultyDashboardWidget />
-
-      {/* ── Classroom spotlight ──────────────────────────────────────────────── */}
-      <div style={{
-        borderRadius: 'var(--kt-radius-md)', overflow: 'hidden',
-        background: 'var(--kt-chalkboard)',
-        border: '1px solid rgba(220,208,174,0.2)',
-        boxShadow: '0 4px 16px rgba(31,58,46,0.12)',
-        padding: '22px 24px',
-        position: 'relative',
-      }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-          <div>
-            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '1.4px', fontFamily: 'var(--kt-font-mono)' }}>Classroom Module</p>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>Grading &amp; Classroom Management</h2>
-          </div>
-        </div>
-        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-          {[
-            { to: '/classroom-management', label: 'Classroom Management', sub: 'Manage sections, students & invitations', Icon: School },
-            { to: '/classes-i-teach',      label: 'Classes I Teach',       sub: 'Enter grades and submit to adviser',      Icon: GraduationCap },
-          ].map(({ to, label, sub, Icon }) => (
-            <button key={to} onClick={() => navigate(to)} style={{
-              display: 'flex', alignItems: 'center', gap: 13,
-              background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(220,208,174,0.15)',
-              borderRadius: 'var(--kt-radius-md)', padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-              transition: 'background 0.15s, border-color 0.15s, transform 0.15s',
-            }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, { background: 'rgba(0,0,0,0.35)', borderColor: 'var(--kt-manila-border)', transform: 'translateY(-1px)' })}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(220,208,174,0.15)', transform: 'none' })}
-            >
-              <div style={{ width: 38, height: 38, borderRadius: 4, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(220,208,174,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <Icon size={18} color="var(--kt-manila)" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(148,163,184,0.8)', lineHeight: 1.4 }}>{sub}</p>
-              </div>
-              <ArrowRight size={14} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Quick actions */}
       <div>
