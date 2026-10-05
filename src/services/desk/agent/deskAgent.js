@@ -290,6 +290,7 @@ export async function runDeskAgentTurn({
     return { content: remembered.content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, fastPath: 'memory' };
   }
 
+  let streamed = ''; // planner text as it streams in (used if the plan JSON can't be read)
   if (fast) {
     reply = fast.reply;
     ({ tasks, problems } = sanitizePlan({ tasks: fast.tasks }, flat, attachedPaths));
@@ -309,10 +310,12 @@ export async function runDeskAgentTurn({
         privacyOn: privacyMode,
       }),
       json: true,
-      maxTokens: 3000,
+      // A general question is answered in full inside "reply" (e.g. "your best use cases").
+      maxTokens: 8000,
       temperature: 0.2,
       // Show the planner's reply word by word while the rest of the plan streams in.
       onText: (full) => {
+        streamed = full;
         const partial = extractPartialReply(full);
         if (partial) emit({ reply: cleanReply(masker.unmask(partial)) });
       },
@@ -320,6 +323,20 @@ export async function runDeskAgentTurn({
     reply = cleanReply(masker.unmask(plan?.reply || ''));
     ({ tasks, problems } = sanitizePlan(plan, flat, attachedPaths));
   } catch (err) {
+    // The plan JSON could not be read, but the answer text arrived: show the answer
+    // (no tasks are run from a plan we could not read).
+    const salvaged = !(err instanceof AIUnavailableError) && err?.rawText !== undefined
+      ? cleanReply(masker.unmask(extractPartialReply(err.rawText) || extractPartialReply(streamed) || ''))
+      : '';
+    if (salvaged) {
+      return {
+        content: err.cutOff ? `${salvaged}…\n\n(My answer was cut short. Ask me to continue if you need the rest.)` : salvaged,
+        steps: [],
+        artifacts: [],
+        createdFiles: [],
+        aiOffline: null,
+      };
+    }
     if (!(err instanceof AIUnavailableError)) throw err;
     aiOffline = err.message;
     tasks = planOffline(prompt, { attachedPaths, activePath, flatFiles: flat });
