@@ -38,7 +38,7 @@ function IssueRow({ issue, learners, onResolve }) {
       <span className="min-w-0 flex-1 text-[11px] text-amber-950">
         <span className="font-semibold">"{issue.heard}"</span>{issue.value !== null && issue.value !== undefined && issue.kind !== 'unclear' ? ` (${fmt(issue.value)})` : ''} {ISSUE_TEXT[issue.kind]}
       </span>
-      <select name="learner" defaultValue={choices.length === 1 ? String(choices[0]) : ''} className="border border-gray-300 bg-white" style={{ padding: '2px 4px', fontSize: 11, borderRadius: 4, width: 'auto', maxWidth: 190 }}>
+      <select name="learner" defaultValue={choices.length === 1 ? String(choices[0]) : ''} className="border border-gray-300 bg-white" style={{ padding: '2px 24px 2px 6px', fontSize: 11, borderRadius: 4, width: 'auto', maxWidth: 210 }}>
         <option value="">Choose learner…</option>
         {choices.map((i) => <option key={i} value={i}>{learners[i].name}</option>)}
       </select>
