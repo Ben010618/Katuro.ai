@@ -36,7 +36,7 @@ import {
 import {
   saveGeminiKey, getGeminiKeyStatus, testGeminiKey,
   saveDeskGeminiKey, getDeskGeminiKeyStatus,
-  getVertexBackupStatus, setVertexBackupEnabled, testVertexBackup,
+  getVertexBackupStatus, setVertexBackupEnabled, setVertexBackupDailyLimit, testVertexBackup,
   listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin
 } from '../services/geminiConfig';
 import {
@@ -1689,6 +1689,8 @@ function ApiKeySection({ adminUid }) {
   const [testingVertex, setTestingVertex]     = useState(false);
   const [savingVertex, setSavingVertex]       = useState(false);
   const [vertexTest, setVertexTest]           = useState(null); // { ok, model, ms, reply, error }
+  const [vertexLimitInput, setVertexLimitInput] = useState('');
+  const [vertexLimitMsg, setVertexLimitMsg]   = useState('');
 
   // NVIDIA State
   const [nvidiaKeyInput, setNvidiaKeyInput]   = useState('');
@@ -1710,7 +1712,7 @@ function ApiKeySection({ adminUid }) {
   useEffect(() => {
     getGeminiKeyStatus().then(setGeminiStatus).catch(() => setGeminiStatus({ hasKey: false }));
     getDeskGeminiKeyStatus().then(setDeskStatus).catch(() => setDeskStatus({ hasKey: false }));
-    getVertexBackupStatus().then(setVertexStatus).catch(() => setVertexStatus({ enabled: true, error: true }));
+    getVertexBackupStatus().then((s) => { setVertexStatus(s); setVertexLimitInput(String(s.dailyLimit)); }).catch(() => setVertexStatus({ enabled: true, error: true }));
     getNvidiaKeyStatus().then(status => {
       setNvidiaStatus(status);
       if (status?.model) setNvidiaTextModel(status.model);
@@ -1818,9 +1820,23 @@ function ApiKeySection({ adminUid }) {
     setSavingVertex(true);
     try {
       await setVertexBackupEnabled(next, adminUid);
-      setVertexStatus({ enabled: next });
+      setVertexStatus((s) => ({ ...(s || {}), enabled: next }));
     } catch (e) {
       setVertexTest({ ok: false, error: `Could not save: ${e.message}` });
+    } finally {
+      setSavingVertex(false);
+    }
+  }
+
+  async function handleSaveVertexLimit() {
+    setVertexLimitMsg('');
+    setSavingVertex(true);
+    try {
+      const n = await setVertexBackupDailyLimit(vertexLimitInput, adminUid);
+      setVertexStatus((s) => ({ ...(s || {}), dailyLimit: n }));
+      setVertexLimitMsg(n === 0 ? 'Saved: the backup will not be used.' : `Saved: at most ${n} backup answers per day.`);
+    } catch (e) {
+      setVertexLimitMsg(e.message);
     } finally {
       setSavingVertex(false);
     }
@@ -2272,7 +2288,7 @@ function ApiKeySection({ adminUid }) {
                   </span>
                 </div>
                 <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-                  Dedicated Gemini API key assigned strictly to KaTuroDesk. Separates desktop traffic from the web version, eliminating rate-limiting bottlenecks so teachers enjoy fast, uninterrupted classroom analysis.
+                  Gemini API key used only by KaTuroDesk, so desktop usage shows separately in AI Studio. Rate limits and prepaid credit belong to the Google Cloud project: if this key is in the same project as the web key, both share one limit and one balance.
                 </p>
               </div>
 
@@ -2387,7 +2403,7 @@ function ApiKeySection({ adminUid }) {
                   </span>
                 </div>
                 <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
-                  When the Gemini key above is busy or out of quota, the same request is answered through Vertex AI, which has its own capacity. No key needed: the server uses its own Google identity. Used only when the main route fails.
+                  When the Gemini key above is busy or out of credit, the same request is answered through Vertex AI, which has its own capacity. No key needed: the server uses its own Google identity. Used only when the main route fails. Billed to the Firebase project's billing account (not the prepaid Gemini credit), so it has a daily limit.
                 </p>
               </div>
               <div>
@@ -2400,6 +2416,32 @@ function ApiKeySection({ adminUid }) {
                 )}
               </div>
             </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+              <div>
+                <label style={labelStyle}>Most backup answers per day (0 = never)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={vertexLimitInput}
+                  onChange={(e) => { setVertexLimitInput(e.target.value); setVertexLimitMsg(''); }}
+                  style={{ ...inputStyle, width: 140 }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveVertexLimit}
+                disabled={savingVertex || vertexStatus === null || String(vertexStatus?.dailyLimit) === vertexLimitInput.trim()}
+                style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (savingVertex || vertexStatus === null || String(vertexStatus?.dailyLimit) === vertexLimitInput.trim()) ? 0.6 : 1 }}
+              >
+                Save limit
+              </button>
+              {vertexStatus && !vertexStatus.error && (
+                <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)', paddingBottom: 8 }}>
+                  Used today: {vertexStatus.usedToday} of {vertexStatus.dailyLimit}
+                </span>
+              )}
+            </div>
+            {vertexLimitMsg && <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--kt-text-secondary)' }}>{vertexLimitMsg}</p>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 type="button"

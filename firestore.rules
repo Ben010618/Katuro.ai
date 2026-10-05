@@ -55,6 +55,11 @@ service cloud.firestore {
     match /adminConfig/{doc} {
       allow read, write: if isAdmin();
     }
+    // Backup-engine answers per day: written only by generateAI; admins can see the count.
+    match /aiBackupUsage/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
 
     // ── AI error reports — any auth user submits; admin reads/resolves ────────
     match /aiErrorReports/{reportId} {

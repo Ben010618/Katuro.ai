@@ -239,6 +239,53 @@ describe('Vertex AI backup', () => {
     expect(Math.max(...vertexTimeouts)).toBeLessThanOrEqual(205000); // never past 205 s: NVIDIA keeps ~95 s
   });
 
+  describe('daily backup limit (cost safety)', () => {
+    const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    const used = () => store.docs.get(`aiBackupUsage/${today()}`)?.count ?? 0;
+
+    it('each backup answer counts once; a failed backup gives its slot back', async () => {
+      stubRoutes();
+      await expect(call()).resolves.toMatchObject({ engine: 'vertex' });
+      expect(used()).toBe(1);
+      stubRoutes({ vertex: () => busy() });
+      await expect(call()).rejects.toBeTruthy();
+      expect(used()).toBe(1);
+    });
+
+    it('stops at the daily limit (default 300): no Vertex call, the normal error is reported', async () => {
+      store.docs.set(`aiBackupUsage/${today()}`, { count: 300 });
+      const log = stubRoutes();
+      await expect(call()).rejects.toBeTruthy();
+      expect(vertexCalls(log)).toEqual([]);
+      expect(used()).toBe(300);
+    });
+
+    it('the admin can set the limit; 0 means the backup is never used', async () => {
+      store.docs.set('adminConfig/vertex', { dailyLimit: 2 });
+      store.docs.set(`aiBackupUsage/${today()}`, { count: 1 });
+      server = loadServer(store);
+      stubRoutes();
+      await expect(call()).resolves.toMatchObject({ engine: 'vertex' }); // 2nd of 2
+      const log = stubRoutes();
+      await expect(call()).rejects.toBeTruthy(); // 3rd: over the limit
+      expect(vertexCalls(log)).toEqual([]);
+
+      store.docs.set('adminConfig/vertex', { dailyLimit: 0 });
+      server = loadServer(store);
+      const log0 = stubRoutes();
+      await expect(call()).rejects.toBeTruthy();
+      expect(vertexCalls(log0)).toEqual([]);
+    });
+
+    it('if the counter cannot be read, the backup is NOT used (never runs uncounted)', async () => {
+      const realDoc = store.db.doc;
+      store.db.doc = (p) => (p.startsWith('aiBackupUsage/') ? { get: async () => { throw new Error('firestore down'); }, set: async () => {} } : realDoc(p));
+      const log = stubRoutes();
+      await expect(call()).rejects.toBeTruthy();
+      expect(vertexCalls(log)).toEqual([]);
+    });
+  });
+
   it('a model Vertex does not have → the next newest flash model', async () => {
     const log = stubRoutes({ vertex: (model) => (model === 'gemini-3.6-flash' ? { ok: false, status: 404, statusText: 'Not Found', json: async () => ({ error: { message: 'not found' } }) } : ok(`ok from ${model}`)) });
     await expect(call()).resolves.toMatchObject({ text: 'ok from gemini-3.5-flash' });
@@ -271,7 +318,7 @@ describe('Vertex AI backup', () => {
     stubRoutes({ vertex: () => ok('OK') });
     await expect(server.adminTestVertex({ auth: { uid: 'nobody' }, data: {} })).rejects.toMatchObject({ code: 'permission-denied' });
     store.docs.set('teachers/adm', { isAdmin: true });
-    await expect(server.adminTestVertex({ auth: { uid: 'adm' }, data: {} })).resolves.toMatchObject({ ok: true, model: 'gemini-3.6-flash', reply: 'OK', enabled: true });
+    await expect(server.adminTestVertex({ auth: { uid: 'adm' }, data: {} })).resolves.toMatchObject({ ok: true, model: 'gemini-3.6-flash', reply: 'OK', enabled: true, dailyLimit: 300 });
     stubRoutes({ vertex: () => ({ ok: false, status: 403, statusText: 'Forbidden', json: async () => ({ error: { message: 'Permission denied on aiplatform.endpoints.predict' } }) }) });
     const r = await server.adminTestVertex({ auth: { uid: 'adm' }, data: {} });
     expect(r.ok).toBe(false);
