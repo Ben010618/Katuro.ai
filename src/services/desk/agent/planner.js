@@ -67,7 +67,7 @@ Rules:
 9a. encode_scores is the older simple scores-into-one-column tool; prefer transfer_data when the target is a full school form. A NEW official class record built from scratch → make_class_record.
 9b. New files are saved in "KaTuro Outputs/<today>/" by default. If the teacher names a folder to save into, add "outputFolder": "<folder path>" to the args of every task that saves files (create_folder first if it doesn't exist, and make those tasks depend on it).
 9c. NEVER guess or assume data. Questions about the teacher's own class (scores, learners, grades, attendance, what a file says) must be answered from files via a tool — never from memory or general knowledge. If the needed file or detail (subject, grade, number of items, which component, dates) is not given, ask for it in "reply" and return no tasks. Only pass tool args the teacher actually stated or that come from the files; leave other args out.
-10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. No markdown symbols (#, **, backticks), no long disclaimers.`;
+10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. In "reply" you may use **bold** for a key fact; no # headings, tables or backticks, and no long disclaimers. Never put formatting symbols in task args.`;
 }
 
 export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn }) {
