@@ -397,7 +397,7 @@ export async function callGeminiProxy({ action, contents: rawContents, temperatu
     ]);
     // Voice clips never use a fallback: the text-only engine can't hear audio and would
     // invent a transcript (wrong scores for real learners).
-    if (action !== 'desk_voice' && !err?.details?.dailyLimit && TRANSIENT.has(err?.code)) {
+    if (action !== 'desk_voice' && !err?.details?.dailyLimit && !err?.details?.tooManyAtOnce && TRANSIENT.has(err?.code)) {
       // 1. Try NVIDIA NIM fallback
       try {
         const { getNvidiaConfig, callNvidiaChat } = await import('./nvidiaConfig');

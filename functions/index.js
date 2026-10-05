@@ -314,12 +314,22 @@ console.info('[kaTuro] AI model: resolved per-request from ListModels (admin pin
 
 // Read API key from adminConfig/gemini in Firestore (set via Admin Dashboard)
 // Supports dedicated deskApiKey for KaTuroDesk to isolate quotas from KaTuro Web
+// The key doc is read at most once a minute per instance (it was one read per AI call).
+// A key changed in the Admin Dashboard is picked up within a minute.
+const GEMINI_CONFIG_TTL_MS = 60 * 1000;
+let _geminiConfigCache = null; // { data, at }
+
 async function getGeminiKey(isDesk = false) {
-  const snap = await db.doc('adminConfig/gemini').get();
-  if (!snap.exists) {
+  let data = _geminiConfigCache && Date.now() - _geminiConfigCache.at < GEMINI_CONFIG_TTL_MS ? _geminiConfigCache.data : undefined;
+  if (data === undefined) {
+    const snap = await db.doc('adminConfig/gemini').get();
+    data = snap.exists ? snap.data() || {} : null;
+    // A missing key is not cached, so a freshly saved key works on the next call.
+    _geminiConfigCache = data ? { data, at: Date.now() } : null;
+  }
+  if (!data) {
     throw new HttpsError('failed-precondition', 'Gemini API key not configured. Set it in the Admin Dashboard → API Settings.');
   }
-  const data = snap.data() || {};
   if (isDesk && data.deskApiKey) {
     return data.deskApiKey;
   }
@@ -756,6 +766,53 @@ function dailyLimitFor(action, plan) {
   if (!full) return 0;
   if (plan === 'subscription') return full;
   return Math.min(full, FREE_DAILY_LIMITS[action] ?? Math.max(1, Math.round(full / 3)));
+}
+
+// ── Fair share: AI calls in flight per teacher ───────────────────────────
+// One teacher (or a runaway script) can't take all the capacity at peak. A full Desk
+// batch is up to 25 calls at once (5 tasks x up to 5 parallel drafts, e.g. DLL days),
+// plus its planner and the web generator's 3, so 32 never refuses normal use. Leases live in
+// a server-only collection (no client rules) and expire on their own after the
+// function timeout, so a crashed call never blocks a teacher. If the lease store
+// itself fails, the call is allowed (fail open): this is fairness, not security.
+const MAX_AI_IN_FLIGHT = 32;
+const AI_LEASE_MS = 330 * 1000; // generateAI timeout (300 s) + margin
+
+async function acquireAiLease(uid) {
+  const now = Date.now();
+  let col;
+  let active;
+  try {
+    col = db.collection(`aiLeases/${uid}/active`);
+    active = await col.where('expiresAt', '>', now).limit(MAX_AI_IN_FLIGHT).get();
+  } catch (err) {
+    console.warn('[aiLease] check skipped:', err?.message);
+    return null;
+  }
+  if (active.size >= MAX_AI_IN_FLIGHT) {
+    throw new HttpsError(
+      'resource-exhausted',
+      'You have many AI requests running at the same time. Please wait a few seconds, then send it once more.',
+      { tooManyAtOnce: true, retryAfter: 5 },
+    );
+  }
+  try {
+    const ref = col.doc();
+    await ref.set({ expiresAt: now + AI_LEASE_MS });
+    return ref;
+  } catch (err) {
+    console.warn('[aiLease] not recorded:', err?.message);
+    return null;
+  }
+}
+
+async function releaseAiLease(ref) {
+  if (!ref) return;
+  try {
+    await ref.delete();
+  } catch {
+    // expires on its own
+  }
 }
 
 /**
@@ -1538,7 +1595,13 @@ exports.generateAI = onCall(
   // us-central1 (every existing caller, unchanged). firebase-functions v7
   // HttpsOptions.region accepts an array for HTTP/callable functions. Both
   // regions share this one handler, Firestore and the per-user daily counters.
-  { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 300, memory: '512MiB' },
+  //
+  // Sizing for peak evenings: each call mostly waits on Gemini, but a call can carry a
+  // photo or a voice clip (up to ~4 MB, held a few times while parsing and sending).
+  // The default 80 calls per 512 MiB instance could run out of memory; 40 per 1 GiB
+  // leaves ~25 MB per call. maxInstances caps runaway cost (50 x 40 = 2,000 calls at
+  // once per region, far above what Gemini's rate limits allow anyway).
+  { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 300, memory: '1GiB', cpu: 1, concurrency: 40, maxInstances: 50 },
   // `res` (CallableResponse: sendChunk/signal) is only used for opt-in streaming.
   async (req, res) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
@@ -1578,7 +1641,15 @@ exports.generateAI = onCall(
     // airtight against a user editing their own request, but this endpoint
     // already trusts authenticated accounts for `action`/`maxTokens` the same
     // way — daily limits here are abuse-prevention, not a security boundary.
-    const charge = isRetry ? null : await checkAndIncrementDailyUsage(req.auth.uid, action);
+    // Fair share (checked before the daily count, so a refused call is never charged).
+    const lease = await acquireAiLease(req.auth.uid);
+    let charge;
+    try {
+      charge = isRetry ? null : await checkAndIncrementDailyUsage(req.auth.uid, action);
+    } catch (err) {
+      await releaseAiLease(lease);
+      throw err;
+    }
 
     const clampedMaxTokens = Math.min(Number(maxTokens) || 2048, MAX_TOKENS_CEILING);
 
@@ -1588,6 +1659,8 @@ exports.generateAI = onCall(
       // The teacher got nothing usable: don't charge them for it.
       await refundDailyUsage(charge);
       throw err;
+    } finally {
+      await releaseAiLease(lease);
     }
 
     async function runGeneration() {

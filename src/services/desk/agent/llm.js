@@ -35,6 +35,11 @@ function isDailyLimitError(err) {
   return Boolean(err?.dailyLimit || err?.details?.dailyLimit);
 }
 
+/** The teacher already has many AI calls running (server fair-share cap): wait, then resend. */
+function isTooManyAtOnce(err) {
+  return Boolean(err?.details?.tooManyAtOnce);
+}
+
 function isAuthError(err) {
   return err?.reason === 'unauthenticated' || /unauthenticated|must be signed in/i.test(`${err?.code} ${err?.message}`);
 }
@@ -188,9 +193,13 @@ export async function callDeskLLM({
 
   let lastErr = null;
   let rateRetries = 0;
+  let capRetries = 0;
+  let lastRefused = false; // refused by the fair-share cap: nothing was charged, so the resend is a first try
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { text, finishReason } = await proxyCall({ action, contents, json, maxTokens, temperature, isRetry: attempt > 0 || rateRetries > 0, tier: effectiveTier, onText });
+      const isRetry = (attempt > 0 || rateRetries > 0) && !lastRefused;
+      lastRefused = false;
+      const { text, finishReason } = await proxyCall({ action, contents, json, maxTokens, temperature, isRetry, tier: effectiveTier, onText });
       if (!json) return text;
       try {
         return parseJsonReply(text);
@@ -206,6 +215,15 @@ export async function callDeskLLM({
       if (action === 'desk_agent_task' && isUnknownActionError(err)) {
         taskActionSupported = false;
         action = 'desk_agent_run';
+        attempt -= 1;
+        continue;
+      }
+      // Fair-share cap: the teacher's other calls finish within seconds to a minute.
+      // Wait (server hint, then longer) instead of reporting a network problem.
+      if (isTooManyAtOnce(err) && capRetries < 4) {
+        await sleep(Math.max(1, Number(err.details.retryAfter) || 5) * 1000 * (capRetries + 1));
+        capRetries += 1;
+        lastRefused = true;
         attempt -= 1;
         continue;
       }

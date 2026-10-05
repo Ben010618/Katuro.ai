@@ -34,9 +34,27 @@ function fakeFirestore() {
     async set(data, opts) {
       docs.set(p, opts?.merge ? apply(docs.get(p), data) : apply(null, data));
     },
+    async delete() {
+      docs.delete(p);
+    },
+  });
+  let autoId = 0;
+  // Direct children of a collection path, filtered by one '>' condition (all generateAI needs).
+  const collection = (p) => ({
+    doc: (id) => docRef(`${p}/${id || `auto${++autoId}`}`),
+    where: (field, op, value) => ({
+      limit: (n) => ({
+        async get() {
+          if (op !== '>') throw new Error(`fake where: unsupported op ${op}`);
+          const hits = [...docs.entries()].filter(([k, v]) => k.startsWith(`${p}/`) && !k.slice(p.length + 1).includes('/') && v[field] > value);
+          return { size: Math.min(hits.length, n) };
+        },
+      }),
+    }),
   });
   const db = {
     doc: docRef,
+    collection,
     async runTransaction(fn) {
       return fn({ get: (ref) => ref.get(), set: (ref, data, opts) => { ref.set(data, opts); } });
     },
@@ -51,7 +69,8 @@ function loadServer(store) {
   const admin = { initializeApp() {}, firestore, auth: () => ({}) };
   const chain = new Proxy(function chainFn() {}, { get: () => chain, apply: () => chain });
   const stubs = {
-    'firebase-functions/v2/https': { onCall: (opts, fn) => fn || opts, onRequest: (opts, fn) => fn || opts, HttpsError },
+    // Handlers keep their options (as __opts) so runtime sizing can be checked.
+    'firebase-functions/v2/https': { onCall: (opts, fn) => (fn ? Object.assign(fn, { __opts: opts }) : opts), onRequest: (opts, fn) => fn || opts, HttpsError },
     'firebase-functions/v2/scheduler': { onSchedule: () => () => {} },
     'firebase-functions/v2/firestore': { onDocumentCreated: () => () => {} },
     'firebase-functions/v1': chain,
@@ -145,6 +164,75 @@ describe('model choice', () => {
     await server.__test.callGeminiRaw('k', contents, { maxTokens: 512, responseMimeType: 'application/json' }).catch(() => {});
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.filter((m) => /transcribe|gemma|omni/.test(m))).toEqual([]);
+  });
+});
+
+describe('peak-load protections', () => {
+  const call = (uid = 't1') => server.generateAI({ auth: { uid }, data: { action: 'dll_gen', contents, maxTokens: 512 } }, {});
+  const leases = (uid) => [...store.docs.keys()].filter((k) => k.startsWith(`aiLeases/${uid}/active/`));
+
+  it('is sized explicitly for peak evenings (no default 80-per-512MiB)', () => {
+    expect(server.generateAI.__opts).toMatchObject({
+      region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 300, memory: '1GiB', cpu: 1, concurrency: 40, maxInstances: 50,
+    });
+  });
+
+  it('allows up to 32 AI calls in flight per teacher (a full Desk batch); the 33rd is refused and NOT charged', async () => {
+    stubGemini(() => ok('{"ok":true}'));
+    const later = Date.now() + 60000;
+    for (let i = 0; i < 31; i++) store.docs.set(`aiLeases/t1/active/busy${i}`, { expiresAt: later });
+    await expect(call()).resolves.toMatchObject({ text: '{"ok":true}' }); // 31 running: the 32nd may start
+    expect(usage('t1').dll_gen).toBe(1);
+    store.docs.set('aiLeases/t1/active/busy31', { expiresAt: later });
+    store.docs.delete(`teachers/t1/usage/${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`);
+    await expect(call()).rejects.toMatchObject({ code: 'resource-exhausted', details: { tooManyAtOnce: true, retryAfter: 5 } });
+    // Not worded as a network failure ("try again" reads as one on Desk).
+    await expect(call()).rejects.toMatchObject({ message: expect.not.stringMatching(/try again/i) });
+    expect(usage('t1').dll_gen).toBeUndefined();
+    // Another teacher is not affected.
+    await expect(call('t2')).resolves.toMatchObject({ text: '{"ok":true}' });
+  });
+
+  it('expired leases (a crashed call) never block; a finished call frees its slot', async () => {
+    const heldDuringCall = [];
+    stubGemini(() => {
+      heldDuringCall.push(leases('t1').filter((k) => !k.includes('/old')).length);
+      return ok('{"ok":true}');
+    });
+    const past = Date.now() - 1000;
+    for (let i = 0; i < 32; i++) store.docs.set(`aiLeases/t1/active/old${i}`, { expiresAt: past });
+    await expect(call()).resolves.toMatchObject({ text: '{"ok":true}' });
+    expect(heldDuringCall[0]).toBe(1); // a slot was held while Gemini worked...
+    expect(leases('t1').filter((k) => !k.includes('/old'))).toEqual([]); // ...and freed afterwards
+  });
+
+  it('a failed generation frees the slot and refunds the unit; a daily-limit refusal frees it too', async () => {
+    stubGemini(() => busy());
+    await expect(call()).rejects.toBeTruthy();
+    expect(leases('t1')).toEqual([]);
+    expect(usage('t1').dll_gen).toBe(0);
+    store.docs.set(`teachers/t1/usage/${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`, { dll_gen: 999 });
+    await expect(call()).rejects.toMatchObject({ details: { dailyLimit: true } });
+    expect(leases('t1')).toEqual([]);
+  });
+
+  it('if the lease store fails, the call still goes through (fairness, not security)', async () => {
+    stubGemini(() => ok('{"ok":true}'));
+    store.db.collection = () => { throw new Error('firestore down'); };
+    await expect(call()).resolves.toMatchObject({ text: '{"ok":true}' });
+  });
+
+  it('reads the API key once a minute per instance, but picks up a newly saved key at once', async () => {
+    stubGemini(() => ok('{"ok":true}'));
+    await expect(call()).resolves.toBeTruthy();
+    store.docs.delete('adminConfig/gemini'); // cached: still works
+    await expect(call()).resolves.toBeTruthy();
+
+    store.docs.delete('adminConfig/gemini');
+    server = loadServer(store); // fresh instance, no key yet
+    await expect(call()).rejects.toMatchObject({ code: 'failed-precondition' });
+    store.docs.set('adminConfig/gemini', { apiKey: 'new-key' }); // "missing" is not cached
+    await expect(call()).resolves.toBeTruthy();
   });
 });
 
