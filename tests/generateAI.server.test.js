@@ -167,6 +167,118 @@ describe('model choice', () => {
   });
 });
 
+describe('Vertex AI backup', () => {
+  // Routes: AI Studio (generativelanguage) busy; metadata token; Vertex scripted per model.
+  function stubRoutes({ vertex = () => ok('from vertex'), gemini = () => busy() } = {}) {
+    const log = [];
+    vi.stubGlobal('fetch', vi.fn(async (url, init = {}) => {
+      const u = String(url);
+      log.push({ url: u, init });
+      if (u.includes('metadata.google.internal')) return { ok: true, status: 200, json: async () => ({ access_token: 'sa-token', expires_in: 3600 }) };
+      if (u.includes('generativelanguage.googleapis.com') && u.includes('/models?')) {
+        return { ok: true, status: 200, json: async () => ({ models: MODELS.map((m) => ({ name: `models/${m}`, supportedGenerationMethods: ['generateContent'] })) }) };
+      }
+      if (u.includes('aiplatform.googleapis.com')) return vertex(/models\/([^:]+):/.exec(u)[1], init);
+      return gemini();
+    }));
+    return log;
+  }
+  const vertexCalls = (log) => log.filter((c) => c.url.includes('aiplatform.googleapis.com'));
+  const call = (data = {}) => server.generateAI({ auth: { uid: 't1' }, data: { action: 'dll_gen', contents, maxTokens: 512, ...data } }, {});
+
+  beforeEach(() => { process.env.GCLOUD_PROJECT = 'demo-proj'; });
+  afterEach(() => { delete process.env.GCLOUD_PROJECT; });
+
+  it('Gemini busy → the same request is answered through Vertex AI with the server identity (charged once)', async () => {
+    const log = stubRoutes();
+    await expect(call()).resolves.toMatchObject({ text: 'from vertex', engine: 'vertex' });
+    const [v] = vertexCalls(log);
+    expect(v.url).toBe('https://aiplatform.googleapis.com/v1/projects/demo-proj/locations/global/publishers/google/models/gemini-3.6-flash:generateContent');
+    expect(v.init.headers.Authorization).toBe('Bearer sa-token');
+    expect(JSON.parse(v.init.body).contents).toEqual(contents);
+    expect(usage('t1').dll_gen).toBe(1);
+  });
+
+  it('web requests without a "role" are sent to Vertex with role "user" (Vertex requires it)', async () => {
+    const log = stubRoutes();
+    await expect(call({ contents: [{ parts: [{ text: 'Make a DLL' }] }] })).resolves.toMatchObject({ text: 'from vertex' });
+    expect(JSON.parse(vertexCalls(log)[0].init.body).contents).toEqual([{ role: 'user', parts: [{ text: 'Make a DLL' }] }]);
+  });
+
+  it('a permission or bad-request error stops at once (another model would fail the same way)', async () => {
+    const log = stubRoutes({ vertex: () => ({ ok: false, status: 403, statusText: 'Forbidden', json: async () => ({ error: { message: 'denied' } }) }) });
+    await expect(call()).rejects.toBeTruthy();
+    expect(vertexCalls(log)).toHaveLength(1);
+  });
+
+  it('a blocked prompt is reported as SAFETY from the first model (not retried)', async () => {
+    const log = stubRoutes({ vertex: () => ({ ok: true, status: 200, json: async () => ({ promptFeedback: { blockReason: 'SAFETY' } }) }) });
+    await expect(call()).resolves.toMatchObject({ text: '', finishReason: 'SAFETY', engine: 'vertex' });
+    expect(vertexCalls(log)).toHaveLength(1);
+  });
+
+  it('time: leaves the NVIDIA fallback room to finish, and one stalled model gets at most half', async () => {
+    const timeouts = [];
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => { timeouts.push(ms); return realTimeout(ms); });
+    const vertexTimeouts = [];
+    const route = () => stubRoutes({ vertex: () => { vertexTimeouts.push(timeouts.at(-1)); return busy(); } });
+    const big = { maxTokens: 16000 }; // per-model budget 180 s, so the deadline is what limits
+
+    route();
+    await expect(call(big)).rejects.toBeTruthy(); // no NVIDIA: Vertex may run to ~270 s
+    expect(vertexTimeouts[0]).toBeGreaterThan(125000);
+    expect(vertexTimeouts[0]).toBeLessThanOrEqual(135000); // half of ~270 s
+
+    store.docs.set('adminConfig/nvidia', { apiKey: 'nv-key' });
+    server = loadServer(store);
+    vertexTimeouts.length = 0;
+    route();
+    await expect(call(big)).rejects.toBeTruthy();
+    expect(vertexTimeouts[0]).toBeLessThanOrEqual(102500); // half of ~205 s
+    expect(Math.max(...vertexTimeouts)).toBeLessThanOrEqual(205000); // never past 205 s: NVIDIA keeps ~95 s
+  });
+
+  it('a model Vertex does not have → the next newest flash model', async () => {
+    const log = stubRoutes({ vertex: (model) => (model === 'gemini-3.6-flash' ? { ok: false, status: 404, statusText: 'Not Found', json: async () => ({ error: { message: 'not found' } }) } : ok(`ok from ${model}`)) });
+    await expect(call()).resolves.toMatchObject({ text: 'ok from gemini-3.5-flash' });
+    expect(vertexCalls(log).map((c) => /models\/([^:]+):/.exec(c.url)[1])).toEqual(['gemini-3.6-flash', 'gemini-3.5-flash']);
+  });
+
+  it('turned off by the admin → not used; the original error is reported and the unit refunded', async () => {
+    store.docs.set('adminConfig/vertex', { enabled: false });
+    server = loadServer(store);
+    const log = stubRoutes();
+    await expect(call()).rejects.toBeTruthy();
+    expect(vertexCalls(log)).toEqual([]);
+    expect(usage('t1').dll_gen).toBe(0);
+  });
+
+  it('voice clips can use Vertex (it hears audio), never the text-only NVIDIA engine', async () => {
+    store.docs.set('adminConfig/nvidia', { apiKey: 'nv-key' });
+    server = loadServer(store);
+    const parts = [{ text: 'Transcribe' }, { inlineData: { mimeType: 'audio/wav', data: 'UklGRg==' } }];
+    const log = stubRoutes({ vertex: () => ok('Make a quiz.') });
+    await expect(call({ action: 'desk_voice', contents: [{ role: 'user', parts }] })).resolves.toMatchObject({ text: 'Make a quiz.' });
+    expect(JSON.parse(vertexCalls(log)[0].init.body).contents[0].parts[1].inlineData.mimeType).toBe('audio/wav');
+
+    const log2 = stubRoutes({ vertex: () => busy() });
+    await expect(call({ action: 'desk_voice', contents: [{ role: 'user', parts }] })).rejects.toBeTruthy();
+    expect(log2.some((c) => /nvidia/i.test(c.url))).toBe(false);
+  });
+
+  it('Admin "Test backup": admins only; reports the model that answered', async () => {
+    stubRoutes({ vertex: () => ok('OK') });
+    await expect(server.adminTestVertex({ auth: { uid: 'nobody' }, data: {} })).rejects.toMatchObject({ code: 'permission-denied' });
+    store.docs.set('teachers/adm', { isAdmin: true });
+    await expect(server.adminTestVertex({ auth: { uid: 'adm' }, data: {} })).resolves.toMatchObject({ ok: true, model: 'gemini-3.6-flash', reply: 'OK', enabled: true });
+    stubRoutes({ vertex: () => ({ ok: false, status: 403, statusText: 'Forbidden', json: async () => ({ error: { message: 'Permission denied on aiplatform.endpoints.predict' } }) }) });
+    const r = await server.adminTestVertex({ auth: { uid: 'adm' }, data: {} });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/403/);
+  });
+});
+
 describe('peak-load protections', () => {
   const call = (uid = 't1') => server.generateAI({ auth: { uid }, data: { action: 'dll_gen', contents, maxTokens: 512 } }, {});
   const leases = (uid) => [...store.docs.keys()].filter((k) => k.startsWith(`aiLeases/${uid}/active/`));

@@ -1585,6 +1585,131 @@ async function streamGeminiToClient(key, contents, res, { temperature, maxTokens
   return { result: { text: parser.text, finishReason: parser.finishReason } };
 }
 
+// ── Backup engine: Gemini on Vertex AI (now "Gemini Enterprise Agent Platform") ──
+// When the AI Studio key route fails (Google busy, quota, timeout), the same request
+// is sent to the same Gemini model family through Vertex AI, which has its own
+// capacity. No API key: the function's own Google identity is used (service account
+// with the Agent Platform User role, API aiplatform.googleapis.com enabled).
+// Admin switch: adminConfig/vertex { enabled (default true), model?, location? }.
+const VERTEX_CONFIG_TTL_MS = 60 * 1000;
+// Deadlines from the start of the request (generateAI times out at 300 s): Vertex must
+// stop early enough that the NVIDIA fallback (~82 s worst case) can still finish.
+const VERTEX_DEADLINE_MS = 270 * 1000;           // when NVIDIA will not run (not set up, or voice)
+const VERTEX_DEADLINE_BEFORE_NVIDIA_MS = 205 * 1000;
+let _vertexConfigCache = null; // { data, at }
+let _vertexToken = null; // { token, exp }
+
+function gcpProjectId() {
+  if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
+  if (process.env.GOOGLE_CLOUD_PROJECT) return process.env.GOOGLE_CLOUD_PROJECT;
+  try {
+    return JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getVertexConfig() {
+  if (_vertexConfigCache && Date.now() - _vertexConfigCache.at < VERTEX_CONFIG_TTL_MS) return _vertexConfigCache.data;
+  let data;
+  try {
+    const snap = await db.doc('adminConfig/vertex').get();
+    data = snap.exists ? snap.data() || {} : {};
+  } catch {
+    data = {}; // unreadable settings: defaults (backup on)
+  }
+  _vertexConfigCache = { data, at: Date.now() };
+  return data;
+}
+
+/** Access token of the function's own service account (Cloud Run metadata server). */
+async function vertexAccessToken() {
+  if (_vertexToken && _vertexToken.exp - 60000 > Date.now()) return _vertexToken.token;
+  const res = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+    headers: { 'Metadata-Flavor': 'Google' },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`Could not get the server's Google identity (${res.status}).`);
+  const json = await res.json();
+  _vertexToken = { token: json.access_token, exp: Date.now() + (Number(json.expires_in) || 300) * 1000 };
+  return _vertexToken.token;
+}
+
+/** Newest general Gemini Flash models first (Vertex uses the same model IDs; no "-latest" aliases). */
+async function vertexModelCandidates(key, cfg) {
+  const list = [];
+  if (cfg.model) list.push(String(cfg.model));
+  if (_modelCache.name && isGeneralTextModel(_modelCache.name) && !/-latest$/.test(_modelCache.name)) list.push(_modelCache.name);
+  if (list.length < 3 && key) {
+    try {
+      (await listGeminiModels(key))
+        .map((id) => ({ id, s: scoreFlashModel(id) }))
+        .filter((x) => x.s && !x.s.lite)
+        .sort((a, b) => b.s.major - a.s.major || b.s.minor - a.s.minor)
+        .forEach((x) => list.push(x.id));
+    } catch {
+      // the model list is optional here
+    }
+  }
+  return [...new Set(list)].slice(0, 3);
+}
+
+/**
+ * One generation through Vertex AI. Tries up to 3 models within the deadline.
+ * Returns { text, finishReason, engine: 'vertex', model }.
+ */
+async function callVertexGemini(contents, { temperature = 0.5, maxTokens = 2048, responseMimeType, deadlineAt, key, ignoreSwitch = false } = {}) {
+  const cfg = await getVertexConfig();
+  if (cfg.enabled === false && !ignoreSwitch) throw new Error('The Vertex AI backup is turned off in the Admin Dashboard.');
+  const project = gcpProjectId();
+  if (!project) throw new Error('Google Cloud project ID not found.');
+  const location = String(cfg.location || 'global');
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const models = await vertexModelCandidates(key, cfg);
+  if (!models.length) throw new Error('No Gemini model to try on Vertex AI (set adminConfig/vertex.model).');
+  const token = await vertexAccessToken();
+  // AI Studio accepts a turn without a role; Vertex requires one ("user" | "model").
+  const vertexContents = contents.map((c) => (c && !c.role ? { ...c, role: 'user' } : c));
+
+  let lastErr = null;
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const remaining = deadlineAt - Date.now();
+    if (remaining < 8000) break;
+    // One stalled model may use at most half of what is left (unless it is the last one).
+    const share = i === models.length - 1 ? remaining : Math.max(30000, Math.floor(remaining / 2));
+    try {
+      const res = await fetch(`https://${host}/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contents: vertexContents, generationConfig: buildGenerationConfig(model, { temperature, maxTokens, responseMimeType }) }),
+        signal: AbortSignal.timeout(Math.min(remaining, share, geminiBudgetMs(withThinkingHeadroom(maxTokens)))),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        lastErr = new Error(`Vertex AI ${res.status} (${model}): ${body?.error?.message || res.statusText}`);
+        // A bad request or missing permission fails the same way on every model.
+        if ([400, 401, 403].includes(res.status)) break;
+        continue; // next model (unknown model, busy, quota)
+      }
+      const data = await res.json();
+      if (!data.candidates?.length && data.promptFeedback?.blockReason) {
+        return { text: '', finishReason: 'SAFETY', engine: 'vertex', model }; // blocked prompt: same on every model
+      }
+      const candidate = data.candidates?.[0];
+      const text = (candidate?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('');
+      if (!text && candidate?.finishReason !== 'SAFETY') {
+        lastErr = new Error(`Vertex AI returned an empty reply (${model}).`);
+        continue;
+      }
+      return { text, finishReason: candidate?.finishReason ?? null, engine: 'vertex', model };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Vertex AI did not answer in time.');
+}
+
 exports.generateAI = onCall(
   // BUG-FIX: COT and Action Research plans need up to ~250s — raised from 120s
   // to 300s so DEADLINE_EXCEEDED never interrupts a legitimate generation.
@@ -1604,6 +1729,7 @@ exports.generateAI = onCall(
   { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 300, memory: '1GiB', cpu: 1, concurrency: 40, maxInstances: 50 },
   // `res` (CallableResponse: sendChunk/signal) is only used for opt-in streaming.
   async (req, res) => {
+    const startedAt = Date.now();
     if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
 
     const { action, contents, temperature, maxTokens, responseMimeType, isRetry, unitCount } = req.data || {};
@@ -1664,9 +1790,10 @@ exports.generateAI = onCall(
     }
 
     async function runGeneration() {
+    const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task' || action === 'desk_voice';
+    let key = null;
     try {
-      const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task' || action === 'desk_voice';
-      const key = await getGeminiKey(isDesk);
+      key = await getGeminiKey(isDesk);
       let overallDeadlineAt;
       if (wantsStream) {
         const streamed = await streamGeminiToClient(key, contents, res, {
@@ -1692,11 +1819,26 @@ exports.generateAI = onCall(
       // a second engine now would only produce a reply nobody sees (cancelled)
       // or one that contradicts what was already shown (midStream).
       if (geminiErr?.midStream || geminiErr?.code === 'cancelled') throw geminiErr;
-      // The fallback engine only gets the text prompt: for a voice clip it would
+      // 1st backup: the same Gemini models through Vertex AI (separate capacity;
+      // hears audio and sees images, so voice and photo calls are covered too).
+      const nvidiaConfig = action === 'desk_voice' ? null : await getNvidiaConfigServer();
+      try {
+        const viaVertex = await callVertexGemini(contents, {
+          temperature: temperature ?? 0.5,
+          maxTokens: clampedMaxTokens,
+          responseMimeType,
+          deadlineAt: startedAt + (nvidiaConfig?.apiKey ? VERTEX_DEADLINE_BEFORE_NVIDIA_MS : VERTEX_DEADLINE_MS),
+          key,
+        });
+        console.warn(`[generateAI] "${action}" answered by the Vertex AI backup (${viaVertex.model}) after: ${geminiErr.message}`);
+        return { text: viaVertex.text, finishReason: viaVertex.finishReason, engine: 'vertex' };
+      } catch (vertexErr) {
+        console.warn(`[generateAI] Vertex AI backup failed for "${action}":`, vertexErr.message);
+      }
+      // The NVIDIA engine only gets the text prompt: for a voice clip it would
       // invent a transcript, so voice input fails honestly instead.
       if (action === 'desk_voice') throw geminiErr;
       console.warn(`[generateAI] Gemini call failed for action "${action}". Checking NVIDIA fallback:`, geminiErr.message);
-      const nvidiaConfig = await getNvidiaConfigServer();
       if (nvidiaConfig?.apiKey) {
         try {
           console.log(`[generateAI] Swapping to NVIDIA NIM API fallback (${nvidiaConfig.model || 'default'})...`);
@@ -1727,6 +1869,26 @@ exports.generateAI = onCall(
     }
   }
 );
+
+// Admin Dashboard → "Test backup": one tiny real request through Vertex AI.
+exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+  if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+    throw new HttpsError('permission-denied', 'Admin access required.');
+  }
+  const t0 = Date.now();
+  try {
+    const key = await getGeminiKey().catch(() => null);
+    const r = await callVertexGemini([{ role: 'user', parts: [{ text: 'Reply with exactly the word: OK' }] }], {
+      temperature: 0, maxTokens: 50, deadlineAt: Date.now() + 90000, key, ignoreSwitch: true,
+    });
+    const cfg = await getVertexConfig();
+    return { ok: true, model: r.model, ms: Date.now() - t0, reply: String(r.text).trim().slice(0, 40), enabled: cfg.enabled !== false };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err), ms: Date.now() - t0 };
+  }
+});
 
 // ── Self-registration (server-enforced, multi-layer) ─────────────────────────
 exports.registerUser = onCall(
