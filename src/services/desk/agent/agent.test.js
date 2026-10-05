@@ -94,6 +94,28 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
     expect(callGeminiProxy).toHaveBeenCalledTimes(1);
   });
 
+  it('a long multi-line answer still reaches the teacher when the plan JSON is broken', async () => {
+    // Every attempt: raw line breaks in the reply AND a broken tail (unreadable even after repair).
+    const broken = `{"reply": "Here are my best use cases:${'\n'}- Item analysis${'\n'}- Remedial slips", "tasks": [ {oops`;
+    callGeminiProxy.mockResolvedValue({ text: broken });
+    const res = await runDeskAgentTurn({ prompt: 'Know yourself and give me your best use cases for teachers.', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' } });
+    expect(res.content).toBe('Here are my best use cases:\n- Item analysis\n- Remedial slips');
+    expect(res.artifacts).toEqual([]);
+  });
+
+  it('a cut-off plan shows the answer so far with a note, and runs no tasks', async () => {
+    callGeminiProxy.mockResolvedValue({ text: '{"reply": "Use case one. Use case two', finishReason: 'MAX_TOKENS' });
+    const res = await runDeskAgentTurn({ prompt: 'List every use case you have, in detail please', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' } });
+    expect(res.content).toMatch(/^Use case one\. Use case two…/);
+    expect(res.content).toMatch(/cut short/);
+    expect(res.artifacts).toEqual([]);
+  });
+
+  it('with no readable answer at all, the error is still reported (nothing invented)', async () => {
+    callGeminiProxy.mockResolvedValue({ text: 'garbage, not json' });
+    await expect(runDeskAgentTurn({ prompt: 'What can you do for me as my assistant?', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' } })).rejects.toThrow(/not valid JSON/);
+  });
+
   it('routes an obvious request straight to the tool (no planner call)', async () => {
     const workspace = workspaceWithScores();
     callGeminiProxy.mockResolvedValueOnce({ text: JSON.stringify({ remarks: ['ok'], interventions: ['ok'] }) });
@@ -346,6 +368,13 @@ describe('llm helpers', () => {
     expect(parseJsonReply('Sure! ```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(parseJsonReply('Here: {"b":[1,2]} thanks')).toEqual({ b: [1, 2] });
     expect(() => parseJsonReply('no json')).toThrow();
+  });
+
+  it('repairs raw line breaks inside strings (multi-line chat replies)', () => {
+    const raw = `{"reply": "Use cases:${'\n'}- Item analysis${'\n'}${'\t'}- Remedial", "tasks": []}`;
+    expect(parseJsonReply(raw)).toEqual({ reply: 'Use cases:\n- Item analysis\n\t- Remedial', tasks: [] });
+    // Escaped quotes and existing escapes are left as they are.
+    expect(parseJsonReply('{"a": "say \\"hi\\"\\nok"}')).toEqual({ a: 'say "hi"\nok' });
   });
 
   it('builds alternating contents with the system prompt first', () => {

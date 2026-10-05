@@ -65,7 +65,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       ? (persona === 'luna'
         ? `I am sorry, ${salutation}. We have reached today's limit for your plan. It resets at midnight, or you may ask the KaTuro admin about a Subscription for higher limits.`
         : `Ay, sorry ${salutation}! Naubos na natin ang daily limit ng plan mo. Babalik 'yan pag midnight — or ask the KaTuro admin about a Subscription para mas marami!`)
-      : `Something went wrong: ${err.message || 'Unknown error'}. Please try again.`;
+      : `Something went wrong: ${String(err.message || 'Unknown error').replace(/[.\s]+$/, '')}. Please try again.`;
     useDeskStore.getState().updateLastAssistantMessage({ content, isThinking: false });
     return { status: 'error', content, files: [] };
   } finally {

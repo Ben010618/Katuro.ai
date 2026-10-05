@@ -72,22 +72,56 @@ export function buildContents({ system, history = [], prompt, parts = [] }) {
   }, []);
 }
 
-/** Pulls a JSON value out of a model reply (tolerates ```json fences and chatter). */
+/**
+ * Escapes raw control characters (line breaks, tabs) that appear INSIDE JSON strings.
+ * Models sometimes write a multi-line reply with real line breaks instead of "\n",
+ * which strict JSON.parse rejects. Characters outside strings are left alone.
+ */
+export function escapeControlCharsInStrings(s) {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inString) {
+      if (c === '\\') {
+        out += c + (s[i + 1] ?? '');
+        i += 1;
+        continue;
+      }
+      if (c === '"') inString = false;
+      else if (c === '\n') { out += '\\n'; continue; }
+      else if (c === '\r') { out += '\\r'; continue; }
+      else if (c === '\t') { out += '\\t'; continue; }
+      else if (c.charCodeAt(0) < 32) continue;
+    } else if (c === '"') {
+      inString = true;
+    }
+    out += c;
+  }
+  return out;
+}
+
+function tryParse(s) {
+  for (const candidate of [s, escapeControlCharsInStrings(s)]) {
+    try {
+      return { ok: true, value: JSON.parse(candidate) };
+    } catch {
+      // try the next form
+    }
+  }
+  return { ok: false };
+}
+
+/** Pulls a JSON value out of a model reply (tolerates ```json fences, chatter and raw line breaks in strings). */
 export function parseJsonReply(text) {
   if (text && typeof text === 'object') return text;
   const s = String(text || '').trim();
-  try {
-    return JSON.parse(s);
-  } catch {
-    // fall through
-  }
+  const whole = tryParse(s);
+  if (whole.ok) return whole.value;
   const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) {
-    try {
-      return JSON.parse(fenced[1]);
-    } catch {
-      // fall through
-    }
+    const r = tryParse(fenced[1]);
+    if (r.ok) return r.value;
   }
   const start = s.search(/[{[]/);
   if (start >= 0) {
@@ -95,11 +129,8 @@ export function parseJsonReply(text) {
     const close = open === '{' ? '}' : ']';
     const end = s.lastIndexOf(close);
     if (end > start) {
-      try {
-        return JSON.parse(s.slice(start, end + 1));
-      } catch {
-        // fall through
-      }
+      const r = tryParse(s.slice(start, end + 1));
+      if (r.ok) return r.value;
     }
   }
   throw new Error('The AI reply was not valid JSON.');
@@ -167,6 +198,8 @@ export async function callDeskLLM({
         lastErr = finishReason === 'MAX_TOKENS'
           ? new Error('The AI reply was cut off (too long). Try asking for a shorter document.')
           : parseErr;
+        lastErr.rawText = text; // the readable part can still be shown (e.g. the planner's reply)
+        lastErr.cutOff = finishReason === 'MAX_TOKENS';
         continue;
       }
     } catch (err) {
