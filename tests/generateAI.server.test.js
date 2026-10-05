@@ -153,8 +153,8 @@ describe('voice input (desk_voice)', () => {
   const call = (parts) => server.generateAI({ auth: { uid: 't1' }, data: { action: 'desk_voice', contents: [{ role: 'user', parts }], maxTokens: 512 } }, {});
 
   it('accepts one WAV clip and counts it under its own daily limit', async () => {
-    stubGemini(() => ok('Gawan mo ako ng quiz.'));
-    await expect(call([{ text: 'Transcribe' }, clip()])).resolves.toMatchObject({ text: 'Gawan mo ako ng quiz.' });
+    stubGemini(() => ok('Make a quiz.'));
+    await expect(call([{ text: 'Transcribe' }, clip()])).resolves.toMatchObject({ text: 'Make a quiz.' });
     expect(usage('t1').desk_voice).toBe(1);
   });
 

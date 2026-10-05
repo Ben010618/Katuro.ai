@@ -13,7 +13,7 @@ export function VoiceButton({ voice, disabled }) {
       onClick={() => (listening ? voice.stop() : voice.start())}
       disabled={disabled || busy}
       aria-pressed={listening}
-      title={listening ? 'Stop and turn into text' : `Speak instead of typing (English, Filipino or Taglish, up to ${VOICE_MAX_SECONDS} seconds)`}
+      title={listening ? 'Stop and turn into text' : `Speak instead of typing (English only, up to ${VOICE_MAX_SECONDS} seconds)`}
       className={`p-2 rounded-lg transition flex-shrink-0 disabled:opacity-40 ${
         listening ? 'bg-red-600 text-white hover:bg-red-700' : 'text-gray-500 hover:text-emerald-700 hover:bg-emerald-50'
       }`}

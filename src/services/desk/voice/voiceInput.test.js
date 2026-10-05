@@ -32,7 +32,7 @@ describe('voice input', () => {
   });
 
   it('cleans the transcript; "[no speech]" means nothing was said', () => {
-    expect(cleanTranscript('  "Gawan mo ako ng 5-item quiz."  ')).toBe('Gawan mo ako ng 5-item quiz.');
+    expect(cleanTranscript('  "Make a 5-item quiz."  ')).toBe('Make a 5-item quiz.');
     expect(cleanTranscript('Transcript: Alvarez 18, Bautista 15')).toBe('Alvarez 18, Bautista 15');
     expect(cleanTranscript('[no speech]')).toBe('');
     expect(cleanTranscript('')).toBe('');
@@ -45,8 +45,16 @@ describe('voice input', () => {
     expect(call).toMatchObject({ action: 'desk_voice', temperature: 0, region: 'asia-southeast1' });
     expect(call.contents).toHaveLength(1);
     expect(call.contents[0].parts).toEqual([{ text: TRANSCRIBE_PROMPT }, { inlineData: { mimeType: 'audio/wav', data: 'AQID' } }]);
+    expect(TRANSCRIBE_PROMPT).toMatch(/English only/);
     expect(TRANSCRIBE_PROMPT).toMatch(/Do not translate/);
+    expect(TRANSCRIBE_PROMPT).not.toMatch(/may speak .*Taglish/);
     expect(TRANSCRIBE_PROMPT).toMatch(/Do not answer/);
+  });
+
+  it('English only: a non-English clip gives a clear message, not a transcript', async () => {
+    proxy.mockResolvedValue({ text: '[not english]' });
+    await expect(transcribeAudio(new Uint8Array([1]))).rejects.toMatchObject({ code: 'not-english', message: expect.stringMatching(/English only/) });
+    expect(() => cleanTranscript('[NOT ENGLISH]')).toThrow(/English only/);
   });
 
   it('turns gateway failures into plain messages', async () => {
