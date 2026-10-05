@@ -239,7 +239,7 @@ export const TOOLS = {
       const { text, visionParts } = await gatherSourceText(paths, ctx);
       const answer = await ctx.llm({
         system: ctx.persona,
-        prompt: `Answer ONLY from the files below. Say which file each fact comes from. If the files do not contain the answer, say so plainly — do not guess or use outside assumptions about this class.\n\nQuestion: ${question}\n\nFiles:\n${text}`,
+        prompt: `You have already greeted the teacher, so start directly with the answer (no greeting). Answer ONLY from the files below. Say which file each fact comes from. If the files do not contain the answer, say so plainly — do not guess or use outside assumptions about this class.\n\nQuestion: ${question}\n\nFiles:\n${text}`,
         parts: visionParts,
         maxTokens: 3072,
         onText: (full) => ctx.streamReply?.(ctx.masker.unmask(full)),

@@ -79,17 +79,21 @@ export function teacherFromProfile(profile = {}, user = {}) {
   };
 }
 
-const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${teacher.salutation}, a DepEd (Philippines) teacher. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Be straight to the point and genuinely helpful. Do not use markdown symbols like #, ** or backticks; use plain sentences and simple "•" bullets when listing.`;
+const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${teacher.salutation}, a DepEd (Philippines) teacher. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Be straight to the point and genuinely helpful.`;
+
+// Chat replies are shown formatted (DeskFormattedText); documents stay plain.
+const CHAT_FORMAT = `Formatting of chat replies: short paragraphs separated by a blank line. For a list, write a short label line ending with ":" and then put EACH item on its own line starting with "- " (or "1. ", "2. " for steps); never put several items on one line. Emphasize sparingly: **bold** for the key facts the teacher must notice (results, totals, scores, file names, deadlines), *italics* for titles and terms, and <u>underline</u> only for a warning or an action the teacher must take. A few words at a time, never whole sentences. No # headings, no tables, no backticks.`;
+const DOC_FORMAT = 'Do not use markdown symbols like #, ** or backticks; use plain sentences and simple "•" bullets when listing.';
 
 /** Chat voice: the persona the teacher picked in Settings (Matt / Luna). */
 export function personaFor(teacher, personaId, now = new Date()) {
   const p = getPersona(personaId);
-  return `${baseRole(teacher)}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.\n\n${GROUNDING_RULES}`;
+  return `${baseRole(teacher)} ${CHAT_FORMAT}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.\n\n${GROUNDING_RULES}`;
 }
 
 /** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
 export function docPersonaFor(teacher) {
-  return `${baseRole(teacher)} Write in formal, clear, professional DepEd English suitable for official school documents. No slang, jokes or emojis.\n\n${GROUNDING_RULES}`;
+  return `${baseRole(teacher)} ${DOC_FORMAT} Write in formal, clear, professional DepEd English suitable for official school documents. No slang, jokes or emojis.\n\n${GROUNDING_RULES}`;
 }
 
 function curriculumHint(subject, gradeLevel, text = '') {
@@ -140,7 +144,6 @@ export function clearAnswerMemory() {
 function cleanReply(text) {
   return String(text || '')
     .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
     // No emoji or pictographs in chat: the assistant should read as professional.
     .replace(/(?![©®™])\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|\u{FE0F}|\u{200D}/gu, '')
@@ -197,6 +200,8 @@ export async function runDeskAgentTurn({
     schoolYear: schoolYearFor(today),
     curriculumHint,
     readBytes,
+    /** True when the classroom folder has this file. */
+    hasFile: (path) => Boolean(findEntryByPath(tree, path)),
     async readParsed(path, { full = true } = {}) {
       const entry = findEntryByPath(tree, path);
       if (folderIndex && entry) {

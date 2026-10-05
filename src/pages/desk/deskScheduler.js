@@ -22,7 +22,7 @@ export function isSchedulerBusy() {
 /** Plain-text one-liner of an agent reply for the task history and the notification. */
 function summarize(content) {
   return String(content || '')
-    .replace(/\*\*/g, '')
+    .replace(/\*{1,3}|<\/?u>/gi, '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)

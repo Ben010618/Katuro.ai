@@ -13,6 +13,7 @@ const SHEET = /\.(xlsx|xlsm|xls|csv|tsv)$/i;
 const PDF = /\.pdf$/i;
 const IMAGE = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const DOC = /\.(docx|dotx|pdf|txt|md|pptx)$/i;
+const EDITABLE = /\.(xlsx|xlsm|docx)$/i;
 const SCORE_SOURCE = (p) => SHEET.test(p) || IMAGE.test(p) || PDF.test(p);
 const base = (p) => p.split('/').pop();
 const stem = (p) => base(p).replace(/\.[^.]+$/, '');
@@ -21,6 +22,7 @@ const stem = (p) => base(p).replace(/\.[^.]+$/, '');
 export const QUICK_PROMPTS = [
   { route: 'item_analysis', label: 'Item Analysis & LMC', prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.' },
   { route: 'remedial', label: 'Remedial Slips & Re-test', prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.' },
+  { route: 'voice_scores', label: 'Encode scores by voice', prompt: 'Encode scores by voice into the attached class record.' },
   { route: 'class_record', label: 'e-Class Record', prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.' },
   { route: 'attendance', label: 'Attendance & SARDO', prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.' },
   { route: 'dll', label: 'DLL from my lesson', prompt: 'Turn the attached lesson file into a complete Daily Lesson Log (Monday to Friday).' },
@@ -34,6 +36,7 @@ const THANKS = /^(thanks?|thank\s*you|ty|salamat|maraming\s*salamat)\b[\s\S]{0,3
 
 /** Intent rules for short free-text requests; each needs matching files to be confident. */
 const INTENTS = [
+  { route: 'voice_scores', test: /\b(by voice|using (my )?voice|voice (input|encoding)|dictat\w*|speak (the )?(scores|grades)|say the (scores|grades)|read (the )?(scores|grades) (aloud|out)|read (them|it) aloud)\b/i, needs: /\b(scores?|grades?|class record|encod\w*)\b/i },
   { route: 'remedial', test: /\b(remedia|re-?test|intervention slip)/i, needs: /\b(item analysis|least mastered|lmc|score|quiz|test)\b/i },
   { route: 'item_analysis', test: /\b(item analysis|least mastered|\blmc\b|\bmps\b|mastery level)\b/i },
   { route: 'class_record', test: /\b(e-?class record|class record|\becr\b|transmut)/i },
@@ -65,8 +68,9 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
     // Free text: only short, single-intent requests are routed in code.
     if (text.length > 140 || /\b(and then|tapos|after that|also|pati|then)\b/i.test(text)) return null;
     const hits = INTENTS.filter((i) => i.test.test(text) && (!i.needs || i.needs.test(text)));
-    if (hits.length !== 1 && !(hits.length === 2 && hits[0].route === 'remedial')) return null;
-    route = hits[0].route;
+    if (hits.some((h) => h.route === 'voice_scores')) route = 'voice_scores'; // "...by voice into my class record"
+    else if (hits.length !== 1 && !(hits.length === 2 && hits[0].route === 'remedial')) return null;
+    else route = hits[0].route;
   }
 
   const files = [...new Set(attachedPaths.length ? attachedPaths : activePath ? [activePath] : [])];
@@ -122,6 +126,11 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
     case 'compare': {
       if (files.length !== 2) return null;
       return { reply: ack(persona, teacherName, `the comparison of ${base(files[0])} and ${base(files[1])}`), tasks: [mk(1, 'compare_files', { pathA: files[0], pathB: files[1], instructions: text }, 'Compare files')] };
+    }
+    case 'voice_scores': {
+      if (files.length !== 1 || !EDITABLE.test(files[0])) return null; // the planner asks which file
+      const col = text.match(/\bcolumn\s+([A-Z]{1,3})\b/i)?.[1] || text.match(/\b((?:WW|PT|QA)\s?\d{1,2})\b/i)?.[1];
+      return { reply: ack(persona, teacherName, 'voice encoding'), tasks: [mk(1, 'voice_encode_scores', { targetPath: files[0], ...(col ? { column: col.replace(/\s+/g, '') } : {}) }, `Voice encoding – ${base(files[0])}`)] };
     }
     case 'understand': {
       if (files.length !== 1) return null;

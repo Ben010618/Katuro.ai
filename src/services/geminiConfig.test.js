@@ -268,6 +268,25 @@ describe('callGeminiProxy — region', () => {
   });
 });
 
+// ── Voice: never a client-side fallback ─────────────────────────────────────
+describe('callGeminiProxy — voice clips (desk_voice)', () => {
+  it('a busy server is reported as is: no NVIDIA / direct-Gemini guess at the audio', async () => {
+    const { callGeminiProxy } = await load();
+    const nv = await import('./nvidiaConfig');
+    nv.getNvidiaConfig.mockResolvedValueOnce({ apiKey: 'nv' }); // once: used up by the control call below
+    nv.callNvidiaChat.mockResolvedValueOnce('Santos = 18'); // what an engine that cannot hear would invent
+    state.callImpl = async () => { throw fnErr('unavailable', 'busy'); };
+
+    const voice = { action: 'desk_voice', contents: [{ role: 'user', parts: [{ text: 'Transcribe' }, { inlineData: { mimeType: 'audio/wav', data: 'UklGRg==' } }] }], temperature: 0, maxTokens: 2048 };
+    await expect(callGeminiProxy(voice)).rejects.toBeTruthy();
+    expect(nv.callNvidiaChat).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Control: other actions still use the fallback (so the check above is meaningful).
+    await expect(callGeminiProxy(base)).resolves.toMatchObject({ text: 'Santos = 18', engine: 'nvidia' });
+  });
+});
+
 // ── Error metadata ───────────────────────────────────────────────────────────
 describe('callGeminiProxy — error rethrow', () => {
   it('keeps message/status/dailyLimit and additionally exposes code + details', async () => {

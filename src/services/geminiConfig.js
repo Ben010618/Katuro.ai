@@ -243,7 +243,7 @@ export const WEB_ACCURACY_RULES = `ACCURACY RULES (kaTuro) — follow these with
 4. If something you need is missing or unreadable (including marks on a scanned sheet), leave it empty or say it is missing. Never fill a gap with a typical or example value.
 5. Keep exactly the output format requested below.`;
 
-const SKIP_ACCURACY_RULES = new Set(['desk_agent_run', 'desk_agent_task']);
+const SKIP_ACCURACY_RULES = new Set(['desk_agent_run', 'desk_agent_task', 'desk_voice']);
 
 /** Puts WEB_ACCURACY_RULES in front of the first user message (once). Never mutates the input. */
 export function withAccuracyRules(action, contents) {
@@ -395,7 +395,9 @@ export async function callGeminiProxy({ action, contents: rawContents, temperatu
       'functions/cancelled',
       'functions/resource-exhausted',
     ]);
-    if (!err?.details?.dailyLimit && TRANSIENT.has(err?.code)) {
+    // Voice clips never use a fallback: the text-only engine can't hear audio and would
+    // invent a transcript (wrong scores for real learners).
+    if (action !== 'desk_voice' && !err?.details?.dailyLimit && TRANSIENT.has(err?.code)) {
       // 1. Try NVIDIA NIM fallback
       try {
         const { getNvidiaConfig, callNvidiaChat } = await import('./nvidiaConfig');

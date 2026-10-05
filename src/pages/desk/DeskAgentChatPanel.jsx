@@ -19,6 +19,7 @@ import {
   Files,
   ListChecks,
   CalendarClock,
+  Mic,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runChatTurn } from './runChatTurn';
@@ -27,6 +28,8 @@ import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
 import { getPersona } from '../../services/desk/personas';
 import { QUICK_PROMPTS } from '../../services/desk/agent/fastRoute';
+import { useVoiceInput } from './useVoiceInput';
+import { VoiceButton, VoiceStatus } from './VoiceControls';
 
 function StepIcon({ status }) {
   if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
@@ -60,6 +63,7 @@ function ArtifactIcon({ type }) {
   if (type === 'sheet' || type === 'table') return <FileSpreadsheet size={14} className="text-blue-600" />;
   if (type === 'files') return <Files size={14} className="text-gray-600" />;
   if (type === 'changes') return <ListChecks size={14} className="text-amber-600" />;
+  if (type === 'voice_scores') return <Mic size={14} className="text-red-600" />;
   return <FileText size={14} className="text-emerald-600" />;
 }
 
@@ -93,6 +97,14 @@ export default function DeskAgentChatPanel({
   const [importError, setImportError] = useState('');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
+  // Voice: the transcript is added to the message box for the teacher to check, never sent directly.
+  const voice = useVoiceInput({
+    onText: (text) => {
+      setInputPrompt((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+  });
 
   const teacherSalutationName = getTeacherSalutationName(profile, user);
 
@@ -291,26 +303,30 @@ export default function DeskAgentChatPanel({
         </div>
       </div>
 
-      {/* Quick Prompt Pills */}
-      <div className="px-4 py-2 border-t border-gray-100 bg-white/70 overflow-x-auto flex items-center gap-2">
-        <div className="max-w-4xl mx-auto w-full flex items-center gap-2 overflow-x-auto py-0.5">
-          {QUICK_PROMPTS.map((qp) => (
+      {/* Quick prompts: a few starters, only until the teacher sends a first message. */}
+      {!messages.some((m) => m.role === 'user') && (
+      <div className="px-4 pt-2 bg-white/70">
+        <div className="max-w-4xl mx-auto w-full flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-gray-400 mr-0.5">Try:</span>
+          {QUICK_PROMPTS.slice(0, 4).map((qp) => (
             <button
               key={qp.label}
               onClick={() => setInputPrompt(qp.prompt)}
               disabled={isGenerating}
               title={qp.prompt}
-              className="px-2.5 py-1 bg-gray-50 hover:bg-emerald-50 hover:text-emerald-800 text-gray-600 text-[11px] font-medium rounded-full border border-gray-200 hover:border-emerald-300 transition whitespace-nowrap flex-shrink-0 disabled:opacity-50"
+              className="px-2 py-0.5 text-gray-500 hover:text-emerald-800 hover:bg-emerald-50 text-[11px] rounded-md border border-gray-200 hover:border-emerald-300 transition whitespace-nowrap disabled:opacity-50"
             >
               {qp.label}
             </button>
           ))}
         </div>
       </div>
+      )}
 
       {/* Bottom Prompt Input */}
       <div className="p-3 bg-white border-t border-gray-200 shadow-md">
         <div className="max-w-4xl mx-auto w-full">
+          <VoiceStatus voice={voice} />
           {(attachedPaths.length > 0 || importError) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {attachedPaths.map((p) => (
@@ -334,6 +350,7 @@ export default function DeskAgentChatPanel({
             >
               <Paperclip size={15} />
             </button>
+            <VoiceButton voice={voice} disabled={isGenerating} />
             <input
               ref={fileInputRef}
               type="file"
@@ -345,14 +362,19 @@ export default function DeskAgentChatPanel({
               }}
             />
             <textarea
+              ref={inputRef}
               rows={2}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Ask your Co-Teacher… e.g. “Make item analysis for all 4 sections” (Enter to send, paste photos here)"
+              placeholder={`Message ${personaInfo.name}…`}
+              title="Enter to send, Shift+Enter for a new line. You can also paste photos."
               disabled={isGenerating}
               className="w-full bg-transparent text-gray-800 text-xs px-2 py-1 resize-none focus:outline-none placeholder-gray-400"
+              // The global textarea style (index.css: manila box with its own border) would
+              // draw a second box inside the composer; the composer frame is the box here.
+              style={{ background: 'transparent', border: 'none', boxShadow: 'none', borderRadius: 0, padding: '6px 8px', fontSize: 13, lineHeight: 1.45 }}
             />
             <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
               {onSchedule && (

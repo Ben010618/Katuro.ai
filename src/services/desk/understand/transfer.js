@@ -128,7 +128,7 @@ function sameValue(a, b) {
   return String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
 }
 
-function toEdit(loc, value, kind) {
+export function toEdit(loc, value, kind) {
   return kind === 'xlsx' ? { sheet: loc.sheet, cell: loc.cell, value } : { id: loc.id, text: value === null || value === undefined ? '' : String(value) };
 }
 

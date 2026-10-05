@@ -15,7 +15,7 @@ describe('fastRoute', () => {
 
   it('routes every quick prompt when suitable files are attached', () => {
     const files = {
-      item_analysis: ['a.xlsx'], remedial: ['a.xlsx'], class_record: ['a.xlsx'], attendance: ['sf2.xlsx'],
+      item_analysis: ['a.xlsx'], remedial: ['a.xlsx'], class_record: ['a.xlsx'], attendance: ['sf2.xlsx'], voice_scores: ['Rizal.xlsx'],
       dll: ['Lesson.docx'], slides: ['Lesson.docx'], photo_table: ['photo.jpg'], merge_pdfs: ['a.pdf', 'b.pdf'],
     };
     for (const q of QUICK_PROMPTS) {
@@ -23,6 +23,22 @@ describe('fastRoute', () => {
       expect(r, q.route).not.toBeNull();
       expect(r.tasks.length, q.route).toBeGreaterThan(0);
     }
+  });
+
+  it('voice encoding: opens the panel for one Excel/Word class record, with a spoken column', () => {
+    expect(route('Encode scores by voice into column F', ['G7 Rizal.xlsx']).tasks).toEqual([
+      { id: 't1', tool: 'voice_encode_scores', args: { targetPath: 'G7 Rizal.xlsx', column: 'F' }, label: 'Voice encoding – G7 Rizal.xlsx', dependsOn: [] },
+    ]);
+    expect(route('I will read the scores aloud for WW 3 in my class record', ['cr.xlsx']).tasks[0].args).toEqual({ targetPath: 'cr.xlsx', column: 'WW3' });
+    expect(route('dictate grades', ['record.docx']).tasks[0].tool).toBe('voice_encode_scores');
+    // "voice" as a lesson topic is not voice input.
+    expect(route('Item analysis of my passive voice quiz scores', ['a.xlsx']).tasks[0].tool).toBe('analyze_scores');
+    expect(route('make a class record for active and passive voice', ['a.xlsx']).tasks[0].tool).toBe('make_class_record');
+    // Not an editable file, or two files: the planner decides / asks.
+    expect(route('Encode scores by voice', ['scores.pdf'])).toBeNull();
+    expect(route('Encode scores by voice', ['a.xlsx', 'b.xlsx'])).toBeNull();
+    // Without voice words, the e-Class Record route is unchanged.
+    expect(route('Encode the attached scores into an official DepEd e-Class Record with transmutation.', ['a.xlsx']).tasks[0].tool).toBe('make_class_record');
   });
 
   it('builds dependent remedial tasks per file', () => {
