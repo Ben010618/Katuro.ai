@@ -267,10 +267,11 @@ export async function callGeminiProxy({ action, contents: rawContents, temperatu
   // one half of why DLL, ILAW and Test Builder stopped working. The client
   // budget must always outlast the server's own budget for the same request
   // (see geminiBudgetMs in functions/index.js) plus its NVIDIA fallback.
-  const isHeavy = action === 'cot_gen' || action === 'action_research_ai' || action === 'expand_slides' || action === 'desk_agent_run' || action === 'desk_agent_task';
+  // Every action now waits the full 300 s (the function's own timeout): the server may
+  // answer through its Vertex AI backup up to ~270 s in, and giving up earlier would
+  // drop (and still charge) an answer that was on its way.
   const serverBudgetMs = Math.min(180000, Math.max(45000, 30000 + (Number(maxTokens) || 2048) * 10));
-  const effectiveTimeout = timeoutMs
-    ?? (isHeavy ? 300000 : Math.min(300000, serverBudgetMs + 100000));
+  const effectiveTimeout = timeoutMs ?? 300000;
 
   const wantStream = stream === true && typeof onChunk === 'function';
   // New fields are only added when used, so a legacy call sends exactly the
@@ -649,6 +650,31 @@ export async function getGeminiKeyStatus() {
   } catch {
     return { hasKey: false, error: true };
   }
+}
+
+// ── Backup engine: Gemini on Vertex AI (Agent Platform) ─────────────────────
+const VERTEX_REF = doc(db, 'adminConfig', 'vertex');
+
+/** { enabled } — the backup is on unless an admin turned it off. */
+export async function getVertexBackupStatus() {
+  try {
+    const snap = await getDoc(VERTEX_REF);
+    const d = snap.exists() ? snap.data() : {};
+    return { enabled: d.enabled !== false };
+  } catch {
+    return { enabled: true, error: true };
+  }
+}
+
+export async function setVertexBackupEnabled(enabled, adminUid) {
+  await setDoc(VERTEX_REF, { enabled: enabled === true, updatedAt: new Date(), updatedBy: adminUid }, { merge: true });
+}
+
+/** One tiny real request through Vertex AI (admins only). → { ok, model?, ms, reply?, error? } */
+export async function testVertexBackup() {
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const res = await httpsCallable(getFunctions(app, 'us-central1'), 'adminTestVertex', { timeout: 90000 })({});
+  return res.data;
 }
 
 /** Admin-only: read KaTuroDesk display info (never exposes the full key) */

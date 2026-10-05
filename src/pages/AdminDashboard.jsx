@@ -36,6 +36,7 @@ import {
 import {
   saveGeminiKey, getGeminiKeyStatus, testGeminiKey,
   saveDeskGeminiKey, getDeskGeminiKeyStatus,
+  getVertexBackupStatus, setVertexBackupEnabled, testVertexBackup,
   listAvailableGeminiModels, saveGeminiModelPin, getGeminiModelPin
 } from '../services/geminiConfig';
 import {
@@ -1683,6 +1684,12 @@ function ApiKeySection({ adminUid }) {
   const [deskTestMsg, setDeskTestMsg]       = useState('');
   const [deskErr, setDeskErr]               = useState('');
 
+  // Vertex AI backup State
+  const [vertexStatus, setVertexStatus]       = useState(null);
+  const [testingVertex, setTestingVertex]     = useState(false);
+  const [savingVertex, setSavingVertex]       = useState(false);
+  const [vertexTest, setVertexTest]           = useState(null); // { ok, model, ms, reply, error }
+
   // NVIDIA State
   const [nvidiaKeyInput, setNvidiaKeyInput]   = useState('');
   const [showNvidiaKey, setShowNvidiaKey]     = useState(false);
@@ -1703,6 +1710,7 @@ function ApiKeySection({ adminUid }) {
   useEffect(() => {
     getGeminiKeyStatus().then(setGeminiStatus).catch(() => setGeminiStatus({ hasKey: false }));
     getDeskGeminiKeyStatus().then(setDeskStatus).catch(() => setDeskStatus({ hasKey: false }));
+    getVertexBackupStatus().then(setVertexStatus).catch(() => setVertexStatus({ enabled: true, error: true }));
     getNvidiaKeyStatus().then(status => {
       setNvidiaStatus(status);
       if (status?.model) setNvidiaTextModel(status.model);
@@ -1789,6 +1797,32 @@ function ApiKeySection({ adminUid }) {
       setDeskTestMsg(e.message);
     } finally {
       setTestingDesk(false);
+    }
+  }
+
+  // Vertex AI backup handlers
+  async function handleTestVertex() {
+    setTestingVertex(true);
+    setVertexTest(null);
+    try {
+      setVertexTest(await testVertexBackup());
+    } catch (e) {
+      setVertexTest({ ok: false, error: e.message });
+    } finally {
+      setTestingVertex(false);
+    }
+  }
+
+  async function handleToggleVertex() {
+    const next = !(vertexStatus?.enabled !== false);
+    setSavingVertex(true);
+    try {
+      await setVertexBackupEnabled(next, adminUid);
+      setVertexStatus({ enabled: next });
+    } catch (e) {
+      setVertexTest({ ok: false, error: `Could not save: ${e.message}` });
+    } finally {
+      setSavingVertex(false);
     }
   }
 
@@ -2336,6 +2370,72 @@ function ApiKeySection({ adminUid }) {
               <div style={{ marginTop: 12, display: 'flex', gap: 7, background: 'rgba(224,92,92,0.08)', border: '1px solid rgba(224,92,92,0.3)', borderRadius: 8, padding: '8px 12px' }}>
                 <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />
                 <p style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{deskErr}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Backup engine: Gemini on Vertex AI (Agent Platform) ── */}
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px dashed rgba(37,99,235,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#dbeafe', color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Backup engine
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
+                    Gemini on Vertex AI (Agent Platform)
+                  </span>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>
+                  When the Gemini key above is busy or out of quota, the same request is answered through Vertex AI, which has its own capacity. No key needed: the server uses its own Google identity. Used only when the main route fails.
+                </p>
+              </div>
+              <div>
+                {vertexStatus === null ? (
+                  <Loader2 size={14} color="#1d4ed8" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: vertexStatus.enabled ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: 20, border: `1px solid ${vertexStatus.enabled ? 'rgba(29,78,216,0.3)' : 'rgba(107,114,128,0.3)'}` }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: vertexStatus.enabled ? '#1d4ed8' : '#4b5563' }}>{vertexStatus.enabled ? 'Backup on' : 'Backup off'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleTestVertex}
+                disabled={testingVertex}
+                title="Send one tiny real request through Vertex AI"
+                style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: testingVertex ? 0.6 : 1 }}
+              >
+                {testingVertex ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FlaskConical size={13} />}
+                Test backup
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleVertex}
+                disabled={savingVertex || vertexStatus === null}
+                style={{ ...btnSecondary, whiteSpace: 'nowrap', opacity: (savingVertex || vertexStatus === null) ? 0.6 : 1 }}
+              >
+                {vertexStatus?.enabled === false ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
+                {vertexStatus?.enabled === false ? 'Turn backup on' : 'Turn backup off'}
+              </button>
+            </div>
+            {vertexTest && (
+              <div style={{
+                marginTop: 12, display: 'flex', gap: 7, alignItems: 'flex-start',
+                background: vertexTest.ok ? '#dcfce7' : 'rgba(224,92,92,0.08)',
+                border: `1px solid ${vertexTest.ok ? 'rgba(21,128,61,0.3)' : 'rgba(224,92,92,0.3)'}`,
+                borderRadius: 8, padding: '8px 12px',
+              }}>
+                {vertexTest.ok
+                  ? <CheckCircle2 size={14} color="#15803d" style={{ flexShrink: 0, marginTop: 1 }} />
+                  : <AlertCircle size={14} color="#e05c5c" style={{ flexShrink: 0, marginTop: 1 }} />}
+                <p style={{ margin: 0, fontSize: 12, color: vertexTest.ok ? '#14532d' : '#c0392b' }}>
+                  {vertexTest.ok
+                    ? `Backup works: ${vertexTest.model} answered "${vertexTest.reply}" in ${(vertexTest.ms / 1000).toFixed(1)} s.`
+                    : `Backup test failed: ${vertexTest.error}`}
+                </p>
               </div>
             )}
           </div>
