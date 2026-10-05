@@ -101,11 +101,20 @@ export async function startRecording({ onLevel, onLimit } = {}) {
     throw micError(err);
   }
 
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AudioCtx();
-  const source = ctx.createMediaStreamSource(stream);
-  // ScriptProcessor is old but works everywhere (including Electron) without a worklet file.
-  const processor = ctx.createScriptProcessor(4096, 1, 1);
+  let ctx;
+  let source;
+  let processor;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    ctx = new AudioCtx();
+    source = ctx.createMediaStreamSource(stream);
+    // ScriptProcessor is old but works everywhere (including Electron) without a worklet file.
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+  } catch {
+    stream.getTracks().forEach((t) => t.stop());
+    ctx?.close().catch(() => {});
+    throw new VoiceError('The microphone could not be started.', 'mic');
+  }
   const chunks = [];
   let total = 0;
   let peak = 0;

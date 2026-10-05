@@ -16,6 +16,7 @@ export function useVoiceInput({ onText, transcribe }) {
   const onTextRef = useRef(onText);
   const transcribeRef = useRef(transcribe);
   const stopRef = useRef(null);
+  const attemptRef = useRef(0); // bumped by cancel/unmount so a mic that is still starting is closed
 
   useEffect(() => {
     onTextRef.current = onText;
@@ -52,14 +53,20 @@ export function useVoiceInput({ onText, transcribe }) {
 
   const start = useCallback(async () => {
     if (recRef.current) return;
+    const attempt = ++attemptRef.current;
     setError('');
     setSeconds(0);
     setStatus('starting');
     try {
-      recRef.current = await startRecording({
+      const rec = await startRecording({
         onLevel: setLevel,
         onLimit: () => stopRef.current?.(), // 90 s reached: send what was said
       });
+      if (attempt !== attemptRef.current) {
+        rec.cancel(); // cancelled (or left) while the microphone was starting
+        return;
+      }
+      recRef.current = rec;
       setStatus('listening');
       const startedAt = Date.now();
       timerRef.current = setInterval(() => setSeconds(Math.min(VOICE_MAX_SECONDS, Math.floor((Date.now() - startedAt) / 1000))), 250);
@@ -71,6 +78,7 @@ export function useVoiceInput({ onText, transcribe }) {
   }, []);
 
   const cancel = useCallback(() => {
+    attemptRef.current += 1;
     recRef.current?.cancel();
     recRef.current = null;
     clearTimer();
@@ -80,6 +88,7 @@ export function useVoiceInput({ onText, transcribe }) {
 
   // Leaving the page while recording releases the microphone.
   useEffect(() => () => {
+    attemptRef.current += 1;
     recRef.current?.cancel();
     clearInterval(timerRef.current);
   }, []);

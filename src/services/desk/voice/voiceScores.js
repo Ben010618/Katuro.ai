@@ -166,10 +166,11 @@ export function addNamedEntries(session, entries, learners) {
   let { assignments, issues, nextIssueId } = session;
   for (const e of entries) {
     const m = matchSpokenName(e.name, learners);
-    if (m.status === 'ok' && e.value !== null) {
+    if (m.status === 'ok' && m.how !== 'close' && e.value !== null) {
       assignments = assign(assignments, m.index, e.value, e.name);
     } else {
-      const kind = m.status === 'ok' ? 'no-score' : m.status;
+      // A close spelling ("Reyez" → REYES) is confirmed by the teacher, never assumed.
+      const kind = m.status === 'ok' ? (m.how === 'close' ? 'confirm' : 'no-score') : m.status;
       issues = [...issues, { id: nextIssueId++, kind, heard: e.name, value: e.value, candidates: m.status === 'ok' ? [m.index] : m.candidates }];
     }
   }
@@ -216,8 +217,10 @@ export function setScore(session, index, raw) {
     delete rest[index];
     return { ...session, assignments: rest };
   }
-  const value = parseValue(text);
-  return { ...session, assignments: assign(session.assignments, index, value === null || value === 'skip' ? text : value, 'typed') };
+  // Strict: exactly what was typed. "1." stays as typed (flagged until it is a number).
+  const lower = text.toLowerCase();
+  const value = /^\d+(\.\d+)?$/.test(text) ? Number(text) : lower === 'absent' || lower === 'a' ? 'absent' : text;
+  return { ...session, assignments: { ...session.assignments, [index]: { value, text: String(raw), heard: 'typed' } } };
 }
 
 export const setCursor = (session, index) => ({ ...session, cursor: Math.max(0, index) });

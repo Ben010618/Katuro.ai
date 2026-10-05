@@ -164,6 +164,8 @@ describe('voice input (desk_voice)', () => {
     await expect(call([clip(), clip()])).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(call([clip({ mimeType: 'video/mp4' })])).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(call([clip({ data: 'A'.repeat(4 * 1024 * 1024 + 1) })])).rejects.toMatchObject({ message: expect.stringMatching(/under 90 seconds/) });
+    // Not a back door for long text generation on the voice limit.
+    await expect(call([{ text: 'x'.repeat(4001) }, clip()])).rejects.toMatchObject({ code: 'invalid-argument', message: expect.stringMatching(/too long/) });
     expect(calls).toEqual([]); // refused before any Gemini call
   });
 

@@ -31,6 +31,9 @@ describe('fastRoute', () => {
     ]);
     expect(route('I will read the scores aloud for WW 3 in my class record', ['cr.xlsx']).tasks[0].args).toEqual({ targetPath: 'cr.xlsx', column: 'WW3' });
     expect(route('dictate grades', ['record.docx']).tasks[0].tool).toBe('voice_encode_scores');
+    // "voice" as a lesson topic is not voice input.
+    expect(route('Item analysis of my passive voice quiz scores', ['a.xlsx']).tasks[0].tool).toBe('analyze_scores');
+    expect(route('make a class record for active and passive voice', ['a.xlsx']).tasks[0].tool).toBe('make_class_record');
     // Not an editable file, or two files: the planner decides / asks.
     expect(route('Encode scores by voice', ['scores.pdf'])).toBeNull();
     expect(route('Encode scores by voice', ['a.xlsx', 'b.xlsx'])).toBeNull();

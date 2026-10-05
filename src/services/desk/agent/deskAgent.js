@@ -200,6 +200,8 @@ export async function runDeskAgentTurn({
     schoolYear: schoolYearFor(today),
     curriculumHint,
     readBytes,
+    /** True when the classroom folder has this file. */
+    hasFile: (path) => Boolean(findEntryByPath(tree, path)),
     async readParsed(path, { full = true } = {}) {
       const entry = findEntryByPath(tree, path);
       if (folderIndex && entry) {

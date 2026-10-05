@@ -36,7 +36,7 @@ const THANKS = /^(thanks?|thank\s*you|ty|salamat|maraming\s*salamat)\b[\s\S]{0,3
 
 /** Intent rules for short free-text requests; each needs matching files to be confident. */
 const INTENTS = [
-  { route: 'voice_scores', test: /\b(by voice|voice|dictat\w*|speak|say the scores|read (the )?scores (aloud|out))\b/i, needs: /\b(scores?|grades?|class record|encod\w*)\b/i },
+  { route: 'voice_scores', test: /\b(by voice|using (my )?voice|voice (input|encoding)|dictat\w*|speak (the )?(scores|grades)|say the (scores|grades)|read (the )?(scores|grades) (aloud|out)|read (them|it) aloud)\b/i, needs: /\b(scores?|grades?|class record|encod\w*)\b/i },
   { route: 'remedial', test: /\b(remedia|re-?test|intervention slip)/i, needs: /\b(item analysis|least mastered|lmc|score|quiz|test)\b/i },
   { route: 'item_analysis', test: /\b(item analysis|least mastered|\blmc\b|\bmps\b|mastery level)\b/i },
   { route: 'class_record', test: /\b(e-?class record|class record|\becr\b|transmut)/i },

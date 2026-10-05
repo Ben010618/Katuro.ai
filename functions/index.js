@@ -639,6 +639,11 @@ function checkVoiceContents(contents) {
   if (!parts || audio.length !== 1 || !onlyTextOtherwise) {
     throw new HttpsError('invalid-argument', 'Voice input needs exactly one audio clip.');
   }
+  // The only text is the fixed transcription prompt (~1 KB): voice is not a general text call.
+  const textChars = parts.reduce((n, p) => n + (typeof p.text === 'string' ? p.text.length : 0), 0);
+  if (textChars > 4000) {
+    throw new HttpsError('invalid-argument', 'Voice input instructions are too long.');
+  }
   const { mimeType, data } = audio[0].inlineData;
   if (mimeType !== 'audio/wav' || typeof data !== 'string' || !data) {
     throw new HttpsError('invalid-argument', 'Voice input must be WAV audio.');

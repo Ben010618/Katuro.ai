@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { transcribeAudio } from '../../services/desk/voice/voiceInput';
@@ -11,6 +11,7 @@ import { useVoiceInput } from './useVoiceInput';
 import { VoiceButton, VoiceStatus } from './VoiceControls';
 
 const ISSUE_TEXT = {
+  confirm: 'sounds like this learner. Is that right?',
   ambiguous: 'matches more than one learner. Who was it?',
   unknown: 'is not in this list. Who was it?',
   'no-score': 'was said without a score.',
@@ -23,12 +24,25 @@ const fmt = (v) => (v === 'absent' ? 'Absent' : v === null || v === undefined ? 
 function IssueRow({ issue, learners, onResolve }) {
   const choices = issue.candidates.length ? issue.candidates : learners.map((_, i) => i);
   const needsScore = issue.value === null || issue.value === undefined;
+  const [hint, setHint] = useState('');
+  // "Use" needs an answer; only Dismiss drops what was heard.
   const pick = (form) => {
     const fd = new FormData(form);
-    const index = fd.get('learner') === '' ? null : Number(fd.get('learner'));
-    const raw = String(fd.get('score') ?? '').trim();
-    const value = needsScore ? (raw.toLowerCase() === 'absent' ? 'absent' : raw === '' ? null : Number(raw)) : undefined;
-    onResolve(issue.id, index, value);
+    if (fd.get('learner') === '') {
+      setHint('Choose the learner first, or tap Dismiss.');
+      return;
+    }
+    let value;
+    if (needsScore) {
+      const raw = String(fd.get('score') ?? '').trim();
+      if (/^\d+(\.\d+)?$/.test(raw)) value = Number(raw);
+      else if (/^(absent|a)$/i.test(raw)) value = 'absent';
+      else {
+        setHint('Type the score (a number, or absent).');
+        return;
+      }
+    }
+    onResolve(issue.id, Number(fd.get('learner')), value);
   };
   return (
     <form
@@ -45,6 +59,7 @@ function IssueRow({ issue, learners, onResolve }) {
       {needsScore && <input name="score" placeholder="Score" aria-label="Score" className="border border-gray-300" style={{ padding: '2px 4px', fontSize: 11, width: 64, borderRadius: 4 }} />}
       <button type="submit" className="rounded bg-emerald-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-800">Use</button>
       <button type="button" onClick={() => onResolve(issue.id, null)} className="rounded px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100">Dismiss</button>
+      {hint && <span className="w-full text-[10.5px] text-red-700" role="alert">{hint}</span>}
     </form>
   );
 }
@@ -53,7 +68,7 @@ function IssueRow({ issue, learners, onResolve }) {
 export default function DeskVoiceScoresView({ art }) {
   const { updateArtifact, addArtifacts, setActiveArtifact } = useDeskStore();
   const d = art.data || {};
-  const learners = d.learners || [];
+  const learners = useMemo(() => d.learners || [], [d.learners]);
   const session = d.session || emptySession();
   const mode = d.mode || 'named';
   const column = (d.columns || []).find((c) => c.key === d.columnKey) || null;
@@ -85,9 +100,12 @@ export default function DeskVoiceScoresView({ art }) {
 
   const chooseColumn = (key) => save((data) => {
     const col = (data.columns || []).find((c) => c.key === key);
-    // The file's own highest possible score fills the box when it is still empty.
-    const fromFile = col?.max && !data.maxScore ? { maxScore: String(col.max), maxFromFile: true } : {};
-    return { columnKey: key, ...fromFile };
+    // The box follows the file's highest possible score for the chosen column, unless the
+    // teacher typed their own; a column without one clears a value that came from the file.
+    if (!data.maxScore || data.maxFromFile) {
+      return col?.max ? { columnKey: key, maxScore: String(col.max), maxFromFile: true } : { columnKey: key, maxScore: '', maxFromFile: false };
+    }
+    return { columnKey: key };
   });
 
   const result = useMemo(
@@ -113,6 +131,11 @@ export default function DeskVoiceScoresView({ art }) {
 
   return (
     <div className="w-full space-y-3 text-xs text-gray-800">
+      {d.continuedFrom && (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+          Continuing in your working copy <span className="font-semibold">{d.targetPath.split('/').pop()}</span>, which has your earlier KaTuro changes. Your original {d.continuedFrom.split('/').pop()} stays untouched.
+        </p>
+      )}
       {/* Setup */}
       <div className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-2">
         <label className="space-y-1">
@@ -202,7 +225,7 @@ export default function DeskVoiceScoresView({ art }) {
                   <td className="px-2 py-1 text-gray-500 tabular-nums">{column ? fmt(l.values?.[column.key]) : ''}</td>
                   <td className="px-2 py-1">
                     <input
-                      value={a ? fmt(a.value) : ''}
+                      value={a ? (a.text ?? fmt(a.value)) : ''}
                       onChange={(e) => save((data) => ({ session: setScore(data.session || emptySession(), i, e.target.value) }))}
                       aria-label={`Score for ${l.name}`}
                       title={problem || undefined}

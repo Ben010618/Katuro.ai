@@ -62,6 +62,23 @@ describe('voice score encoding', () => {
     expect(matchSpokenName('', ROSTER).status).toBe('unknown');
   });
 
+  it('a close-sounding name is a question to confirm, never an automatic match', () => {
+    const s = addNamedEntries(emptySession(), [{ name: 'Bautesta', value: 15 }], ROSTER);
+    expect(s.assignments).toEqual({});
+    expect(s.issues).toMatchObject([{ kind: 'confirm', heard: 'Bautesta', value: 15, candidates: [1] }]);
+    expect(resolveIssue(s, s.issues[0].id, 1).assignments[1].value).toBe(15);
+  });
+
+  it('typed scores keep exactly what was typed ("1." is not turned into 1)', () => {
+    let s = setScore(emptySession(), 0, '1.');
+    expect(s.assignments[0]).toMatchObject({ value: '1.', text: '1.' });
+    expect(scoreProblem(s.assignments[0].value, 20)).toBe('Not a score');
+    s = setScore(s, 0, '1.5');
+    expect(s.assignments[0]).toMatchObject({ value: 1.5, text: '1.5' });
+    s = setScore(s, 0, 'Absent');
+    expect(s.assignments[0].value).toBe('absent');
+  });
+
   it('named clips: matched scores assigned, questions kept, later score replaces earlier', () => {
     let s = addNamedEntries(emptySession(), parseNamedScores('Alvarez = 18\nSantos = 17\nReyes = 12\nGarcia = ?'), ROSTER);
     expect(s.assignments).toEqual({ 0: { value: 18, heard: 'Alvarez', replaced: undefined } });

@@ -251,8 +251,13 @@ export const UNDERSTAND_TOOLS = {
     label: 'Encode scores by voice',
     description: "Open the voice score-encoding panel for the teacher's OWN class record or score sheet (Excel or Word). The teacher reads names and scores aloud (or only the scores, going down the list); KaTuro matches each one to the learner list in that file and shows them for checking before anything is written (review, then Apply: original backed up, working copy edited). Use when the teacher wants to encode, enter, record or type scores by voice, by speaking or by dictating.",
     args: '{ "targetPath": string, "column"?: string (header or column letter of the score column, only if the teacher said it) }',
-    async run({ targetPath, column }, ctx, report) {
-      if (!EDITABLE.test(targetPath || '')) throw new Error('Voice encoding fills an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
+    async run({ targetPath: chosenPath, column }, ctx, report) {
+      if (!EDITABLE.test(chosenPath || '')) throw new Error('Voice encoding fills an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
+      // An earlier KaTuro edit of this file exists: continue in it, so scores saved before
+      // (e.g. WW1 last week) are not lost when this column is applied. The original stays untouched.
+      const { workingCopyPath } = await import('../../localFileSystem.js');
+      const copy = workingCopyPath(chosenPath);
+      const targetPath = copy !== chosenPath && ctx.hasFile?.(copy) ? copy : chosenPath;
       report(`Reading the learner list in ${targetPath}…`);
       const u = await understandFile(targetPath, ctx);
       if (!u.editable) throw new Error(`${targetPath} can't be edited (it may be protected or read-only).`);
@@ -266,7 +271,10 @@ export const UNDERSTAND_TOOLS = {
       const wanted = String(column || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
       const pre = wanted ? columns.find((c) => c.header.toLowerCase().replace(/[^a-z0-9]+/g, '') === wanted || c.column.toLowerCase() === wanted) : null;
       const name = targetPath.split('/').pop();
-      const summary = `${table.learners.length} learners found in ${name}. ${pre ? `Column ${pre.header || pre.column} is selected.` : 'Choose the score column in the Canvas.'} Then press the microphone and read the scores in English.`;
+      const continued = targetPath !== chosenPath
+        ? `I'm continuing in your working copy ${name}, which has your earlier KaTuro changes (your original ${chosenPath.split('/').pop()} stays untouched). `
+        : '';
+      const summary = `${continued}${table.learners.length} learners found in ${name}. ${pre ? `Column ${pre.header || pre.column} is selected.` : 'Choose the score column in the Canvas.'} Then press the microphone and read the scores in English.`;
       return {
         summary,
         artifacts: [{
@@ -281,6 +289,7 @@ export const UNDERSTAND_TOOLS = {
             learners: table.learners.map((l) => ({ name: l.name, values: l.values, cells: l.cells })),
             columns,
             columnKey: pre?.key || '',
+            ...(targetPath !== chosenPath ? { continuedFrom: chosenPath } : {}),
           },
         }],
       };

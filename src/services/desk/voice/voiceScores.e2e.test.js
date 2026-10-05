@@ -136,6 +136,28 @@ describe('end to end: spoken scores → the teacher\'s own class record', () => 
     expect(ws.getCell('E5').formula).toBe('SUM(C5:D5)');
     expect(ws.getCell('C3').fill?.fgColor?.argb).toBe('FFE4D5AC');
     expect(ws.getCell('D5').border?.left?.style).toBe('thin');
+
+    // 5. Next week: WW1 by voice for the same file. KaTuro continues in the working copy,
+    //    so the WW2 scores applied above are kept (the original still untouched).
+    workspace.files = workspace.handle.getFiles();
+    const res2 = await runDeskAgentTurn({ prompt: 'Encode scores by voice into column C', workspace, attachedPaths: ['Records/G7 Rizal.xlsx'], user: { uid: 'u1' } });
+    const panel2 = res2.artifacts.find((a) => a.type === 'voice_scores');
+    expect(panel2.data.targetPath).toBe('Records/G7 Rizal (KaTuro edit).xlsx');
+    expect(panel2.data.continuedFrom).toBe('Records/G7 Rizal.xlsx');
+    expect(res2.content).toMatch(/continuing in your working copy/i);
+    const ww1 = panel2.data.columns.find((c) => c.key === 'ww1');
+    const s2 = addNamedEntries(emptySession(), parseNamedScores(await speak('Cruz = 11', NAMED_SCORES_PROMPT)), panel2.data.learners);
+    const plan2 = buildScorePlan({ learners: panel2.data.learners, column: ww1, kind: panel2.data.kind, session: s2, maxScore: 20 });
+    const changes2 = scoreChangesArtifact(plan2.plan, { targetPath: panel2.data.targetPath, kind: panel2.data.kind, columnLabel: 'WW1', now: Date.now() + 1 });
+    useDeskStore.setState({ workspace, artifacts: [changes2], activeArtifact: changes2 });
+    const saved2 = await useDeskStore.getState().applyPendingChanges(changes2.id);
+    expect(saved2.path).toBe('Records/G7 Rizal (KaTuro edit).xlsx');
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(await readFileBytes(workspace.handle, saved2.path));
+    const ws2 = wb2.getWorksheet('TERM1');
+    expect(ws2.getCell('C6').value).toBe(11); // new WW1 score
+    expect(['D5', 'D7', 'D9'].map((a) => ws2.getCell(a).value)).toEqual([18, 16, 15]); // WW2 from before: kept
+    expect(Array.from(await readFileBytes(workspace.handle, 'Records/G7 Rizal.xlsx'))).toEqual(Array.from(original));
   });
 
   it('list mode: scores fill in order from the chosen learner; non-English is refused', async () => {
