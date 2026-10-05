@@ -92,6 +92,17 @@ describe.skipIf(!hasEmulator)('firestore.rules', () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'adminConfig/billing')));
   });
 
+  it('backup-engine usage: only admins can read it; nobody can write it from the app', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'aiBackupUsage/2026-10-05'), { count: 3 }));
+    await assertSucceeds(getDoc(doc(asAdmin(), 'aiBackupUsage/2026-10-05')));
+    await assertFails(getDoc(doc(asTeacher(), 'aiBackupUsage/2026-10-05')));
+    await assertFails(setDoc(doc(asAdmin(), 'aiBackupUsage/2026-10-05'), { count: 0 }));
+    await assertFails(setDoc(doc(asTeacher(), 'aiBackupUsage/2026-10-05'), { count: 0 }));
+    // The vertex settings (limit, on/off) are admin-only like every adminConfig doc.
+    await assertFails(setDoc(doc(asTeacher(), 'adminConfig/vertex'), { dailyLimit: 100000 }));
+    await assertSucceeds(setDoc(doc(asAdmin(), 'adminConfig/vertex'), { dailyLimit: 300 }));
+  });
+
   it('Shares: following writes both sides and one follower count; nothing more', async () => {
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'shares_profiles/teacher2'), { followerCount: 4, bio: 'hi' }));
     const db = asTeacher();

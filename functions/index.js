@@ -1622,6 +1622,48 @@ async function getVertexConfig() {
   return data;
 }
 
+// Daily limit on backup answers (cost safety: Gemini credit is prepaid, Vertex is not).
+// adminConfig/vertex.dailyLimit (default 300; 0 = backup never used). Counted per
+// Manila day in aiBackupUsage/{date} (server-only; admins can read it). If the counter
+// can't be read, the backup is NOT used: it never runs uncounted.
+const VERTEX_DEFAULT_DAILY_LIMIT = 300;
+
+function vertexDailyLimit(cfg) {
+  const n = Number(cfg?.dailyLimit);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : VERTEX_DEFAULT_DAILY_LIMIT;
+}
+
+/** Reserves one backup answer for today. Returns the counter ref, or null (off / limit reached / unreadable). */
+async function reserveVertexBackup() {
+  const cfg = await getVertexConfig();
+  if (cfg.enabled === false) return null;
+  const limit = vertexDailyLimit(cfg);
+  if (limit === 0) return null;
+  const ref = db.doc(`aiBackupUsage/${todayInManila()}`);
+  try {
+    const used = (await ref.get()).data()?.count || 0;
+    if (used >= limit) {
+      console.warn(`[vertexBackup] daily limit reached (${used}/${limit}); backup paused until midnight`);
+      return null;
+    }
+    await ref.set({ count: MsgFieldValue.increment(1), limit, updatedAt: new Date() }, { merge: true });
+    return ref;
+  } catch (err) {
+    console.warn('[vertexBackup] usage counter unavailable; backup not used:', err?.message);
+    return null;
+  }
+}
+
+/** A backup attempt that produced nothing gives its slot back. */
+async function releaseVertexBackup(ref) {
+  if (!ref) return;
+  try {
+    await ref.set({ count: MsgFieldValue.increment(-1) }, { merge: true });
+  } catch {
+    // counted once too many: harmless (the limit only gets stricter)
+  }
+}
+
 /** Access token of the function's own service account (Cloud Run metadata server). */
 async function vertexAccessToken() {
   if (_vertexToken && _vertexToken.exp - 60000 > Date.now()) return _vertexToken.token;
@@ -1822,18 +1864,22 @@ exports.generateAI = onCall(
       // 1st backup: the same Gemini models through Vertex AI (separate capacity;
       // hears audio and sees images, so voice and photo calls are covered too).
       const nvidiaConfig = action === 'desk_voice' ? null : await getNvidiaConfigServer();
-      try {
-        const viaVertex = await callVertexGemini(contents, {
-          temperature: temperature ?? 0.5,
-          maxTokens: clampedMaxTokens,
-          responseMimeType,
-          deadlineAt: startedAt + (nvidiaConfig?.apiKey ? VERTEX_DEADLINE_BEFORE_NVIDIA_MS : VERTEX_DEADLINE_MS),
-          key,
-        });
-        console.warn(`[generateAI] "${action}" answered by the Vertex AI backup (${viaVertex.model}) after: ${geminiErr.message}`);
-        return { text: viaVertex.text, finishReason: viaVertex.finishReason, engine: 'vertex' };
-      } catch (vertexErr) {
-        console.warn(`[generateAI] Vertex AI backup failed for "${action}":`, vertexErr.message);
+      const backupSlot = await reserveVertexBackup();
+      if (backupSlot) {
+        try {
+          const viaVertex = await callVertexGemini(contents, {
+            temperature: temperature ?? 0.5,
+            maxTokens: clampedMaxTokens,
+            responseMimeType,
+            deadlineAt: startedAt + (nvidiaConfig?.apiKey ? VERTEX_DEADLINE_BEFORE_NVIDIA_MS : VERTEX_DEADLINE_MS),
+            key,
+          });
+          console.warn(`[generateAI] "${action}" answered by the Vertex AI backup (${viaVertex.model}) after: ${geminiErr.message}`);
+          return { text: viaVertex.text, finishReason: viaVertex.finishReason, engine: 'vertex' };
+        } catch (vertexErr) {
+          await releaseVertexBackup(backupSlot);
+          console.warn(`[generateAI] Vertex AI backup failed for "${action}":`, vertexErr.message);
+        }
       }
       // The NVIDIA engine only gets the text prompt: for a voice clip it would
       // invent a transcript, so voice input fails honestly instead.
@@ -1884,7 +1930,7 @@ exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 },
       temperature: 0, maxTokens: 50, deadlineAt: Date.now() + 90000, key, ignoreSwitch: true,
     });
     const cfg = await getVertexConfig();
-    return { ok: true, model: r.model, ms: Date.now() - t0, reply: String(r.text).trim().slice(0, 40), enabled: cfg.enabled !== false };
+    return { ok: true, model: r.model, ms: Date.now() - t0, reply: String(r.text).trim().slice(0, 40), enabled: cfg.enabled !== false, dailyLimit: vertexDailyLimit(cfg) };
   } catch (err) {
     return { ok: false, error: String(err?.message || err), ms: Date.now() - t0 };
   }

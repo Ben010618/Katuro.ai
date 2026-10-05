@@ -655,15 +655,32 @@ export async function getGeminiKeyStatus() {
 // ── Backup engine: Gemini on Vertex AI (Agent Platform) ─────────────────────
 const VERTEX_REF = doc(db, 'adminConfig', 'vertex');
 
-/** { enabled } — the backup is on unless an admin turned it off. */
+export const VERTEX_DEFAULT_DAILY_LIMIT = 300;
+
+const manilaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+/** { enabled, dailyLimit, usedToday } — the backup is on (300 answers/day) unless an admin changed it. */
 export async function getVertexBackupStatus() {
   try {
-    const snap = await getDoc(VERTEX_REF);
+    const [snap, usage] = await Promise.all([getDoc(VERTEX_REF), getDoc(doc(db, 'aiBackupUsage', manilaToday())).catch(() => null)]);
     const d = snap.exists() ? snap.data() : {};
-    return { enabled: d.enabled !== false };
+    const n = Number(d.dailyLimit);
+    return {
+      enabled: d.enabled !== false,
+      dailyLimit: Number.isFinite(n) && n >= 0 ? Math.floor(n) : VERTEX_DEFAULT_DAILY_LIMIT,
+      usedToday: usage?.exists() ? Number(usage.data().count) || 0 : 0,
+    };
   } catch {
-    return { enabled: true, error: true };
+    return { enabled: true, dailyLimit: VERTEX_DEFAULT_DAILY_LIMIT, usedToday: 0, error: true };
   }
+}
+
+/** Most backup answers per day (0 = never use the backup). */
+export async function setVertexBackupDailyLimit(limit, adminUid) {
+  const n = Math.floor(Number(limit));
+  if (!Number.isFinite(n) || n < 0 || n > 100000) throw new Error('Enter a whole number from 0 to 100000.');
+  await setDoc(VERTEX_REF, { dailyLimit: n, updatedAt: new Date(), updatedBy: adminUid }, { merge: true });
+  return n;
 }
 
 export async function setVertexBackupEnabled(enabled, adminUid) {
