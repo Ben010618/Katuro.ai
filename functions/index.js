@@ -2413,12 +2413,20 @@ exports.cleanupInactiveUsers = onSchedule(
       // once so a long-time active user isn't misjudged by their old
       // registration date instead of when they actually last used the app.
       if (lastActiveMs === null) {
-        const evSnap = await db.collection('usageEvents')
-          .where('uid', '==', doc.id).orderBy('ts', 'desc').limit(1).get();
-        lastActiveMs = evSnap.empty
-          ? (t.createdAt?.toMillis?.() ?? now)
-          : evSnap.docs[0].data().ts.toMillis();
-        updateFields.lastActiveAt = admin.firestore.Timestamp.fromMillis(lastActiveMs);
+        // Needs the usageEvents (uid asc, ts desc) index in firestore.indexes.json.
+        // If the lookup fails, this teacher is skipped (never deactivated on a guess);
+        // before this, one failure stopped the whole job every night.
+        try {
+          const evSnap = await db.collection('usageEvents')
+            .where('uid', '==', doc.id).orderBy('ts', 'desc').limit(1).get();
+          lastActiveMs = evSnap.empty
+            ? (t.createdAt?.toMillis?.() ?? now)
+            : evSnap.docs[0].data().ts.toMillis();
+          updateFields.lastActiveAt = admin.firestore.Timestamp.fromMillis(lastActiveMs);
+        } catch (err) {
+          console.error(`[cleanupInactiveUsers] activity lookup failed for ${doc.id}; skipped:`, err?.message);
+          continue;
+        }
       }
 
       if (now - lastActiveMs >= DEACTIVATE_AFTER_MS) {
