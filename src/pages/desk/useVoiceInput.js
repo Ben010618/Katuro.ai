@@ -4,8 +4,9 @@ import { startRecording, transcribeAudio, VOICE_MAX_SECONDS } from '../../servic
 /**
  * Push-to-talk voice input: start() → teacher speaks → stop() → onText(transcript).
  * status: 'idle' | 'starting' | 'listening' | 'transcribing'
+ * transcribe: optional (wav) => Promise<string>, for another transcription format (spoken scores).
  */
-export function useVoiceInput({ onText }) {
+export function useVoiceInput({ onText, transcribe }) {
   const [status, setStatus] = useState('idle');
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
@@ -13,11 +14,13 @@ export function useVoiceInput({ onText }) {
   const recRef = useRef(null);
   const timerRef = useRef(null);
   const onTextRef = useRef(onText);
+  const transcribeRef = useRef(transcribe);
   const stopRef = useRef(null);
 
   useEffect(() => {
     onTextRef.current = onText;
-  }, [onText]);
+    transcribeRef.current = transcribe;
+  }, [onText, transcribe]);
 
   const clearTimer = () => {
     clearInterval(timerRef.current);
@@ -33,7 +36,7 @@ export function useVoiceInput({ onText }) {
     setStatus('transcribing');
     try {
       const wav = await rec.stop();
-      const text = await transcribeAudio(wav);
+      const text = await (transcribeRef.current || transcribeAudio)(wav);
       if (text) onTextRef.current?.(text);
       else setError("I didn't catch any words. Please try again.");
     } catch (err) {

@@ -19,6 +19,7 @@ import {
   Files,
   ListChecks,
   CalendarClock,
+  Mic,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { runChatTurn } from './runChatTurn';
@@ -62,6 +63,7 @@ function ArtifactIcon({ type }) {
   if (type === 'sheet' || type === 'table') return <FileSpreadsheet size={14} className="text-blue-600" />;
   if (type === 'files') return <Files size={14} className="text-gray-600" />;
   if (type === 'changes') return <ListChecks size={14} className="text-amber-600" />;
+  if (type === 'voice_scores') return <Mic size={14} className="text-red-600" />;
   return <FileText size={14} className="text-emerald-600" />;
 }
 

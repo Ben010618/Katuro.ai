@@ -247,6 +247,46 @@ export const UNDERSTAND_TOOLS = {
     },
   },
 
+  voice_encode_scores: {
+    label: 'Encode scores by voice',
+    description: "Open the voice score-encoding panel for the teacher's OWN class record or score sheet (Excel or Word). The teacher reads names and scores aloud (or only the scores, going down the list); KaTuro matches each one to the learner list in that file and shows them for checking before anything is written (review, then Apply: original backed up, working copy edited). Use when the teacher wants to encode, enter, record or type scores by voice, by speaking or by dictating.",
+    args: '{ "targetPath": string, "column"?: string (header or column letter of the score column, only if the teacher said it) }',
+    async run({ targetPath, column }, ctx, report) {
+      if (!EDITABLE.test(targetPath || '')) throw new Error('Voice encoding fills an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
+      report(`Reading the learner list in ${targetPath}…`);
+      const u = await understandFile(targetPath, ctx);
+      if (!u.editable) throw new Error(`${targetPath} can't be edited (it may be protected or read-only).`);
+      const table = pickTable(u.data, 'class_record');
+      if (!table) throw new Error(`I couldn't find a learner list in ${targetPath}.`);
+      // Only columns a score can go into (never names, totals, grades or attendance).
+      const columns = table.columns
+        .filter((c) => c.meaning === 'score' || c.meaning === 'other')
+        .map((c) => ({ key: c.key, header: c.header || '', column: String(c.column ?? ''), meaning: c.meaning, ...(c.component ? { component: c.component } : {}), ...(Number.isFinite(c.item) ? { item: c.item } : {}), ...(Number.isFinite(c.max) && c.max > 0 ? { max: c.max } : {}) }));
+      if (!columns.length) throw new Error(`I couldn't find a score column in ${targetPath}.`);
+      const wanted = String(column || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const pre = wanted ? columns.find((c) => c.header.toLowerCase().replace(/[^a-z0-9]+/g, '') === wanted || c.column.toLowerCase() === wanted) : null;
+      const name = targetPath.split('/').pop();
+      const summary = `${table.learners.length} learners found in ${name}. ${pre ? `Column ${pre.header || pre.column} is selected.` : 'Choose the score column in the Canvas.'} Then press the microphone and read the scores in English.`;
+      return {
+        summary,
+        artifacts: [{
+          type: 'voice_scores',
+          title: `Voice encoding: ${name}`,
+          subtitle: `${table.learners.length} learners`,
+          files: [],
+          editable: false,
+          data: {
+            targetPath,
+            kind: u.map.kind,
+            learners: table.learners.map((l) => ({ name: l.name, values: l.values, cells: l.cells })),
+            columns,
+            columnKey: pre?.key || '',
+          },
+        }],
+      };
+    },
+  },
+
   edit_file: {
     label: 'Edit file',
     description: 'Make specific changes inside an existing Word or Excel file while keeping its exact formatting: e.g. "change the school year to 2026-2027", "fill the remarks column: Passed if grade ≥ 75", "put my name as adviser", "correct Juan\'s LRN". Only the needed cells/paragraphs change. Produces a change preview for approval; original backed up, working copy edited.',

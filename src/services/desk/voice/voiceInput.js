@@ -182,19 +182,22 @@ export function cleanTranscript(text) {
   return t.replace(/^transcript:\s*/i, '');
 }
 
-/** Sends one WAV clip to the gateway and returns the transcript ('' when nothing was said). */
-export async function transcribeAudio(wavBytes) {
+/**
+ * Sends one WAV clip to the gateway and returns the transcript ('' when nothing was said).
+ * prompt/clean: a different transcription format (e.g. spoken scores) and its reply check.
+ */
+export async function transcribeAudio(wavBytes, { prompt = TRANSCRIBE_PROMPT, clean = cleanTranscript } = {}) {
   try {
     const res = await callGeminiProxy({
       action: 'desk_voice',
-      contents: [{ role: 'user', parts: [{ text: TRANSCRIBE_PROMPT }, { inlineData: { mimeType: 'audio/wav', data: bytesToBase64(wavBytes) } }] }],
+      contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: 'audio/wav', data: bytesToBase64(wavBytes) } }] }],
       temperature: 0,
       maxTokens: 2048,
       region: DESK_REGION,
     });
-    return cleanTranscript(typeof res === 'string' ? res : res?.text);
+    return clean(typeof res === 'string' ? res : res?.text);
   } catch (err) {
-    if (err instanceof VoiceError) throw err;
+    if (err instanceof VoiceError || err?.code === 'not-english') throw err;
     if (err?.dailyLimit || err?.details?.dailyLimit) {
       throw new VoiceError("You've reached today's voice input limit. It resets tomorrow.", 'limit');
     }
