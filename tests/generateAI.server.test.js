@@ -148,6 +148,41 @@ describe('model choice', () => {
   });
 });
 
+describe('voice input (desk_voice)', () => {
+  const clip = (over = {}) => ({ inlineData: { mimeType: 'audio/wav', data: 'UklGRg==', ...over } });
+  const call = (parts) => server.generateAI({ auth: { uid: 't1' }, data: { action: 'desk_voice', contents: [{ role: 'user', parts }], maxTokens: 512 } }, {});
+
+  it('accepts one WAV clip and counts it under its own daily limit', async () => {
+    stubGemini(() => ok('Gawan mo ako ng quiz.'));
+    await expect(call([{ text: 'Transcribe' }, clip()])).resolves.toMatchObject({ text: 'Gawan mo ako ng quiz.' });
+    expect(usage('t1').desk_voice).toBe(1);
+  });
+
+  it('refuses anything but exactly one WAV clip, and over-long clips', async () => {
+    const calls = stubGemini(() => ok('x'));
+    await expect(call([{ text: 'Transcribe' }])).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(call([clip(), clip()])).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(call([clip({ mimeType: 'video/mp4' })])).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(call([clip({ data: 'A'.repeat(4 * 1024 * 1024 + 1) })])).rejects.toMatchObject({ message: expect.stringMatching(/under 90 seconds/) });
+    expect(calls).toEqual([]); // refused before any Gemini call
+  });
+
+  it('never falls back to the text-only engine (it would invent a transcript)', async () => {
+    store.docs.set('adminConfig/nvidia', { apiKey: 'nv-key' });
+    server = loadServer(store);
+    const urls = [];
+    stubGemini(() => busy());
+    const geminiFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      urls.push(String(url));
+      return geminiFetch(url, init);
+    }));
+    await expect(call([{ text: 'Transcribe' }, clip()])).rejects.toBeTruthy();
+    expect(urls.some((u) => /nvidia/i.test(u))).toBe(false);
+    expect(usage('t1').desk_voice).toBe(0); // refunded
+  });
+});
+
 describe('daily limit is only used by generations that succeed', () => {
   const call = (data) => server.generateAI({ auth: { uid: 't1' }, data: { action: 'dll_gen', contents, maxTokens: 512, ...data } }, {});
 

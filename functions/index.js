@@ -623,8 +623,30 @@ const PROXY_LIMITS = {
   melc_validate:       50,  // validateMelcCode — one call per lesson-plan save, generous headroom
   desk_agent_run:      50,  // KaTuroDesk Co-Teacher Assistant operations (one per teacher turn: the planner call)
   desk_agent_task:    300,  // KaTuroDesk sub-tasks inside a turn (parallel document generation, vision reads) — a batch of 4 sections = ~5 calls
+  desk_voice:         150,  // KaTuroDesk voice input: one short spoken clip (WAV, <= 90 s) turned into text
 };
 Object.assign(DAILY_LIMITS, PROXY_LIMITS);
+
+// ── Voice input (desk_voice) ──────────────────────────────────────────────
+// One user turn: text instructions + exactly one 16 kHz mono WAV clip. 90 s of
+// 16-bit audio is 2.9 MB (3.9 MB as base64); anything bigger is refused before
+// it costs a Gemini call.
+const VOICE_MAX_BASE64 = 4 * 1024 * 1024;
+function checkVoiceContents(contents) {
+  const parts = contents.length === 1 && Array.isArray(contents[0]?.parts) ? contents[0].parts : null;
+  const audio = parts ? parts.filter((p) => p && p.inlineData) : [];
+  const onlyTextOtherwise = parts && parts.every((p) => p && (p.inlineData || typeof p.text === 'string'));
+  if (!parts || audio.length !== 1 || !onlyTextOtherwise) {
+    throw new HttpsError('invalid-argument', 'Voice input needs exactly one audio clip.');
+  }
+  const { mimeType, data } = audio[0].inlineData;
+  if (mimeType !== 'audio/wav' || typeof data !== 'string' || !data) {
+    throw new HttpsError('invalid-argument', 'Voice input must be WAV audio.');
+  }
+  if (data.length > VOICE_MAX_BASE64) {
+    throw new HttpsError('invalid-argument', 'That recording is too long. Please keep it under 90 seconds.');
+  }
+}
 
 // ── Per-call size caps ────────────────────────────────────────────────────
 // A handful of actions have a per-call "size" that the UI already bounds
@@ -1531,6 +1553,7 @@ exports.generateAI = onCall(
     if (!Array.isArray(contents) || contents.length === 0) {
       throw new HttpsError('invalid-argument', 'contents array is required.');
     }
+    if (action === 'desk_voice') checkVoiceContents(contents);
     const maxUnits = MAX_UNITS[action];
     if (maxUnits) {
       const n = Number(unitCount);
@@ -1564,7 +1587,7 @@ exports.generateAI = onCall(
 
     async function runGeneration() {
     try {
-      const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task';
+      const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task' || action === 'desk_voice';
       const key = await getGeminiKey(isDesk);
       let overallDeadlineAt;
       if (wantsStream) {
@@ -1591,6 +1614,9 @@ exports.generateAI = onCall(
       // a second engine now would only produce a reply nobody sees (cancelled)
       // or one that contradicts what was already shown (midStream).
       if (geminiErr?.midStream || geminiErr?.code === 'cancelled') throw geminiErr;
+      // The fallback engine only gets the text prompt: for a voice clip it would
+      // invent a transcript, so voice input fails honestly instead.
+      if (action === 'desk_voice') throw geminiErr;
       console.warn(`[generateAI] Gemini call failed for action "${action}". Checking NVIDIA fallback:`, geminiErr.message);
       const nvidiaConfig = await getNvidiaConfigServer();
       if (nvidiaConfig?.apiKey) {

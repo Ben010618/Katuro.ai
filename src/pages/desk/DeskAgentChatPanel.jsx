@@ -27,6 +27,8 @@ import DeskAvatar, { KaTuroAIAvatar } from './DeskAvatar';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
 import { getPersona } from '../../services/desk/personas';
 import { QUICK_PROMPTS } from '../../services/desk/agent/fastRoute';
+import { useVoiceInput } from './useVoiceInput';
+import { VoiceButton, VoiceStatus } from './VoiceControls';
 
 function StepIcon({ status }) {
   if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
@@ -93,6 +95,14 @@ export default function DeskAgentChatPanel({
   const [importError, setImportError] = useState('');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
+  // Voice: the transcript is added to the message box for the teacher to check, never sent directly.
+  const voice = useVoiceInput({
+    onText: (text) => {
+      setInputPrompt((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+  });
 
   const teacherSalutationName = getTeacherSalutationName(profile, user);
 
@@ -314,6 +324,7 @@ export default function DeskAgentChatPanel({
       {/* Bottom Prompt Input */}
       <div className="p-3 bg-white border-t border-gray-200 shadow-md">
         <div className="max-w-4xl mx-auto w-full">
+          <VoiceStatus voice={voice} />
           {(attachedPaths.length > 0 || importError) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {attachedPaths.map((p) => (
@@ -337,6 +348,7 @@ export default function DeskAgentChatPanel({
             >
               <Paperclip size={15} />
             </button>
+            <VoiceButton voice={voice} disabled={isGenerating} />
             <input
               ref={fileInputRef}
               type="file"
@@ -348,6 +360,7 @@ export default function DeskAgentChatPanel({
               }}
             />
             <textarea
+              ref={inputRef}
               rows={2}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
