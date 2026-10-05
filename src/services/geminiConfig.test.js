@@ -285,6 +285,24 @@ describe('callGeminiProxy — voice clips (desk_voice)', () => {
     // Control: other actions still use the fallback (so the check above is meaningful).
     await expect(callGeminiProxy(base)).resolves.toMatchObject({ text: 'Santos = 18', engine: 'nvidia' });
   });
+
+  it('the per-teacher "too many at once" cap is reported as is (never bypassed by a fallback)', async () => {
+    const { callGeminiProxy } = await load();
+    const nv = await import('./nvidiaConfig');
+    nv.callNvidiaChat.mockClear();
+    nv.getNvidiaConfig.mockResolvedValue({ apiKey: 'nv' }); // a fallback IS available...
+    try {
+      state.callImpl = async () => { throw fnErr('resource-exhausted', 'You have several AI requests running at once.', { tooManyAtOnce: true, retryAfter: 5 }); };
+      const e = await callGeminiProxy(base).catch((x) => x);
+      expect(e.status).toBe(429);
+      expect(e.retryAfter).toBe(5);
+      expect(e.dailyLimit).toBeUndefined();
+      expect(nv.callNvidiaChat).not.toHaveBeenCalled(); // ...but is not used
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      nv.getNvidiaConfig.mockResolvedValue(null);
+    }
+  });
 });
 
 // ── Error metadata ───────────────────────────────────────────────────────────

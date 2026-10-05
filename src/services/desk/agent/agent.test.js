@@ -6,7 +6,7 @@ import { getPersona, PERSONAS, timeOfDay } from '../personas';
 import { runTaskGraph } from './runner';
 import { createNameMasker } from './privacy';
 import { sanitizePlan, resolvePath, planOffline } from './planner';
-import { parseJsonReply, buildContents, resetTaskActionSupport } from './llm';
+import { parseJsonReply, buildContents, resetTaskActionSupport, callDeskLLM } from './llm';
 import { createVirtualWorkspace, flattenFileTree, readFileBytes } from '../../localFileSystem';
 import { readDocument } from '../readers/index.js';
 
@@ -233,6 +233,39 @@ describe('gateway compatibility', () => {
     expect(callGeminiProxy.mock.calls.map((c) => c[0].action)).toEqual(['desk_agent_run', 'desk_agent_task', 'desk_agent_run']);
     expect(res.createdFiles).toHaveLength(1);
     expect(res.content).not.toMatch(/Unknown or missing action/);
+  });
+
+  it('"too many at once" waits and resends (not a network error), and the resend is charged normally', async () => {
+    vi.useFakeTimers();
+    try {
+      const cap = Object.assign(new Error('You have many AI requests running at the same time.'), { status: 429, code: 'functions/resource-exhausted', details: { tooManyAtOnce: true, retryAfter: 5 } });
+      callGeminiProxy.mockRejectedValueOnce(cap).mockRejectedValueOnce(cap).mockResolvedValueOnce({ text: 'done' });
+      const p = callDeskLLM({ prompt: 'Draft Monday' });
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(callGeminiProxy).toHaveBeenCalledTimes(1); // honours the server's 5 s hint
+      await vi.advanceTimersByTimeAsync(100 + 10000); // then waits longer (10 s)
+      await expect(p).resolves.toBe('done');
+      expect(callGeminiProxy).toHaveBeenCalledTimes(3);
+      // A refused call was never charged, so the resend is not marked as a free retry.
+      expect(callGeminiProxy.mock.calls[2][0].isRetry).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('if the teacher stays over the cap, the message says so (never "check your internet")', async () => {
+    vi.useFakeTimers();
+    try {
+      const cap = Object.assign(new Error('You have many AI requests running at the same time.'), { status: 429, code: 'functions/resource-exhausted', details: { tooManyAtOnce: true, retryAfter: 5 } });
+      callGeminiProxy.mockRejectedValue(cap);
+      const p = callDeskLLM({ prompt: 'Draft Monday' }).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(120000);
+      const err = await p;
+      expect(err.message).toMatch(/many AI requests/);
+      expect(err.message).not.toMatch(/internet/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('treats the gateway daily-limit error (status 429, no code) as AI unavailable', async () => {
