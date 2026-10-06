@@ -203,7 +203,7 @@ export default function LandingPage() {
             Sign In
           </Link>
           <a
-            href="#pricing"
+            href="#get-started"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -219,7 +219,7 @@ export default function LandingPage() {
               transition: 'transform 0.2s, box-shadow 0.2s',
             }}
           >
-            Get 5 Co-Teachers — ₱499
+            Get Started
           </a>
         </div>
       </nav>
@@ -254,7 +254,7 @@ export default function LandingPage() {
           }}
         >
           <Sparkles size={13} color="#34d399" />
-          5 Specialized AI Co-Teachers · One-Time Payment · DepEd Aligned
+          5 Specialized AI Co-Teachers · DepEd Aligned
         </div>
 
         {/* Main Headline */}
@@ -293,27 +293,10 @@ export default function LandingPage() {
           Generate DepEd-ready Daily Lesson Logs in Word, calculate balanced TOS exams, scan and grade test papers with your camera, and build PowerPoint decks in minutes.
         </p>
 
-        {/* Price & CTA */}
+        {/* CTA */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-            <span style={{ fontSize: '38px', fontWeight: 900, color: '#34d399' }}>₱499</span>
-            <span style={{ fontSize: '20px', color: '#94a3b8', textDecoration: 'line-through' }}>₱5,000+</span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                background: '#ef4444',
-                color: '#fff',
-                padding: '2px 8px',
-                borderRadius: '6px',
-              }}
-            >
-              SAVE 90% LAUNCH OFFER
-            </span>
-          </div>
-
           <a
-            href="#pricing"
+            href="#get-started"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -334,9 +317,7 @@ export default function LandingPage() {
           </a>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#a7f3d0', marginTop: '6px' }}>
-            <span>✓ Lifetime Access</span>
-            <span>·</span>
-            <span>✓ No Monthly Fees</span>
+            <span>✓ DepEd & MATATAG Aligned</span>
             <span>·</span>
             <span>✓ 100% Word & PPTX Downloads</span>
           </div>
@@ -628,9 +609,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Pricing & Registration Section ─────────────────────────────────────── */}
+      {/* ── Get Started Section ────────────────────────────────────────────────── */}
       <section
-        id="pricing"
+        id="get-started"
         style={{
           position: 'relative',
           zIndex: 1,
@@ -661,7 +642,7 @@ export default function LandingPage() {
               borderRadius: '100px',
             }}
           >
-            Lifetime Access · Limited Launch
+            Everything Included
           </span>
 
           <h3 style={{ fontSize: '28px', fontWeight: 900, margin: '18px 0 6px', color: '#fff' }}>
@@ -671,13 +652,6 @@ export default function LandingPage() {
             All 5 Core AI Co-Teachers + Full Platform Access
           </p>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '46px', fontWeight: 900, color: '#ffffff' }}>₱499</span>
-            <span style={{ fontSize: '22px', color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through' }}>
-              ₱5,000
-            </span>
-          </div>
-
           <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '10px', margin: '0 0 24px' }}>
             {[
               'Sir Dan: Daily Lesson Log (DLL & DLP) with Word .docx',
@@ -686,7 +660,6 @@ export default function LandingPage() {
               'SlideCraft: Classroom PowerPoint Presentation (.pptx) generator',
               'Dr. Ben: 6-Phase Classroom Action Research (CAR) Advisor',
               'Custom Faculty Room: Rename & redesign avatars anytime',
-              'One-time payment: Zero monthly subscriptions forever',
             ].map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#ecfdf5' }}>
                 <CheckCircle2 size={16} color="#34d399" style={{ flexShrink: 0 }} />
@@ -713,12 +686,9 @@ export default function LandingPage() {
               transition: 'transform 0.2s',
             }}
           >
-            Get Instant Access for ₱499
+            Get Started Now
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8', marginTop: '14px' }}>
-            <span>💳 Pay via GCash, Maya, or Bank Transfer</span>
-          </div>
         </div>
       </section>
 
