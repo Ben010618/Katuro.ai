@@ -264,7 +264,7 @@ export async function adminCreateUser(email, password, { plan = 'free', subscrip
 
 // ─── Self sign-up: teacher creates their own account ─────────────────────────
 
-export async function selfSignUp({ email, password, surname, givenName, mi, school }) {
+export async function selfSignUp({ email, password, surname, givenName, mi, school, code }) {
   // Registration is handled by a Cloud Function — validation runs server-side so it
   // cannot be bypassed by any client version or cached bundle.
   const { getFunctions, httpsCallable } = await import('firebase/functions');
@@ -273,7 +273,7 @@ export async function selfSignUp({ email, password, surname, givenName, mi, scho
   const registerFn = httpsCallable(getFunctions(app, 'us-central1'), 'registerUser');
   let result;
   try {
-    result = await registerFn({ email, password, surname, givenName, mi, school });
+    result = await registerFn({ email, password, surname, givenName, mi, school, ...(code ? { code } : {}) });
   } catch (err) {
     // Surface the Cloud Function's user-friendly message; hide opaque internal codes
     const raw = err?.message ?? '';

@@ -14,6 +14,7 @@ const { onSchedule }         = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated }  = require('firebase-functions/v2/firestore');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
+const { createEmailCodes, codeEmail } = require('./emailCode');
 const { createGeminiSseParser } = require('./lib/sse');
 
 admin.initializeApp();
@@ -1936,11 +1937,52 @@ exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 },
   }
 });
 
+// ── Email codes (website sign-up, and website sign-in every 30 days) ─────────
+// Logic and tests: functions/emailCode.js, tests/emailCode.server.test.js.
+const emailCodes = createEmailCodes({ db, fetchFn: (...a) => fetch(...a), HttpsError });
+
+async function emailHasAccount(email) {
+  try {
+    await admin.auth().getUserByEmail(email);
+    return true;
+  } catch (err) {
+    if (err?.code === 'auth/user-not-found') return false;
+    throw err;
+  }
+}
+
+exports.sendEmailCode = onCall({ region: 'us-central1', maxInstances: 20 }, (req) =>
+  emailCodes.sendCode(req, { userExists: emailHasAccount }));
+
+exports.verifyEmailCode = onCall({ region: 'us-central1', maxInstances: 20 }, (req) =>
+  emailCodes.verifySignIn(req));
+
+// Admin Dashboard → "Send test email": sends a sample code email to the admin.
+exports.adminTestEmail = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+  if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+    throw new HttpsError('permission-denied', 'Admin access required.');
+  }
+  const to = String(req.auth.token?.email || '').trim().toLowerCase();
+  // ip: what the server sees as the caller's network — the sign-up limit per network relies on it.
+  const ip = req.rawRequest?.ip || '';
+  if (!to) return { ok: false, error: 'Your account has no email address.', ip };
+  try {
+    await emailCodes.sendMail(to, codeEmail('123456'));
+    return { ok: true, to, ip };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err), ip };
+  }
+});
+
 // ── Self-registration (server-enforced, multi-layer) ─────────────────────────
+// Same as admin.firestore.FieldValue (that namespace is missing inside the functions emulator).
+const { FieldValue: RegFieldValue } = require('firebase-admin/firestore');
 exports.registerUser = onCall(
   { region: 'us-central1' },
   async (req) => {
-    const { email, password, surname, givenName, mi, school } = req.data || {};
+    const { email, password, surname, givenName, mi, school, code } = req.data || {};
 
     // Layer 1: Server-side field validation — cannot be bypassed by any client or cached bundle
     if (!surname?.trim())                 throw new HttpsError('invalid-argument', 'Last name (Surname) is required.');
@@ -1948,6 +1990,9 @@ exports.registerUser = onCall(
     if (!school?.trim())                  throw new HttpsError('invalid-argument', 'School name is required.');
     if (!email?.trim())                   throw new HttpsError('invalid-argument', 'Email address is required.');
     if (!password || password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+
+    // Email code (when switched on): the website emails a code first; KaTuroDesk sends teachers to the website.
+    const { verified: emailVerified } = await emailCodes.checkSignup(email, code);
 
     const MAX_ACCOUNTS   = 1000;
 
@@ -1975,11 +2020,11 @@ exports.registerUser = onCall(
       givenName:       givenName.trim(),
       mi:              mi?.trim() || '',
       school:          school.trim(),
-      access:          { mode: 'free', subscriptionUntil: null, note: 'New account', setAt: admin.firestore.FieldValue.serverTimestamp() },
+      access:          { mode: 'free', subscriptionUntil: null, note: 'New account', setAt: RegFieldValue.serverTimestamp() },
       isAdmin:         false,
       disabled:        false,
       pendingApproval: false,
-      createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+      createdAt:       RegFieldValue.serverTimestamp(),
       _registeredViaFunction: true, // marker — enforceRegistrationSecurity checks this
     });
 
@@ -1997,6 +2042,8 @@ exports.registerUser = onCall(
       throw new HttpsError('internal', err.message || 'Registration failed. Please try again.');
     }
 
+    await emailCodes.finishSignup(email, uid, emailVerified).catch((e) => console.warn('[registerUser] email code cleanup:', e?.message));
+
     // Admin notification — non-fatal
     try {
       await db.collection('adminNotifications').add({
@@ -2008,7 +2055,7 @@ exports.registerUser = onCall(
         school:          school.trim(),
         pendingApproval: false,
         read:            false,
-        createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+        createdAt:       RegFieldValue.serverTimestamp(),
       });
     } catch { /* admin notification is best-effort — registration already succeeded */ }
 

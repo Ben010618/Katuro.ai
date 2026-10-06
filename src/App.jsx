@@ -8,6 +8,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ensureTeacherProfile } from './services/db';
 import { auth } from './firebase';
 import AppShell from './components/AppShell';
+import EmailCodeGate from './components/EmailCodeGate';
 import { Clock, LogOut as LogOutIcon } from 'lucide-react';
 
 // Pages — LoginPage stays eager (near-universal first paint); everything
@@ -165,7 +166,8 @@ function ProtectedRoute({ children }) {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (pendingApproval) return <PendingApprovalScreen />;
-  return children;
+  // Website only (KaTuroDesk uses DesktopAppShell): email code every 30 days when switched on.
+  return <EmailCodeGate uid={user.uid} fallback={<LoadingScreen />}>{children}</EmailCodeGate>;
 }
 
 function AdminRoute({ children }) {
@@ -173,7 +175,7 @@ function AdminRoute({ children }) {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
-  return children;
+  return <EmailCodeGate uid={user.uid} fallback={<LoadingScreen />}>{children}</EmailCodeGate>;
 }
 
 function PublicRoute({ children }) {
