@@ -14,6 +14,7 @@ import ktLogo from '../assets/KT-Favicon.webp';
 import { planStatusText, formatPlanDate, SUBSCRIBE_CONTACT_URL } from '../services/plans';
 import FloatingSuggestButton from '../features/feedback/FloatingSuggestButton';
 import InactivityAnnouncementModal from './InactivityAnnouncementModal';
+import DeskDownloadButton from './DeskDownloadButton';
 import FacultyCustomizerModal from './FacultyCustomizerModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
@@ -26,7 +27,7 @@ const MAIN_NAV = [
   { to: '/messages',                label: 'Messages',             Icon: MessageSquare, badge: 'messages' },
   { to: '/lesson-gen',              label: 'Lesson Gen',           Icon: Sparkles        },
   { to: '/my-lessons',              label: 'My Lessons',           Icon: BookOpen        },
-  { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck, isNew: true },
+  { to: '/assessment',              label: 'Assessment',           Icon: ClipboardCheck },
   { to: '/action-research/phase-1', label: 'Action Research',      Icon: FlaskConical    },
 ];
 
@@ -447,6 +448,9 @@ export default function AppShell() {
           .shell-req-btn span {
             display: none !important;
           }
+          .shell-desk-dl {
+            display: none !important;
+          }
         }
         @media (max-width: 480px) {
           .shell-brand-tag {
@@ -498,6 +502,7 @@ export default function AppShell() {
               <ChevronRight className="shell-header-crumb" size={11} color="var(--kt-border)" />
               <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageTitle}</span>
             </div>
+            <DeskDownloadButton />
             <button className="shell-req-btn" onClick={() => navigate('/feature-requests')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--kt-card-2)', color: 'var(--kt-text-secondary)', border: '1px solid var(--kt-border)', borderRadius: 'var(--kt-radius-md)', padding: '5px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s', flexShrink: 0 }}
               onMouseEnter={e => { e.currentTarget.style.background = '#E4D5AC'; e.currentTarget.style.color = '#262119'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-card-2)'; e.currentTarget.style.color = 'var(--kt-text-secondary)'; }}>
               <Lightbulb size={13} /> <span>Request Feature</span>
