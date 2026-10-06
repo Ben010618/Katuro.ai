@@ -26,6 +26,7 @@ import {
 } from '../docSpec.js';
 import { visionPartsFor } from './visionPrep.js';
 import { GROUNDING_RULES, verifySpec } from './grounding.js';
+import { buildConsolidatedSpec } from './consolidate.js';
 
 const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
 {
@@ -361,7 +362,7 @@ export const TOOLS = {
 
   make_spreadsheet: {
     label: 'Make spreadsheet',
-    description: 'Create an Excel workbook from instructions or files (e.g. masterlist template, inventory, schedule, tally sheet, data extracted from documents).',
+    description: 'Design a NEW Excel workbook from instructions or a few short sources (e.g. masterlist template, inventory, schedule, tally sheet). To put together the data of several existing files, use consolidate_files instead.',
     args: '{ "title": string, "instructions": string, "sourcePaths"?: [string] }',
     async run({ title = '', instructions = '', sourcePaths = [] }, ctx, report) {
       const { text, visionParts } = await gatherSourceText(sourcePaths, ctx);
@@ -371,7 +372,7 @@ export const TOOLS = {
         prompt: `Return ONLY JSON: {"title": string, "sheets": [{"name": string, "columns": [{"header": string, "width"?: number}], "rows": [[string|number|null]]}]}\nNumbers must be JSON numbers. Title: ${title}\nInstructions: ${ctx.masker.mask(instructions)}${text ? `\n\nSource files:\n${text}` : ''}`,
         parts: visionParts,
         json: true,
-        maxTokens: 8192,
+        maxTokens: 16000,
       });
       const spec = normalizeSheetSpec(ctx.masker.unmask({ ...raw, title: title || raw?.title }));
       if (!spec.sheets.length) throw new Error('The AI returned no sheets.');
@@ -379,6 +380,63 @@ export const TOOLS = {
       const file = await ctx.saveOutput(`${slug(spec.title)}.xlsx`, await buildSheetWorkbook(spec), 'xlsx');
       return {
         summary: `Created ${file.name}`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: file.name, spec, files: [file], editable: false }],
+      };
+    },
+  },
+
+  consolidate_files: {
+    label: 'Combine files into one Excel',
+    description: "Combine MANY existing files into ONE Excel workbook (consolidate, compile, merge or put together the data of several files or a whole folder). Every spreadsheet sheet and Word table is copied exactly by code (never retyped), photos/scans of tables are read one by one, and an Index sheet lists each file and what was taken. Always use this, not make_spreadsheet, when the data comes from several existing files.",
+    args: '{ "sourcePaths": [string], "title"?: string }',
+    async run({ sourcePaths = [], title = '' }, ctx, report) {
+      const paths = [...new Set(sourcePaths)];
+      if (!paths.length) throw new Error('Tell me which files to combine (tick them in the explorer, or name the folder).');
+      report(`Reading ${paths.length} file(s)…`);
+      const parsed = await Promise.all(paths.map((p) => ctx.readParsed(p).then((d) => ({ p, d }), (error) => ({ p, error }))));
+
+      // Photos/scans: one small AI request each (3 at a time), so no reply can get too long.
+      const photos = parsed.filter((x) => x.d?.needsVision && x.d.vision);
+      const photoTables = new Map();
+      if (photos.length) report(`Reading ${photos.length} photo(s)/scan(s)…`);
+      let nextPhoto = 0;
+      const worker = async () => {
+        while (nextPhoto < photos.length) {
+          const { p } = photos[nextPhoto++];
+          try {
+            const t = await extractTableWithAI(p, ctx, 'the main table (every row and column, including learner names and scores)');
+            photoTables.set(p, ctx.masker.unmask(t));
+          } catch (err) {
+            photoTables.set(p, { error: err?.message || 'could not be read' });
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, photos.length) }, worker));
+
+      const entries = parsed.map(({ p, d, error }) => {
+        if (error || !d) return { path: p, skipped: `Could not be read: ${error?.message || 'unknown error'}` };
+        if (d.sheets) return { path: p, sheets: d.sheets.map((s) => ({ name: s.name, rows: s.rows })) };
+        if (d.needsVision && d.vision) {
+          const t = photoTables.get(p);
+          return t && !t.error ? { path: p, photo: t } : { path: p, skipped: `Photo/scan could not be read: ${t?.error || 'no table found'}` };
+        }
+        if (Array.isArray(d.tables)) return { path: p, tables: d.tables };
+        if (d.kind === 'unsupported') return { path: p, skipped: (d.warnings || []).join(' ') || 'Unsupported file type.' };
+        return { path: p, skipped: 'No table to copy (text only). Ask me to extract a table from it if it has one.' };
+      });
+
+      const spec = buildConsolidatedSpec(entries, { title: title || 'Consolidated Files' });
+      const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+      report('Building the workbook…');
+      const file = await ctx.saveOutput(`${slug(spec.title)}.xlsx`, await buildSheetWorkbook(spec), 'xlsx');
+      const dataSheets = spec.sheets.length - 1;
+      const notIncluded = entries.filter((e) => e.skipped).length;
+      const fromPhotos = entries.filter((e) => e.photo).length;
+      const parts = [`Combined ${paths.length - notIncluded} file(s) into ${dataSheets} sheet(s) in ${file.name}, with an Index sheet listing each file`];
+      if (fromPhotos) parts.push(`${fromPhotos} sheet(s) were read from photos: please check them against the originals`);
+      if (notIncluded) parts.push(`${notIncluded} file(s) had nothing to copy or could not be read (see the Index sheet)`);
+      return {
+        summary: `${parts.join('. ')}.`,
         artifacts: [{ type: 'sheet', title: spec.title, subtitle: file.name, spec, files: [file], editable: false }],
       };
     },
