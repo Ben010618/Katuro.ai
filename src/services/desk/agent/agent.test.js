@@ -276,7 +276,7 @@ describe('gateway compatibility', () => {
   });
 });
 
-describe('personas (Matt / Luna)', () => {
+describe('personas (Matt / Luna / Grey)', () => {
   const teacher = { salutation: 'Sir Ben' };
 
   it('builds distinct chat voices and a neutral document voice', () => {
@@ -294,6 +294,23 @@ describe('personas (Matt / Luna)', () => {
     expect(PERSONAS.luna.welcome("Ma'am April")).toMatch(/^A pleasant day, Ma'am April\./);
     expect(getPersona('luna').gender).toBe('girl');
     expect(timeOfDay(new Date(2026, 0, 1, 8))).toBe('morning');
+  });
+
+  it('Grey: serious, witty and scientific; every persona has every line', () => {
+    const grey = personaFor(teacher, 'grey');
+    expect(grey).toMatch(/Your name is Grey/);
+    expect(grey).toMatch(/scientific/);
+    expect(grey).toMatch(/Never make up facts/); // trivia must be real (no-invented-data rule)
+    expect(docPersonaFor(teacher)).not.toMatch(/Grey/);
+    expect(PERSONAS.grey.welcome('Sir Ben')).toMatch(/^Good day, Sir Ben\. I am Grey/);
+    expect(PERSONAS.grey.greeting('Sir Ben', new Date(2026, 0, 1, 15))).toMatch(/^Good afternoon, Sir Ben\./);
+    for (const p of Object.values(PERSONAS)) {
+      for (const line of [p.welcome('Sir Ben'), p.greeting('Sir Ben'), p.thanks('Sir Ben'), p.ack('Sir Ben', 'the item analysis'), p.limitReached('Sir Ben')]) {
+        expect(line).toContain('Sir Ben');
+        expect(line).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u); // no emoji
+      }
+      expect(p.name && p.tagline && p.sample && p.style && p.thinking).toBeTruthy();
+    }
   });
 
   it('sends the chosen persona to the planner but keeps document prompts formal', async () => {

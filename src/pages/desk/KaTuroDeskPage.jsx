@@ -300,7 +300,7 @@ export default function KaTuroDeskPage() {
 
           <button
             onClick={() => { setSettingsTab('assistant'); setShowSettings(true); }}
-            title="Settings: choose your assistant (Matt or Luna)"
+            title="Settings: choose your assistant (Matt, Luna or Grey)"
             className="flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <KaTuroAIAvatar persona={persona} size={22} />
