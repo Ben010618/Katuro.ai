@@ -28,6 +28,7 @@ import {
 import { getFileIcon } from './deskFileIcons';
 import { planStatusText, SUBSCRIBE_CONTACT_URL } from '../../services/plans';
 import { teacherInfo } from '../../services/teacherInfo';
+import AvatarImage from '../../components/AvatarImage';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
 
@@ -436,9 +437,11 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
       <div className="p-2.5 bg-[#141f17] border-t border-[#2d3e33] space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-emerald-800 text-emerald-200 flex items-center justify-center font-bold text-[11px]">
-              {accountName.charAt(0).toUpperCase()}
-            </div>
+            <AvatarImage
+              photoURL={profile?.photoURL || user?.photoURL}
+              alt={`${accountName} profile photo`}
+              className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+            />
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-white truncate leading-tight">
                 {accountName}
