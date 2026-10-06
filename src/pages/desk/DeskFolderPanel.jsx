@@ -3,7 +3,6 @@ import {
   FolderOpen,
   FolderPlus,
   RefreshCw,
-  Search,
   HardDrive,
   Cloud,
   CreditCard,
@@ -316,13 +315,13 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
       {/* Action Toolbar: Search + Import + Add File + Add Folder */}
       <div className="p-2 border-b border-[#2d3e33] flex items-center gap-1 bg-[#18231c]">
         <div className="relative flex-1">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7f9988]" />
           <input
             type="text"
             placeholder="Search all files..."
+            aria-label="Search all files"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#121b15] text-white text-[11px] pl-6 pr-2 py-1 rounded border border-[#27382d] focus:outline-none focus:border-[#408a65] placeholder-[#647c6e]"
+            className="w-full bg-[#121b15] text-white text-[11px] px-2 py-1 rounded border border-[#27382d] focus:outline-none focus:border-[#408a65] placeholder-[#647c6e]"
           />
         </div>
         <button

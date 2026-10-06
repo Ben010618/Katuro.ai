@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Save,
   Download,
@@ -94,7 +94,7 @@ function SlidesView({ spec }) {
   );
 }
 
-export default function DeskCanvasPanel({ onCollapse }) {
+export default function DeskCanvasPanel({ onCollapse, width }) {
   const { activeArtifact, setActiveArtifact, artifacts, saveArtifactEdits, workspace, toggleAttachment, attachedPaths } = useDeskStore();
   const [isEditing, setIsEditing] = useState(false);
   const [draftSpec, setDraftSpec] = useState(null);
@@ -127,17 +127,34 @@ export default function DeskCanvasPanel({ onCollapse }) {
 
   const art = activeArtifact;
   const spec = draftSpec || art?.spec;
+  const pageWidthPx = useMemo(() => {
+    if (art?.type !== 'document' || !spec) return 0;
+    try {
+      return (normalizeDocumentSpec(spec).orientation === 'landscape' ? 13 : 8.5) * 96 + 48;
+    } catch {
+      return 0;
+    }
+  }, [art?.type, spec]);
+  const zoom = pageWidthPx ? Math.min(1, Math.max(0.3, (viewportWidth - 8) / pageWidthPx)).toFixed(3) : '1';
+
+  // Built once per document. The zoom it starts with is the panel width at that moment;
+  // later width changes (dragging the divider) re-zoom the open page below, without a reload.
   const docHtml = useMemo(() => {
     if (art?.type !== 'document' || !spec) return '';
     try {
       const normalized = normalizeDocumentSpec(spec);
-      const pageWidthPx = (normalized.orientation === 'landscape' ? 13 : 8.5) * 96 + 48;
-      const zoom = Math.min(1, Math.max(0.3, (viewportWidth - 8) / pageWidthPx)).toFixed(3);
       return buildHtml(normalized, { forPrint: false }).replace('</head>', `<style>html{zoom:${zoom}}</style></head>`);
     } catch (e) {
       return `<p style="font-family:sans-serif;color:#b91c1c">Preview failed: ${String(e.message)}</p>`;
     }
-  }, [art?.type, spec, viewportWidth]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- zoom is applied live by applyZoom; rebuilding would reload the page on every drag step
+  }, [art?.type, spec]);
+
+  const applyZoom = useCallback(() => {
+    const root = iframeRef.current?.contentDocument?.documentElement;
+    if (root) root.style.zoom = zoom;
+  }, [zoom]);
+  useEffect(() => { applyZoom(); }, [applyZoom]);
 
   const handleSave = async () => {
     if (!draftSpec || !art) return;
@@ -229,7 +246,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
 
   if (!art) {
     return (
-      <aside className="w-80 lg:w-96 xl:w-[460px] flex-shrink-0 flex flex-col h-full bg-[#f1f5f3] border-l border-gray-200 select-none">
+      <aside className={`${width ? '' : 'w-80 lg:w-96 xl:w-[460px] '}flex-shrink-0 flex flex-col h-full bg-[#f1f5f3] border-l border-gray-200 select-none`} style={width ? { width } : undefined}>
         <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between">
           <span className="text-[11px] font-bold text-gray-700">
             Document Canvas
@@ -264,7 +281,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
   const files = isPreview ? [{ path: art.path, name: art.title, format: art.path.split('.').pop().toLowerCase() }] : art.files || [];
 
   return (
-    <aside className="w-80 lg:w-96 xl:w-[460px] flex-shrink-0 flex flex-col h-full bg-[#e8ecea] border-l border-gray-300">
+    <aside className={`${width ? '' : 'w-80 lg:w-96 xl:w-[460px] '}flex-shrink-0 flex flex-col h-full bg-[#e8ecea] border-l border-gray-300`} style={width ? { width } : undefined}>
       {/* Canvas Action Bar */}
       <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10 gap-2">
         <div className="min-w-0">
@@ -381,6 +398,7 @@ export default function DeskCanvasPanel({ onCollapse }) {
               title="Document preview"
               sandbox="allow-same-origin allow-modals"
               srcDoc={docHtml}
+              onLoad={applyZoom}
               className="w-full h-full min-h-[600px] bg-white border border-gray-300 rounded shadow-md"
             />
           )

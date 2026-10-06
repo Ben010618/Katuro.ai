@@ -175,7 +175,7 @@ export default function DeskAgentChatPanel({
       )}
 
       {/* KaTuro Teaching Assistant Header */}
-      <header className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between gap-2 shadow-2xs z-10">
+      <header className="@container px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between gap-2 shadow-2xs z-10">
         <div className="flex items-center gap-3 min-w-0">
           {!showLeftPanel && onToggleLeftPanel && (
             <button
@@ -189,8 +189,8 @@ export default function DeskAgentChatPanel({
           <KaTuroAIAvatar persona={persona} size={40} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-sm font-bold text-gray-900 truncate">{personaInfo.name} <span className="font-medium text-gray-500 hidden xl:inline">· KaTuro Teaching Assistant</span></h1>
-              <span className="hidden lg:inline px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+              <h1 className="text-sm font-bold text-gray-900 truncate">{personaInfo.name} <span className="font-medium text-gray-500 hidden @[36rem]:inline">· KaTuro Teaching Assistant</span></h1>
+              <span className="hidden @[32rem]:inline px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                 Co-Teacher Studio
               </span>
             </div>
@@ -213,7 +213,7 @@ export default function DeskAgentChatPanel({
             }`}
           >
             {privacyMode ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
-            <span className="hidden xl:inline whitespace-nowrap">{privacyMode ? 'Names protected' : 'Names visible to AI'}</span>
+            <span className="hidden @[28rem]:inline whitespace-nowrap">{privacyMode ? 'Names protected' : 'Names visible to AI'}</span>
           </button>
           <button
             onClick={clearConversation}
@@ -221,7 +221,7 @@ export default function DeskAgentChatPanel({
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition flex items-center gap-1 text-xs"
           >
             <Trash2 size={14} />
-            <span className="hidden xl:inline">Clear</span>
+            <span className="hidden @[28rem]:inline">Clear</span>
           </button>
         </div>
       </header>
