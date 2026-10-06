@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { FollowButton } from './FollowButton';
 import { avatarColor } from '../services/sharesService';
+import AvatarImage from '../../../components/AvatarImage';
 
 export function TeacherCard({ teacher, myUid, myName }) {
   const bg = avatarColor(teacher.id);
@@ -11,9 +12,7 @@ export function TeacherCard({ teacher, myUid, myName }) {
           className="sh-avatar sh-avatar--sm"
           style={{ background: bg, color: '#fff', fontSize: 12 }}
         >
-          {teacher.photoURL
-            ? <img src={teacher.photoURL} alt={teacher.displayName || 'Teacher'} />
-            : teacher.initials || 'T'}
+          <AvatarImage photoURL={teacher.photoURL} alt={teacher.displayName || 'Teacher'} />
         </div>
         <div className="sh-teacher-card-info">
           <div className="sh-teacher-card-name">{teacher.displayName}</div>

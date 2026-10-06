@@ -6,10 +6,11 @@ import { PhotoLightbox } from './PhotoLightbox';
 import { ReactionBar }  from './ReactionBar';
 import { CommentThread } from './CommentThread';
 import { RichTextEditor } from './RichTextEditor';
-import { timeAgo, avatarColor, getInitials, deletePost, editPost } from '../services/sharesService';
+import { timeAgo, avatarColor, deletePost, editPost } from '../services/sharesService';
 import ShareModal from '../../../components/ShareModal';
 
 import { isHTMLCaption, sanitizeHTML, renderPlainCaption } from '../utils/captionUtils';
+import AvatarImage from '../../../components/AvatarImage';
 
 export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, onDelete }) {
   const [lightbox,      setLightbox]      = useState(null);
@@ -81,9 +82,7 @@ export function PostCard({ post, uid, displayName, initials, photoURL, isAdmin, 
       {/* Header */}
       <div className="sh-card-header">
         <div className="sh-avatar sh-avatar--md" style={{ background: bg, color: '#fff' }}>
-          {post.authorPhotoURL
-            ? <img src={post.authorPhotoURL} alt={post.authorName || 'Teacher'} />
-            : post.authorInitials || getInitials(post.authorName)}
+          <AvatarImage photoURL={post.authorPhotoURL} alt={post.authorName || 'Teacher'} />
         </div>
         <div className="sh-card-header-info">
           <span className="sh-author-name">
