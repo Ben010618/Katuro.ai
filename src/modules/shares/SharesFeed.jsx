@@ -8,12 +8,12 @@ import { PostCard }    from './components/PostCard';
 import { SkeletonCard } from './components/SkeletonCard';
 import { TeacherCard }  from './components/TeacherCard';
 import { AutoScrollToggle } from './components/AutoScrollToggle';
+import AvatarImage from '../../components/AvatarImage';
 import {
   fetchSuggestions,
   fetchTrendingHashtags,
   fetchOnlineTeachers,
   avatarColor,
-  getInitials,
 } from './services/sharesService';
 
 const FEED_MODES = [
@@ -62,7 +62,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
           {/* Composer trigger — opens the full post composer */}
           <button type="button" className="sh-composer-trigger" onClick={onOpenComposer}>
             <div className="sh-avatar sh-avatar--md" style={{ background: myBg, color: '#fff', flexShrink: 0 }}>
-              {photoURL ? <img src={photoURL} alt={displayName} /> : initials}
+              <AvatarImage photoURL={photoURL} alt={displayName} />
             </div>
             <span className="sh-composer-trigger-text">
               What&rsquo;s on your mind, {displayName.split(' ')[0]}?
@@ -134,7 +134,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
               className="sh-avatar sh-avatar--md"
               style={{ background: myBg, color: '#fff', flexShrink: 0 }}
             >
-              {photoURL ? <img src={photoURL} alt={displayName} /> : initials}
+              <AvatarImage photoURL={photoURL} alt={displayName} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -179,9 +179,7 @@ export default function SharesFeed({ uid, displayName, initials, photoURL, schoo
             {onlineTeachers.slice(0, 6).map(t => (
               <div key={t.id} className="sh-teacher-card">
                 <div className="sh-avatar sh-avatar--sm" style={{ background: avatarColor(t.id), color: '#fff' }}>
-                  {t.photoURL
-                    ? <img src={t.photoURL} alt={t.displayName || 'T'} />
-                    : getInitials(t.displayName || 'T')}
+                  <AvatarImage photoURL={t.photoURL} alt={t.displayName || 'Teacher'} />
                 </div>
                 <div className="sh-teacher-card-info">
                   <div className="sh-teacher-card-name">{t.displayName || 'Teacher'}</div>

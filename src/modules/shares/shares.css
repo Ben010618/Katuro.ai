@@ -280,6 +280,8 @@
 .sh-avatar--xl  { width: 80px; height: 80px; font-size: 26px; }
 
 .sh-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* The default "no photo" picture is round: no coloured box behind it. */
+.sh-avatar:has(img[data-default-avatar]) { background: transparent !important; }
 
 /* ── Caption ─────────────────────────────────────────────────────── */
 .sh-caption {

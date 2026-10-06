@@ -4,6 +4,7 @@ import { Send, Trash2, Pencil, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
 import { timeAgo, avatarColor, getInitials } from '../services/sharesService';
 import { subscribeToReplies } from '../services/sharesService';
+import AvatarImage from '../../../components/AvatarImage';
 
 const PREVIEW_COUNT = 3;
 
@@ -13,7 +14,7 @@ function Avatar({ uid, photoURL, initials, size = 'sm' }) {
       className={`sh-avatar sh-avatar--${size}`}
       style={{ background: avatarColor(uid), color: '#fff', flexShrink: 0 }}
     >
-      {photoURL ? <img src={photoURL} alt={initials || 'T'} /> : (initials || 'T')}
+      <AvatarImage photoURL={photoURL} alt={initials || 'Teacher'} />
     </div>
   );
 }

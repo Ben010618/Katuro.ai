@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
 import { getReactors, getSharesProfile, avatarColor, getInitials } from '../services/sharesService';
+import AvatarImage from '../../../components/AvatarImage';
 
 const REACTION_META = {
   love:    { emoji: '❤️', label: 'Love' },
@@ -81,7 +82,7 @@ export function ReactorsModal({ postId, onClose }) {
             filtered.map(r => (
               <div key={r.uid} className="sh-reactors-row">
                 <div className="sh-avatar sh-avatar--sm" style={{ background: avatarColor(r.uid), color: '#fff' }}>
-                  {r.photoURL ? <img src={r.photoURL} alt={r.displayName} /> : r.initials}
+                  <AvatarImage photoURL={r.photoURL} alt={r.displayName || 'Teacher'} />
                 </div>
                 <div className="sh-reactors-info">
                   <span className="sh-reactors-name">{r.displayName}</span>

@@ -5,6 +5,7 @@ import { isHTMLCaption, sanitizeHTML, renderPlainCaption } from '../utils/captio
 import { avatarColor, getInitials, timeAgo } from '../services/sharesService';
 import { ReactionBar } from './ReactionBar';
 import { CommentThread } from './CommentThread';
+import AvatarImage from '../../../components/AvatarImage';
 
 /**
  * Facebook & Instagram style Theater Photo Modal / Lightbox.
@@ -120,11 +121,7 @@ export function PhotoLightbox({
                 className="sh-avatar sh-avatar--md"
                 style={{ background: authorBg, color: '#fff', flexShrink: 0 }}
               >
-                {authorPhotoURL ? (
-                  <img src={authorPhotoURL} alt={authorName} />
-                ) : (
-                  authorInitials
-                )}
+                <AvatarImage photoURL={authorPhotoURL} alt={authorName || authorInitials || 'Teacher'} />
               </div>
               <div className="sh-card-header-info" style={{ minWidth: 0 }}>
                 <span className="sh-author-name" style={{ fontSize: 13.5 }}>

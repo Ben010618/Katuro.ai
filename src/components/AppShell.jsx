@@ -19,6 +19,7 @@ import FacultyCustomizerModal from './FacultyCustomizerModal';
 
 const SLIDE_IMGS = [img1, img2, img3, img4];
 import { LayoutDashboard, Sparkles, BookOpen, LogOut, Menu, X, ChevronRight, ChevronDown, ShieldCheck, BadgeCheck, FlaskConical, ClipboardCheck, Moon, Sun, Settings, Camera, Loader2, Images, Lightbulb, Users, MessageSquare } from 'lucide-react';
+import { avatarSrc } from '../utils/defaultAvatar';
 
 const MAIN_NAV = [
   { to: '/shares',                   label: 'kaTuro Shares',        Icon: Images, highlight: true },
@@ -54,9 +55,6 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
 
-  const initials    = user?.displayName
-    ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : (user?.email?.[0] || 'T').toUpperCase();
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Teacher';
 
   async function handleLogout() { await signOut(auth); navigate('/login', { replace: true }); }
@@ -203,13 +201,11 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.22)'; }}
         >
           <div style={{
-            width: 30, height: 30, borderRadius: 4, flexShrink: 0,
-            background: photoURL ? 'transparent' : '#2B4E3E',
-            backgroundImage: photoURL ? `url(${photoURL})` : undefined,
+            width: 30, height: 30, borderRadius: photoURL ? 4 : '50%', flexShrink: 0,
+            backgroundImage: `url("${avatarSrc(photoURL)}")`,
             backgroundSize: 'cover', backgroundPosition: 'center',
-            display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 11, color: '#E4D5AC',
-            border: '1px solid #C9B583',
-          }}>{!photoURL && initials}</div>
+            border: photoURL ? '1px solid #C9B583' : 'none',
+          }} role="img" aria-label={photoURL ? `${displayName} profile photo` : 'No profile photo'} />
           <div style={{ overflow: 'hidden', flex: 1, textAlign: 'left' }}>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#FBF7EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -413,9 +409,6 @@ export default function AppShell() {
     finally { setPhotoUploading(false); }
   }
 
-  const initials    = user?.displayName
-    ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : (user?.email?.[0] || 'T').toUpperCase();
 
   const pageTitle = Object.keys(TITLES).find(k => location.pathname.startsWith(k))
     ? TITLES[Object.keys(TITLES).find(k => location.pathname.startsWith(k))]
@@ -559,12 +552,11 @@ export default function AppShell() {
                 <div style={{
                   width: 80, height: 80, borderRadius: '50%',
                   border: `4px solid ${dark ? '#1c2e22' : '#fff'}`,
-                  background: profileData.photoURL ? 'transparent' : 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
-                  backgroundImage: profileData.photoURL ? `url(${profileData.photoURL})` : undefined,
+                  backgroundColor: dark ? '#1c2e22' : '#fff',
+                  backgroundImage: `url("${avatarSrc(profileData.photoURL)}")`,
                   backgroundSize: 'cover', backgroundPosition: 'center',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: 28, color: '#fff', boxSizing: 'border-box',
-                }}>{!profileData.photoURL && initials}</div>
+                  boxSizing: 'border-box',
+                }} role="img" aria-label={profileData.photoURL ? 'Profile photo' : 'No profile photo'} />
                 <button
                   onClick={() => photoRef.current?.click()}
                   title="Change profile photo"
