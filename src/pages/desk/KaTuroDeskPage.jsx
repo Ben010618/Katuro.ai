@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -18,6 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
+import { CANVAS_DEFAULT_WIDTH, CHAT_MIN_WIDTH, clampCanvasWidth, loadCanvasWidth, saveCanvasWidth } from './canvasResize';
 import { useDeskStore } from '../../store/deskStore';
 import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
@@ -64,6 +65,72 @@ export default function KaTuroDeskPage() {
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+
+  // Document Canvas width: drag the divider (like a VS Code split); remembered on this PC.
+  const workspaceRef = useRef(null);
+  const chatPanelRef = useRef(null);
+  const [canvasWidth, setCanvasWidth] = useState(loadCanvasWidth);
+  const [canvasMax, setCanvasMax] = useState(Infinity);
+  const [resizing, setResizing] = useState(false);
+  const measureCanvasMax = useCallback(() => {
+    const ws = workspaceRef.current;
+    const chat = chatPanelRef.current;
+    if (!ws || !chat || !chat.offsetWidth) return Infinity;
+    // Room right of the chat's left edge, minus the chat's minimum and the 16px divider strip.
+    const max = ws.clientWidth - chat.offsetLeft - CHAT_MIN_WIDTH - 16;
+    setCanvasMax(max);
+    return max;
+  }, []);
+  useEffect(() => {
+    const ws = workspaceRef.current;
+    if (!ws || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => measureCanvasMax());
+    ro.observe(ws);
+    return () => ro.disconnect();
+  }, [measureCanvasMax, showLeftPanel]);
+  const shownCanvasWidth = clampCanvasWidth(canvasWidth, canvasMax);
+
+  const startCanvasResize = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    const max = measureCanvasMax();
+    const right = ws.getBoundingClientRect().right;
+    let last = shownCanvasWidth;
+    setResizing(true);
+    const move = (ev) => {
+      last = clampCanvasWidth(right - ev.clientX - 8, max);
+      setCanvasWidth(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      setResizing(false);
+      saveCanvasWidth(last);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  const nudgeCanvas = (e) => {
+    const step = e.shiftKey ? 64 : 16;
+    let next = null;
+    if (e.key === 'ArrowLeft') next = shownCanvasWidth + step;
+    else if (e.key === 'ArrowRight') next = shownCanvasWidth - step;
+    else if (e.key === 'Home') next = CANVAS_DEFAULT_WIDTH;
+    if (next === null) return;
+    e.preventDefault();
+    next = clampCanvasWidth(next, measureCanvasMax());
+    setCanvasWidth(next);
+    saveCanvasWidth(next);
+  };
+  const resetCanvasWidth = () => {
+    const next = clampCanvasWidth(CANVAS_DEFAULT_WIDTH, measureCanvasMax());
+    setCanvasWidth(next);
+    saveCanvasWidth(next);
+  };
 
   useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
 
@@ -253,7 +320,9 @@ export default function KaTuroDeskPage() {
       </div>
 
       {/* 3-Panel Main Workspace */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div ref={workspaceRef} className={`flex-1 flex overflow-hidden relative${resizing ? ' select-none cursor-col-resize' : ''}`}>
+        {/* While dragging the divider, this layer keeps the mouse away from the preview iframe. */}
+        {resizing && <div className="absolute inset-0 z-30 cursor-col-resize" />}
         {/* Desktop Left Panel (Folder / File Tree) */}
         {showLeftPanel && (
           <div className="hidden md:flex h-full flex-shrink-0 relative transition-all duration-200">
@@ -278,7 +347,7 @@ export default function KaTuroDeskPage() {
         </div>
 
         {/* Desktop Center Panel (Agent Conversation Stream - Wide & Expansive Hero) */}
-        <div className="hidden md:flex flex-1 h-full min-w-0 transition-all duration-200">
+        <div ref={chatPanelRef} className="hidden md:flex flex-1 h-full min-w-0">
           <DeskAgentChatPanel
             user={user}
             profile={profile}
@@ -291,8 +360,24 @@ export default function KaTuroDeskPage() {
           />
         </div>
 
-        {/* Divider Toggle Button: Center to Right */}
+        {/* Divider: drag to resize the canvas (double-click resets); the button collapses it. */}
         <div className="hidden md:flex items-center relative z-20">
+          {showRightPanel && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize Document Canvas"
+              aria-valuenow={shownCanvasWidth}
+              tabIndex={0}
+              title="Drag to resize. Double-click to reset."
+              onPointerDown={startCanvasResize}
+              onDoubleClick={resetCanvasWidth}
+              onKeyDown={nudgeCanvas}
+              className={`group absolute inset-y-0 -left-1 w-3 cursor-col-resize flex justify-center outline-none`}
+            >
+              <span className={`h-full w-[3px] rounded transition-colors ${resizing ? 'bg-emerald-500' : 'bg-transparent group-hover:bg-emerald-400/70 group-focus-visible:bg-emerald-400/70'}`} />
+            </div>
+          )}
           <button
             onClick={() => setShowRightPanel(!showRightPanel)}
             title={showRightPanel ? 'Collapse Document Canvas (►)' : 'Expand Document Canvas (◄)'}
@@ -304,8 +389,8 @@ export default function KaTuroDeskPage() {
 
         {/* Desktop Right Panel (Live DepEd Canvas) */}
         {showRightPanel ? (
-          <div className="hidden md:flex h-full flex-shrink-0 transition-all duration-200">
-            <DeskCanvasPanel onCollapse={() => setShowRightPanel(false)} />
+          <div className="hidden md:flex h-full flex-shrink-0">
+            <DeskCanvasPanel width={shownCanvasWidth} onCollapse={() => setShowRightPanel(false)} />
           </div>
         ) : (
           /* Slim Minimized Ribbon when Canvas is Collapsed */
