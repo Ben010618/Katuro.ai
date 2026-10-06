@@ -1,19 +1,21 @@
 /**
- * MessagesPanel — teacher-to-teacher messages (Phase 1): unique usernames, one-to-one
- * chats and teams with teachers from the same school or division. Used by the web
- * /messages page and by KaTuroDesk (top bar → Messages).
+ * MessagesPanel — teacher-to-teacher messages: unique usernames, finding teachers by
+ * @username (with "did you mean" suggestions), invites (bell) and contacts, one-to-one
+ * chats and teams. Used by the web /messages page and by KaTuroDesk (top bar → Messages).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, Users, Search, Send, X, ArrowLeft, Flag, Trash2, AtSign, Info, Paperclip, FolderOpen, Bell, BellOff, Ban, ExternalLink } from 'lucide-react';
 import {
-  syncDirectory, claimUsername, isUsernameFree, usernameProblem, normalizeUsername, canMessage,
-  listColleagues, findByUsername, openDirectChat, createTeam, addTeamMember, removeTeamMember, leaveTeam,
+  syncDirectory, claimUsername, isUsernameFree, usernameProblem, normalizeUsername,
+  searchTeachers, searchKey, SEARCH_MIN_CHARS, sendInvite, respondInvite, listContacts,
+  openDirectChat, createTeam, addTeamMember, removeTeamMember, leaveTeam,
   renameTeam, subscribeMembers, subscribeMessages, sendMessage, markRead, deleteMyMessage, reportMessage,
   getDirectoryCard, MAX_MESSAGE_LENGTH, MAX_TEAM_MEMBERS,
   uploadChatFile, fetchChatFile, saveBlobAs, subscribeAssets, subscribeBlocks, blockTeacher, unblockTeacher,
   setChatMuted, fileProblem, fileExtension, formatBytes, linkDomain, FILE_ACCEPT, FILE_KINDS,
 } from '../../services/messages/chatService';
 import { useChats } from './chatStore';
+import AvatarImage from '../../components/AvatarImage';
 
 const C = {
   card: 'var(--kt-card, #FBF7EC)',
@@ -120,63 +122,46 @@ function UsernameForm({ uid, current = '', onDone, onCancel }) {
 }
 
 /** Pick teachers from my school / division (plus exact username lookup). */
+/** Pick from my contacts (teachers who accepted an invite, or whose invite I accepted). */
 function ColleaguePicker({ me, multiple, exclude = [], onPick, selected = [], max = MAX_TEAM_MEMBERS - 1 }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('');
-  const [lookup, setLookup] = useState('');
-  const [lookupMsg, setLookupMsg] = useState('');
 
   useEffect(() => {
     let alive = true;
-    listColleagues(me).then((l) => alive && setList(l)).catch((e) => alive && setError(e?.message || 'Could not load teachers.'));
+    listContacts(me.uid).then((l) => alive && setList(l)).catch((e) => alive && setError(e?.message || 'Could not load your contacts.'));
     return () => { alive = false; };
   }, [me]);
 
   const shown = useMemo(() => {
-    const f = filter.trim().toLowerCase();
-    return (list || []).filter((c) => !exclude.includes(c.id) && (!f || `${c.displayName} ${c.username} ${c.school}`.toLowerCase().includes(f)));
+    const f = normalizeUsername(filter);
+    return (list || []).filter((c) => !exclude.includes(c.id) && (!f || `${c.username} ${c.displayName} ${c.school}`.toLowerCase().includes(f)));
   }, [list, filter, exclude]);
-
-  async function findExact(e) {
-    e.preventDefault();
-    setLookupMsg('');
-    try {
-      const res = await findByUsername(lookup, me);
-      if (res.card) onPick(res.card);
-      else setLookupMsg(res.reason === 'self' ? 'That is you.' : res.reason === 'other_org' ? 'That teacher is not in your school or division.' : 'No teacher has that username.');
-    } catch (err) {
-      setLookupMsg(err?.message || 'Could not search.');
-    }
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <form onSubmit={findExact} style={{ display: 'flex', gap: 6 }}>
-        <input value={lookup} onChange={(e) => setLookup(e.target.value)} placeholder="Find by exact username" style={input} />
-        <button type="submit" style={btnGhost} disabled={!lookup.trim()}>Find</button>
-      </form>
-      {lookupMsg && <p style={{ margin: 0, fontSize: 12, color: C.red }}>{lookupMsg}</p>}
       <div style={{ position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 10, top: 11, color: '#6E6455' }} />
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter teachers in your school or division" style={{ ...input, paddingLeft: 30 }} />
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter your contacts" style={{ ...input, paddingLeft: 30 }} />
       </div>
       {error && <p style={{ margin: 0, fontSize: 12, color: C.red }}>{error}</p>}
       {list === null && !error ? (
-        <p style={{ margin: 0, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading teachers…</p>
+        <p style={{ margin: 0, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading contacts…</p>
       ) : (
         <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
-          {shown.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No teachers found. Teachers appear here once they choose a username in Messages.</p>}
+          {shown.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>{(list || []).length ? 'No contacts match.' : 'No contacts yet. Use New chat to find teachers by @username and invite them.'}</p>}
           {shown.map((c) => {
             const on = selected.includes(c.id);
             const full = multiple && !on && selected.length >= max;
             return (
               <button key={c.id} type="button" disabled={full} onClick={() => onPick(c)}
-                style={{ display: 'flex', width: '100%', textAlign: 'left', gap: 10, alignItems: 'center', padding: '9px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: on ? 'rgba(45,106,79,0.12)' : 'transparent', color: C.text, cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.5 : 1, fontFamily: 'inherit' }}>
+                style={{ display: 'flex', width: '100%', textAlign: 'left', gap: 10, alignItems: 'center', padding: '8px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: on ? 'rgba(45,106,79,0.12)' : 'transparent', color: C.text, cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.5 : 1, fontFamily: 'inherit' }}>
                 {multiple && <input type="checkbox" readOnly checked={on} style={{ accentColor: C.green }} />}
+                <AvatarImage photoURL={c.photoURL} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>{c.displayName}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{c.username}{c.school ? ` · ${c.school}` : ''}</span>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>@{c.username}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.school || 'School not set'}</span>
                 </span>
               </button>
             );
@@ -184,6 +169,181 @@ function ColleaguePicker({ me, multiple, exclude = [], onPick, selected = [], ma
         </div>
       )}
     </div>
+  );
+}
+
+const RELATION_BUTTON = {
+  none: 'Invite',
+  invited: 'Invited',
+  invited_me: 'Accept',
+  contact: 'Message',
+};
+
+/**
+ * Find any teacher by @username: results drop down as you type, most likely first,
+ * with "Did you mean @ben?" for close spellings. Invite / Accept / Message per result.
+ */
+function PeopleSearch({ onMessage }) {
+  const [q, setQ] = useState('');
+  const [data, setData] = useState(null); // { query, results }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [busyUid, setBusyUid] = useState('');
+  const [states, setStates] = useState({}); // after Invite/Accept here
+  const seq = useRef(0);
+
+  const query = searchKey(q);
+  const tooShort = query.length > 0 && query.length < SEARCH_MIN_CHARS;
+  useEffect(() => {
+    const mine = ++seq.current;
+    if (query.length < SEARCH_MIN_CHARS) return undefined;
+    const t = setTimeout(() => {
+      setLoading(true);
+      searchTeachers(query)
+        .then((res) => { if (mine === seq.current) { setData(res); setError(''); } })
+        .catch((e) => { if (mine === seq.current) setError(e?.message || 'Could not search right now.'); })
+        .finally(() => { if (mine === seq.current) setLoading(false); });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  async function act(r) {
+    const state = states[r.uid] || r.state;
+    if (state === 'invited') return;
+    if (state === 'contact') { onMessage({ id: r.uid, ...r }); return; }
+    setBusyUid(r.uid);
+    setError('');
+    try {
+      const next = state === 'invited_me' ? await respondInvite(r.uid, true) : await sendInvite(r.uid);
+      setStates((m) => ({ ...m, [r.uid]: next }));
+    } catch (e) {
+      setError(e?.message || 'That did not work. Please try again.');
+    } finally {
+      setBusyUid('');
+    }
+  }
+
+  // Only results for what is typed now (older answers are never shown).
+  const shown = query && data?.query === query ? data : null;
+  const results = shown?.results || [];
+  const top = results[0];
+  const suggest = top && top.username !== shown.query && top.score < 0.75 ? top.username : '';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ position: 'relative' }}>
+        <AtSign size={14} style={{ position: 'absolute', left: 10, top: 11, color: '#6E6455' }} />
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value.replace(/^@+/, ''))} placeholder="Search a username, e.g. ben"
+          aria-label="Search teachers by username" style={{ ...input, paddingLeft: 30 }} />
+        {loading && !tooShort && query && <Loader2 size={14} className="animate-spin" style={{ position: 'absolute', right: 10, top: 11, color: '#6E6455' }} />}
+      </div>
+      {error && <p style={{ margin: 0, fontSize: 12, color: C.red }}>{error}</p>}
+      {tooShort && <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Type at least {SEARCH_MIN_CHARS} characters of the username.</p>}
+      {suggest && (
+        <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
+          Did you mean{' '}
+          <button type="button" onClick={() => setQ(suggest)} style={{ border: 'none', background: 'none', padding: 0, color: C.green, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>@{suggest}</button>?
+        </p>
+      )}
+      {shown && (
+        <div role="listbox" aria-label="Matching teachers" style={{ maxHeight: 320, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+          {!results.length && !loading && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No teacher has a username like @{shown.query}.</p>}
+          {results.map((r) => {
+            const state = states[r.uid] || r.state;
+            const label = RELATION_BUTTON[state] || 'Invite';
+            const primary = state === 'none' || state === 'invited_me' || state === 'contact';
+            return (
+              <div key={r.uid} role="option" aria-selected="false" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: `1px solid ${C.border}` }}>
+                <AvatarImage photoURL={r.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>@{r.username}</span>
+                  <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.school || 'School not set'}</span>
+                </span>
+                <button type="button" onClick={() => act(r)} disabled={busyUid === r.uid || state === 'invited'}
+                  title={state === 'invited' ? 'Waiting for them to accept' : state === 'invited_me' ? 'They invited you: accept to start messaging' : undefined}
+                  style={{ ...(primary ? btnPrimary : btnGhost), padding: '5px 12px', fontSize: 12, opacity: busyUid === r.uid ? 0.6 : 1, cursor: state === 'invited' ? 'default' : 'pointer' }}>
+                  {busyUid === r.uid ? <Loader2 size={12} className="animate-spin" /> : label}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p style={{ margin: 0, fontSize: 11.5, color: C.muted }}>Invite a teacher first. You can message each other once they accept.</p>
+    </div>
+  );
+}
+
+/** The bell: invites waiting for my answer, with Accept and Decline. */
+function InviteBell({ me, invites, onAccepted }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const count = invites.length;
+  const boxRef = useRef(null);
+
+  // Clicking anywhere else closes the list.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  async function answer(inv, accept, block = false) {
+    setBusy(inv.from);
+    setError('');
+    try {
+      if (block) {
+        if (!window.confirm(`Block @${inv.fromUsername}? They will not be able to find you, invite you or message you.`)) return;
+        await blockTeacher(me.uid, inv.from); // also declines this invite
+      } else {
+        await respondInvite(inv.from, accept);
+      }
+      if (accept) {
+        setOpen(false);
+        onAccepted?.(inv.from);
+      }
+    } catch (e) {
+      setError(e?.message || 'That did not work. Please try again.');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  return (
+    <span ref={boxRef} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={count ? `${count} invite(s) waiting` : 'Invites'} title={count ? `${count} invite(s) waiting` : 'No invites'}
+        style={{ ...btn, position: 'relative', padding: '3px 6px', background: 'transparent', color: count ? C.green : C.muted }}>
+        <Bell size={15} />
+        {count > 0 && <span style={{ position: 'absolute', top: -3, right: -4, minWidth: 15, height: 15, padding: '0 4px', borderRadius: 8, background: C.red, color: '#fff', fontSize: 9.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center' }}>{count > 99 ? '99+' : count}</span>}
+      </button>
+      {open && (
+        <div role="dialog" aria-label="Invites" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 30, width: 320, maxWidth: '86vw', background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.18)', color: C.text }}>
+          <p style={{ margin: 0, padding: '10px 12px', fontSize: 12.5, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>Invites</p>
+          {!count && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No invites right now.</p>}
+          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {invites.map((inv) => (
+              <div key={inv.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: `1px solid ${C.border}` }}>
+                <AvatarImage photoURL={inv.fromPhotoURL} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700 }}>@{inv.fromUsername}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.fromSchool || 'School not set'}</span>
+                </span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={() => answer(inv, true)} disabled={busy === inv.from} style={{ ...btnPrimary, padding: '4px 10px', fontSize: 11.5 }}>
+                    {busy === inv.from ? <Loader2 size={11} className="animate-spin" /> : 'Accept'}
+                  </button>
+                  <button type="button" onClick={() => answer(inv, false)} disabled={busy === inv.from} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11.5 }}>Decline</button>
+                  <button type="button" onClick={() => answer(inv, false, true)} disabled={busy === inv.from} title="Decline and block" aria-label={`Block @${inv.fromUsername}`} style={{ ...btnGhost, padding: '4px 6px', fontSize: 11.5, color: C.red }}><Ban size={12} /></button>
+                </span>
+              </div>
+            ))}
+          </div>
+          {error && <p style={{ margin: 0, padding: '8px 12px', fontSize: 12, color: C.red }}>{error}</p>}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -731,7 +891,7 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
   );
 }
 
-export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, deskFiles = null, height = '100%' }) {
+export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null, height = '100%' }) {
   const uid = user?.uid;
   const [me, setMe] = useState(undefined); // undefined = loading, null = no username yet
   const [loadError, setLoadError] = useState('');
@@ -743,7 +903,7 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
   const [teamPick, setTeamPick] = useState([]);
   const [dialogError, setDialogError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { chats, ready, error } = useChats(me ? uid : null);
+  const { chats, invites, ready, error } = useChats(me ? uid : null);
   const [blocked, setBlocked] = useState(() => new Set());
   useEffect(() => (me && uid ? subscribeBlocks(uid, setBlocked) : undefined), [me, uid]);
 
@@ -777,13 +937,12 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
     return (
       <div style={{ maxWidth: 440, margin: '30px auto', padding: 20, background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14 }}>
         <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800 }}>Choose your username</h2>
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>Teachers at your school or division find and message you by your username. Each username belongs to one teacher only.</p>
+        <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>Teachers find and invite you by your username. Each username belongs to one teacher only.</p>
         <UsernameForm uid={uid} onDone={(entry) => setMe(entry)} />
       </div>
     );
   }
 
-  const reachable = canMessage(me);
   const visible = chats.filter((c) => {
     const f = filter.trim().toLowerCase();
     if (!f) return true;
@@ -798,7 +957,7 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
       setDialog(null);
       setOpenCid(cid);
     } catch (err) {
-      setDialogError(err?.code === 'permission-denied' ? 'You can only message teachers from your school or division.' : (err?.message || 'Could not open the chat.'));
+      setDialogError(err?.code === 'permission-denied' ? 'You can message this teacher once they accept your invite.' : (err?.message || 'Could not open the chat.'));
     } finally {
       setBusy(false);
     }
@@ -813,7 +972,7 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
       setTeamName('');
       setTeamPick([]);
       setOpenCid(cid);
-      if (failed.length) setDialogError(`${failed.length} teacher(s) could not be added (not in your school or division).`);
+      if (failed.length) setDialogError(`${failed.length} teacher(s) could not be added (only your contacts can be added).`);
     } catch (err) {
       setDialogError(err?.message || 'Could not create the team.');
     } finally {
@@ -845,22 +1004,16 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, flexWrap: 'wrap' }}>
         <Info size={13} />
         <span style={{ flex: 1, minWidth: 200 }}>The kaTuro admin can view messages for safety and child protection. Keep messages professional.</span>
+        <InviteBell me={me} invites={invites} onAccepted={(fromUid) => startDm({ id: fromUid })} />
         <button onClick={() => setDialog('username')} style={{ ...btn, padding: '2px 6px', background: 'transparent', color: C.green }}>@{me.username}</button>
       </div>
-
-      {!reachable && (
-        <div style={{ padding: '10px 14px', background: 'rgba(180,83,9,0.08)', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ flex: 1, minWidth: 220 }}>Add your School ID, school or division in your profile so you can message teachers at your school or division.</span>
-          {onOpenProfile && <button onClick={onOpenProfile} style={btnGhost}>Open my profile</button>}
-        </div>
-      )}
 
       <div className={`kt-msg-layout${openChat ? ' has-open' : ''}`}>
         <div className="kt-msg-list" style={{ borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button disabled={!reachable} onClick={() => { setDialog('dm'); setDialogError(''); }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', opacity: reachable ? 1 : 0.5 }}><Plus size={13} /> New chat</button>
-              <button disabled={!reachable} onClick={() => { setDialog('team'); setDialogError(''); }} style={{ ...btnGhost, flex: 1, justifyContent: 'center', opacity: reachable ? 1 : 0.5 }}><Users size={13} /> New team</button>
+              <button onClick={() => { setDialog('dm'); setDialogError(''); }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center' }}><Plus size={13} /> New chat</button>
+              <button onClick={() => { setDialog('team'); setDialogError(''); }} style={{ ...btnGhost, flex: 1, justifyContent: 'center' }}><Users size={13} /> New team</button>
             </div>
             <div style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: 10, color: '#6E6455' }} />
@@ -870,7 +1023,7 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {!ready && <p style={{ padding: 14, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading chats…</p>}
             {error && <p style={{ padding: 14, fontSize: 12, color: C.red }}>{error}</p>}
-            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: 12, color: C.muted }}>{chats.length ? 'No chats match.' : 'No chats yet. Start one with a teacher from your school or division.'}</p>}
+            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: 12, color: C.muted }}>{chats.length ? 'No chats match.' : 'No chats yet. Use New chat to find a teacher by @username and invite them.'}</p>}
             {visible.map((c) => (
               <button key={c.cid} onClick={() => setOpenCid(c.cid)}
                 style={{ display: 'flex', width: '100%', gap: 8, textAlign: 'left', padding: '10px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: c.cid === openCid ? 'rgba(45,106,79,0.12)' : 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -910,8 +1063,8 @@ export default function MessagesPanel({ user, onOpenProfile, onOpenChatChange, d
         </Modal>
       )}
       {dialog === 'dm' && (
-        <Modal title="New chat" onClose={() => setDialog(null)}>
-          <ColleaguePicker me={me} onPick={(card) => !busy && startDm(card)} />
+        <Modal title="Find a teacher" onClose={() => setDialog(null)}>
+          <PeopleSearch onMessage={(card) => !busy && startDm(card)} />
           {dialogError && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.red }}>{dialogError}</p>}
         </Modal>
       )}

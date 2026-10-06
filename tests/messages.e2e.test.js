@@ -97,17 +97,44 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     await svc.claimUsername('kt.admin');
   }, 60000);
 
-  it('the directory only shows the same school or division', async () => {
-    const me = await (async () => { await signIn('ana'); return svc.syncDirectory(); })();
-    const list = await svc.listColleagues(me);
-    expect(list.map((c) => c.username)).toContain('ben');
-    expect(list.map((c) => c.username)).not.toContain('carl');
-    expect(await svc.findByUsername('carl', me)).toEqual({ reason: 'other_org' });
-    expect(await svc.findByUsername('nobody.here', me)).toEqual({ reason: 'not_found' });
-    expect((await svc.findByUsername('ben', me)).card.uid).toBe(users.ben.uid);
-  }, 60000);
+  it('find by @username (typos too), invite, the invitee accepts; only then can they message', async () => {
+    await signIn('ana');
+    const ana = await svc.syncDirectory();
+    await expect(svc.openDirectChat(ana, users.ben.uid)).rejects.toBeTruthy(); // not contacts yet
 
-  it('one-to-one chat: send, unread, read, delete; never across divisions', async () => {
+    const exact = await svc.searchTeachers('@ben');
+    expect(exact.results[0]).toMatchObject({ uid: users.ben.uid, username: 'ben', school: 'Calauan NHS', state: 'none' });
+    expect(exact.results.map((r) => r.uid)).not.toContain(ana.uid); // never yourself
+    const typo = await svc.searchTeachers('ban');
+    expect(typo.results[0].username).toBe('ben'); // "Did you mean @ben?"
+    expect(typo.results[0].score).toBeLessThan(0.75);
+    expect((await svc.searchTeachers('carl')).results[0].username).toBe('carl'); // any school or division
+
+    expect(await svc.sendInvite(users.ben.uid)).toBe('invited');
+    expect(await svc.sendInvite(users.ben.uid)).toBe('invited'); // no duplicate
+    expect((await svc.searchTeachers('ben')).results[0].state).toBe('invited');
+
+    await signIn('ben');
+    const invites = await new Promise((resolve, reject) => {
+      const off = svc.subscribeIncomingInvites(users.ben.uid, (list) => { if (list.length) { off(); resolve(list); } }, reject);
+    });
+    expect(invites[0]).toMatchObject({ from: users.ana.uid, fromUsername: 'ana', fromSchool: 'Dayap National High School', status: 'pending' });
+    expect((await svc.searchTeachers('ana')).results[0].state).toBe('invited_me');
+    expect(await svc.respondInvite(users.ana.uid, true)).toBe('contact');
+    expect((await svc.listContacts(users.ben.uid)).map((c) => c.username)).toEqual(['ana']);
+
+    // Carl declines; Ana cannot re-invite right away.
+    await signIn('ana');
+    expect(await svc.sendInvite(users.carl.uid)).toBe('invited');
+    await signIn('carl');
+    expect(await svc.respondInvite(users.ana.uid, false)).toBe('declined');
+    await signIn('ana');
+    await expect(svc.sendInvite(users.carl.uid)).rejects.toThrow(/after 3 days/);
+    expect((await svc.listContacts(users.ana.uid)).map((c) => c.username)).toEqual(['ben']);
+    expect((await svc.searchTeachers('ben')).results[0].state).toBe('contact');
+  }, 90000);
+
+  it('one-to-one chat: send, unread, read, delete; never with someone who is not a contact', async () => {
     await signIn('ana');
     const me = await svc.syncDirectory();
     const cid = await svc.openDirectChat(me, users.ben.uid);
@@ -147,7 +174,7 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     await expect(getDocFromServer(doc(fb.db, 'conversations', cid))).rejects.toMatchObject({ code: 'permission-denied' });
   }, 90000);
 
-  it('teams: create, refuse other divisions, members leave, admin hands over, report reaches the admin', async () => {
+  it('teams: create, only contacts can be added, members leave, admin hands over, report reaches the admin', async () => {
     await signIn('ana');
     const ana = await svc.syncDirectory();
     const { cid, failed } = await svc.createTeam(ana, 'Grade 7 Science', [users.ben.uid, users.carl.uid]);
@@ -244,6 +271,7 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     const cid = svc.directChatId(ana.uid, users.ben.uid);
     await svc.blockTeacher(ana.uid, users.ben.uid);
     await expect(svc.sendMessage(cid, ana, 'still there?')).rejects.toBeTruthy();
+    expect((await svc.searchTeachers('ben')).results.map((r) => r.username)).not.toContain('ben'); // hidden while blocked
     await svc.setChatMuted(ana.uid, cid, true);
     expect((await adminDb.doc(`chatInbox/${ana.uid}/chats/${cid}`).get()).data().muted).toBe(true);
 
@@ -251,11 +279,58 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     const ben = await svc.syncDirectory();
     await expect(svc.sendMessage(cid, ben, 'hello?')).rejects.toBeTruthy();
     await expect(svc.uploadChatFile(cid, { name: 'notes.pdf', bytes: PDF }).promise).rejects.toThrow(/cannot send messages/);
+    expect((await svc.searchTeachers('ana')).results.map((r) => r.username)).not.toContain('ana'); // both ways
 
     await signIn('ana');
     await svc.unblockTeacher(ana.uid, users.ben.uid);
     await svc.sendMessage(cid, ana, 'Unblocked, sorry!');
   }, 90000);
+
+  it('anti-spam and edge cases: short searches, repeated declines, invites both ways, block from the bell', async () => {
+    await signIn('ana');
+    expect(await svc.searchTeachers('be')).toMatchObject({ results: [], tooShort: true }); // at least 3 characters
+    const res = await svc.searchTeachers('ben');
+    expect(res.results[0]).not.toHaveProperty('displayName'); // no real names in results
+
+    // Two declines: no more invites from that teacher, ever.
+    await adminDb.doc(`chatInvites/${users.ana.uid}_${users.carl.uid}`).set({ declines: 2, respondedAt: new Date(Date.now() - 10 * 86400000) }, { merge: true });
+    await expect(svc.sendInvite(users.carl.uid)).rejects.toThrow(/declined your invites/);
+
+    // Carl invites Ben; Ben "invites" Carl back: no second invite, Ben just accepts.
+    await signIn('carl');
+    expect(await svc.sendInvite(users.ben.uid)).toBe('invited');
+    await signIn('ben');
+    expect(await svc.sendInvite(users.carl.uid)).toBe('invited_me');
+    expect((await adminDb.doc(`chatInvites/${users.ben.uid}_${users.carl.uid}`).get()).exists).toBe(false);
+    expect(await svc.respondInvite(users.carl.uid, true)).toBe('contact');
+
+    // The admin account invites Carl; Carl blocks from the bell: the invite is declined.
+    await signIn('adm');
+    expect(await svc.sendInvite(users.carl.uid)).toBe('invited');
+    await signIn('carl');
+    await svc.blockTeacher(users.carl.uid, users.adm.uid);
+    await waitFor(async () => (await adminDb.doc(`chatInvites/${users.adm.uid}_${users.carl.uid}`).get()).data().status === 'declined');
+    await signIn('adm');
+    expect((await svc.searchTeachers('carl')).results.map((r) => r.username)).not.toContain('carl'); // hidden while blocked
+    await expect(svc.sendInvite(users.carl.uid)).rejects.toThrow(/cannot invite/);
+    await signIn('carl');
+    await svc.unblockTeacher(users.carl.uid, users.adm.uid);
+  }, 90000);
+
+  it('chats from before invites keep working: those teachers become contacts once', async () => {
+    const members = [users.ben.uid, users.carl.uid].sort();
+    const cid = `dm_${members[0]}_${members[1]}`;
+    await adminDb.doc(`conversations/${cid}`).set({ type: 'dm', members, createdBy: members[0], createdAt: new Date(), lastMessage: null, lastMessageAt: null });
+    for (const uid of members) await adminDb.doc(`chatInbox/${uid}/chats/${cid}`).set({ cid, type: 'dm', addedAt: new Date(), lastReadAt: null });
+    await adminDb.doc(`directory/${users.carl.uid}`).set({ contactsBackfilled: false }, { merge: true });
+
+    await signIn('carl');
+    await svc.syncDirectory();
+    expect((await svc.listContacts(users.carl.uid)).map((c) => c.username)).toContain('ben');
+    expect((await adminDb.doc(`directory/${users.carl.uid}`).get()).data().contactsBackfilled).toBe(true);
+    await signIn('ben');
+    expect((await svc.listContacts(users.ben.uid)).map((c) => c.username)).toContain('carl');
+  }, 60000);
 
   it('division suggestions come from what teachers actually entered', async () => {
     await signIn('ben');

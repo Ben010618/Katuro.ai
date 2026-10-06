@@ -2615,10 +2615,10 @@ exports.createSharedPlan = onCall(
 
 // ── Messages: unique usernames + school/division directory ───────────────────
 // Usernames are claimed here, inside a transaction, so two teachers can never hold
-// the same one ("That username is taken."). The directory is a small public card
-// (username, name, school, division, photo) that teachers at the same school or
-// division can read; teacher documents themselves stay private. Clients cannot
-// write either collection (see firestore.rules).
+// the same one ("That username is taken."). The directory is a small card (username,
+// name, school, division, photo) that signed-in teachers can open one at a time (names
+// in chats); it cannot be listed, and search returns only username, school and photo.
+// Teacher documents themselves stay private. Clients cannot write either collection.
 // Modular import: works in production and in the emulator (where the legacy
 // admin.firestore.FieldValue namespace is not always present).
 const { FieldValue: MsgFieldValue } = require('firebase-admin/firestore');
@@ -2698,6 +2698,29 @@ exports.claimUsername = onCall({ region: 'us-central1' }, async (req) => {
   });
 });
 
+/**
+ * One time per teacher: everyone they already have a one-to-one chat with becomes a
+ * contact (chats started before invites existed keep working, and those colleagues can
+ * be added to teams). Blocked pairs are skipped.
+ */
+async function backfillContactsFromDms(uid) {
+  const inbox = await db.collection(`chatInbox/${uid}/chats`).where('type', '==', 'dm').limit(300).get();
+  const convs = await Promise.all(inbox.docs.map((d) => db.doc(`conversations/${d.id}`).get()));
+  const others = [...new Set(convs.flatMap((c) => (c.exists && Array.isArray(c.get('members')) ? c.get('members') : [])).filter((m) => m && m !== uid))];
+  const blocked = await Promise.all(others.map((o) => blockedBetween(uid, o)));
+  const pairs = others.filter((_, i) => !blocked[i]);
+  // Firestore batches hold at most 500 writes: 2 per partner, in chunks.
+  for (let i = 0; i < pairs.length; i += 200) {
+    const batch = db.batch();
+    for (const other of pairs.slice(i, i + 200)) {
+      batch.set(db.doc(`chatContacts/${uid}/list/${other}`), { uid: other, since: MsgFieldValue.serverTimestamp(), fromExistingChat: true }, { merge: true });
+      batch.set(db.doc(`chatContacts/${other}/list/${uid}`), { uid, since: MsgFieldValue.serverTimestamp(), fromExistingChat: true }, { merge: true });
+    }
+    await batch.commit();
+  }
+  await db.doc(`directory/${uid}`).set({ contactsBackfilled: true }, { merge: true });
+}
+
 /** Refreshes the caller's directory card from their profile (school/division/name may have changed). */
 exports.syncDirectory = onCall({ region: 'us-central1' }, async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
@@ -2708,8 +2731,173 @@ exports.syncDirectory = onCall({ region: 'us-central1' }, async (req) => {
   const entry = directoryEntry(uid, teacherSnap.data(), dirSnap.data().usernameKey);
   const old = dirSnap.data();
   const changed = Object.keys(entry).some((k) => old[k] !== entry[k]);
-  if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: MsgFieldValue.serverTimestamp() });
+  if (changed) await db.doc(`directory/${uid}`).set({ ...entry, updatedAt: MsgFieldValue.serverTimestamp() }, { merge: true });
+  if (!old.contactsBackfilled) {
+    try {
+      await backfillContactsFromDms(uid);
+    } catch (err) {
+      console.warn('[syncDirectory] contacts backfill skipped (retried next time):', err?.message);
+    }
+  }
   return { entry };
+});
+
+// ── Messages: find teachers by @username, invite, accept (2026-10-06) ───────
+// Anyone can be found by username (fuzzy: "@ban" suggests "@ben"); messaging opens
+// only after the other teacher accepts an invite (they become contacts). Invites and
+// contacts are written here only (clients read their own; see firestore.rules).
+// Against copying the teacher list: at least 3 characters, 300 searches a day per
+// teacher, at most 8 results, and no real names in results (username, school, photo).
+const { normalizeQuery: chatQuery, searchUsernames } = require('./chatSearch');
+const DIRECTORY_CACHE_MS = 5 * 60 * 1000;
+const SEARCH_MIN_CHARS = 3;
+const SEARCHES_PER_DAY = 300;
+const INVITES_PER_DAY = 30;
+const REINVITE_AFTER_MS = 3 * 86400000;
+const MAX_DECLINES = 2; // after two declines the same teacher cannot invite again
+let _directoryCache = { at: 0, list: null };
+let _directoryLoading = null;
+
+function loadDirectory() {
+  _directoryLoading ||= db.collection('directory').select('username', 'school', 'photoURL').get()
+    .then((snap) => {
+      const list = snap.docs
+        .map((d) => ({ uid: d.id, username: d.get('username') || '', school: d.get('school') || '', photoURL: d.get('photoURL') || '' }))
+        .filter((e) => e.username);
+      _directoryCache = { at: Date.now(), list };
+      return list;
+    })
+    .finally(() => { _directoryLoading = null; });
+  return _directoryLoading;
+}
+
+/** One shared load per instance; a stale list is used while a fresh one loads. */
+async function directoryForSearch() {
+  const fresh = _directoryCache.list && Date.now() - _directoryCache.at < DIRECTORY_CACHE_MS;
+  if (fresh) return _directoryCache.list;
+  if (_directoryCache.list) {
+    loadDirectory().catch(() => {});
+    return _directoryCache.list;
+  }
+  return loadDirectory();
+}
+
+/** Counts one use of a per-day allowance in the server-only usage ledger; throws when it is used up. */
+async function takeDailyAllowance(uid, field, limit, message) {
+  const ref = db.doc(`teachers/${uid}/usage/${todayInManila()}`);
+  await db.runTransaction(async (tx) => {
+    const used = (await tx.get(ref)).data()?.[field] ?? 0;
+    if (used >= limit) throw new HttpsError('resource-exhausted', message);
+    tx.set(ref, { [field]: MsgFieldValue.increment(1), updatedAt: MsgFieldValue.serverTimestamp() }, { merge: true });
+  });
+}
+
+/** For each other teacher: 'contact' | 'invited' (I asked) | 'invited_me' (they asked) | 'none' | 'blocked'. */
+async function relationStates(me, uids) {
+  if (!uids.length) return {};
+  const refs = uids.flatMap((u) => [
+    db.doc(`chatBlocks/${me}/blocked/${u}`), db.doc(`chatBlocks/${u}/blocked/${me}`),
+    db.doc(`chatContacts/${me}/list/${u}`), db.doc(`chatInvites/${me}_${u}`), db.doc(`chatInvites/${u}_${me}`),
+  ]);
+  const snaps = await db.getAll(...refs);
+  const out = {};
+  uids.forEach((u, i) => {
+    const [b1, b2, contact, mine, theirs] = snaps.slice(i * 5, i * 5 + 5);
+    if (b1.exists || b2.exists) out[u] = 'blocked';
+    else if (contact.exists) out[u] = 'contact';
+    else if (theirs.exists && theirs.get('status') === 'pending') out[u] = 'invited_me';
+    else if (mine.exists && mine.get('status') === 'pending') out[u] = 'invited';
+    else out[u] = 'none';
+  });
+  return out;
+}
+
+exports.searchTeachers = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const me = req.auth.uid;
+  const q = chatQuery(req.data?.q);
+  if (q.length < SEARCH_MIN_CHARS) return { query: q, results: [], tooShort: true };
+  await takeDailyAllowance(me, 'chat_searches', SEARCHES_PER_DAY, `You can search up to ${SEARCHES_PER_DAY} times a day. Try again tomorrow.`);
+  const hits = searchUsernames(q, (await directoryForSearch()).filter((e) => e.uid !== me), { limit: 12 });
+  const states = await relationStates(me, hits.map((h) => h.uid));
+  const results = hits
+    .filter((h) => states[h.uid] !== 'blocked') // either side blocked: never shown
+    .slice(0, 8)
+    .map((h) => ({ uid: h.uid, username: h.username, school: h.school, photoURL: h.photoURL, score: Math.round(h.score * 100) / 100, state: states[h.uid] }));
+  return { query: q, results };
+});
+
+exports.sendChatInvite = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const from = req.auth.uid;
+  const to = String(req.data?.uid || '');
+  if (!to || to === from || to.includes('/')) throw new HttpsError('invalid-argument', 'Choose a teacher to invite.');
+  const [meDir, toDir] = await Promise.all([db.doc(`directory/${from}`).get(), db.doc(`directory/${to}`).get()]);
+  if (!meDir.exists) throw new HttpsError('failed-precondition', 'Choose your username first.');
+  if (!toDir.exists) throw new HttpsError('not-found', 'That teacher was not found.');
+  if (await blockedBetween(from, to)) throw new HttpsError('permission-denied', 'You cannot invite this teacher.');
+
+  const m = meDir.data();
+  const ref = db.doc(`chatInvites/${from}_${to}`);
+  const usageRef = db.doc(`teachers/${from}/usage/${todayInManila()}`);
+  // One transaction: the state checks, the daily allowance and the invite itself.
+  return db.runTransaction(async (tx) => {
+    const [contact, mine, theirs, usage] = await Promise.all([
+      tx.get(db.doc(`chatContacts/${from}/list/${to}`)), tx.get(ref), tx.get(db.doc(`chatInvites/${to}_${from}`)), tx.get(usageRef),
+    ]);
+    if (contact.exists) return { state: 'contact' };
+    if (theirs.exists && theirs.get('status') === 'pending') return { state: 'invited_me' };
+    if (mine.exists && mine.get('status') === 'pending') return { state: 'invited' };
+    const declines = mine.exists ? mine.get('declines') || 0 : 0;
+    if (declines >= MAX_DECLINES) throw new HttpsError('failed-precondition', 'This teacher declined your invites.');
+    const respondedAt = mine.exists ? mine.get('respondedAt') : null;
+    if (mine.exists && mine.get('status') === 'declined' && respondedAt?.toMillis && Date.now() - respondedAt.toMillis() < REINVITE_AFTER_MS) {
+      throw new HttpsError('failed-precondition', 'This teacher declined your invite. You can invite them again after 3 days.');
+    }
+    if ((usage.data()?.chat_invites ?? 0) >= INVITES_PER_DAY) {
+      throw new HttpsError('resource-exhausted', `You can send up to ${INVITES_PER_DAY} invites a day. Try again tomorrow.`);
+    }
+    tx.set(usageRef, { chat_invites: MsgFieldValue.increment(1), updatedAt: MsgFieldValue.serverTimestamp() }, { merge: true });
+    tx.set(ref, {
+      from, to, status: 'pending', createdAt: MsgFieldValue.serverTimestamp(), respondedAt: null, declines,
+      fromUsername: m.username || '', fromSchool: m.school || '', fromPhotoURL: m.photoURL || '',
+      toUsername: toDir.get('username') || '',
+    });
+    return { state: 'invited' };
+  });
+});
+
+exports.respondChatInvite = onCall({ region: 'us-central1' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const to = req.auth.uid;
+  const from = String(req.data?.from || '');
+  const accept = req.data?.accept === true;
+  if (!from || from === to || from.includes('/')) throw new HttpsError('invalid-argument', 'Invite not found.');
+  const ref = db.doc(`chatInvites/${from}_${to}`);
+  const reverseRef = db.doc(`chatInvites/${to}_${from}`);
+  return db.runTransaction(async (tx) => {
+    const [snap, reverse, b1, b2] = await Promise.all([
+      tx.get(ref), tx.get(reverseRef), tx.get(db.doc(`chatBlocks/${from}/blocked/${to}`)), tx.get(db.doc(`chatBlocks/${to}/blocked/${from}`)),
+    ]);
+    if (!snap.exists || snap.get('to') !== to) {
+      // Nothing to answer (e.g. "decline and block" with no pending invite): not an error.
+      if (!accept) return { state: 'declined' };
+      throw new HttpsError('not-found', 'Invite not found.');
+    }
+    if (snap.get('status') !== 'pending') return { state: snap.get('status') === 'accepted' ? 'contact' : snap.get('status') };
+    if (accept && (b1.exists || b2.exists)) throw new HttpsError('permission-denied', 'You cannot accept this invite.');
+    const now = MsgFieldValue.serverTimestamp();
+    if (!accept) {
+      tx.update(ref, { status: 'declined', respondedAt: now, declines: (snap.get('declines') || 0) + 1 });
+      return { state: 'declined' };
+    }
+    tx.update(ref, { status: 'accepted', respondedAt: now });
+    // Both invited each other: the other invite is settled too (no leftover in the bell).
+    if (reverse.exists && reverse.get('status') === 'pending') tx.update(reverseRef, { status: 'accepted', respondedAt: now });
+    tx.set(db.doc(`chatContacts/${to}/list/${from}`), { uid: from, since: now });
+    tx.set(db.doc(`chatContacts/${from}/list/${to}`), { uid: to, since: now });
+    return { state: 'contact' };
+  });
 });
 
 // ── Messages Phase 2: files, media, links, blocks, division suggestions ─────
