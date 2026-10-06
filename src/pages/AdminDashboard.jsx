@@ -18,6 +18,7 @@ import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
 import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
+import EmailCodeAdminCard from '../features/emailCode/EmailCodeAdminCard';
 import { db } from '../firebase';
 import {
   BarChart, Bar, LineChart, Line,
@@ -2483,6 +2484,9 @@ function ApiKeySection({ adminUid }) {
           </div>
         </div>
       )}
+
+      {/* Email codes (both engine tabs) */}
+      <EmailCodeAdminCard adminUid={adminUid} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { auth } from '../firebase';
 import { Loader2, Eye, EyeOff, Gift, BookOpen, CheckCircle2, ShieldCheck, FileSpreadsheet, Award } from 'lucide-react';
 import ktLogo from '../assets/KT-Favicon.webp';
 import { selfSignUp } from '../services/db';
+import { sendSignupCode, cleanCode, SIGNUP_URL } from '../services/emailCode';
 
 import bg1 from '../assets/1.webp';
 import bg2 from '../assets/2.webp';
@@ -429,6 +430,9 @@ const CSS = `
   }
 `;
 
+// KaTuroDesk (Electron) never asks for email codes; it sends new teachers to the website to sign up.
+const IS_DESK_APP = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
+
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
   // Old share links may still carry ?ref= — just open the sign-up form for them.
@@ -450,6 +454,16 @@ export default function LoginPage() {
   const [confirmPw, setConfirmPw] = useState('');
   const [showCPw,   setShowCPw]   = useState(false);
   const [signedUp,  setSignedUp]  = useState(false); // false | 'active' | 'pending'
+  // Email code (website sign-up): null until the code is sent, then { sentTo }.
+  const [codeStep,   setCodeStep]   = useState(null);
+  const [code,       setCode]       = useState('');
+  const [resendWait, setResendWait] = useState(0);
+
+  useEffect(() => {
+    if (resendWait <= 0) return undefined;
+    const id = setTimeout(() => setResendWait(w => w - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resendWait]);
 
   // Background subtle crossfade slideshow
   useEffect(() => {
@@ -483,9 +497,20 @@ export default function LoginPage() {
     if (!school.trim())    { setError('School name is required.'); triggerShake(); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); triggerShake(); return; }
     if (password !== confirmPw) { setError('Passwords do not match.'); triggerShake(); return; }
+    if (codeStep && code.length !== 6) { setError('Please type the 6-digit code from your email.'); triggerShake(); return; }
     setError(''); setLoading(true);
     try {
-      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school });
+      if (!codeStep) {
+        // Email codes switched on → show the code step; off (or email service down) → sign up as before.
+        const sent = await sendSignupCode(email);
+        if (sent?.required) {
+          setCodeStep({ sentTo: sent.sentTo });
+          setResendWait(sent.waitSec || 60);
+          setCode('');
+          return;
+        }
+      }
+      const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school, code: codeStep ? code : undefined });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
       setError((err?.message ?? 'Registration failed. Please try again.')
@@ -496,8 +521,21 @@ export default function LoginPage() {
     }
   }
 
+  async function resendSignupCode() {
+    setError(''); setLoading(true);
+    try {
+      const sent = await sendSignupCode(email);
+      if (sent?.required) { setCodeStep({ sentTo: sent.sentTo }); setResendWait(sent.waitSec || 60); }
+      else setCodeStep(null); // email service down: the next "Create account" signs up without a code
+    } catch (err) {
+      setError(err.message); triggerShake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function switchMode(m) {
-    setMode(m); setError(''); setSignedUp(false);
+    setMode(m); setError(''); setSignedUp(false); setCodeStep(null); setCode('');
   }
 
   const signupReady = mode !== 'signup' || (
@@ -676,8 +714,76 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {/* ── KaTuroDesk: accounts are made on the website (it emails a code first) ── */}
+              {!signedUp && mode === 'signup' && IS_DESK_APP && (
+                <div style={{ padding: '6px 0 4px' }}>
+                  <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                    Create your account on the website
+                  </h2>
+                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
+                    New accounts are made on katuro.website, which emails you a code to confirm your address.
+                    When you are done, come back here and sign in with the same email and password.
+                  </p>
+                  <button type="button" className="kt-submit-btn" onClick={() => window.open(SIGNUP_URL, '_blank', 'noopener')}>
+                    Open katuro.website
+                  </button>
+                  <p style={{ margin: '14px 0 0', textAlign: 'center', fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>
+                    Mayroon nang account?{' '}
+                    <button type="button" onClick={() => switchMode('login')} className="kt-auth-footer-link">
+                      Mag-sign in dito
+                    </button>
+                  </p>
+                </div>
+              )}
+
+              {/* ── Website sign-up: the code from the email ── */}
+              {!signedUp && mode === 'signup' && !IS_DESK_APP && codeStep && (
+                <form onSubmit={handleSignup}>
+                  <div style={{ marginBottom: 14 }}>
+                    <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                      Check your email
+                    </h2>
+                    <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--kt-text-secondary)', lineHeight: 1.6 }}>
+                      We sent a 6-digit code to <strong style={{ color: 'var(--kt-text-primary)' }}>{codeStep.sentTo}</strong>. It expires in 10 minutes.
+                      Check your spam folder if you do not see it.
+                    </p>
+                  </div>
+                  <div className="kt-form-field">
+                    <label className="kt-input-label">6-digit code *</label>
+                    <input
+                      className="kt-text-input"
+                      style={{ fontSize: 22, letterSpacing: 8, textAlign: 'center', fontWeight: 700 }}
+                      value={code}
+                      onChange={e => { setCode(cleanCode(e.target.value)); setError(''); }}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="000000"
+                      autoFocus
+                      disabled={loading}
+                    />
+                  </div>
+                  {error && <div className="kt-auth-error">{error}</div>}
+                  <button type="submit" className="kt-submit-btn" disabled={loading || code.length !== 6}>
+                    {loading ? (
+                      <>
+                        <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                        Nililikha ang account…
+                      </>
+                    ) : 'Create my account'}
+                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 12, fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>
+                    {resendWait > 0
+                      ? <span>Send a new code in {resendWait}s</span>
+                      : <button type="button" onClick={resendSignupCode} className="kt-auth-footer-link" disabled={loading}>Send a new code</button>}
+                    <button type="button" onClick={() => { setCodeStep(null); setCode(''); setError(''); }} className="kt-auth-footer-link" disabled={loading}>
+                      Change my details
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {/* ── Form Inputs ── */}
-              {!signedUp && (
+              {!signedUp && !(mode === 'signup' && (IS_DESK_APP || codeStep)) && (
                 <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
 
                   {/* Header info */}

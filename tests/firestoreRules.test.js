@@ -92,6 +92,29 @@ describe.skipIf(!hasEmulator)('firestore.rules', () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'adminConfig/billing')));
   });
 
+  it('email codes: everyone signed in reads the switch; teachers read only their own last check; codes are unreachable', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'adminConfig/emailCode'), { enabled: true });
+      await setDoc(doc(db, 'adminConfig/resend'), { apiKey: 're_secret' });
+      await setDoc(doc(db, 'emailChecks/teacher1'), { verifiedAt: 1 });
+      await setDoc(doc(db, 'emailChecks/teacher2'), { verifiedAt: 1 });
+      await setDoc(doc(db, 'emailCodes/abc'), { codeHash: 'x' });
+    });
+    const t = asTeacher();
+    await assertSucceeds(getDoc(doc(t, 'adminConfig/emailCode')));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'adminConfig/emailCode')));
+    await assertFails(setDoc(doc(t, 'adminConfig/emailCode'), { enabled: false }));
+    await assertFails(getDoc(doc(t, 'adminConfig/resend')));            // the Resend key stays admin-only
+    await assertSucceeds(getDoc(doc(t, 'emailChecks/teacher1')));
+    await assertFails(getDoc(doc(t, 'emailChecks/teacher2')));
+    await assertFails(setDoc(doc(t, 'emailChecks/teacher1'), { verifiedAt: Date.now() })); // cannot skip the code
+    await assertFails(getDoc(doc(t, 'emailCodes/abc')));
+    await assertFails(setDoc(doc(t, 'emailCodes/abc'), { codeHash: 'y' }));
+    await assertSucceeds(setDoc(doc(asAdmin(), 'adminConfig/emailCode'), { enabled: false }));
+    await assertSucceeds(getDoc(doc(asAdmin(), 'emailChecks/teacher2')));
+  });
+
   it('backup-engine usage: only admins can read it; nobody can write it from the app', async () => {
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'aiBackupUsage/2026-10-05'), { count: 3 }));
     await assertSucceeds(getDoc(doc(asAdmin(), 'aiBackupUsage/2026-10-05')));
