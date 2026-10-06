@@ -310,7 +310,7 @@ export default function App() {
             {/* Profile & signatories, plan and daily limits, account (linked from the plan badge and the Settings menu) */}
             <Route path="settings" element={<SettingsPage />} />
 
-            {/* Teacher-to-teacher chats (same school or division) */}
+            {/* Teacher-to-teacher chats (@username search, invites, contacts) */}
             <Route path="messages" element={<MessagesPage />} />
           </Route>
 

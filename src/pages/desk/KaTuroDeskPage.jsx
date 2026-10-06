@@ -90,6 +90,8 @@ export default function KaTuroDeskPage() {
   useChatNotifications({
     uid: user?.uid,
     chats: chatState.chats,
+    invites: chatState.invites,
+    invitesReady: chatState.invitesReady,
     ready: chatState.ready,
     openCid: openChatId,
     panelOpen: showMessages,
@@ -117,7 +119,6 @@ export default function KaTuroDeskPage() {
               user={user}
               deskFiles={deskFiles}
               onOpenChatChange={setOpenChatId}
-              onOpenProfile={() => { setShowMessages(false); setSettingsTab('profile'); setShowSettings(true); }}
             />
           </div>
         </div>
@@ -222,12 +223,12 @@ export default function KaTuroDeskPage() {
 
           <button
             onClick={() => setShowMessages(true)}
-            title="Messages: chat with teachers from your school or division"
+            title="Messages: find teachers by @username and chat with your contacts"
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <MessageSquare size={14} />
             <span className="text-[11px] font-semibold hidden sm:inline">Messages</span>
-            {chatState.unreadCount > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">{chatState.unreadCount > 99 ? '99+' : chatState.unreadCount}</span>}
+            {chatState.badgeCount > 0 && <span title={chatState.inviteCount ? `${chatState.inviteCount} invite(s) to answer` : undefined} className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
           </button>
 
           <button

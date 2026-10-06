@@ -1,6 +1,6 @@
 /**
- * chatService.js — Messages (Phase 1): unique usernames, the school/division
- * directory, one-to-one chats and teams. Every write here matches a rule in
+ * chatService.js — Messages: unique usernames, finding teachers by @username,
+ * invites/contacts, one-to-one chats and teams. Every write here matches a rule in
  * firestore.rules (see tests/messagesRules.test.js); usernames and directory cards
  * are written only by the claimUsername / syncDirectory Cloud Functions.
  *
@@ -12,6 +12,8 @@
  *   conversations/{cid}/messages/{id}   { senderUid, senderName, text, createdAt, deleted? }
  *   chatInbox/{uid}/chats/{cid}         { cid, type, addedAt, lastReadAt }
  *   chatReports/{id}                    reported messages (admin only)
+ *   chatInvites/{from}_{to}             { from, to, status: pending|accepted|declined, from card } (server-written)
+ *   chatContacts/{uid}/list/{otherUid}  accepted invites, both ways (server-written)
  * Phase 2:
  *   conversations/{cid}/media|files/{id} shared images / documents (written by uploadChatFile)
  *   conversations/{cid}/links/{id}      web links found in messages (written with the message)
@@ -129,15 +131,6 @@ export async function syncDirectory() {
   return res?.entry || null;
 }
 
-/** A teacher can message others only once their profile has a school (ID or name) or division. */
-export function canMessage(entry) {
-  return Boolean(entry?.divisionKey || entry?.schoolKey);
-}
-
-export function sameOrg(a, b) {
-  return Boolean(a && b && ((a.divisionKey && a.divisionKey === b.divisionKey) || (a.schoolKey && a.schoolKey === b.schoolKey)));
-}
-
 const dirCache = new Map();
 
 /** A directory card by uid (cached); null when it is not visible to you or does not exist. */
@@ -154,31 +147,53 @@ export async function getDirectoryCard(uid) {
   }
 }
 
-/** Teachers of my school and division (up to a few hundred each), sorted by name, without me. */
-export async function listColleagues(me) {
-  const found = new Map();
-  const add = (snap) => snap.docs.forEach((d) => { if (d.id !== me.uid) found.set(d.id, { id: d.id, ...d.data() }); });
-  const tasks = [];
-  if (me.schoolKey) tasks.push(getDocs(query(collection(db, 'directory'), where('schoolKey', '==', me.schoolKey), limit(300))).then(add));
-  if (me.divisionKey) tasks.push(getDocs(query(collection(db, 'directory'), where('divisionKey', '==', me.divisionKey), limit(300))).then(add));
-  await Promise.all(tasks);
-  const list = [...found.values()];
-  list.forEach((c) => dirCache.set(c.id, c));
-  // Same school first, then alphabetical.
-  const rank = (c) => (me.schoolKey && c.schoolKey === me.schoolKey ? 0 : 1);
-  return list.sort((a, b) => rank(a) - rank(b) || String(a.displayName || '').localeCompare(String(b.displayName || '')));
+/**
+ * Teachers whose @username matches (most likely first, typos included: "ban" → @ben).
+ * Each result: { uid, username, displayName, school, photoURL, score, state } where state is
+ * 'none' | 'invited' (I asked) | 'invited_me' (they asked) | 'contact'.
+ */
+export async function searchTeachers(query) {
+  const q = searchKey(query);
+  if (q.length < SEARCH_MIN_CHARS) return { query: q, results: [], tooShort: true };
+  return callFunction('searchTeachers', { q });
 }
 
-/** Exact username lookup. Returns { card } or { reason } ('not_found' | 'other_org' | 'self'). */
-export async function findByUsername(value, me) {
-  const name = normalizeUsername(value);
-  if (!name) return { reason: 'not_found' };
-  const snap = await getDoc(doc(db, 'usernames', name));
-  if (!snap.exists()) return { reason: 'not_found' };
-  const uid = snap.data().uid;
-  if (uid === me.uid) return { reason: 'self' };
-  const card = await getDirectoryCard(uid);
-  return card ? { card } : { reason: 'other_org' };
+export const SEARCH_MIN_CHARS = 3;
+
+/** What the server searches for (same cleaning as functions/chatSearch.js normalizeQuery). */
+export function searchKey(value) {
+  return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9._]/g, '').slice(0, 30);
+}
+
+/** Invites a teacher to connect. Returns the new state ('invited', or the existing one). */
+export async function sendInvite(uid) {
+  const res = await callFunction('sendChatInvite', { uid });
+  return res?.state || 'invited';
+}
+
+/** Accept (→ 'contact') or decline (→ 'declined') an invite from `fromUid`. */
+export async function respondInvite(fromUid, accept) {
+  const res = await callFunction('respondChatInvite', { from: fromUid, accept: accept === true });
+  return res?.state || (accept ? 'contact' : 'declined');
+}
+
+/** Invites waiting for my answer, newest first. */
+export function subscribeIncomingInvites(uid, cb, onError) {
+  return onSnapshot(
+    query(collection(db, 'chatInvites'), where('to', '==', uid), where('status', '==', 'pending'), limit(100)),
+    (snap) => {
+      const ms = (t) => (t?.toMillis ? t.toMillis() : 0);
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)));
+    },
+    onError,
+  );
+}
+
+/** My contacts (teachers I can message and add to teams), as directory cards sorted by username. */
+export async function listContacts(uid) {
+  const snap = await getDocs(query(collection(db, 'chatContacts', uid, 'list'), limit(500)));
+  const cards = await Promise.all(snap.docs.map((d) => getDirectoryCard(d.id)));
+  return cards.filter(Boolean).sort((a, b) => String(a.username || '').localeCompare(String(b.username || '')));
 }
 
 export function directChatId(a, b) {
@@ -189,7 +204,8 @@ export function directChatId(a, b) {
 /** Opens (or creates) the one-to-one chat with another teacher. Returns the chat id. */
 export async function openDirectChat(me, otherUid) {
   const cid = directChatId(me.uid, otherUid);
-  const mine = await getDoc(doc(db, 'chatInbox', me.uid, 'chats', cid));
+  const inboxRef = doc(db, 'chatInbox', me.uid, 'chats', cid);
+  const mine = await getDoc(inboxRef);
   if (mine.exists()) return cid;
   const members = [me.uid, otherUid].sort();
   const batch = writeBatch(db);
@@ -198,11 +214,17 @@ export async function openDirectChat(me, otherUid) {
     batch.set(doc(db, 'conversations', cid, 'chatMembers', uid), { uid, role: 'member', addedBy: me.uid, joinedAt: serverTimestamp() });
     batch.set(doc(db, 'chatInbox', uid, 'chats', cid), { cid, type: 'dm', addedAt: serverTimestamp(), lastReadAt: null });
   }
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (err) {
+    // The other teacher opened the same new chat a moment earlier: just open it.
+    if (err?.code === 'permission-denied' && (await getDoc(inboxRef).catch(() => null))?.exists()) return cid;
+    throw err;
+  }
   return cid;
 }
 
-/** Adds one teacher to a team (team admins only; same school or division). */
+/** Adds one teacher to a team (team admins only; one of my contacts). */
 export async function addTeamMember(me, cid, uid) {
   const batch = writeBatch(db);
   batch.set(doc(db, 'conversations', cid, 'chatMembers', uid), { uid, role: 'member', addedBy: me.uid, joinedAt: serverTimestamp() });
@@ -464,7 +486,9 @@ export function subscribeBlocks(uid, cb) {
   return onSnapshot(collection(db, 'chatBlocks', uid, 'blocked'), (snap) => cb(new Set(snap.docs.map((d) => d.id))), () => cb(new Set()));
 }
 
+/** Block: their pending invite to me is declined too (best effort), so it leaves the bell. */
 export async function blockTeacher(myUid, otherUid) {
+  respondInvite(otherUid, false).catch(() => {});
   const { setDoc } = await import('firebase/firestore');
   await setDoc(doc(db, 'chatBlocks', myUid, 'blocked', otherUid), { blockedAt: serverTimestamp() });
 }

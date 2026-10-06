@@ -1,7 +1,7 @@
 /**
  * Messages security rules — run against the local emulator:
  *   npm run test:rules
- * teacher1 + teacher2: same division (Laguna). teacher3: another division. admin1: admin.
+ * teacher1 + teacher2: contacts (one accepted the other's invite). teacher3: not a contact. admin1: admin.
  */
 import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -41,6 +41,9 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
       await setDoc(doc(db, 'directory/teacher2'), dir('teacher2', 'Ben', 'laguna'));
       await setDoc(doc(db, 'directory/teacher3'), dir('teacher3', 'Carl', 'cebu'));
       await setDoc(doc(db, 'usernames/ana'), { uid: 'teacher1', username: 'ana' });
+      // teacher1 and teacher2 are contacts (written by respondChatInvite on the server).
+      await setDoc(doc(db, 'chatContacts/teacher1/list/teacher2'), { uid: 'teacher2', since: 1 });
+      await setDoc(doc(db, 'chatContacts/teacher2/list/teacher1'), { uid: 'teacher1', since: 1 });
     });
   });
 
@@ -72,18 +75,35 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     await assertFails(setDoc(doc(as('teacher2'), 'usernames/ana'), { uid: 'teacher2' }));
   });
 
-  it('the directory shows only teachers of the same school or division', async () => {
+  it('directory cards open one at a time for any signed-in teacher; never listed by teachers', async () => {
     await assertSucceeds(getDoc(doc(as('teacher1'), 'directory/teacher2')));
-    await assertFails(getDoc(doc(as('teacher1'), 'directory/teacher3')));
-    await assertSucceeds(getDocs(query(collection(as('teacher1'), 'directory'), where('divisionKey', '==', 'laguna'))));
-    await assertFails(getDocs(query(collection(as('teacher1'), 'directory'), where('divisionKey', '==', 'cebu'))));
+    await assertSucceeds(getDoc(doc(as('teacher1'), 'directory/teacher3'))); // any school
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'directory/teacher3')));
+    await assertFails(getDocs(query(collection(as('teacher1'), 'directory'), where('divisionKey', '==', 'laguna'))));
+    await assertFails(getDocs(collection(as('teacher1'), 'directory')));
     await assertFails(setDoc(doc(as('teacher1'), 'directory/teacher1'), dir('teacher1', 'Ana', 'cebu')));
-    await assertSucceeds(getDoc(doc(as('admin1'), 'directory/teacher3')));
+    await assertSucceeds(getDocs(collection(as('admin1'), 'directory')));
   });
 
-  it('one-to-one chats only within the same school or division', async () => {
+  it('one-to-one chats only with contacts (an accepted invite), not by school or division', async () => {
     await assertSucceeds(startDm('teacher2').commit());
-    await assertFails(startDm('teacher3').commit());
+    await assertFails(startDm('teacher3').commit()); // not a contact
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatContacts/teacher1/list/teacher3'), { uid: 'teacher3', since: 1 }));
+    await assertSucceeds(startDm('teacher3').commit()); // other division, but now a contact
+  });
+
+  it('invites and contacts: only the two teachers involved read them; only the server writes', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatInvites/teacher3_teacher1'), { from: 'teacher3', to: 'teacher1', status: 'pending' }));
+    await assertSucceeds(getDoc(doc(as('teacher1'), 'chatInvites/teacher3_teacher1'))); // invitee
+    await assertSucceeds(getDoc(doc(as('teacher3'), 'chatInvites/teacher3_teacher1'))); // sender
+    await assertFails(getDoc(doc(as('teacher2'), 'chatInvites/teacher3_teacher1')));    // anyone else
+    await assertSucceeds(getDocs(query(collection(as('teacher1'), 'chatInvites'), where('to', '==', 'teacher1'), where('status', '==', 'pending'))));
+    await assertFails(getDocs(collection(as('teacher1'), 'chatInvites')));              // not everyone's invites
+    await assertFails(updateDoc(doc(as('teacher1'), 'chatInvites/teacher3_teacher1'), { status: 'accepted' }));
+    await assertFails(setDoc(doc(as('teacher3'), 'chatInvites/teacher3_teacher2'), { from: 'teacher3', to: 'teacher2', status: 'pending' }));
+    await assertSucceeds(getDocs(collection(as('teacher1'), 'chatContacts/teacher1/list')));
+    await assertFails(getDocs(collection(as('teacher3'), 'chatContacts/teacher1/list')));
+    await assertFails(setDoc(doc(as('teacher3'), 'chatContacts/teacher3/list/teacher1'), { uid: 'teacher1', since: 1 })); // no self-made contacts
   });
 
   it('only members (and the admin) read a chat; senders cannot fake their name', async () => {
@@ -97,7 +117,7 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     await assertSucceeds(getDocs(collection(as('admin1'), `conversations/${cid}/messages`)));
   });
 
-  it('teams: any teacher creates one; the admin adds same-school/division teachers; members can leave', async () => {
+  it('teams: any teacher creates one; the admin adds their contacts; members can leave', async () => {
     const db = as('teacher1');
     const cid = 'team_test1';
     const b = writeBatch(db);
@@ -114,7 +134,10 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
       return bb.commit();
     };
     await assertSucceeds(add('teacher1', 'teacher2'));
-    await assertFails(add('teacher1', 'teacher3'));                      // other division
+    await assertFails(add('teacher1', 'teacher3'));                      // not a contact
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatContacts/teacher1/list/teacher3'), { uid: 'teacher3', since: 1 }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher3/blocked/teacher1'), { at: 1 }));
+    await assertFails(add('teacher1', 'teacher3'));                      // a contact, but blocked
     await assertFails(add('teacher2', 'teacher3'));                      // members cannot add
     await assertFails(setDoc(doc(as('teacher3'), `conversations/${cid}/chatMembers/teacher3`), { uid: 'teacher3', role: 'admin', addedBy: 'teacher3', joinedAt: serverTimestamp() }));
     await assertSucceeds(send(cid, 'teacher2', 'Ben'));

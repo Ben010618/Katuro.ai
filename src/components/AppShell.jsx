@@ -50,7 +50,7 @@ const TITLES = {
 
 // ── Sidebar (no profile card rendered here — lifted to AppShell root) ─────────
 function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, onProfileOpen, onFacultyOpen }) {
-  const { unreadCount } = useChats(user?.uid);
+  const { unreadCount, inviteCount, badgeCount } = useChats(user?.uid);
   const navigate = useNavigate();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef(null);
@@ -163,11 +163,11 @@ function SidebarContent({ user, photoURL, plan, isAdmin, onClose, dark, toggle, 
           >
             <Icon size={15} style={{ flexShrink: 0 }} />
             <span style={{ flex: 1 }}>{label}</span>
-            {badge === 'messages' && unreadCount > 0 && (
-              <span title={`${unreadCount} unread chat${unreadCount === 1 ? '' : 's'}`} style={{
+            {badge === 'messages' && badgeCount > 0 && (
+              <span title={[unreadCount && `${unreadCount} unread chat${unreadCount === 1 ? '' : 's'}`, inviteCount && `${inviteCount} invite${inviteCount === 1 ? '' : 's'} to answer`].filter(Boolean).join(', ')} style={{
                 background: '#E4D5AC', color: '#262119', borderRadius: 10, fontSize: 10,
                 padding: '0 6px', fontWeight: 800, lineHeight: '16px', minWidth: 16, textAlign: 'center',
-              }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+              }}>{badgeCount > 99 ? '99+' : badgeCount}</span>
             )}
             {isNew && (
               <span style={{
@@ -379,6 +379,8 @@ export default function AppShell() {
   useChatNotifications({
     uid: user?.uid,
     chats: chatState.chats,
+    invites: chatState.invites,
+    invitesReady: chatState.invitesReady,
     ready: chatState.ready,
     openCid: null,
     panelOpen: location.pathname.startsWith('/messages'),

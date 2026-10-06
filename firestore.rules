@@ -278,21 +278,20 @@ service cloud.firestore {
     }
 
 
-    // ── Messages: usernames, directory, chats (Phase 1, 2026-10-04) ──────────
-    // Teachers message teachers from the same school or division. Usernames and
-    // directory cards are written only by the claimUsername / syncDirectory
-    // functions. The kaTuro admin can read every chat (teachers are told so).
+    // ── Messages: usernames, directory, chats ───────────────────────────────
+    // Teachers find each other by @username (searchTeachers function) and can start a
+    // one-to-one chat or add someone to a team once that teacher accepted an invite
+    // (they are contacts). Usernames, directory cards, invites and contacts are written
+    // only by the server. The kaTuro admin can read every chat (teachers are told so).
     function myDir() {
       return get(/databases/$(database)/documents/directory/$(request.auth.uid)).data;
     }
     function hasDir() {
       return request.auth != null && exists(/databases/$(database)/documents/directory/$(request.auth.uid));
     }
-    function sameOrgWith(otherUid) {
-      let a = myDir();
-      let b = get(/databases/$(database)/documents/directory/$(otherUid)).data;
-      return (a.divisionKey != '' && a.divisionKey == b.divisionKey) ||
-             (a.schoolKey != '' && a.schoolKey == b.schoolKey);
+    // The other teacher accepted an invite from me, or I accepted theirs.
+    function isContact(otherUid) {
+      return exists(/databases/$(database)/documents/chatContacts/$(request.auth.uid)/list/$(otherUid));
     }
     function isChatMember(cid) {
       return request.auth != null &&
@@ -320,12 +319,22 @@ service cloud.firestore {
       allow list, write:  if false;                  // no browsing; claimed by the server only
     }
 
+    // A card can be opened by id (names in chats, search results); never listed.
     match /directory/{uid} {
-      allow read: if request.auth != null && (
-        request.auth.uid == uid || isAdmin() ||
-        (hasDir() && myDir().divisionKey != '' && resource.data.divisionKey == myDir().divisionKey) ||
-        (hasDir() && myDir().schoolKey != '' && resource.data.schoolKey == myDir().schoolKey)
-      );
+      allow get:   if request.auth != null;
+      allow list:  if isAdmin();
+      allow write: if false;
+    }
+
+    // Invites: the two teachers involved can read them; only the server writes.
+    match /chatInvites/{inviteId} {
+      allow read:  if request.auth != null && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // My contacts (accepted invites): mine to read; only the server writes.
+    match /chatContacts/{uid}/list/{otherUid} {
+      allow read:  if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow write: if false;
     }
 
@@ -345,7 +354,7 @@ service cloud.firestore {
             request.auth.uid in request.resource.data.members &&
             cid == 'dm_' + request.resource.data.members[0] + '_' + request.resource.data.members[1] &&
             !blockedPair(request.resource.data.members[0], request.resource.data.members[1]) &&
-            sameOrgWith(request.resource.data.members[0] == request.auth.uid
+            isContact(request.resource.data.members[0] == request.auth.uid
               ? request.resource.data.members[1] : request.resource.data.members[0]) &&
             request.resource.data.keys().hasOnly(['type', 'members', 'createdBy', 'createdAt', 'lastMessage', 'lastMessageAt']))
         );
@@ -377,10 +386,10 @@ service cloud.firestore {
               getAfter(/databases/$(database)/documents/conversations/$(cid)).data.type == 'dm' &&
               getAfter(/databases/$(database)/documents/conversations/$(cid)).data.createdBy == request.auth.uid &&
               memberUid in getAfter(/databases/$(database)/documents/conversations/$(cid)).data.members) ||
-            // A team admin adds a teacher from the same school or division.
+            // A team admin adds one of their contacts (never across a block).
             (request.resource.data.role == 'member' && memberUid != request.auth.uid &&
               get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
-              isChatAdmin(cid) && sameOrgWith(memberUid))
+              isChatAdmin(cid) && isContact(memberUid) && !blockedPair(request.auth.uid, memberUid))
           );
         // A team admin may make another member an admin (e.g. before leaving).
         allow update: if isChatAdmin(cid) &&
