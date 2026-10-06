@@ -55,7 +55,7 @@ export const useDeskStore = create(
       // Learner-name masking before text goes to the AI (RA 10173)
       privacyMode: true,
 
-      // Assistant personality chosen in Settings: 'matt' | 'luna'
+      // Assistant personality chosen in Settings: 'matt' | 'luna' | 'grey'
       persona: 'matt',
 
       // Conversation Stream

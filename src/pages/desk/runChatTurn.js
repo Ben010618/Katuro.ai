@@ -6,6 +6,7 @@
 import { useDeskStore, folderIndex } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
+import { getPersona } from '../../services/desk/personas';
 
 /**
  * @param {object} o
@@ -62,9 +63,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
   } catch (err) {
     console.error('Agent execution error:', err);
     const content = err.dailyLimit || err.status === 429
-      ? (persona === 'luna'
-        ? `I am sorry, ${salutation}. We have reached today's limit for your plan. It resets at midnight, or you may ask the KaTuro admin about a Subscription for higher limits.`
-        : `Ay, sorry ${salutation}! Naubos na natin ang daily limit ng plan mo. Babalik 'yan pag midnight — or ask the KaTuro admin about a Subscription para mas marami!`)
+      ? getPersona(persona).limitReached(salutation)
       : `Something went wrong: ${String(err.message || 'Unknown error').replace(/[.\s]+$/, '')}. Please try again.`;
     useDeskStore.getState().updateLastAssistantMessage({ content, isThinking: false });
     return { status: 'error', content, files: [] };

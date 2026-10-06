@@ -31,7 +31,7 @@ export const QUICK_PROMPTS = [
   { route: 'merge_pdfs', label: 'Merge PDFs', prompt: 'Merge the attached PDFs into one file in the order I attached them.' },
 ];
 
-const GREETING = /^(hi+|hello+|hey+|helo|hellow|yo+|yow|kumusta|musta|kamusta|good\s*(morning|afternoon|evening|day)|magandang\s*(umaga|hapon|gabi|araw))\b[\s,!.]*(po|sir|ma'?am|matt|luna|teacher|katuro)?[\s,!.?😊👋🙂]*$/iu;
+const GREETING = /^(hi+|hello+|hey+|helo|hellow|yo+|yow|kumusta|musta|kamusta|good\s*(morning|afternoon|evening|day)|magandang\s*(umaga|hapon|gabi|araw))\b[\s,!.]*(po|sir|ma'?am|matt|luna|grey|teacher|katuro)?[\s,!.?😊👋🙂]*$/iu;
 const THANKS = /^(thanks?|thank\s*you|ty|salamat|maraming\s*salamat)\b[\s\S]{0,30}$/i;
 
 /** Intent rules for short free-text requests; each needs matching files to be confident. */

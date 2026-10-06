@@ -6,7 +6,7 @@ import { KaTuroAIAvatar } from './DeskAvatar';
 import TeacherProfileForm from '../../components/TeacherProfileForm';
 import { useDeskUpdate, updateStatusText } from './useDeskUpdate';
 
-/** KaTuroDesk Settings: assistant persona (Matt / Luna) and privacy. */
+/** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
   const { persona, setPersona, privacyMode, setPrivacyMode } = useDeskStore();
   const [tab, setTab] = useState(initialTab);
