@@ -349,7 +349,13 @@ h1, h2, h3, .doc-heading, .editorial-heading {
 
 .kt-split-sidebar {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+.kt-split-sidebar > *,
+.kt-grid-2 > *,
+.kt-grid-3 > *,
+.kt-grid-4 > * {
+  min-width: 0;
 }
 
 .my-lessons-board {
@@ -380,7 +386,7 @@ h1, h2, h3, .doc-heading, .editorial-heading {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .kt-split-sidebar {
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: minmax(0, 1fr) 280px;
   }
 }
 
@@ -418,6 +424,21 @@ h1, h2, h3, .doc-heading, .editorial-heading {
 @media (max-width: 640px) {
   :root {
     --kt-main-padding: 14px 12px;
+  }
+  /* Settings > Plan: the daily-limits table fits a phone (it scrolls sideways if not). */
+  .kt-limits-table th, .kt-limits-table td { padding: 8px 8px !important; }
+  .kt-limits-table th { letter-spacing: 0.3px !important; font-size: 10px !important; }
+  /* Landing co-teacher strip: five across on a phone. */
+  .landing-agent-strip button { padding: 12px 2px !important; min-width: 0; }
+  .landing-agent-strip img { width: 36px !important; height: 36px !important; }
+  .landing-agent-strip span { font-size: 10.5px !important; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
+  .landing-agent-strip span + span { font-size: 7.5px !important; letter-spacing: 0.2px !important; }
+  /* Wizard steps: on a phone only the current step keeps its name. */
+  .kt-step-label:not([data-active='true']) {
+    display: none;
+  }
+  .kt-wizard-card {
+    padding: 18px !important;
   }
   body {
     font-size: 14px;

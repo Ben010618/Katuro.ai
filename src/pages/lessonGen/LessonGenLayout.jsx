@@ -111,7 +111,7 @@ export default function LessonGenLayout() {
   const showContextChip = currentIdx > 0 && store.subject;
 
   return (
-    <div style={{ margin: '-24px', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 56px)' }}>
+    <div style={{ margin: 'calc(-1 * var(--shell-pad-y, 24px)) calc(-1 * var(--shell-pad-x, 24px))', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 56px)' }}>
 
       {/* Progress bar — sticky */}
       <div style={{

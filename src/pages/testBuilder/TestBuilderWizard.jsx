@@ -232,7 +232,7 @@ export default function TestBuilderWizard({ onSessionFinalized }) {
   }
 
   return (
-    <div style={{ margin: '-24px', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 56px)' }}>
+    <div style={{ margin: 'calc(-1 * var(--shell-pad-y, 24px)) calc(-1 * var(--shell-pad-x, 24px))', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 56px)' }}>
 
       {/* ── Progress rail — kaTuro gradient, sticky top ───────────────────── */}
       <div style={{

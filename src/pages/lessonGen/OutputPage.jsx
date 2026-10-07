@@ -464,7 +464,7 @@ export default function OutputPage() {
         background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)',
         padding: '10px 24px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', gap: 12,
-        margin: '-24px -24px 0',
+        margin: 'calc(-1 * var(--shell-pad-y, 24px)) calc(-1 * var(--shell-pad-x, 24px)) 0',
         boxShadow: '0 1px 3px rgba(38,33,25,0.04)',
       }}>
         {/* Left: Navigation */}
