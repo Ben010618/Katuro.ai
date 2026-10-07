@@ -31,6 +31,7 @@ function toForm(profile, user) {
   const form = {
     userName: t.userName, name: t.name, honorific: t.honorific,
     school: t.school, schoolId: t.schoolId, district: t.district, division: t.division, region: t.region, designation: t.designation,
+    advisoryClass: t.advisoryClass, teachingLoad: t.teachingLoad,
   };
   for (const r of SIGNATORY_ROLES) {
     form[`${r.key}Name`] = t.signatories[r.key].name;
@@ -132,6 +133,19 @@ export default function TeacherProfileForm({ uid, profile, user, onSaved, compac
           </Field>
           <Field label="Region">
             <input style={inputStyle} value={form.region} onChange={set('region')} placeholder="Region IV-A (CALABARZON)" />
+          </Field>
+        </div>
+      </section>
+
+      <section>
+        <h3 style={sectionTitle}>My classes (this school year)</h3>
+        <p style={sectionHint}>Helps KaTuro understand "my class" and "my grades" without guessing. Leave blank what does not apply.</p>
+        <div style={grid(compact ? 150 : 220)}>
+          <Field label="Advisory class" hint="e.g. Grade 5 – Rizal. Leave blank if you are not a class adviser.">
+            <input style={inputStyle} value={form.advisoryClass} onChange={set('advisoryClass')} placeholder="Grade 5 – Rizal" />
+          </Field>
+          <Field label="Teaching load" hint="Subjects and sections you teach, e.g. Science 7 – A, B; Math 8 – C">
+            <input style={inputStyle} value={form.teachingLoad} onChange={set('teachingLoad')} placeholder="Science 7 – A, B; Math 8 – C" />
           </Field>
         </div>
       </section>
