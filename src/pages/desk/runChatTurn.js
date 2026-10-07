@@ -15,9 +15,10 @@ import { getPersona } from '../../services/desk/personas';
  * @param {object} o.user, o.profile
  * @param {object} [o.scheduled]     { id, name } when a scheduled task started this turn
  * @param {Function} [o.onOpenCanvas]
+ * @param {object} [o.confirmedPlan] a plan the teacher approved with "Proceed" (runs with no new AI call)
  * @returns {Promise<{ status: 'done'|'needs_info'|'error', content: string, files: string[] }>}
  */
-export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas }) {
+export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null }) {
   const store = useDeskStore.getState();
   const { messages, persona, privacyMode, workspace, activeFile, activeArtifact } = store;
   const salutation = getTeacherSalutationName(profile, user);
@@ -43,13 +44,20 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       privacyMode,
       persona,
       fileIndex: folderIndex,
+      confirmedPlan,
+      autoApprove: Boolean(scheduled),
       onUpdate: ({ steps, reply }) => {
         useDeskStore.getState().updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
       },
     });
 
     const s = useDeskStore.getState();
-    s.updateLastAssistantMessage({ content: result.content, steps: result.steps, isThinking: false, artifacts: result.artifacts });
+    s.updateLastAssistantMessage({
+      content: result.content, steps: result.steps, isThinking: false, artifacts: result.artifacts,
+      // One-tap answers to a question, and a plan waiting for "Proceed".
+      ...(result.choices?.length ? { choices: result.choices } : {}),
+      ...(result.pendingPlan ? { pendingPlan: result.pendingPlan, pendingAttachments: attachments } : {}),
+    });
     if (result.artifacts.length) {
       s.addArtifacts(result.artifacts);
       s.setActiveArtifact(result.artifacts[0]);
@@ -58,7 +66,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
     if (result.createdFiles.length) await s.refreshFiles();
 
     const failed = result.steps?.some((st) => st.status === 'error');
-    const status = /\*\*Needs your input\*\*/.test(result.content) ? 'needs_info' : failed && !result.createdFiles.length ? 'error' : 'done';
+    const status = result.pendingPlan || result.asked || /\*\*Needs your input\*\*/.test(result.content) ? 'needs_info' : failed && !result.createdFiles.length ? 'error' : 'done';
     return { status, content: result.content, files: result.createdFiles.map((f) => f.path) };
   } catch (err) {
     console.error('Agent execution error:', err);

@@ -30,6 +30,8 @@ import {
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
+import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
+import { gradingRulesBrief } from '../knowledge/gradingRules.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
 
@@ -89,6 +91,44 @@ const DOC_FORMAT = 'Do not use markdown symbols like #, ** or backticks; use pla
 export function personaFor(teacher, personaId, now = new Date()) {
   const p = getPersona(personaId);
   return `${baseRole(teacher)} ${CHAT_FORMAT}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.\n\n${GROUNDING_RULES}`;
+}
+
+/**
+ * DepEd knowledge for this request only (school forms the teacher's words point to,
+ * grading rules when grades come up). Sent in the prompt, not the system text, so the
+ * fixed instructions stay identical between requests. '' when nothing is relevant.
+ */
+export function plannerKnowledge(prompt, history = [], schoolYear = '') {
+  // A short follow-up ("Grade 5 Rizal po") keeps the topic of the teacher's previous message.
+  const lastTeacher = [...history].reverse().find((m) => m.role === 'user')?.content || '';
+  const text = `${prompt}\n${String(prompt).length < 60 ? lastTeacher : ''}`;
+  const parts = [formKnowledgeFor(text)];
+  if (talksAboutGrades(text)) parts.push(gradingRulesBrief(schoolYear));
+  return parts.filter(Boolean).join('\n\n');
+}
+
+// Plans that change the teacher's own files, or spend a long AI generation, get a
+// "Proceed?" when the planner was only medium-sure. Simple, clear jobs just run.
+const CONFIRM_TOOLS = new Set(['edit_file', 'transfer_data', 'encode_scores', 'fill_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package']);
+
+/**
+ * The planner's self-check (rule 11). Missing fields mean "high", so a planner reply
+ * without them behaves exactly as before.
+ */
+export function readPlanCheck(plan, unmask = (x) => x) {
+  const list = (v, max) => (Array.isArray(v) ? v : []).map((x) => unmask(String(x || '').trim())).filter(Boolean).slice(0, max);
+  const confidence = ['high', 'medium', 'low'].includes(String(plan?.confidence || '').toLowerCase()) ? String(plan.confidence).toLowerCase() : 'high';
+  return {
+    confidence,
+    understanding: unmask(String(plan?.understanding || '').trim()).slice(0, 300),
+    missing: list(plan?.missing, 4),
+    assumptions: list(plan?.assumptions, 4),
+    choices: list(plan?.choices, 4).map((c) => c.slice(0, 60)),
+  };
+}
+
+export function needsConfirmation(tasks) {
+  return tasks.length > 3 || tasks.some((t) => CONFIRM_TOOLS.has(t.tool));
 }
 
 /** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
@@ -168,6 +208,8 @@ export async function runDeskAgentTurn({
   persona: personaId,
   fileIndex: folderIndex, // optional background index (services/desk/index): cached parses + file descriptions
   onUpdate,
+  confirmedPlan = null, // { reply, tasks } the teacher approved with "Proceed": runs with no new AI call
+  autoApprove = false, // scheduled tasks: approved when scheduled, so no "Proceed?" step
 }) {
   const teacher = teacherFromProfile(profile, user);
   const persona = personaFor(teacher, personaId);
@@ -286,12 +328,16 @@ export async function runDeskAgentTurn({
   // 1b. Same question, same unchanged files → remembered answer.
   const memoKey = answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePath, history });
   const remembered = answerMemory.get(memoKey);
-  if (!fast && remembered && Date.now() - remembered.at < ANSWER_TTL_MS) {
+  if (!fast && !confirmedPlan && remembered && Date.now() - remembered.at < ANSWER_TTL_MS) {
     return { content: remembered.content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, fastPath: 'memory' };
   }
 
   let streamed = ''; // planner text as it streams in (used if the plan JSON can't be read)
-  if (fast) {
+  let check = null; // the planner's self-check (understanding, confidence, missing, choices)
+  if (confirmedPlan) {
+    reply = '';
+    ({ tasks, problems } = sanitizePlan({ tasks: confirmedPlan.tasks }, flat, attachedPaths));
+  } else if (fast) {
     reply = fast.reply;
     ({ tasks, problems } = sanitizePlan({ tasks: fast.tasks }, flat, attachedPaths));
   } else try {
@@ -308,6 +354,8 @@ export async function runDeskAgentTurn({
         activePath,
         activeArtifact,
         privacyOn: privacyMode,
+        knowledge: plannerKnowledge(prompt, history, ctx.schoolYear),
+        answeringQuestion: lastReplyAsked(history),
       }),
       json: true,
       // A general question is answered in full inside "reply" (e.g. "your best use cases").
@@ -322,6 +370,7 @@ export async function runDeskAgentTurn({
     });
     reply = cleanReply(masker.unmask(plan?.reply || ''));
     ({ tasks, problems } = sanitizePlan(plan, flat, attachedPaths));
+    check = readPlanCheck(plan, (x) => masker.unmask(x));
   } catch (err) {
     // The plan JSON could not be read, but the answer text arrived: show the answer
     // (no tasks are run from a plan we could not read).
@@ -343,6 +392,25 @@ export async function runDeskAgentTurn({
     reply = tasks.length
       ? `${aiOffline} I can still do the number-crunching part offline, so here it is.`
       : `${aiOffline} Without the AI I can only run item analysis, class records, attendance checks, and PDF tools on files you select.`;
+  }
+
+  // ── 1c. Think before acting: ask when unsure, confirm big jobs when only fairly sure ──
+  if (check && tasks.length && (check.confidence === 'low' || check.missing.length)) {
+    const ask = reply && /\?\s*$/.test(reply) ? reply : [reply, `**Needs your input** — ${check.missing.join('; ') || 'please tell me a bit more about what you need.'}`].filter(Boolean).join('\n\n');
+    return { content: ask, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: check.choices, asked: true };
+  }
+  if (check && tasks.length && check.confidence === 'medium' && !autoApprove && needsConfirmation(tasks)) {
+    const planLines = tasks.map((t) => `- ${masker.unmask(t.label || t.tool)}`);
+    const content = [
+      reply,
+      check.understanding ? `**Here's what I understood:** ${check.understanding}` : '',
+      `I'll do this:\n${planLines.join('\n')}`,
+      check.assumptions.length ? `I'm assuming:\n${check.assumptions.map((a) => `- ${a}`).join('\n')}` : '',
+      'Shall I go ahead?',
+    ].filter(Boolean).join('\n\n');
+    // Stored with real names (codes only mean something inside this turn); the approved run re-masks them.
+    const approved = tasks.map((t) => ({ ...t, args: JSON.parse(masker.unmask(JSON.stringify(t.args))) }));
+    return { content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, pendingPlan: { reply, tasks: approved } };
   }
 
   steps = [{ id: 'plan', label: tasks.length ? `Planned ${tasks.length} task(s)` : 'Understood your request', status: 'done' }];
@@ -409,5 +477,12 @@ export async function runDeskAgentTurn({
     answerMemory.set(memoKey, { content, at: Date.now() });
   }
 
-  return { content, steps, artifacts, createdFiles, aiOffline };
+  return { content, steps, artifacts, createdFiles, aiOffline, ...(check?.choices?.length && !tasks.length ? { choices: check.choices } : {}) };
+}
+
+/** True when the assistant's last message asked the teacher something. */
+function lastReplyAsked(history = []) {
+  const last = [...history].reverse().find((m) => m.role === 'assistant');
+  const text = String(last?.content || '').trim();
+  return Boolean(text) && (/\?\s*$/.test(text) || /\*\*Needs your input\*\*/.test(text));
 }
