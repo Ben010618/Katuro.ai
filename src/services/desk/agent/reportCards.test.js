@@ -6,7 +6,7 @@ import { callGeminiProxy } from '../../geminiConfig';
 import { runDeskAgentTurn, clearAnswerMemory, plannerKnowledge } from './deskAgent';
 import { resetTaskActionSupport } from './llm';
 import { createVirtualWorkspace, readFileBytes } from '../../localFileSystem';
-import { parseTermLabel, nameKey } from './reportCards';
+import { parseTermLabel, nameKey, extractGradeRecords } from './reportCards';
 import {
   finalGrade, compositeFinalGrade, generalAverage, descriptorFor, remarksFor, promotionFor,
   academicExcellenceByGrades, gradingModeFor, matchLearningArea, keyStage, roundGrade,
@@ -182,7 +182,8 @@ describe('end to end: "consolidate all the grades for the report cards"', () => 
     ws.files = ws.handle.getFiles();
     return ws;
   };
-  const paths = ['Grade 5/Science 5 - Rizal.xlsx', 'Grade 5/Mathematics 5 Rizal.xlsx', 'Grade 5/MAPEH 5 Rizal.xlsx', 'Grade 5/English 5 Rizal.docx', 'Grade 5/AP old quarters.xlsx'];
+  // The old-quarters AP file is tested on its own below (KaTuro asks about it first).
+  const paths = ['Grade 5/Science 5 - Rizal.xlsx', 'Grade 5/Mathematics 5 Rizal.xlsx', 'Grade 5/MAPEH 5 Rizal.xlsx', 'Grade 5/English 5 Rizal.docx'];
 
   it('computes every grade in code, flags what to check, and sends no learner data to the AI', async () => {
     const ws = await setup();
@@ -226,7 +227,6 @@ describe('end to end: "consolidate all the grades for the report cards"', () => 
     const checks = values('Checks').map((r) => r.join(' | '));
     expect(checks.some((c) => /Missing grades \| REYES, MARIA: no Mathematics grade for Term 3/.test(c))).toBe(true);
     expect(checks.some((c) => /Name spelling \| "REYES, MARIAH" .* matched to "REYES, MARIA"/.test(c))).toBe(true);
-    expect(checks.some((c) => /quarterly grades \(Q1–Q4\)/.test(c))).toBe(true);
     expect(values('Basis').some((r) => /para\. 52/.test(r[1]))).toBe(true);
 
     // The report cards: one page per learner, with the computed rows.
@@ -285,5 +285,59 @@ describe('report cards use the teacher profile, not guesses', () => {
     const done = await runDeskAgentTurn({ prompt: 'report cards', workspace: ws, attachedPaths: ['Grade 5/Mathematics.xlsx'], user: { uid: 'u1' }, profile: { fullName: 'Ana Reyes', advisoryClass: 'Grade 5 – Rizal' } });
     expect(done.content).toMatch(/Prepared report cards for \*\*3 learner\(s\)\*\*/);
     expect(done.createdFiles.find((f) => f.format === 'xlsx').name).toMatch(/Grade5_Rizal/);
+  });
+
+  it('old "Q1–Q4" class records: asks first; used as Term 1–3 only after the teacher says yes', async () => {
+    const ws = createVirtualWorkspace('G5');
+    ws.handle.saveVirtualFile('Grade 5/Mathematics.xlsx', math());
+    ws.handle.saveVirtualFile('Grade 5/AP old quarters.xlsx', oldQuarters());
+    ws.files = ws.handle.getFiles();
+    const both = ['Grade 5/Mathematics.xlsx', 'Grade 5/AP old quarters.xlsx'];
+    const plan = (args) => callGeminiProxy.mockImplementation(async () => ({ text: JSON.stringify({ reply: 'OK.', tasks: [{ id: 't1', tool: 'build_report_cards', args: { sourcePaths: both, ...args } }] }) }));
+    const profile = { fullName: 'Ana Reyes', advisoryClass: 'Grade 5 – Rizal' };
+    plan({});
+    const asked = await runDeskAgentTurn({ prompt: 'report cards', workspace: ws, attachedPaths: both, user: { uid: 'u1' }, profile });
+    expect(asked.content).toMatch(/Needs your input.*AP old quarters\.xlsx labels the grades by quarter.*Are the 1st, 2nd and 3rd Quarter columns your Term 1, Term 2 and Term 3 grades\?/);
+    expect(asked.createdFiles).toHaveLength(0);
+    clearAnswerMemory();
+    plan({ quartersAsTerms: true });
+    const done = await runDeskAgentTurn({ prompt: 'Yes, use them as Term 1 to 3', workspace: ws, attachedPaths: both, user: { uid: 'u1' }, profile });
+    expect(done.content).toMatch(/Prepared report cards for \*\*3 learner\(s\)\*\*/);
+    expect(done.content).toMatch(/4th Quarter column has grades/);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await readFileBytes(ws.handle, done.createdFiles.find((f) => f.format === 'xlsx').path));
+    const header = wb.getWorksheet('Final Grades').getRow(1).values.slice(1);
+    expect(header).toContain('Araling Panlipunan (AP)');
+    expect(done.content).not.toMatch(/\.\./);
+  });
+});
+
+describe('class records in the layouts teachers really use', () => {
+  const S = (name, rows) => ({ sheets: [{ name, rows }] });
+  const read = (path, parsed, opts) => extractGradeRecords(path, parsed, opts).records.map((r) => `${r.name} | ${r.areaName} | ${JSON.stringify(r.terms)}`);
+
+  it('one "Grade" column, with the term in the file name', () => {
+    expect(read('Grade 5 Rizal - Math Term 1.xlsx', S('Sheet1', [['Name', 'Grade'], ['Dela Cruz, Juan', 85]]))).toEqual(['Dela Cruz, Juan | Mathematics | {"1":85}']);
+  });
+  it("the adviser's sheet: one column per learning area, the term in the title", () => {
+    const r = read('Grade 5 Rizal Grades.xlsx', S('Sheet1', [['TERM 1 GRADES'], ['Name', 'Filipino', 'English', 'Math', 'Science', 'MAPEH'], ['Dela Cruz, Juan', 85, 86, 87, 88, 89]]));
+    expect(r).toEqual(['Filipino', 'English', 'Mathematics', 'Science', 'MAPEH'].map((a, i) => `Dela Cruz, Juan | ${a} | {"1":${85 + i}}`));
+  });
+  it('separate Last / First / Middle name columns are one learner each (never merged by surname)', () => {
+    const r = read('Science - Grade 5 Rizal.xlsx', S('Sheet1', [['LRN', 'Last Name', 'First Name', 'Middle Name', 'Term 1'], ['1', 'Dela Cruz', 'Juan', 'P', 85], ['2', 'Dela Cruz', 'Maria', 'S', 88]]));
+    expect(r).toEqual(['Dela Cruz, Juan P | Science | {"1":85}', 'Dela Cruz, Maria S | Science | {"1":88}']);
+  });
+  it('class record score columns are never taken as a term grade', () => {
+    const r = read('ECR Math 5.xlsx', S('TERM 1', [["LEARNERS' NAMES", 'WRITTEN WORKS (40%)', 'Total', 'QUARTERLY ASSESSMENT (20%)', 'INITIAL GRADE', 'QUARTERLY GRADE'], ['DELA CRUZ, JUAN', 10, 19, 40, 82.1, 88]]));
+    expect(r).toEqual(['DELA CRUZ, JUAN | Mathematics | {"1":88}']);
+  });
+  it('quarter labels: never used unless the teacher confirmed; Q4 is never a term', () => {
+    const parsed = S('Sheet1', [["Learner's Name", '1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'], ['Dela Cruz, Juan', 85, 86, null, 80]]);
+    const before = extractGradeRecords('Math 5.xlsx', parsed);
+    expect(before.records).toHaveLength(0);
+    expect(before.meta.quarterLabels).toBe(true);
+    const after = extractGradeRecords('Math 5.xlsx', parsed, { quartersAsTerms: true });
+    expect(after.records.map((r) => r.terms)).toEqual([{ 1: 85, 2: 86 }]);
+    expect(after.notes.join(' ')).toMatch(/4th Quarter column has grades/);
   });
 });

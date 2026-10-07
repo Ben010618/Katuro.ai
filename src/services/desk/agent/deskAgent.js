@@ -33,7 +33,7 @@ import { getPersona, timeOfDay } from '../personas.js';
 import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
 import { gradingRulesBrief } from '../knowledge/gradingRules.js';
 import { firstMissingDetails } from './requiredDetails.js';
-import { calendarContext } from '../knowledge/schoolCalendar.js';
+import { calendarContext, calendarFacts } from '../knowledge/schoolCalendar.js';
 import { loadRuleCards, ruleCardsText } from '../knowledge/ruleCards.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
@@ -110,6 +110,7 @@ export function plannerKnowledge(prompt, history = [], schoolYear = '', now = ne
   // Where we are in the school year (one short line; '' outside a known calendar).
   const parts = [calendarContext(now), formKnowledgeFor(text)];
   if (talksAboutGrades(text)) parts.push(gradingRulesBrief(schoolYear));
+  parts.push(calendarFacts(text, schoolYear, now));
   parts.push(ruleCardsText(text, cards));
   return parts.filter(Boolean).join('\n\n');
 }
@@ -143,11 +144,11 @@ export function needsConfirmation(tasks) {
  * so the exam measures exactly what teachers get.
  * → { action: 'answer'|'run'|'ask'|'confirm', gap? }
  */
-export function decideAction({ tasks = [], check = null, prompt = '', teacher = {}, confirmed = false, autoApprove = false }) {
+export function decideAction({ tasks = [], check = null, prompt = '', history = [], teacher = {}, confirmed = false, autoApprove = false }) {
   if (!tasks.length) return { action: 'answer' };
   if (confirmed) return { action: 'run' };
   // Required details, checked by code (no AI tokens).
-  const gap = firstMissingDetails(tasks, { prompt, teacher });
+  const gap = firstMissingDetails(tasks, { prompt, history, teacher });
   if (gap) return { action: 'ask', gap };
   if (check && (check.confidence === 'low' || check.missing.length)) return { action: 'ask' };
   if (check && check.confidence === 'medium' && !autoApprove && needsConfirmation(tasks)) return { action: 'confirm' };
@@ -420,7 +421,7 @@ export async function runDeskAgentTurn({
   }
 
   // ── 1c. Think before acting: required details (code), then ask when unsure, confirm big jobs ──
-  const decision = decideAction({ tasks, check, prompt, teacher, confirmed: Boolean(confirmedPlan), autoApprove });
+  const decision = decideAction({ tasks, check, prompt, history, teacher, confirmed: Boolean(confirmedPlan), autoApprove });
   if (decision.action === 'ask' && decision.gap) {
     const content = `**Needs your input** — ${decision.gap.question}`; // the plan's "doing it now" reply is dropped: nothing runs yet
     return { content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: decision.gap.choices, asked: true };
