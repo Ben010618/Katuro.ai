@@ -202,6 +202,11 @@ export const useDeskStore = create(
         }));
       },
 
+      /** Patch one message by id (e.g. mark a plan as approved). */
+      updateMessage: (id, patch) => set((state) => ({
+        messages: state.messages.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+      })),
+
       updateLastAssistantMessage: (patch) => {
         set((state) => {
           const list = [...state.messages];

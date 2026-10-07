@@ -129,7 +129,21 @@ export default function DeskAgentChatPanel({
     const attachmentsForTurn = [...attachedPaths];
     setInputPrompt('');
     const outcome = await runChatTurn({ text: textToSend, attachments: attachmentsForTurn, user, profile, onOpenCanvas });
-    if (outcome.status !== 'error' || outcome.files.length) clearAttachments();
+    // Keep the attached files while KaTuro is asking or waiting for "Proceed", so the answer goes with them.
+    if (outcome.status === 'done' || outcome.files.length) clearAttachments();
+  };
+
+  // "Proceed" on a plan card: runs exactly that plan, with no new AI call.
+  const handleProceed = async (msg) => {
+    if (isGenerating || !msg.pendingPlan) return;
+    useDeskStore.getState().updateMessage(msg.id, { planDecision: 'proceed' });
+    const outcome = await runChatTurn({ text: 'Proceed', attachments: msg.pendingAttachments || [], user, profile, onOpenCanvas, confirmedPlan: msg.pendingPlan });
+    if (outcome.status === 'done' || outcome.files.length) clearAttachments();
+  };
+
+  const handleChangePlan = (msg) => {
+    useDeskStore.getState().updateMessage(msg.id, { planDecision: 'change' });
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleKeyDown = (e) => {
@@ -273,6 +287,51 @@ export default function DeskAgentChatPanel({
                         <span key={p} className="px-1.5 py-0.5 rounded bg-emerald-900/40 text-[10px] text-emerald-50 flex items-center gap-1">
                           <Paperclip size={9} /> {p.split('/').pop()}
                         </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* A plan waiting for the teacher's go-ahead (KaTuro was only fairly sure). */}
+                  {isAssistant && msg.pendingPlan && (msg.planDecision || idx === messages.length - 1) && (
+                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                      {msg.planDecision ? (
+                        <span className="text-[11px] text-gray-500">{msg.planDecision === 'proceed' ? 'You chose: Proceed' : 'You chose to change the plan. Type what to change below.'}</span>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleProceed(msg)}
+                            disabled={isGenerating}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition disabled:opacity-50"
+                          >
+                            Proceed
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleChangePlan(msg)}
+                            disabled={isGenerating}
+                            className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold transition disabled:opacity-50"
+                          >
+                            Change something
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* One-tap answers to KaTuro's question (latest message only). */}
+                  {isAssistant && msg.choices?.length > 0 && idx === messages.length - 1 && !isGenerating && (
+                    <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Quick answers">
+                      {msg.choices.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => handleSendPrompt(c)}
+                          className="px-2.5 py-1 rounded-full border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-[11px] font-medium transition max-w-full truncate"
+                          title={c}
+                        >
+                          {c}
+                        </button>
                       ))}
                     </div>
                   )}

@@ -48,7 +48,7 @@ You are the planner of KaTuroDesk, a desktop co-teacher that works directly on t
 Today is ${today}. The teacher is ${teacherName}.
 
 Decide how to handle the teacher's latest message. Return ONLY JSON:
-{"reply": string, "tasks": [{"id": "t1", "tool": string, "label": string, "args": object, "dependsOn": [string]}]}
+{"understanding": string, "confidence": "high"|"medium"|"low", "missing": [string], "assumptions": [string], "choices": [string], "reply": string, "tasks": [{"id": "t1", "tool": string, "label": string, "args": object, "dependsOn": [string]}]}
 
 Tools you can use:
 ${toolCatalog()}
@@ -70,10 +70,11 @@ Rules:
 9a. encode_scores is the older simple scores-into-one-column tool; prefer transfer_data when the target is a full school form. A NEW official class record built from scratch → make_class_record.
 9b. New files are saved in "KaTuro Outputs/<today>/" by default. If the teacher names a folder to save into, add "outputFolder": "<folder path>" to the args of every task that saves files (create_folder first if it doesn't exist, and make those tasks depend on it).
 9c. NEVER guess or assume data. Questions about the teacher's own class (scores, learners, grades, attendance, what a file says) must be answered from files via a tool — never from memory or general knowledge. If the needed file or detail (subject, grade, number of items, which component, dates) is not given, ask for it in "reply" and return no tasks. Only pass tool args the teacher actually stated or that come from the files; leave other args out.
-10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. In "reply" you may use **bold** for a key fact; no # headings, tables or backticks, and no long disclaimers. Never put formatting symbols in task args.`;
+10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. In "reply" you may use **bold** for a key fact; no # headings, tables or backticks, and no long disclaimers. Never put formatting symbols in task args.
+11. Think before you plan: re-read the teacher's message, the attached files and the folder index, and check that your tasks really produce what they asked for. Then fill: "understanding" = one short sentence, in plain words, of what the teacher wants; "confidence" = "high" when the request, files and details are clear, "medium" when you can act but had to assume something (list each assumption in "assumptions"), "low" when you would have to guess the file, class/section, subject, grade or the kind of output; "missing" = what you still need from the teacher (empty when nothing). With "low" or anything in "missing", return NO tasks and ask ONE clear question in "reply", and put up to 4 short possible answers the teacher can tap in "choices" (e.g. the matching file names, "Grade 5", "Adviser - whole section"). Otherwise "choices" is []. Never ask about something the teacher or the files already answered.`;
 }
 
-export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn, knowledge = '' }) {
+export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn, knowledge = '', answeringQuestion = false }) {
   return [
     `Classroom folder: ${workspaceName || '(none opened)'} — ${fileIndex.count} files`,
     fileIndex.text ? `Folder index:\n${fileIndex.text}` : 'Folder index: (empty)',
@@ -82,6 +83,7 @@ export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedP
     activeArtifact ? `Open in Canvas: "${activeArtifact.title}" (${activeArtifact.type})` : '',
     privacyOn ? 'Learner names in file contents are replaced with codes like "Learner 01" for privacy; keep using the codes.' : '',
     knowledge ? `\n${knowledge}` : '',
+    answeringQuestion ? '\nYour previous reply asked the teacher a question. Their message below answers it: combine it with their earlier request (see the conversation) instead of starting over.' : '',
     `\nTeacher's message: ${prompt}`,
   ].filter(Boolean).join('\n');
 }
