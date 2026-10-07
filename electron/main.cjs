@@ -298,9 +298,10 @@ function createWindow() {
     fs.writeFileSync(consoleLogFile, `--- KaTuroDesk Started: ${new Date().toISOString()} ---\n`);
   } catch (e) {}
 
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  // Electron 35+: the details are on the event object (the old separate arguments are deprecated).
+  mainWindow.webContents.on('console-message', (event) => {
     try {
-      fs.appendFileSync(consoleLogFile, `[Level ${level}] ${message} (${sourceId}:${line})\n`);
+      fs.appendFileSync(consoleLogFile, `[Level ${event.level}] ${event.message} (${event.sourceId}:${event.lineNumber})\n`);
     } catch (e) {}
   });
 
