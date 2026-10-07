@@ -37,6 +37,25 @@ export function parseTermLabel(label) {
   return null;
 }
 
+/** Quarter number (1–4) of an old-style "1st Quarter" / "Q2" label, or null. */
+export function quarterNumber(label) {
+  const t = str(label).toLowerCase();
+  const words = { first: 1, second: 2, third: 3, fourth: 4 };
+  let m = t.match(/\bq\s*-?\s*([1-4])\b/) || t.match(/\b([1-4])\s*(st|nd|rd|th)?\s*(quarter|qtr|q)\b/);
+  if (m) return Number(m[1]);
+  m = t.match(/\b(first|second|third|fourth)\s*(quarter|qtr)\b/);
+  return m ? words[m[1]] : null;
+}
+
+// Separate name columns (SF1 style): "Last Name | First Name | Middle Name".
+const LAST_NAME = /^(last\s*name|surname|family\s*name|apelyido)\b/i;
+const FIRST_NAME = /^(first\s*name|given\s*name|unang\s*pangalan)\b/i;
+const MIDDLE_NAME = /^(middle\s*(name|initial)|m\.?\s*i\.?)$/i;
+// One grade column whose term comes from the sheet, title or file name ("Grade", "Rating").
+const PLAIN_GRADE = /^(grades?|rating|term\s*rating|grade\s*for\s*the\s*term)$/i;
+// Score columns of a class record, never a term grade.
+const SCORE_WORDS = /written|performance|assessment|initial|total|score|\bhps\b|\bps\b|\bws\b|%|item|quiz|exam|test/i;
+
 /** A grade cell: number 0–100 → number; blank → null; anything else → the text (flagged). */
 function gradeCell(v) {
   if (v === null || v === undefined || (typeof v === 'string' && !v.trim())) return null;
@@ -152,12 +171,13 @@ function classFromTitle(rows, headerRow) {
 
 /**
  * Reads term grades from one parsed file (spreadsheet or Word tables).
- * → { records: [{ name, lrn, sex, areaKey, areaName, terms: {1,2,3}, source }], notes: [string], meta: { grade, section } }
+ * → { records: [{ name, lrn, sex, areaKey, areaName, terms: {1,2,3}, source }], notes: [string], meta: { grade, section, quarterLabels } }
+ * quartersAsTerms: the teacher confirmed that old "1st–3rd Quarter" columns are Term 1–3.
  */
-export function extractGradeRecords(path, parsed) {
+export function extractGradeRecords(path, parsed, { quartersAsTerms = false } = {}) {
   const notes = [];
   const records = [];
-  const meta = { grade: '', section: '' };
+  const meta = { grade: '', section: '', quarterLabels: false };
   const grids = parsed?.sheets
     ? parsed.sheets.map((s) => ({ name: s.name, rows: s.rows || [] }))
     : Array.isArray(parsed?.tables) ? parsed.tables.map((t, i) => ({ name: `Table ${i + 1}`, rows: Array.isArray(t) ? t : t.rows || [] })) : [];
@@ -173,6 +193,16 @@ export function extractGradeRecords(path, parsed) {
       }
     }
     if (headerRow < 0) continue;
+    // Separate Last / First / Middle name columns are joined into one name ("Dela Cruz, Juan P").
+    const headCells = (rows[headerRow] || []).map(str);
+    const lastCol = headCells.findIndex((v) => LAST_NAME.test(v));
+    const firstCol = headCells.findIndex((v) => FIRST_NAME.test(v));
+    const middleCol = headCells.findIndex((v) => MIDDLE_NAME.test(v));
+    const split = lastCol >= 0 && firstCol >= 0;
+    if (split) nameCol = lastCol;
+    const nameOf = (row) => (split
+      ? [str(row[lastCol]), [str(row[firstCol]), middleCol >= 0 ? str(row[middleCol]) : ''].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+      : str(row[nameCol]));
     // first learner row = first row below the header whose name cell looks like a name
     let firstLearner = -1;
     for (let r = headerRow + 1; r < rows.length; r++) {
@@ -191,10 +221,11 @@ export function extractGradeRecords(path, parsed) {
       if (m && matchLearningArea(m[1])) bareTerms.set(m[1], (bareTerms.get(m[1]) || new Set()).add(m[2]));
     }
     const ctxArea = contextAreas(rows, headerRow, grid.name, path);
-    const sheetTerm = parseTermLabel(grid.name) || (() => {
+    // The term named once for the whole sheet: sheet name, then title rows, then file name.
+    const sheetTerm = [parseTermLabel(grid.name), (() => {
       for (let r = 0; r < headerRow; r++) for (const cell of rows[r] || []) { const t = parseTermLabel(cell); if (typeof t === 'number') return t; }
       return null;
-    })();
+    })(), parseTermLabel(stem(path))].find((t) => typeof t === 'number') ?? null;
     const cls = classFromTitle(rows, headerRow);
     meta.grade ||= cls.grade; meta.section ||= cls.section;
 
@@ -203,11 +234,25 @@ export function extractGradeRecords(path, parsed) {
     const sexCol = labels.findIndex((l) => /^(sex|gender|kasarian)\b/i.test(l));
     const cols = [];
     let sawQuarter = false;
+    let q4Used = false;
+    const skip = new Set([nameCol, lrnCol, sexCol, firstCol, middleCol].filter((c) => c >= 0));
     labels.forEach((label, c) => {
-      if (c === nameCol || c === lrnCol || c === sexCol || !label) return;
+      if (skip.has(c) || !label) return;
       let term = parseTermLabel(label);
-      if (term === 'quarter') { sawQuarter = true; return; }
+      if (term === 'quarter') {
+        // Old "1st–3rd Quarter" labels count as Term 1–3 only after the teacher said so.
+        const q = quarterNumber(label);
+        if (!quartersAsTerms || !q) { sawQuarter = true; return; }
+        if (q === 4) { q4Used = q4Used || rows.slice(firstLearner).some((row) => gradeCell((row || [])[c]) !== null); return; }
+        term = q;
+      }
       if (term === null && /\b(term|quarterly|transmuted)\s*grade\b/i.test(label) && typeof sheetTerm === 'number') term = sheetTerm;
+      // The term is named once for the whole sheet: a plain "Grade" column, or one
+      // column per learning area ("Math | Science | …"). Score columns never count.
+      if (term === null && typeof sheetTerm === 'number' && !SCORE_WORDS.test(label)) {
+        if (PLAIN_GRADE.test(label)) term = sheetTerm;
+        else if (label.split(/\s+/).length <= 5 && matchLearningArea(label)) term = sheetTerm;
+      }
       if (term === null) {
         const m = str(label).match(/^(.*\S)\s+([123])$/);
         if (m && (bareTerms.get(m[1])?.size || 0) >= 2) term = Number(m[2]);
@@ -219,8 +264,10 @@ export function extractGradeRecords(path, parsed) {
       if (!area) return;
       cols.push({ c, term, area });
     });
+    if (q4Used) notes.push(`${fileName(path)} (${grid.name}): the 4th Quarter column has grades, but SY 2026–2027 has three terms (DO 15, s. 2026), so it was not used.`);
     if (sawQuarter && !cols.length) {
-      notes.push(`${fileName(path)} (${grid.name}): has quarterly grades (Q1–Q4). From SY 2026–2027 DepEd uses three terms (DO 15, s. 2026), so it was not used.`);
+      meta.quarterLabels = true;
+      notes.push(`${fileName(path)} (${grid.name}): the grades are labeled by quarter (1st Quarter, 2nd Quarter…), but from SY 2026–2027 DepEd uses three terms (DO 15, s. 2026).`);
       continue;
     }
     if (!cols.length) {
@@ -233,7 +280,7 @@ export function extractGradeRecords(path, parsed) {
     let sex = '';
     for (let r = firstLearner - 1; r < rows.length; r++) {
       const row = rows[r] || [];
-      const nameCell = str(row[nameCol]);
+      const nameCell = nameOf(row);
       const firstCell = str(row.find((v) => str(v)));
       if (SEX_LABEL.test(nameCell) || SEX_LABEL.test(firstCell)) { sex = /^(male|boys?|lalaki)/i.test(nameCell || firstCell) ? 'Male' : 'Female'; continue; }
       if (r < firstLearner || !looksLikeName(nameCell)) continue;

@@ -75,3 +75,24 @@ export function calendarContext(d = new Date()) {
   const range = pos.block === 'opening' ? t.opening : pos.block === 'endOfTerm' ? t.endOfTerm : t.instructional;
   return `${head} It is Term ${pos.term}, ${label} (${pretty(range[0])} – ${pretty(range[1])}); Term ${pos.term} ends ${pretty(t.end)}${pos.daysToTermEnd >= 0 ? ` (${pos.daysToTermEnd} day(s) from today)` : ''}. Teacher work in this block: ${BLOCK_WORK[pos.block]}. "This term" means Term ${pos.term}.`;
 }
+
+const ASKS_ABOUT_CALENDAR = /\b(terms?|block|calendar|class\s*days|school\s*days|break|eosy|bosy|opening|school\s*year|sy\s*20\d\d|end[-\s]of[-\s](term|school)|semestral|trimester|kailan|when\s+(does|do|is|will))\b/i;
+
+/**
+ * The whole official calendar, for questions about it ("When does Term 1 end?", "What do
+ * teachers do in the End-of-Term Block?"). '' unless the text is about the calendar.
+ */
+export function calendarFacts(text, schoolYear = '', now = new Date()) {
+  if (!CALENDARS[schoolYear]) schoolYear = calendarPosition(now)?.schoolYear || '';
+  const cal = CALENDARS[schoolYear];
+  if (!cal || !ASKS_ABOUT_CALENDAR.test(String(text || ''))) return '';
+  const range = ([a, b]) => `${pretty(a)} – ${pretty(b)}`;
+  const lines = [`Official three-term calendar, SY ${schoolYear} (${cal.source}; ${cal.totalClassDays} class days):`];
+  for (const t of cal.terms) {
+    const parts = [t.opening && `Opening Block ${range(t.opening)}`, `Instructional Block ${range(t.instructional)}`, `End-of-Term Block ${range(t.endOfTerm)}`].filter(Boolean);
+    lines.push(`- Term ${t.term}: ${range([t.start, t.end])} (${t.classDays} class days). ${parts.join('; ')}.`);
+  }
+  lines.push(`- End-of-school-year break: ${range(cal.eosyBreak)}.`);
+  lines.push(`Work in each block (${DO9}, paras. 12–13, Figure 2): Opening Block = ${BLOCK_WORK.opening}. Instructional Block = ${BLOCK_WORK.instructional}. End-of-Term Block = ${BLOCK_WORK.endOfTerm}.`);
+  return lines.join('\n');
+}

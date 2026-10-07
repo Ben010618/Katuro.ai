@@ -26,15 +26,21 @@ describe('required details: never assume the subject or grade', () => {
     expect(parseTeachingLoad('')).toEqual([]);
   });
 
-  it('asks only when the detail is nowhere: not in the args, the title, the instructions or the message', () => {
+  it('asks unless the teacher said it (this message or the last few), or the source files carry it', () => {
     const dll = (args) => ({ tool: 'write_document', args: { docType: 'dll', title: 'DLL', instructions: 'Week 3 on cells', ...args } });
     const teacher = { teachingLoad: 'Science 7 – A, B; Math 8 – C' };
     expect(missingDetails(dll({}), { prompt: 'gawa ng DLL', teacher })).toEqual({
       question: 'Which learning area and grade level is this Daily Lesson Log for?', missing: ['learning area', 'grade level'], choices: ['Science 7', 'Math 8'],
     });
-    expect(missingDetails(dll({ subject: 'Science' }), { prompt: 'DLL for Grade 7', teacher })).toBeNull();
+    // A subject the AI filled in by itself (even from the profile) is not the teacher's word.
+    expect(missingDetails(dll({ subject: 'Science' }), { prompt: 'DLL for Grade 7', teacher }).question).toBe('Which learning area is this Daily Lesson Log for?');
+    expect(missingDetails(dll({ subject: 'Science', gradeLevel: 'Grade 7' }), { prompt: 'gawa ka ng DLL', teacher }).missing).toEqual(['learning area', 'grade level']);
+    // The tap answer "Science 7", or an earlier message, counts.
+    expect(missingDetails(dll({}), { prompt: 'Science 7', teacher })).toBeNull();
+    expect(missingDetails(dll({}), { prompt: 'Week 3 po', history: [{ role: 'user', content: 'DLL for Math 8' }], teacher })).toBeNull();
+    expect(missingDetails(dll({}), { prompt: 'DLL sa Filipino, Baitang 7', teacher })).toBeNull();
     expect(missingDetails(dll({}), { prompt: 'DLL for Science 7 (Grade 7)', teacher })).toBeNull();
-    expect(missingDetails(dll({ subject: 'Science' }), { prompt: 'DLL', teacher }).question).toBe('Which grade level is this Daily Lesson Log for?');
+    expect(missingDetails(dll({}), { prompt: 'DLL in Science', teacher }).question).toBe('Which grade level is this Daily Lesson Log for?');
     // Built from the teacher's own files: the files carry the details.
     expect(missingDetails(dll({ sourcePaths: ['Lesson.docx'] }), { prompt: 'make a DLL from this', teacher })).toBeNull();
     // Letters and reports do not need a learning area.

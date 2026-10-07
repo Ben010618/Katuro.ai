@@ -444,9 +444,9 @@ export const TOOLS = {
 
   build_report_cards: {
     label: 'Report cards (SF9) from class records',
-    description: "Consolidate each learner's grades from the subject teachers' class records into the Learner's Performance Report (SF9) for a whole section: Term 1–3 grades per learning area, Final Grade, Remarks and General Average, plus a summary workbook (final grades, promotion, checks). Use for \"consolidate the grades\", \"report cards\", \"cards\", \"SF9\" from a class adviser. Computed entirely by code under DepEd Order No. 15, s. 2026; no learner data is sent to the AI.",
-    args: '{ "sourcePaths": [string], "grade"?: string, "section"?: string, "schoolYear"?: string }',
-    async run({ sourcePaths = [], grade = '', section = '', schoolYear = '' }, ctx, report) {
+    description: "Consolidate each learner's grades from the subject teachers' class records into the Learner's Performance Report (SF9) for a whole section: Term 1–3 grades per learning area, Final Grade, Remarks and General Average, plus a summary workbook (final grades, promotion, checks). Use for \"consolidate the grades\", \"report cards\", \"cards\", \"SF9\" from a class adviser. Computed entirely by code under DepEd Order No. 15, s. 2026; no learner data is sent to the AI. quartersAsTerms: true ONLY after the teacher answered yes to KaTuro's question that their files' 1st–3rd Quarter columns are Term 1–3.",
+    args: '{ "sourcePaths": [string], "grade"?: string, "section"?: string, "schoolYear"?: string, "quartersAsTerms"?: boolean }',
+    async run({ sourcePaths = [], grade = '', section = '', schoolYear = '', quartersAsTerms = false }, ctx, report) {
       const {
         extractGradeRecords, consolidateLearners, buildReportCardSpec, buildSummarySheetSpec,
       } = await import('./reportCards.js');
@@ -458,11 +458,13 @@ export const TOOLS = {
       const fileResults = [];
       const notes = [];
       const found = { grade: '', section: '' };
+      const quarterFiles = [];
       for (const { p, d, error } of parsed) {
         if (error || !d) { notes.push(`${p.split('/').pop()}: could not be read (${error?.message || 'unknown error'}).`); continue; }
         // Grades stay on this computer: names are read as written, never masked or sent anywhere.
-        const res = extractGradeRecords(p, d);
+        const res = extractGradeRecords(p, d, { quartersAsTerms: quartersAsTerms === true });
         notes.push(...res.notes);
+        if (res.meta.quarterLabels) quarterFiles.push(p.split('/').pop());
         found.grade ||= res.meta.grade; found.section ||= res.meta.section;
         fileResults.push({ path: p, records: res.records });
       }
@@ -480,6 +482,10 @@ export const TOOLS = {
         throw needsInfo(`In SY ${sy}, Grade ${gradeNumber(gradeLevel) || 'Kindergarten'} uses the descriptive ${mode.report}, with no numerical grades (${mode.source}). Tell me if you want me to prepare it from your learners' ratings instead.`);
       }
       const { learners, areas, checks } = consolidateLearners(fileResults, { terms: mode.terms });
+      // Old templates still say "1st Quarter": ask, never assume they are Term 1–3.
+      if (quarterFiles.length && !quartersAsTerms) {
+        throw needsInfo(`${quarterFiles.length === 1 ? `${quarterFiles[0]} labels` : `${quarterFiles.length} of your files (${quarterFiles.slice(0, 3).join(', ')}${quarterFiles.length > 3 ? '…' : ''}) label`} the grades by quarter ("1st Quarter, 2nd Quarter…"), but SY ${sy} uses three terms (DepEd Order No. 15, s. 2026). Are the 1st, 2nd and 3rd Quarter columns your Term 1, Term 2 and Term 3 grades? Reply "Yes, use them as Term 1 to 3" and I will prepare the report cards. A 4th Quarter column is never used.`);
+      }
       if (!learners.length) {
         throw needsInfo(`I could not find learner names with term grades in these files. ${notes.slice(0, 3).join(' ')}`.trim());
       }
@@ -511,7 +517,7 @@ export const TOOLS = {
           ? `Grades found for Term ${termsWithGrades.join(', ') || '—'} only, so Final Grades and General Averages will be filled in once all ${mode.terms} terms are recorded`
           : `${learners.length - complete} learner(s) have missing grades, so their Final Grade or General Average is left blank`);
       if (checks.length) parts.push(`**${checks.length} item(s) to check** are listed in the Checks sheet (missing grades, name spellings, unusual values)`);
-      if (notes.length) parts.push(`${notes.length} file note(s): ${notes.slice(0, 2).join(' ')}`);
+      if (notes.length) parts.push(`${notes.length} file note(s): ${notes.slice(0, 2).join(' ').replace(/\.$/, '')}`);
       return {
         summary: `${parts.join('. ')}. Grades were computed by code from your files; nothing was estimated by AI.`,
         artifacts: [

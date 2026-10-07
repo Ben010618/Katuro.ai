@@ -36,16 +36,36 @@ export function parseTeachingLoad(load) {
   }).filter(Boolean).slice(0, 4);
 }
 
+/** "Science 7", "Math 8", "Baitang 7": a grade written right after a learning area (or "baitang"). */
+export function gradeNearSubject(text) {
+  const b = String(text || '').match(/\bbaitang\s*(\d{1,2})\b/i);
+  if (b && Number(b[1]) <= 12) return Number(b[1]);
+  const words = String(text || '').split(/[\s,;()]+/).filter(Boolean);
+  for (let i = 1; i < words.length; i++) {
+    if (!/^\d{1,2}$/.test(words[i]) || Number(words[i]) > 12) continue;
+    for (let k = 1; k <= 3 && i - k >= 0; k++) if (matchLearningArea(words.slice(i - k, i).join(' '))) return Number(words[i]);
+  }
+  return null;
+}
+
+/** What the teacher actually wrote: this message and their last few messages. */
+function teacherWords(prompt, history) {
+  const recent = (history || []).filter((m) => m?.role === 'user').slice(-4).map((m) => m.content || '');
+  return [...recent, prompt].join('\n');
+}
+
 /**
  * What a task still needs. → null, or { question, missing: [string], choices: [string] }.
- * `context` = { prompt, teacher: { teachingLoad, advisoryClass } }.
+ * `context` = { prompt, history, teacher: { teachingLoad, advisoryClass } }.
+ * The learning area and grade must be in the teacher's own words (or the source files):
+ * a value the AI filled in by itself, even from the profile, is not enough.
  */
-export function missingDetails(task, { prompt = '', teacher = {} } = {}) {
+export function missingDetails(task, { prompt = '', history = [], teacher = {} } = {}) {
   const a = task?.args || {};
   if (task?.tool === 'write_document' && LESSON_DOCS.has(a.docType) && !(Array.isArray(a.sourcePaths) && a.sourcePaths.length)) {
-    const text = [prompt, a.title, a.instructions, a.subject, a.gradeLevel].join(' ');
-    const needSubject = !String(a.subject || '').trim() && !subjectInText(text);
-    const needGrade = !String(a.gradeLevel || '').trim() && gradeInText(text) === null && gradeNumber(a.gradeLevel) === null;
+    const text = teacherWords(prompt, history);
+    const needSubject = !subjectInText(text);
+    const needGrade = gradeInText(text) === null && gradeNearSubject(text) === null;
     if (!needSubject && !needGrade) return null;
     const load = parseTeachingLoad(teacher.teachingLoad);
     const what = DOC_NAMES[a.docType];

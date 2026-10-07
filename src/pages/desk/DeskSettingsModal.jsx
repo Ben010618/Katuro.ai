@@ -9,7 +9,7 @@ import TeacherExamPanel from './TeacherExamPanel';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
-  const { persona, setPersona, privacyMode, setPrivacyMode } = useDeskStore();
+  const { persona, setPersona, privacyMode, setPrivacyMode, deskTheme, setDeskTheme } = useDeskStore();
   const [tab, setTab] = useState(initialTab);
   const { status: update, appVersion, check, install } = useDeskUpdate();
   const busy = update.state === 'checking' || update.state === 'downloading';
@@ -95,6 +95,26 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          <section className="border-t border-gray-100 pt-4">
+            <h3 className="text-xs font-bold text-gray-800 mb-0.5">Appearance</h3>
+            <p className="text-[11px] text-gray-500 mb-2">Soft, calm surfaces. Dark is easier on the eyes at night; your documents always stay on white paper.</p>
+            <div className="flex gap-2" role="radiogroup" aria-label="Appearance">
+              {[['light', 'Light'], ['dark', 'Dark']].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={deskTheme === id}
+                  aria-pressed={deskTheme === id}
+                  onClick={() => setDeskTheme(id)}
+                  className={`px-4 py-1.5 rounded-lg border text-xs font-semibold transition ${deskTheme === id ? 'border-emerald-600 text-emerald-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </section>
 

@@ -58,6 +58,9 @@ export const useDeskStore = create(
       // Assistant personality chosen in Settings: 'matt' | 'luna' | 'grey' | 'carmen'
       persona: 'matt',
 
+      // KaTuroDesk look (neumorphic): 'light' | 'dark'
+      deskTheme: 'light',
+
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
       isGenerating: false,
@@ -156,6 +159,8 @@ export const useDeskStore = create(
       setPrivacyMode: (privacyMode) => set({ privacyMode }),
 
       setPersona: (persona) => set({ persona }),
+
+      setDeskTheme: (deskTheme) => set({ deskTheme: deskTheme === 'dark' ? 'dark' : 'light' }),
 
       setActiveAgent: (agentId) => set({ activeAgentId: agentId }),
 
@@ -327,6 +332,7 @@ export const useDeskStore = create(
         activeAgentId: state.activeAgentId,
         privacyMode: state.privacyMode,
         persona: state.persona,
+        deskTheme: state.deskTheme,
         scheduledTasks: state.scheduledTasks,
         // Don't persist native handles or file bytes (not serializable / private)
       }),

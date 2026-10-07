@@ -15,7 +15,7 @@ const hasInstanceLock = app.requestSingleInstanceLock();
 if (!hasInstanceLock) app.quit();
 
 // Theme colors of the top studio bar, used for the window controls area.
-const TITLE_BAR = { color: '#16211a', symbolColor: '#c9d8ce', height: 40 };
+const TITLE_BAR = { color: '#e4ebe6', symbolColor: '#3f5046', height: 40 };
 
 // Background mode: keep running in the tray when the window is closed, so scheduled
 // tasks still run on time. Saved on this PC; off until the teacher turns it on.
@@ -228,7 +228,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'KaTuroDesk',
-    backgroundColor: '#16211a',
+    backgroundColor: '#e4ebe6',
     icon: appIconPath(),
     // The Windows title bar is replaced by the app's own dark top bar (same theme);
     // the minimize / maximize / close buttons stay, drawn in the bar's colors.
@@ -431,6 +431,22 @@ ipcMain.handle('app:showWindow', async () => {
 });
 
 ipcMain.handle('app:getVersion', async () => app.getVersion());
+
+// The window's title-bar buttons follow the Desk theme (light or dark neumorphic surface).
+ipcMain.handle('app:setTitleBarColors', async (event, colors = {}) => {
+  const hex = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : null);
+  const color = hex(colors.color);
+  const symbolColor = hex(colors.symbolColor);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || !color || !symbolColor) return { success: false };
+  try {
+    if (typeof win.setTitleBarOverlay === 'function') win.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR.height });
+    win.setBackgroundColor(color);
+  } catch {
+    return { success: false };
+  }
+  return { success: true };
+});
 
 ipcMain.handle('update:getStatus', async () => updateStatus);
 

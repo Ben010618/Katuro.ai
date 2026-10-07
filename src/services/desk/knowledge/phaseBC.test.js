@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calendarPosition, calendarContext, manilaDate } from './schoolCalendar';
+import { calendarPosition, calendarContext, calendarFacts, manilaDate } from './schoolCalendar';
 import { cleanCard, cardsFor, ruleCardsText, triggerList, CARD_LIMITS } from './ruleCards';
 import { isCorrection, toolsOf, summarizeFeedback } from '../feedback';
 import { plannerKnowledge, decideAction } from '../agent/deskAgent';
@@ -38,6 +38,15 @@ describe('school calendar (DO 9, s. 2026)', () => {
     expect(c).toMatch(/"This term" means Term 2/);
     expect(c.length).toBeLessThan(700);
     expect(calendarContext('2026-12-10')).toMatch(/End-of-Term Block.*computing grades/);
+  });
+  it('answers questions about any term or block, not only the current one', () => {
+    const now = new Date('2026-10-07T09:00:00+08:00'); // Term 2, Instructional Block
+    const f = calendarFacts('What are teachers supposed to do during the End-of-Term Block?', '2026-2027', now);
+    expect(f).toMatch(/Term 1: June 8, 2026 – September 15, 2026 \(69 class days\)/);
+    expect(f).toMatch(/End-of-Term Block = computing grades/);
+    expect(calendarFacts('When does Term 3 end?', '', now)).toMatch(/Term 3: January 4, 2027 – April 8, 2027/);
+    expect(calendarFacts('make a quiz about fractions', '2026-2027', now)).toBe('');
+    expect(plannerKnowledge('When does Term 1 end?', [], '2026-2027', now)).toMatch(/Official three-term calendar/);
   });
 });
 
@@ -118,11 +127,12 @@ describe('decideAction: ask, confirm or run', () => {
   });
   it('asks when the planner is unsure, confirms big jobs when only fairly sure', () => {
     const full = { tool: 'write_document', args: { docType: 'dll', subject: 'Science', gradeLevel: 'Grade 7' } };
-    expect(decideAction({ tasks: [full], check: { ...high, confidence: 'low' } }).action).toBe('ask');
-    expect(decideAction({ tasks: [full], check: { ...high, missing: ['week'] } }).action).toBe('ask');
-    expect(decideAction({ tasks: [full], check: { ...high, confidence: 'medium' } }).action).toBe('confirm');
-    expect(decideAction({ tasks: [full], check: { ...high, confidence: 'medium' }, autoApprove: true }).action).toBe('run');
-    expect(decideAction({ tasks: [full], check: high }).action).toBe('run');
+    const said = { prompt: 'DLL for Science 7, Week 3' };
+    expect(decideAction({ ...said, tasks: [full], check: { ...high, confidence: 'low' } }).action).toBe('ask');
+    expect(decideAction({ ...said, tasks: [full], check: { ...high, missing: ['week'] } }).action).toBe('ask');
+    expect(decideAction({ ...said, tasks: [full], check: { ...high, confidence: 'medium' } }).action).toBe('confirm');
+    expect(decideAction({ ...said, tasks: [full], check: { ...high, confidence: 'medium' }, autoApprove: true }).action).toBe('run');
+    expect(decideAction({ ...said, tasks: [full], check: high }).action).toBe('run');
   });
   it('runs an approved plan without asking again', () => {
     expect(decideAction({ tasks: [dll], check: { ...high, confidence: 'low' }, confirmed: true }).action).toBe('run');
