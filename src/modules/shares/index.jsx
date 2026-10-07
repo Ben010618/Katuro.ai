@@ -52,6 +52,8 @@ export default function SharesModule() {
 
   return (
     <div className="sh-root">
+      {/* Decorative background layer (soft glows that drift as you scroll) */}
+      <div className="sh-ambient" aria-hidden="true" />
       <div className="sh-page">
 
         {/* ── Brand strip + Explore/Notifications shortcuts ─────────────── */}
