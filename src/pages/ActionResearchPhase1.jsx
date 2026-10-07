@@ -311,7 +311,7 @@ function ActionResearchPhase1() {
     return (
       <ActionResearchShell phase={1} canNext={false} nextLabel="Susunod na Phase" themeName="">
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--kt-text-secondary, #6E6455)', fontSize: 14 }}>
-          <Loader2 size={28} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+          <Loader2 size={28} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
           <p style={{ margin: 0, fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>Ikinakarga ang iyong na-save na pananaliksik…</p>
         </div>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -343,7 +343,7 @@ function ActionResearchPhase1() {
             alignItems: 'center',
             gap: 10,
           }}>
-            <CheckCircle2 size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+            <CheckCircle2 size={16} color="var(--kt-chalkboard-ink, #1F3A2E)" />
             <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-text-primary, #262119)', fontWeight: 600 }}>
               Ipinagpapatuloy ang na-save na action research project — naibalik ang lahat ng naunang impormasyon.
             </p>
@@ -361,7 +361,7 @@ function ActionResearchPhase1() {
             alignItems: 'flex-start',
             gap: 12,
           }}>
-            <AlertTriangle size={17} color="var(--kt-chalkboard, #1F3A2E)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <AlertTriangle size={17} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                 May Posibilidad sa BERF Grant Funding Alignment
@@ -577,11 +577,11 @@ function ActionResearchPhase1() {
             padding: '20px 22px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-              <Sparkles size={15} color="var(--kt-chalkboard, #1F3A2E)" />
+              <Sparkles size={15} color="var(--kt-chalkboard-ink, #1F3A2E)" />
               <span style={{
                 fontSize: 11.5,
                 fontWeight: 700,
-                color: 'var(--kt-chalkboard, #1F3A2E)',
+                color: 'var(--kt-chalkboard-ink, #1F3A2E)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontFamily: 'var(--kt-font-mono, monospace)',

@@ -176,7 +176,8 @@ export default function FacultyDashboardWidget() {
                     style={{
                       fontSize: 9.5,
                       fontWeight: 700,
-                      color: agent.color || '#059669',
+                      // Accent as text: same colour in light mode, lightened in dark mode (--kt-accent-ink-mix).
+                      color: `color-mix(in srgb, ${agent.color || '#059669'} var(--kt-accent-ink-mix, 100%), #ffffff)`,
                       background: `${agent.color || '#059669'}18`,
                       padding: '1px 6px',
                       borderRadius: 100,
@@ -209,7 +210,8 @@ export default function FacultyDashboardWidget() {
                   gap: 4,
                   fontSize: 11.5,
                   fontWeight: 700,
-                  color: agent.color || '#059669',
+                  // Accent as text: same colour in light mode, lightened in dark mode (--kt-accent-ink-mix).
+                  color: `color-mix(in srgb, ${agent.color || '#059669'} var(--kt-accent-ink-mix, 100%), #ffffff)`,
                   marginTop: 'auto',
                 }}
               >

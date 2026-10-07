@@ -121,7 +121,7 @@ export default function SharesReminderPopup() {
           <p style={{
             margin: '0 0 20px',
             fontSize: 15, fontWeight: 700, fontStyle: 'italic',
-            color: 'var(--kt-green-primary)', lineHeight: 1.5,
+            color: 'var(--kt-green-primary-ink, var(--kt-green-primary))', lineHeight: 1.5,
           }}>
             {prompt}
           </p>

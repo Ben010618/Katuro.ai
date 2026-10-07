@@ -104,7 +104,7 @@ const CSS = `
     font-family: var(--kt-font-mono, "JetBrains Mono", monospace);
     font-size: 10.5px;
     font-weight: 700;
-    color: var(--kt-manila, #E4D5AC);
+    color: var(--kt-manila-ink, #E4D5AC);
     background: rgba(228, 213, 172, 0.15);
     border: 1px solid var(--kt-manila-border, #C9B583);
     border-radius: 4px;
@@ -163,7 +163,7 @@ const CSS = `
   }
 
   .kt-pillar-icon {
-    color: var(--kt-manila, #E4D5AC);
+    color: var(--kt-manila-ink, #E4D5AC);
     flex-shrink: 0;
     margin-top: 2px;
   }
@@ -189,7 +189,7 @@ const CSS = `
     gap: 8px;
     font-family: var(--kt-font-mono, "JetBrains Mono", monospace);
     font-size: 11.5px;
-    color: var(--kt-manila, #E4D5AC);
+    color: var(--kt-manila-ink, #E4D5AC);
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(201, 181, 131, 0.3);
     border-radius: 4px;
@@ -282,7 +282,7 @@ const CSS = `
   }
 
   .kt-voucher-icon {
-    color: var(--kt-chalkboard, #1F3A2E);
+    color: var(--kt-chalkboard-ink, #1F3A2E);
     flex-shrink: 0;
     margin-top: 1px;
   }
@@ -291,7 +291,7 @@ const CSS = `
     font-family: var(--kt-font-mono, "JetBrains Mono", monospace);
     font-size: 11.5px;
     font-weight: 700;
-    color: var(--kt-chalkboard, #1F3A2E);
+    color: var(--kt-chalkboard-ink, #1F3A2E);
     margin: 0 0 2px;
     letter-spacing: 0.04em;
   }
@@ -417,7 +417,7 @@ const CSS = `
     border: none;
     cursor: pointer;
     font-size: 12.5px;
-    color: var(--kt-chalkboard, #1F3A2E);
+    color: var(--kt-chalkboard-ink, #1F3A2E);
     font-weight: 700;
     padding: 0;
     font-family: inherit;
@@ -591,7 +591,7 @@ export default function LoginPage() {
               <img src={ktLogo} alt="kaTuro AI" className="kt-board-logo" />
               <div>
                 <div className="kt-board-title">
-                  kaTuro <span style={{ color: 'var(--kt-manila, #E4D5AC)' }}>AI</span>
+                  kaTuro <span style={{ color: 'var(--kt-manila-ink, #E4D5AC)' }}>AI</span>
                 </div>
                 <div className="kt-board-badge">
                   KAGAMITAN NG GURONG PILIPINO
@@ -682,7 +682,7 @@ export default function LoginPage() {
                   border: '1px solid var(--kt-manila-border, #C9B583)',
                   borderRadius: 4, padding: '20px 16px', textAlign: 'center',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', color: 'var(--kt-chalkboard)', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', color: 'var(--kt-chalkboard-ink, #1F3A2E)', marginBottom: 8 }}>
                     <CheckCircle2 size={36} />
                   </div>
                   <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, fontFamily: 'var(--kt-font-heading, "Bitter", serif)', color: 'var(--kt-text-primary)' }}>

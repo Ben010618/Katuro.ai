@@ -57,11 +57,11 @@ export default function AssessmentGateway() {
           padding: '4px 10px',
           marginBottom: 12,
         }}>
-          <Sparkles size={13} color="var(--kt-chalkboard, #1F3A2E)" />
+          <Sparkles size={13} color="var(--kt-chalkboard-ink, #1F3A2E)" />
           <span style={{
             fontSize: 11,
             fontWeight: 700,
-            color: 'var(--kt-chalkboard, #1F3A2E)',
+            color: 'var(--kt-chalkboard-ink, #1F3A2E)',
             fontFamily: 'var(--kt-font-mono, monospace)',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
@@ -150,7 +150,7 @@ export default function AssessmentGateway() {
                     fontFamily: 'var(--kt-font-mono, monospace)',
                     fontSize: 10.5,
                     fontWeight: 700,
-                    color: 'var(--kt-chalkboard, #1F3A2E)',
+                    color: 'var(--kt-chalkboard-ink, #1F3A2E)',
                     letterSpacing: '0.06em',
                   }}>
                     {badge}
@@ -264,7 +264,7 @@ export default function AssessmentGateway() {
           placeItems: 'center',
           flexShrink: 0,
         }}>
-          <ClipboardCheck size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+          <ClipboardCheck size={16} color="var(--kt-chalkboard-ink, #1F3A2E)" />
         </div>
         <p style={{ margin: 0, fontSize: 12.5, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.5 }}>
           <strong>Paalala ng Kagawaran:</strong> Ang Quiz Builder ay mainam para sa <em>formative assessment</em> at daily drills. Para sa <em>quarterly / periodical examinations</em>, gamitin ang Test Builder upang awtomatikong mabuo ang DepEd Table of Specifications (TOS) matrix.

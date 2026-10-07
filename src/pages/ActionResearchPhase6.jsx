@@ -146,7 +146,7 @@ export default function ActionResearchPhase6() {
 
   if (pageLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--kt-surface, #FBF7EC)' }}>
-      <Loader2 size={24} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
+      <Loader2 size={24} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
@@ -187,7 +187,7 @@ export default function ActionResearchPhase6() {
               justifyContent: 'center',
               flexShrink: 0,
             }}>
-              <Trophy size={22} color="var(--kt-chalkboard, #1F3A2E)" />
+              <Trophy size={22} color="var(--kt-chalkboard-ink, #1F3A2E)" />
             </div>
             <div>
               <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
@@ -216,11 +216,11 @@ export default function ActionResearchPhase6() {
           </h2>
           {docData?.dataCollection?.primaryTool?.name && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', color: 'var(--kt-chalkboard, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 600, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+              <span style={{ fontSize: 11, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', color: 'var(--kt-chalkboard-ink, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 600, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                 Primary Tool: {docData.dataCollection.primaryTool.name}
               </span>
               {docData.dataCollection.secondaryTool?.name && (
-                <span style={{ fontSize: 11, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', color: 'var(--kt-chalkboard, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 600, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                <span style={{ fontSize: 11, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', color: 'var(--kt-chalkboard-ink, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 600, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                   Secondary Tool: {docData.dataCollection.secondaryTool.name}
                 </span>
               )}
@@ -305,10 +305,10 @@ export default function ActionResearchPhase6() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><MessageSquare size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Resulta at Pagsusuri Bawat Katanungan (Findings by RQ)</p>
+              <p style={sectionHead}><span style={iconBox}><MessageSquare size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Resulta at Pagsusuri Bawat Katanungan (Findings by RQ)</p>
               {(findings.findings ?? []).map((f, i) => (
                 <div key={i} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < findings.findings.length - 1 ? '1px solid var(--kt-border, #DCD0AE)' : 'none' }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                     RQ{f.questionNumber}. {f.question}
                   </p>
                   <p style={{ margin: '0 0 6px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.7 }}>{f.analysis}</p>
@@ -325,7 +325,7 @@ export default function ActionResearchPhase6() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><BookOpen size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Talakayan (Discussion)</p>
+              <p style={sectionHead}><span style={iconBox}><BookOpen size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Talakayan (Discussion)</p>
               {(findings.discussion ?? '').split('\n').filter(Boolean).map((p, i) => (
                 <p key={i} style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75, textAlign: 'justify', textIndent: '2em' }}>{p}</p>
               ))}
@@ -339,7 +339,7 @@ export default function ActionResearchPhase6() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><ListChecks size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Konklusyon (Conclusions)</p>
+              <p style={sectionHead}><span style={iconBox}><ListChecks size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Konklusyon (Conclusions)</p>
               {(findings.conclusions ?? []).map((c, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                   <span style={{ background: 'var(--kt-chalkboard, #1F3A2E)', color: '#FBF7EC', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700, flexShrink: 0, marginTop: 2, fontFamily: 'var(--kt-font-mono, monospace)' }}>
@@ -358,10 +358,10 @@ export default function ActionResearchPhase6() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><Lightbulb size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Rekomendasyon (Recommendations)</p>
+              <p style={sectionHead}><span style={iconBox}><Lightbulb size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Rekomendasyon (Recommendations)</p>
               {(findings.recommendations ?? []).map((r, i) => (
                 <div key={i} style={{ marginBottom: 10, padding: '12px 16px', background: 'var(--kt-card-2, #F4EDDB)', borderRadius: 'var(--kt-radius-sm, 4px)', borderLeft: '3px solid var(--kt-chalkboard, #1F3A2E)' }}>
-                  <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', textTransform: 'uppercase', fontFamily: 'var(--kt-font-mono, monospace)' }}>Para kay / sa: {r.for}</p>
+                  <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', textTransform: 'uppercase', fontFamily: 'var(--kt-font-mono, monospace)' }}>Para kay / sa: {r.for}</p>
                   <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.6 }}>{r.text}</p>
                 </div>
               ))}
@@ -376,7 +376,7 @@ export default function ActionResearchPhase6() {
                 padding: '20px 24px',
                 boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
               }}>
-                <p style={sectionHead}><span style={iconBox}><Heart size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Pagninilay ng Guro-Mananaliksik (Teacher-Researcher's Reflection)</p>
+                <p style={sectionHead}><span style={iconBox}><Heart size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Pagninilay ng Guro-Mananaliksik (Teacher-Researcher's Reflection)</p>
                 {(findings.reflections ?? '').split('\n').filter(Boolean).map((p, i) => (
                   <p key={i} style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75, fontStyle: 'italic', textIndent: '2em' }}>{p}</p>
                 ))}

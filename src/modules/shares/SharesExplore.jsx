@@ -80,7 +80,7 @@ export default function SharesExplore({ uid, displayName, initials, photoURL, is
           {/* Active hashtag header */}
           {activeTag && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                 #{activeTag}
               </h2>
               <button

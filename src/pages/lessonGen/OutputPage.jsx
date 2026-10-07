@@ -85,7 +85,7 @@ function SectionBanner({ n, title, desc }) {
               <td style={{ width: '22%', fontWeight: 700, fontStyle: 'italic', fontSize: 17, fontFamily: 'var(--kt-font-heading)', verticalAlign: 'top', paddingRight: 16, color: '#FBF7EC' }}>
                 {title}
               </td>
-              <td style={{ fontStyle: 'italic', fontSize: 12.5, color: 'var(--kt-manila)', lineHeight: 1.6, verticalAlign: 'top', fontFamily: 'var(--kt-font-ui)' }}>
+              <td style={{ fontStyle: 'italic', fontSize: 12.5, color: 'var(--kt-manila-ink, #E4D5AC)', lineHeight: 1.6, verticalAlign: 'top', fontFamily: 'var(--kt-font-ui)' }}>
                 {desc}
               </td>
             </tr>
@@ -552,20 +552,20 @@ export default function OutputPage() {
           >
             {pptLoading
               ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
-              : <><Presentation size={14} color="var(--kt-manila)" /> Presentation</>}
+              : <><Presentation size={14} color="var(--kt-manila-ink, #E4D5AC)" /> Presentation</>}
           </button>
 
           {/* Quiz Builder Action */}
           <button
             className="action-btn-clean"
             style={{
-              background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+              background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)',
               border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '8px 14px', fontSize: 12.5, fontWeight: 600,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 1px 2px rgba(38,33,25,0.05)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-manila-hover, #dac797)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; }}
             onClick={() => navigate('/quiz-builder')}
           >
@@ -797,7 +797,7 @@ export default function OutputPage() {
                 borderBottom: '2px solid var(--kt-manila-border)',
               }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'var(--kt-font-mono)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-manila-ink, #E4D5AC)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'var(--kt-font-mono)' }}>
                     Session {s.day} · {s.date || 'Scheduled'}
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#FBF7EC', marginTop: 2, fontFamily: 'var(--kt-font-heading)' }}>
@@ -837,7 +837,7 @@ export default function OutputPage() {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--kt-chalkboard-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'var(--kt-chalkboard)'}
                 >
-                  <Sparkles size={14} color="var(--kt-manila)" /> Continue to COT 4As Lesson Plan →
+                  <Sparkles size={14} color="var(--kt-manila-ink, #E4D5AC)" /> Continue to COT 4As Lesson Plan →
                 </button>
 
                 <button
@@ -858,7 +858,7 @@ export default function OutputPage() {
                 >
                   {pptLoading
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {pptPhase || 'Building PPT…'}</>
-                    : <><Presentation size={14} color="var(--kt-manila)" /> Presentation Deck (PPTX)</>}
+                    : <><Presentation size={14} color="var(--kt-manila-ink, #E4D5AC)" /> Presentation Deck (PPTX)</>}
                 </button>
 
                 <button
@@ -873,7 +873,7 @@ export default function OutputPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#dac797'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--kt-manila-hover, #dac797)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'var(--kt-manila)'}
                 >
                   <Gamepad2 size={14} /> Interactive Game Worksheet

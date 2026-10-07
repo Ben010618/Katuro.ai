@@ -94,7 +94,7 @@
 
 .sh-subheader-link.active {
   background: var(--kt-manila, #E4D5AC);
-  color: var(--kt-text-primary, #262119);
+  color: var(--kt-on-manila, #262119);
   border-color: var(--kt-manila-border, #C9B583);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   font-weight: 700;
@@ -162,7 +162,7 @@
   border-radius: var(--sh-radius-sm, 4px);
   flex-shrink: 0;
   background: var(--kt-manila, #E4D5AC);
-  color: var(--kt-text-primary, #262119);
+  color: var(--kt-on-manila, #262119);
   border: 1px solid var(--kt-manila-border, #C9B583);
   box-shadow: 0 1px 2px rgba(38,33,25,0.06);
   transition: transform 0.15s ease;
@@ -317,7 +317,7 @@
   padding: 2px 8px;
   border-radius: var(--sh-radius-sm, 4px);
   background: var(--kt-manila, #E4D5AC);
-  color: var(--kt-text-primary, #262119);
+  color: var(--kt-on-manila, #262119);
   border: 1px solid var(--kt-manila-border, #C9B583);
   font-family: var(--sh-mono);
 }
@@ -777,7 +777,7 @@
   font-family: var(--kt-font-header, inherit);
   font-size: 16px;
   font-weight: 700;
-  color: var(--kt-chalkboard, #1F3A2E);
+  color: var(--kt-chalkboard-ink, #1F3A2E);
   margin: 0 0 10px 0;
   line-height: 1.35;
 }
@@ -866,7 +866,7 @@
   background: var(--kt-manila);
 }
 
-.sh-drop-zone-icon { color: var(--kt-chalkboard); margin-bottom: 8px; }
+.sh-drop-zone-icon { color: var(--kt-chalkboard-ink, #1F3A2E); margin-bottom: 8px; }
 .sh-drop-zone-text { font-size: 13.5px; color: var(--sh-text-primary); font-weight: 600; font-family: var(--sh-heading-font); }
 .sh-drop-zone-hint { font-size: 11.5px; color: var(--sh-text-secondary); margin-top: 4px; font-family: var(--sh-mono); }
 
@@ -881,7 +881,7 @@
 }
 .sh-prompt-banner-icon {
   width: 26px; height: 26px; border-radius: var(--sh-radius-sm); flex-shrink: 0;
-  background: var(--kt-chalkboard, #1F3A2E); color: var(--kt-manila, #E4D5AC);
+  background: var(--kt-chalkboard, #1F3A2E); color: var(--kt-manila-ink, #E4D5AC);
   display: grid; place-items: center;
 }
 .sh-prompt-banner-text {
@@ -889,7 +889,7 @@
 }
 .sh-prompt-banner-label {
   display: block; font-size: 10px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--kt-chalkboard); margin-bottom: 2px; font-family: var(--sh-mono);
+  letter-spacing: 0.08em; color: var(--kt-chalkboard-ink, #1F3A2E); margin-bottom: 2px; font-family: var(--sh-mono);
 }
 .sh-prompt-banner-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .sh-prompt-use-btn {
@@ -1048,7 +1048,7 @@
 .sh-filter-tab:hover { border-color: var(--kt-manila-border); color: var(--sh-text-primary); }
 .sh-filter-tab.active {
   background: var(--kt-manila, #E4D5AC);
-  color: var(--kt-text-primary, #262119);
+  color: var(--kt-on-manila, #262119);
   border-color: var(--kt-manila-border, #C9B583);
   font-weight: 700;
 }
@@ -1213,7 +1213,7 @@
   transition: background 0.14s, color 0.14s; white-space: nowrap;
 }
 
-.sh-follow-btn--follow { background: var(--kt-manila, #E4D5AC); color: var(--kt-text-primary, #262119); border: 1px solid var(--kt-manila-border, #C9B583); }
+.sh-follow-btn--follow { background: var(--kt-manila, #E4D5AC); color: var(--kt-on-manila, #262119); border: 1px solid var(--kt-manila-border, #C9B583); }
 .sh-follow-btn--follow:hover { background: #dac797; }
 .sh-follow-btn--following { background: var(--kt-card-2, #F4EDDB); color: var(--sh-text-secondary); border: 1px solid var(--sh-border); }
 .sh-follow-btn--following:hover { background: var(--kt-danger-tint); border-color: var(--sh-red); color: var(--sh-red); }
@@ -1260,7 +1260,7 @@
 .sh-hashtag-pill {
   display: inline-flex; align-items: center; gap: 4px;
   background: var(--kt-manila, #E4D5AC);
-  color: var(--kt-text-primary, #262119);
+  color: var(--kt-on-manila, #262119);
   font-size: 11.5px; font-weight: 700;
   padding: 3px 10px; border-radius: var(--sh-radius-sm);
   cursor: pointer; text-decoration: none;
@@ -1341,7 +1341,7 @@
   transition: transform 0.1s ease, color 0.1s ease, background 0.1s ease, border-color 0.1s ease;
 }
 .sh-rte-btn:hover {
-  color: var(--kt-text-primary);
+  color: var(--kt-on-manila, #262119);
   background: var(--kt-manila, #E4D5AC);
   border-color: var(--kt-manila-border);
   transform: translateY(-1px);
@@ -1445,3 +1445,23 @@
 .sh-caption--rich u { text-decoration: underline; }
 .sh-caption--rich ul { margin: 6px 0; padding-left: 20px; }
 .sh-caption--rich li { margin-bottom: 3px; }
+
+/* ── Captions pasted from Word / Google Docs / chat apps ─────────────
+   Pasted text carries inline colours (e.g. black) and white backgrounds that
+   become unreadable in dark mode. The editor has no text-colour tool, so pasted
+   colours follow the theme; only the editor's own yellow highlight is kept. */
+.sh-caption--rich [style*="color"] { color: inherit !important; }
+.sh-caption--rich [style*="background"] { background: transparent !important; }
+.sh-caption--rich [style*="254, 240, 138"],
+.sh-caption--rich [style*="fef08a"] {
+  background: #fef08a !important;
+  color: #262119 !important;
+  border-radius: 2px;
+}
+
+/* ── Dark mode readability ───────────────────────────────────────── */
+[data-dark="true"] {
+  --sh-primary: #8FD3A9;   /* chalkboard green is too dark for text on dark surfaces */
+  --sh-teal:    #8FD3A9;
+}
+[data-dark="true"] .sh-theater-title { color: var(--kt-text-primary); }

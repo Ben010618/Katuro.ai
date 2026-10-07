@@ -21,7 +21,7 @@ const GRADES   = ['7', '8', '9', '10', '11', '12'];
 function LabeledField({ label, children }) {
   return (
     <div>
-      <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+      <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: 'var(--kt-form-label, #4a6357)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
         {label}
       </label>
       {children}
@@ -224,8 +224,8 @@ export default function SettingsPage() {
           {tab === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Your plan</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Plans are activated by the KaTuro admin. Free plans have lower daily AI limits; Subscriptions get the full limits.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: 'var(--kt-form-title, #0d2218)' }}>Your plan</h2>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-form-label, #4a6357)' }}>Plans are activated by the KaTuro admin. Free plans have lower daily AI limits; Subscriptions get the full limits.</p>
               </div>
 
               {/* Plan card */}
@@ -235,9 +235,9 @@ export default function SettingsPage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
               }}>
                 <div>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: plan.plan === 'subscription' ? '#E4D5AC' : '#4a6357', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Current plan</p>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: plan.plan === 'subscription' ? '#E4D5AC' : 'var(--kt-form-label, #4a6357)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>Current plan</p>
                   <p style={{ margin: '4px 0 2px', fontSize: 22, fontWeight: 700, color: plan.plan === 'subscription' ? '#fff' : '#0d2218' }}>{plan.label}</p>
-                  <p style={{ margin: 0, fontSize: 13, color: plan.plan === 'subscription' ? '#d8f3dc' : '#4a6357' }}>
+                  <p style={{ margin: 0, fontSize: 13, color: plan.plan === 'subscription' ? '#d8f3dc' : 'var(--kt-form-label, #4a6357)' }}>
                     {planStatusText(plan)}{plan.expiringSoon ? ` · ${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'} left` : ''}
                   </p>
                 </div>
@@ -255,7 +255,7 @@ export default function SettingsPage() {
               <div style={{ border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: '#f5faf7', textAlign: 'left', color: '#4a6357' }}>
+                    <tr style={{ background: '#f5faf7', textAlign: 'left', color: 'var(--kt-form-label, #4a6357)' }}>
                       <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px' }}>Daily limit</th>
                       <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', background: plan.plan === 'free' ? '#d8f3dc' : undefined }}>Free</th>
                       <th style={{ padding: '10px 14px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', background: plan.plan === 'subscription' ? '#d8f3dc' : undefined }}>Subscription</th>
@@ -268,7 +268,7 @@ export default function SettingsPage() {
                       const limit = row[plan.plan];
                       return (
                         <tr key={row.action} style={{ borderTop: '1px solid rgba(45,106,79,0.1)' }}>
-                          <td style={{ padding: '9px 14px', color: '#0d2218' }}>{row.feature}</td>
+                          <td style={{ padding: '9px 14px', color: 'var(--kt-form-title, #0d2218)' }}>{row.feature}</td>
                           <td style={{ padding: '9px 14px', fontWeight: plan.plan === 'free' ? 700 : 400 }}>{row.free}</td>
                           <td style={{ padding: '9px 14px', fontWeight: plan.plan === 'subscription' ? 700 : 400 }}>{row.subscription}</td>
                           <td style={{ padding: '9px 14px', fontFamily: '"DM Mono", monospace', color: used >= limit ? '#c0392b' : '#2d6a4f' }}>{used}/{limit}</td>
@@ -278,7 +278,7 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
-              <p style={{ margin: 0, fontSize: 12, color: '#4a6357' }}>Limits reset every midnight (Philippine time).</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--kt-form-label, #4a6357)' }}>Limits reset every midnight (Philippine time).</p>
             </div>
           )}
 
@@ -286,8 +286,8 @@ export default function SettingsPage() {
           {tab === 2 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: '#0d2218' }}>Account Security</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#4a6357' }}>Password management is handled by your administrator.</p>
+                <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: 'var(--kt-form-title, #0d2218)' }}>Account Security</h2>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--kt-form-label, #4a6357)' }}>Password management is handled by your administrator.</p>
               </div>
 
               <div style={{
@@ -299,8 +299,8 @@ export default function SettingsPage() {
                   <Lock size={18} color="#2d6a4f" />
                 </div>
                 <div>
-                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#0d2218' }}>Password changes are admin-only</p>
-                  <p style={{ margin: 0, fontSize: 13, color: '#4a6357', lineHeight: 1.6 }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--kt-form-title, #0d2218)' }}>Password changes are admin-only</p>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-form-label, #4a6357)', lineHeight: 1.6 }}>
                     Only your kaTuro administrator can change or reset your password.
                     Please contact your admin if you need a password update.
                   </p>
@@ -309,7 +309,7 @@ export default function SettingsPage() {
 
               <div style={{ borderTop: '1px solid rgba(45,106,79,0.12)', paddingTop: 20 }}>
                 <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 600, color: '#e05c5c' }}>Danger Zone</h3>
-                <p style={{ margin: '0 0 14px', fontSize: 14, color: '#4a6357' }}>
+                <p style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--kt-form-label, #4a6357)' }}>
                   These actions are permanent and cannot be undone.
                 </p>
                 <div style={{

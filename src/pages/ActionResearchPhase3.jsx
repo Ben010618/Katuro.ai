@@ -122,7 +122,7 @@ export default function ActionResearchPhase3() {
 
   if (pageLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--kt-surface, #FBF7EC)' }}>
-      <Loader2 size={24} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
+      <Loader2 size={24} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
@@ -169,7 +169,7 @@ export default function ActionResearchPhase3() {
               </p>
               {docData.selectedQuestions.map((q, i) => (
                 <p key={i} style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.55 }}>
-                  <span style={{ fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', marginRight: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>RQ{i + 1}.</span> {q}
+                  <span style={{ fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', marginRight: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>RQ{i + 1}.</span> {q}
                 </p>
               ))}
             </div>
@@ -255,7 +255,7 @@ export default function ActionResearchPhase3() {
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}>
-                      <Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+                      <Icon size={16} color="var(--kt-chalkboard-ink, #1F3A2E)" />
                     </div>
                     <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                       {label}

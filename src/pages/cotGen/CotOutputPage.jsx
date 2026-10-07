@@ -244,14 +244,14 @@ export default function CotOutputPage() {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--kt-font-mono)' }}>
+            <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--kt-font-mono)' }}>
               PPST-aligned · COT-optimized · 4As Framework
             </span>
           </div>
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#FBF7EC', lineHeight: 1.2, fontFamily: 'var(--kt-font-heading)' }}>
             {store.topic || 'Lesson Plan'}
           </h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-manila)' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--kt-manila-ink, #E4D5AC)' }}>
             {store.subject} · {store.grade} · {store.quarter}
             {store.teacherName && ` · ${store.teacherName}`}
           </p>
@@ -263,7 +263,7 @@ export default function CotOutputPage() {
             title="Save as Word document — required for DepEd submission"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+              background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)',
               border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)',
               padding: '10px 18px', fontSize: 13, fontWeight: 700,
               cursor: exporting ? 'not-allowed' : 'pointer',
@@ -286,7 +286,7 @@ export default function CotOutputPage() {
               cursor: 'pointer',
             }}
           >
-            <Sparkles size={14} color="var(--kt-chalkboard)" /> Create Quiz
+            <Sparkles size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /> Create Quiz
           </button>
           <button
             onClick={() => { store.reset(); navigate('/cot-gen'); }}

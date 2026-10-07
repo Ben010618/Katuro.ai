@@ -489,7 +489,7 @@ export default function AppShell() {
           ))}
 
           <header style={{ height: 56, background: 'var(--kt-topbar-bg)', borderBottom: '1px solid var(--kt-border)', boxShadow: '0 1px 2px rgba(38,33,25,0.04)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 40, flexShrink: 0 }}>
-            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--kt-chalkboard, #1F3A2E)', alignItems: 'center' }}>
+            <button className="shell-menu-btn" onClick={() => setMobileOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--kt-chalkboard-ink, #1F3A2E)', alignItems: 'center' }}>
               <Menu size={20} />
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>

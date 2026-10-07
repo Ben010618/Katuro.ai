@@ -84,7 +84,7 @@ export default function ActionResearchShell({
             padding: '4px 8px',
           }}>
             <img src={ktLogo} alt="kaTuro" style={{ width: 20, height: 20, borderRadius: 3, objectFit: 'cover' }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
               kaTuro AI
             </span>
           </div>
@@ -119,7 +119,7 @@ export default function ActionResearchShell({
             padding: '5px 12px',
             fontSize: 11.5,
             fontWeight: 700,
-            color: 'var(--kt-chalkboard, #1F3A2E)',
+            color: 'var(--kt-chalkboard-ink, #1F3A2E)',
             fontFamily: 'var(--kt-font-mono, monospace)',
           }}>
             {themeName}
@@ -174,7 +174,7 @@ export default function ActionResearchShell({
                     fontSize: 12,
                     fontWeight: active ? 700 : 500,
                     color: active
-                      ? 'var(--kt-chalkboard, #1F3A2E)'
+                      ? 'var(--kt-chalkboard-ink, #1F3A2E)'
                       : complete
                       ? 'var(--kt-sage, #5F7A54)'
                       : 'var(--kt-text-secondary, #6E6455)',
@@ -262,7 +262,7 @@ export default function ActionResearchShell({
                   padding: '9px 16px',
                   fontSize: 12.5,
                   fontWeight: 600,
-                  color: 'var(--kt-chalkboard, #1F3A2E)',
+                  color: 'var(--kt-chalkboard-ink, #1F3A2E)',
                   cursor: downloadLoading ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                   display: 'flex',
