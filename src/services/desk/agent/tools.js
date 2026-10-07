@@ -442,6 +442,83 @@ export const TOOLS = {
     },
   },
 
+  build_report_cards: {
+    label: 'Report cards (SF9) from class records',
+    description: "Consolidate each learner's grades from the subject teachers' class records into the Learner's Performance Report (SF9) for a whole section: Term 1–3 grades per learning area, Final Grade, Remarks and General Average, plus a summary workbook (final grades, promotion, checks). Use for \"consolidate the grades\", \"report cards\", \"cards\", \"SF9\" from a class adviser. Computed entirely by code under DepEd Order No. 15, s. 2026; no learner data is sent to the AI.",
+    args: '{ "sourcePaths": [string], "grade"?: string, "section"?: string, "schoolYear"?: string }',
+    async run({ sourcePaths = [], grade = '', section = '', schoolYear = '' }, ctx, report) {
+      const {
+        extractGradeRecords, consolidateLearners, buildReportCardSpec, buildSummarySheetSpec,
+      } = await import('./reportCards.js');
+      const { gradingModeFor, gradeNumber } = await import('../knowledge/gradingRules.js');
+      const paths = [...new Set(sourcePaths)].filter((p) => /\.(xlsx|xlsm|xls|csv|docx)$/i.test(p));
+      if (!paths.length) throw new Error("Tell me which class records to use: tick every subject's class record for the section (Excel or Word), or name the folder.");
+      report(`Reading ${paths.length} class record(s)…`);
+      const parsed = await Promise.all(paths.map((p) => ctx.readParsed(p).then((d) => ({ p, d }), (error) => ({ p, error }))));
+      const fileResults = [];
+      const notes = [];
+      const found = { grade: '', section: '' };
+      for (const { p, d, error } of parsed) {
+        if (error || !d) { notes.push(`${p.split('/').pop()}: could not be read (${error?.message || 'unknown error'}).`); continue; }
+        // Grades stay on this computer: names are read as written, never masked or sent anywhere.
+        const res = extractGradeRecords(p, d);
+        notes.push(...res.notes);
+        found.grade ||= res.meta.grade; found.section ||= res.meta.section;
+        fileResults.push({ path: p, records: res.records });
+      }
+      const gradeLevel = String(grade || found.grade || '').trim();
+      const sectionName = String(section || found.section || '').trim();
+      const sy = String(schoolYear || ctx.schoolYear || '').trim();
+      if (gradeNumber(gradeLevel) === null) {
+        throw needsInfo('Which grade level is this class? The grading rules depend on it (for example, Grade 1 is descriptive in SY 2026–2027).');
+      }
+      const mode = gradingModeFor(sy, gradeLevel);
+      if (mode.mode === 'descriptive') {
+        throw needsInfo(`In SY ${sy}, Grade ${gradeNumber(gradeLevel) || 'Kindergarten'} uses the descriptive ${mode.report}, with no numerical grades (${mode.source}). Tell me if you want me to prepare it from your learners' ratings instead.`);
+      }
+      const { learners, areas, checks } = consolidateLearners(fileResults, { terms: mode.terms });
+      if (!learners.length) {
+        throw needsInfo(`I could not find learner names with term grades in these files. ${notes.slice(0, 3).join(' ')}`.trim());
+      }
+      const info = {
+        schoolYear: sy, grade: String(gradeNumber(gradeLevel)), section: sectionName,
+        school: ctx.teacher.school, district: ctx.teacher.district, division: ctx.teacher.division, region: ctx.teacher.region,
+        adviser: ctx.teacher.fullName,
+      };
+      const usedFor = new Map();
+      for (const l of learners) for (const a of l.areas.values()) for (const s of a.sources || []) {
+        const set = usedFor.get(s) || new Set(); set.add(a.name); usedFor.set(s, set);
+      }
+      const sources = [...usedFor.entries()].map(([file, set]) => ({ file, usedFor: [...set].join(', ') }));
+
+      report('Building the report cards…');
+      const cardSpec = buildReportCardSpec({ learners, areas, info });
+      const sheetSpec = buildSummarySheetSpec({ learners, areas, checks, info, sources, notes });
+      const base = slug(`Report_Cards_Grade${info.grade}${sectionName ? `_${sectionName}` : ''}`);
+      const files = await saveDocumentOutputs(cardSpec, base, ['docx'], ctx);
+      const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+      const sheetFile = await ctx.saveOutput(`${slug(`Summary_of_Grades_Grade${info.grade}${sectionName ? `_${sectionName}` : ''}`)}.xlsx`, await buildSheetWorkbook(sheetSpec), 'xlsx');
+
+      const complete = learners.filter((l) => l.generalAverage !== null).length;
+      const termsWithGrades = [1, 2, 3].filter((t) => learners.some((l) => [...l.areas.values()].some((a) => typeof a.terms[t] === 'number')));
+      const parts = [`Prepared report cards for **${learners.length} learner(s)** (${areas.filter((k) => !['music_arts', 'pe_health'].includes(k)).length} learning areas) from ${sources.length} class record(s)`];
+      parts.push(complete === learners.length
+        ? 'Final Grades and General Averages are computed (average of the three terms, DO 15, s. 2026)'
+        : termsWithGrades.length < mode.terms
+          ? `Grades found for Term ${termsWithGrades.join(', ') || '—'} only, so Final Grades and General Averages will be filled in once all ${mode.terms} terms are recorded`
+          : `${learners.length - complete} learner(s) have missing grades, so their Final Grade or General Average is left blank`);
+      if (checks.length) parts.push(`**${checks.length} item(s) to check** are listed in the Checks sheet (missing grades, name spellings, unusual values)`);
+      if (notes.length) parts.push(`${notes.length} file note(s): ${notes.slice(0, 2).join(' ')}`);
+      return {
+        summary: `${parts.join('. ')}. Grades were computed by code from your files; nothing was estimated by AI.`,
+        artifacts: [
+          { type: 'document', title: cardSpec.title, subtitle: files[0]?.name, spec: cardSpec, files, editable: false },
+          { type: 'sheet', title: sheetSpec.title, subtitle: sheetFile.name, spec: sheetSpec, files: [sheetFile], editable: false },
+        ],
+      };
+    },
+  },
+
   analyze_scores: {
     label: 'Item analysis & LMC',
     description: 'Item analysis of a quiz/test score sheet (Excel/CSV, photo, or scanned PDF): MPS, mastery level, difficulty & discrimination per item, Least Mastered Competencies, learners below 75%. Saves an Item Analysis report (.docx) and workbook (.xlsx). Computed exactly in code.',

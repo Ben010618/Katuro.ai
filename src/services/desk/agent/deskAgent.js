@@ -30,6 +30,8 @@ import {
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
+import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
+import { gradingRulesBrief } from '../knowledge/gradingRules.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
 
@@ -89,6 +91,20 @@ const DOC_FORMAT = 'Do not use markdown symbols like #, ** or backticks; use pla
 export function personaFor(teacher, personaId, now = new Date()) {
   const p = getPersona(personaId);
   return `${baseRole(teacher)} ${CHAT_FORMAT}\n\n${p.style}\nIt is currently ${timeOfDay(now)} in the Philippines.\nThis personality applies to how you talk in chat only, never to the content of official documents.\n\n${GROUNDING_RULES}`;
+}
+
+/**
+ * DepEd knowledge for this request only (school forms the teacher's words point to,
+ * grading rules when grades come up). Sent in the prompt, not the system text, so the
+ * fixed instructions stay identical between requests. '' when nothing is relevant.
+ */
+export function plannerKnowledge(prompt, history = [], schoolYear = '') {
+  // A short follow-up ("Grade 5 Rizal po") keeps the topic of the teacher's previous message.
+  const lastTeacher = [...history].reverse().find((m) => m.role === 'user')?.content || '';
+  const text = `${prompt}\n${String(prompt).length < 60 ? lastTeacher : ''}`;
+  const parts = [formKnowledgeFor(text)];
+  if (talksAboutGrades(text)) parts.push(gradingRulesBrief(schoolYear));
+  return parts.filter(Boolean).join('\n\n');
 }
 
 /** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
@@ -308,6 +324,7 @@ export async function runDeskAgentTurn({
         activePath,
         activeArtifact,
         privacyOn: privacyMode,
+        knowledge: plannerKnowledge(prompt, history, ctx.schoolYear),
       }),
       json: true,
       // A general question is answered in full inside "reply" (e.g. "your best use cases").

@@ -65,6 +65,7 @@ Rules:
 8b. "Summarize / review this folder (or subfolder)": use write_document with docType "summary" (or answer_from_files if they only want a chat answer) and put the relevant document files from the index in sourcePaths (up to 40; skip code, images and duplicates; prefer docx/pdf/xlsx/pptx). Say which files you included.
 9. Schools use their OWN templates. Moving data between two existing papers (e.g. attendance in a Word doc → the SF2 Excel, scores → their class record, SF1 details → a masterlist) → transfer_data (source = where the data is, target = the file to fill). Checking/cross-checking two papers → compare_files. Changing words/values inside an existing Word/Excel file → edit_file. "What is this file / did you read it right" → understand_file. These keep the target's formatting and show a preview the teacher approves.
 9e. "Consolidate / combine / compile / merge" the data of several existing files (or a folder) into one Excel → consolidate_files with all those files in sourcePaths (one task, not one per file). make_spreadsheet is only for designing a new sheet.
+9f. Think like a DepEd teacher. GRADES of learners across learning areas ("consolidate the grades", "grades for the cards", "report card(s)", "card", "SF9", "Form 138") from a class adviser → build_report_cards with sourcePaths = every subject's class record for that section (from the folder index or attached files) and the grade/section if stated. consolidate_files is for copying other kinds of data. If it is unclear whether the teacher is the adviser (whole section, all subjects) or a subject teacher (one learning area, several sections), or which section's files to use, ask in "reply" with no tasks. Use the "School forms knowledge" and "Grading rules" sections when they are given; never state a DepEd rule that is not in them.
 9d. The teacher wants to encode/enter scores BY VOICE (speaking, dictating, reading scores aloud) → voice_encode_scores with targetPath = their own class record or score sheet (.xlsx/.docx); add "column" only if they named it. If the file is unclear, ask which file.
 9a. encode_scores is the older simple scores-into-one-column tool; prefer transfer_data when the target is a full school form. A NEW official class record built from scratch → make_class_record.
 9b. New files are saved in "KaTuro Outputs/<today>/" by default. If the teacher names a folder to save into, add "outputFolder": "<folder path>" to the args of every task that saves files (create_folder first if it doesn't exist, and make those tasks depend on it).
@@ -72,7 +73,7 @@ Rules:
 10. Write "reply" fully in YOUR persona's voice described above (greeting style, energy, formality), addressing the teacher as "${teacherName}". Keep it short and clear. In "reply" you may use **bold** for a key fact; no # headings, tables or backticks, and no long disclaimers. Never put formatting symbols in task args.`;
 }
 
-export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn }) {
+export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedPaths, activePath, activeArtifact, privacyOn, knowledge = '' }) {
   return [
     `Classroom folder: ${workspaceName || '(none opened)'} — ${fileIndex.count} files`,
     fileIndex.text ? `Folder index:\n${fileIndex.text}` : 'Folder index: (empty)',
@@ -80,6 +81,7 @@ export function buildPlannerPrompt({ prompt, workspaceName, fileIndex, attachedP
     activePath ? `Active file (selected in explorer): ${activePath}` : '',
     activeArtifact ? `Open in Canvas: "${activeArtifact.title}" (${activeArtifact.type})` : '',
     privacyOn ? 'Learner names in file contents are replaced with codes like "Learner 01" for privacy; keep using the codes.' : '',
+    knowledge ? `\n${knowledge}` : '',
     `\nTeacher's message: ${prompt}`,
   ].filter(Boolean).join('\n');
 }
