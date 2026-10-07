@@ -149,7 +149,7 @@ export default function Step1() {
     <div style={{maxWidth:900,margin:'0 auto'}}>
       {/* Phase badge + heading */}
       <div style={{marginBottom:28}}>
-        <span style={{background:'var(--kt-manila)',color:'var(--kt-text-primary)',border:'1px solid var(--kt-manila-border)',borderRadius:'var(--kt-radius-sm)',padding:'3px 10px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'1px',fontFamily:'var(--kt-font-mono)'}}>
+        <span style={{background:'var(--kt-manila)',color:'var(--kt-on-manila, #262119)',border:'1px solid var(--kt-manila-border)',borderRadius:'var(--kt-radius-sm)',padding:'3px 10px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'1px',fontFamily:'var(--kt-font-mono)'}}>
           Step 1 · Setup
         </span>
         <h2 style={{margin:'10px 0 6px',fontSize:24,fontWeight:700,color:'var(--kt-text-primary)',fontFamily:'var(--kt-font-heading)'}}>Set up your teaching session</h2>

@@ -268,7 +268,7 @@ export default function DashboardPage() {
         ))}
 
         <div style={{ position: 'relative' }}>
-          <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--kt-manila)', fontFamily: 'var(--kt-font-mono)', textTransform: 'uppercase', letterSpacing: '1px' }}>{greeting()},</p>
+          <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--kt-manila-ink, #E4D5AC)', fontFamily: 'var(--kt-font-mono)', textTransform: 'uppercase', letterSpacing: '1px' }}>{greeting()},</p>
           <h1 style={{ margin: '4px 0 6px', fontSize: 26, fontWeight: 700, color: '#FBF7EC', lineHeight: 1.15, fontFamily: 'var(--kt-font-heading)' }}>
             {form.name || displayName}
           </h1>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
             cursor: 'pointer', transition: 'background 0.15s, transform 0.15s',
             fontFamily: 'inherit',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-manila-hover, #dac797)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; e.currentTarget.style.transform = 'translateY(0)'; }}
         >
           <Sparkles size={15} /> New Lesson
@@ -307,7 +307,7 @@ export default function DashboardPage() {
           onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-border)', transform: 'none', boxShadow: 'var(--kt-shadow-sm)' })}
         >
           <div style={{ width: 34, height: 34, borderRadius: 4, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', display: 'grid', placeItems: 'center', marginBottom: 10 }}>
-            <BookOpen size={17} color="var(--kt-chalkboard)" />
+            <BookOpen size={17} color="var(--kt-chalkboard-ink, #1F3A2E)" />
           </div>
           <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{loading ? '—' : totalLessons}</p>
           <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Lesson Plans</p>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
             onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: 'var(--kt-border)', transform: 'none', boxShadow: 'var(--kt-shadow-sm)' })}
           >
             <div style={{ width: 34, height: 34, borderRadius: 4, background: 'var(--kt-card-2)', border: '1px solid var(--kt-border)', display: 'grid', placeItems: 'center', marginBottom: 10 }}>
-              <FlaskConical size={17} color="var(--kt-chalkboard)" />
+              <FlaskConical size={17} color="var(--kt-chalkboard-ink, #1F3A2E)" />
             </div>
             <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--kt-text-primary)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{researches.length}</p>
             <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>Research Projects</p>
@@ -446,7 +446,7 @@ export default function DashboardPage() {
           <button onClick={() => navigate('/my-lessons')} style={{
             display: 'flex', alignItems: 'center', gap: 5,
             background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 12, fontWeight: 600, color: '#2d6a4f',
+            fontSize: 12, fontWeight: 600, color: 'var(--kt-green-ink, #2d6a4f)',
           }}>
             View All <ArrowRight size={13} />
           </button>
@@ -510,7 +510,7 @@ export default function DashboardPage() {
               <Plus size={20} color="#fff" />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#2d6a4f' }}>Create New Lesson</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--kt-green-ink, #2d6a4f)' }}>Create New Lesson</p>
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>AI-powered planning</p>
             </div>
           </button>
@@ -663,19 +663,19 @@ export default function DashboardPage() {
           <button
             onClick={() => navigate('/action-research/phase-1')}
             style={{
-              background: '#f0f9ff', border: '2px dashed rgba(3,105,161,0.25)',
+              background: 'var(--kt-sky-fill, #f0f9ff)', border: '2px dashed rgba(3,105,161,0.25)',
               borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: 10, minHeight: 160, transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0369a1'; e.currentTarget.style.background = '#e0f2fe'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(3,105,161,0.25)'; e.currentTarget.style.background = '#f0f9ff'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0369a1'; e.currentTarget.style.background = 'var(--kt-sky-fill-hover, #e0f2fe)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(3,105,161,0.25)'; e.currentTarget.style.background = 'var(--kt-sky-fill, #f0f9ff)'; }}
           >
             <div style={{ width: 38, height: 38, borderRadius: 10, background: '#0369a1', display: 'grid', placeItems: 'center' }}>
               <Plus size={20} color="#fff" />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0369a1' }}>Start New Research</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--kt-blue-ink, #0369a1)' }}>Start New Research</p>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)' }}>AI-guided DepEd action research</p>
             </div>
           </button>

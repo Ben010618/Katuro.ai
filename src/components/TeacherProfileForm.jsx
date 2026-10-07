@@ -9,11 +9,11 @@ import { listDivisions } from '../services/messages/chatService';
  * Every field is optional; blank fields are simply left out of generated documents.
  */
 
-const labelStyle = { display: 'block', marginBottom: 5, fontSize: 11, fontWeight: 700, color: '#4a6357', textTransform: 'uppercase', letterSpacing: '0.8px' };
-const hintStyle = { margin: '3px 0 0', fontSize: 11, color: '#6b7f74' };
-const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cfd8d3', background: '#fff', color: '#0d2218', fontFamily: 'inherit' };
-const sectionTitle = { margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: '#0d2218' };
-const sectionHint = { margin: '0 0 10px', fontSize: 12, color: '#4a6357' };
+const labelStyle = { display: 'block', marginBottom: 5, fontSize: 11, fontWeight: 700, color: 'var(--kt-form-label, #4a6357)', textTransform: 'uppercase', letterSpacing: '0.8px' };
+const hintStyle = { margin: '3px 0 0', fontSize: 11, color: 'var(--kt-form-label, #6b7f74)' };
+const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--kt-form-input-border, #cfd8d3)', background: 'var(--kt-form-input-bg, #fff)', color: 'var(--kt-form-title, #0d2218)', fontFamily: 'inherit' };
+const sectionTitle = { margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--kt-form-title, #0d2218)' };
+const sectionHint = { margin: '0 0 10px', fontSize: 12, color: 'var(--kt-form-label, #4a6357)' };
 const grid = (cols) => ({ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${cols}px, 1fr))`, gap: 12 });
 
 function Field({ label, hint, children }) {
@@ -141,9 +141,9 @@ export default function TeacherProfileForm({ uid, profile, user, onSaved, compac
         <p style={sectionHint}>Saved once, added to your DLL, lesson plans, COT and KaTuroDesk documents automatically. Leave a person blank and their signature line won't appear.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {SIGNATORY_ROLES.map((r) => (
-            <div key={r.key} style={{ border: '1px solid #e1e8e4', borderRadius: 10, padding: '10px 12px', background: '#fafcfb' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>
-                {r.role} <span style={{ fontWeight: 500, color: '#6b7f74' }}>· signs as “{r.label.replace(':', '')}”</span>
+            <div key={r.key} style={{ border: '1px solid var(--kt-form-card-border, #e1e8e4)', borderRadius: 10, padding: '10px 12px', background: 'var(--kt-form-card-bg, #fafcfb)' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--kt-green-ink, #2d6a4f)' }}>
+                {r.role} <span style={{ fontWeight: 500, color: 'var(--kt-form-label, #6b7f74)' }}>· signs as “{r.label.replace(':', '')}”</span>
               </p>
               <div style={grid(compact ? 150 : 200)}>
                 <Field label="Name">
@@ -161,7 +161,7 @@ export default function TeacherProfileForm({ uid, profile, user, onSaved, compac
       {error && <p role="alert" style={{ margin: 0, fontSize: 12, color: '#c0392b' }}>{error}</p>}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
         {saved && !dirty && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#2d6a4f', fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--kt-green-ink, #2d6a4f)', fontWeight: 600 }}>
             <CheckCircle2 size={14} /> Saved
           </span>
         )}

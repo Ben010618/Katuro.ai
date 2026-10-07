@@ -227,7 +227,7 @@ export default function Step3() {
 
       {/* Phase badge + heading */}
       <div style={{ marginBottom: 24 }}>
-        <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
+        <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
           Step 3 · Review & Generate
         </span>
         <h2 style={{ margin: '10px 0 6px', fontSize: 24, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>
@@ -317,7 +317,7 @@ export default function Step3() {
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>
               Ready to generate your ILAW lesson plan?
             </h3>
-            <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--kt-manila)', lineHeight: 1.6, maxWidth: 520, marginInline: 'auto' }}>
+            <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--kt-manila-ink, #E4D5AC)', lineHeight: 1.6, maxWidth: 520, marginInline: 'auto' }}>
               kaTuro AI will write your complete{' '}
               <strong style={{ color: '#ffffff' }}>{n}-session</strong> ILAW document —
               Pre-Lesson, Flow, Learning Resources, Integration, Formative Assessment,
@@ -326,14 +326,14 @@ export default function Step3() {
             <button
               onClick={handleGenerate}
               style={{
-                width: '100%', maxWidth: 360, margin: '0 auto', background: 'var(--kt-manila)', color: 'var(--kt-text-primary)',
+                width: '100%', maxWidth: 360, margin: '0 auto', background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)',
                 border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-md)', padding: '13px 28px',
                 fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 transition: 'background 0.15s, transform 0.15s',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#dac797'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--kt-manila-hover, #dac797)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--kt-manila)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               Generate Now <ArrowRight size={17} />

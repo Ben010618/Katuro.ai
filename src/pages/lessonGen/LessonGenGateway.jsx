@@ -145,7 +145,7 @@ export default function LessonGenGateway() {
                     fontFamily: 'var(--kt-font-mono, monospace)',
                     fontSize: 10.5,
                     fontWeight: 700,
-                    color: 'var(--kt-chalkboard, #1F3A2E)',
+                    color: 'var(--kt-chalkboard-ink, #1F3A2E)',
                     letterSpacing: '0.06em',
                   }}>
                     {badge}

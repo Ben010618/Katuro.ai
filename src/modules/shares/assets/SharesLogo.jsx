@@ -33,7 +33,7 @@ export function SharesLogoFull({ height = 40 }) {
           fontFamily: 'var(--kt-font-heading, "Bitter", serif)',
           lineHeight: 1,
         }}>
-          kaTuro <span style={{ color: 'var(--kt-manila, #E4D5AC)' }}>Shares</span>
+          kaTuro <span style={{ color: 'var(--kt-manila-ink, #E4D5AC)' }}>Shares</span>
         </span>
         <span style={{
           display: 'block',

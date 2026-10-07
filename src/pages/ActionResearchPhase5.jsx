@@ -40,7 +40,7 @@ const tag = (t) => (
     fontWeight: 700,
     background: 'var(--kt-card-2, #F4EDDB)',
     border: '1px solid var(--kt-border, #DCD0AE)',
-    color: 'var(--kt-chalkboard, #1F3A2E)',
+    color: 'var(--kt-chalkboard-ink, #1F3A2E)',
     borderRadius: 3,
     padding: '2px 8px',
     marginRight: 6,
@@ -614,14 +614,14 @@ export default function ActionResearchPhase5() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><ClipboardList size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Pangunahing Instrumento (Primary Data Collection Tool)</p>
+              <p style={sectionHead}><span style={iconBox}><ClipboardList size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Pangunahing Instrumento (Primary Data Collection Tool)</p>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 {dc.primaryTool?.name && tag(dc.primaryTool.name)}
                 {dc.primaryTool?.type && tag(dc.primaryTool.type)}
               </div>
               <p style={{ margin: '0 0 8px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.65 }}>{dc.primaryTool?.description}</p>
-              {dc.primaryTool?.rationale && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard, #1F3A2E)' }}>Batayan (Rationale):</strong> {dc.primaryTool.rationale}</p>}
-              {dc.primaryTool?.administration && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard, #1F3A2E)' }}>Pangangasiwa (Administration):</strong> {dc.primaryTool.administration}</p>}
+              {dc.primaryTool?.rationale && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard-ink, #1F3A2E)' }}>Batayan (Rationale):</strong> {dc.primaryTool.rationale}</p>}
+              {dc.primaryTool?.administration && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--kt-text-secondary, #6E6455)', lineHeight: 1.6 }}><strong style={{ color: 'var(--kt-chalkboard-ink, #1F3A2E)' }}>Pangangasiwa (Administration):</strong> {dc.primaryTool.administration}</p>}
               {dc.primaryTool?.sampleItems?.length > 0 && (
                 <div style={{ marginTop: 12, background: 'var(--kt-card-2, #F4EDDB)', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)', padding: '12px 14px' }}>
                   <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary, #6E6455)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--kt-font-mono, monospace)' }}>Mga Halimbawang Aytem (Sample Items)</p>
@@ -638,7 +638,7 @@ export default function ActionResearchPhase5() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><FlaskConical size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Sekundaryang Instrumento (Secondary Data Collection Tool)</p>
+              <p style={sectionHead}><span style={iconBox}><FlaskConical size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Sekundaryang Instrumento (Secondary Data Collection Tool)</p>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 {dc.secondaryTool?.name && tag(dc.secondaryTool.name)}
                 {dc.secondaryTool?.type && tag(dc.secondaryTool.type)}
@@ -660,20 +660,20 @@ export default function ActionResearchPhase5() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><BarChart2 size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Pang-estadistikang Pagsusuri (Statistical Treatment)</p>
+              <p style={sectionHead}><span style={iconBox}><BarChart2 size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Pang-estadistikang Pagsusuri (Statistical Treatment)</p>
               <div style={{ overflowX: 'auto', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--kt-manila, #E4D5AC)', borderBottom: '1px solid var(--kt-manila-border, #C9B583)' }}>
                       {['Pormula / Treatment', 'Layunin (Purpose)', 'Interpretasyon'].map(h => (
-                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontSize: 11, fontFamily: 'var(--kt-font-mono, monospace)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', fontSize: 11, fontFamily: 'var(--kt-font-mono, monospace)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(dc.statisticalTreatment ?? []).map((row, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--kt-border, #DCD0AE)', background: i % 2 === 0 ? 'var(--kt-card, #FBF7EC)' : 'var(--kt-card-2, #F4EDDB)' }}>
-                        <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', verticalAlign: 'top' }}>{row.formula}</td>
+                        <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', verticalAlign: 'top' }}>{row.formula}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--kt-text-primary, #262119)', verticalAlign: 'top' }}>{row.purpose}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--kt-text-secondary, #6E6455)', verticalAlign: 'top' }}>{row.interpretation}</td>
                       </tr>
@@ -725,7 +725,7 @@ export default function ActionResearchPhase5() {
               </p>
             </div>
             {instrument && (
-              <span style={{ marginLeft: 'auto', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', color: 'var(--kt-chalkboard, #1F3A2E)', borderRadius: 3, padding: '3px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+              <span style={{ marginLeft: 'auto', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', color: 'var(--kt-chalkboard-ink, #1F3A2E)', borderRadius: 3, padding: '3px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                 <CheckCircle2 size={12} /> Nabuong Instrumento
               </span>
             )}
@@ -793,7 +793,7 @@ export default function ActionResearchPhase5() {
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, marginTop: isAiPick ? 20 : 0 }}>
-                    <Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" />
+                    <Icon size={16} color="var(--kt-chalkboard-ink, #1F3A2E)" />
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                       {label}
                     </p>
@@ -854,11 +854,11 @@ export default function ActionResearchPhase5() {
             boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              {(() => { const t = INSTRUMENT_TYPES.find(x => x.id === instrumentType); return t ? <t.Icon size={16} color="var(--kt-chalkboard, #1F3A2E)" /> : null; })()}
+              {(() => { const t = INSTRUMENT_TYPES.find(x => x.id === instrumentType); return t ? <t.Icon size={16} color="var(--kt-chalkboard-ink, #1F3A2E)" /> : null; })()}
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary, #262119)', fontFamily: 'var(--kt-font-heading, "Bitter", serif)' }}>
                 {INSTRUMENT_TYPES.find(t => t.id === instrumentType)?.label}
               </h3>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', borderRadius: 3, padding: '2px 8px', marginLeft: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', borderRadius: 3, padding: '2px 8px', marginLeft: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                 Handa nang Gamitin (Ready to Use)
               </span>
             </div>

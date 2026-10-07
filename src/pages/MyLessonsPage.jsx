@@ -232,7 +232,7 @@ function TermColumn({ term, groups, onAction, loadingId }) {
         boxShadow: '0 2px 8px rgba(31,58,46,0.12)',
       }}>
         <div>
-          <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 700, color: 'var(--kt-manila)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
+          <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 700, color: 'var(--kt-manila-ink, #E4D5AC)', textTransform: 'uppercase', letterSpacing: '1.2px', fontFamily: 'var(--kt-font-mono)' }}>
             MATATAG
           </p>
           <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#FBF7EC', fontFamily: 'var(--kt-font-heading)' }}>
@@ -240,7 +240,7 @@ function TermColumn({ term, groups, onAction, loadingId }) {
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--kt-manila)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{total}</p>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--kt-manila-ink, #E4D5AC)', lineHeight: 1, fontFamily: 'var(--kt-font-heading)' }}>{total}</p>
           <p style={{ margin: 0, fontSize: 9.5, color: 'rgba(251,247,236,0.7)', fontWeight: 600, fontFamily: 'var(--kt-font-mono)' }}>plan{total !== 1 ? 's' : ''}</p>
         </div>
       </div>

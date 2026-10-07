@@ -137,7 +137,7 @@ export default function ActionResearchPhase2() {
 
   if (pageLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--kt-surface, #FBF7EC)' }}>
-      <Loader2 size={24} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
+      <Loader2 size={24} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
@@ -183,7 +183,7 @@ export default function ActionResearchPhase2() {
               </span>
             )}
             {themeName && (
-              <span style={{ fontSize: 11, background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', color: 'var(--kt-chalkboard, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 700, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+              <span style={{ fontSize: 11, background: 'var(--kt-manila, #E4D5AC)', border: '1px solid var(--kt-manila-border, #C9B583)', color: 'var(--kt-chalkboard-ink, #1F3A2E)', borderRadius: 3, padding: '2px 8px', fontWeight: 700, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                 {themeName}
               </span>
             )}
@@ -273,7 +273,7 @@ export default function ActionResearchPhase2() {
                         {active ? <CheckSquare size={17} /> : <Square size={17} />}
                       </div>
                       <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.6, fontWeight: active ? 600 : 400 }}>
-                        <span style={{ fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', marginRight: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', marginRight: 6, fontFamily: 'var(--kt-font-mono, monospace)' }}>
                           RQ{i + 1}.
                         </span>
                         {q}

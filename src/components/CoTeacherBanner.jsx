@@ -59,7 +59,8 @@ export default function CoTeacherBanner({
           style={{
             fontSize: 10,
             fontWeight: 700,
-            color: agent.color || '#059669',
+            // Accent as text: same colour in light mode, lightened in dark mode (--kt-accent-ink-mix).
+            color: `color-mix(in srgb, ${agent.color || '#059669'} var(--kt-accent-ink-mix, 100%), #ffffff)`,
             background: `${agent.color || '#059669'}15`,
             padding: '2px 8px',
             borderRadius: 100,
@@ -143,7 +144,8 @@ export default function CoTeacherBanner({
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: agent.color || '#059669',
+                // Accent as text: same colour in light mode, lightened in dark mode (--kt-accent-ink-mix).
+                color: `color-mix(in srgb, ${agent.color || '#059669'} var(--kt-accent-ink-mix, 100%), #ffffff)`,
                 background: `${agent.color || '#059669'}15`,
                 padding: '3px 10px',
                 borderRadius: 100,

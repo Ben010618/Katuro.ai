@@ -293,7 +293,7 @@ export default function Step2() {
 
         {/* ── Phase badge + heading ─────────────────────────────────────────── */}
         <div style={{ marginBottom: 28 }}>
-          <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
+          <span style={{ background: 'var(--kt-manila)', color: 'var(--kt-on-manila, #262119)', border: '1px solid var(--kt-manila-border)', borderRadius: 'var(--kt-radius-sm)', padding: '3px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--kt-font-mono)' }}>
             Step 2 · Competency Unpacking
           </span>
           <h2 style={{ margin: '10px 0 6px', fontSize: 24, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: 'var(--kt-font-heading)' }}>

@@ -136,7 +136,7 @@ export default function ActionResearchPhase4() {
 
   if (pageLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--kt-surface, #FBF7EC)' }}>
-      <Loader2 size={24} color="var(--kt-chalkboard, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
+      <Loader2 size={24} color="var(--kt-chalkboard-ink, #1F3A2E)" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
@@ -237,7 +237,7 @@ export default function ActionResearchPhase4() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><Target size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>SMART Objectives</p>
+              <p style={sectionHead}><span style={iconBox}><Target size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>SMART Objectives</p>
               {(actionPlan.objectives ?? []).map((o, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                   <span style={{ background: 'var(--kt-chalkboard, #1F3A2E)', color: '#FBF7EC', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700, flexShrink: 0, marginTop: 2, fontFamily: 'var(--kt-font-mono, monospace)' }}>
@@ -256,7 +256,7 @@ export default function ActionResearchPhase4() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><Sparkles size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Deskripsyon ng Interbensyon (Intervention Details)</p>
+              <p style={sectionHead}><span style={iconBox}><Sparkles size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Deskripsyon ng Interbensyon (Intervention Details)</p>
               <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75, textAlign: 'justify' }}>{actionPlan.interventionDescription}</p>
             </div>
 
@@ -268,20 +268,20 @@ export default function ActionResearchPhase4() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><Calendar size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Gantt Chart & Timeline ng Implementasyon</p>
+              <p style={sectionHead}><span style={iconBox}><Calendar size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Gantt Chart & Timeline ng Implementasyon</p>
               <div style={{ overflowX: 'auto', border: '1px solid var(--kt-border, #DCD0AE)', borderRadius: 'var(--kt-radius-sm, 4px)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--kt-manila, #E4D5AC)', borderBottom: '1px solid var(--kt-manila-border, #C9B583)' }}>
                       {['Yugto (Phase)', 'Tagal (Duration)', 'Mga Gawain (Activities)', 'Mga Output'].map(h => (
-                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', fontSize: 11, fontFamily: 'var(--kt-font-mono, monospace)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', fontSize: 11, fontFamily: 'var(--kt-font-mono, monospace)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(actionPlan.timeline ?? []).map((row, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--kt-border, #DCD0AE)', background: i % 2 === 0 ? 'var(--kt-card, #FBF7EC)' : 'var(--kt-card-2, #F4EDDB)' }}>
-                        <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--kt-chalkboard, #1F3A2E)', verticalAlign: 'top', whiteSpace: 'nowrap' }}>{row.phase}</td>
+                        <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--kt-chalkboard-ink, #1F3A2E)', verticalAlign: 'top', whiteSpace: 'nowrap' }}>{row.phase}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--kt-text-secondary, #6E6455)', verticalAlign: 'top', whiteSpace: 'nowrap', fontFamily: 'var(--kt-font-mono, monospace)' }}>{row.duration}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--kt-text-primary, #262119)', verticalAlign: 'top' }}>{(row.activities ?? []).join(' • ')}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--kt-text-secondary, #6E6455)', verticalAlign: 'top' }}>{row.outputs}</td>
@@ -300,7 +300,7 @@ export default function ActionResearchPhase4() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><Package size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Mga Kinakailangang Kagamitan at Materyales (Resources Needed)</p>
+              <p style={sectionHead}><span style={iconBox}><Package size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Mga Kinakailangang Kagamitan at Materyales (Resources Needed)</p>
               {(actionPlan.resources ?? []).map((r, i) => (
                 <p key={i} style={{ margin: '0 0 6px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.55 }}>• {r}</p>
               ))}
@@ -314,7 +314,7 @@ export default function ActionResearchPhase4() {
               padding: '20px 24px',
               boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
             }}>
-              <p style={sectionHead}><span style={iconBox}><CheckCircle2 size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Mga Pamantayan sa Tagumpay (Success Indicators)</p>
+              <p style={sectionHead}><span style={iconBox}><CheckCircle2 size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Mga Pamantayan sa Tagumpay (Success Indicators)</p>
               {(actionPlan.successIndicators ?? []).map((s, i) => (
                 <p key={i} style={{ margin: '0 0 6px', fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.55 }}>✓ {s}</p>
               ))}
@@ -329,7 +329,7 @@ export default function ActionResearchPhase4() {
                 padding: '20px 24px',
                 boxShadow: '0 2px 6px rgba(38, 33, 25, 0.04)',
               }}>
-                <p style={sectionHead}><span style={iconBox}><ShieldCheck size={14} color="var(--kt-chalkboard, #1F3A2E)" /></span>Etikal na Pagsasaalang-alang (Ethical Considerations)</p>
+                <p style={sectionHead}><span style={iconBox}><ShieldCheck size={14} color="var(--kt-chalkboard-ink, #1F3A2E)" /></span>Etikal na Pagsasaalang-alang (Ethical Considerations)</p>
                 <p style={{ margin: 0, fontSize: 13.5, color: 'var(--kt-text-primary, #262119)', lineHeight: 1.75 }}>{actionPlan.ethicalConsiderations}</p>
               </div>
             )}
