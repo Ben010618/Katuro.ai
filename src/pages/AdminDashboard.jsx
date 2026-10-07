@@ -2965,15 +2965,23 @@ export default function AdminDashboard() {
       `}</style>
 
       {/* Topbar */}
-      <header style={{
+      <style>{`
+        @media (max-width: 640px) {
+          .admin-header { padding: 0 12px !important; gap: 8px !important; }
+          .admin-header-crumb, .admin-btn-label { display: none !important; }
+          .admin-header-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+          .admin-notif-panel { position: fixed !important; top: 62px !important; left: 12px !important; right: 12px !important; width: auto !important; max-width: none !important; }
+        }
+      `}</style>
+      <header className="admin-header" style={{
         height: 56, background: 'var(--kt-card)', borderBottom: '1px solid var(--kt-border)',
         display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14,
         position: 'sticky', top: 0, zIndex: 40,
       }}>
-        <img src={ktLogo} alt="kaTuro AI" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'cover' }} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>kaTuro AI</span>
-        <span style={{ fontSize: 12, color: 'rgba(45,106,79,0.4)', margin: '0 2px' }}>›</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#2d6a4f' }}>Admin Dashboard</span>
+        <img src={ktLogo} alt="kaTuro AI" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />
+        <span className="admin-header-crumb" style={{ fontSize: 14, fontWeight: 700, color: 'var(--kt-text-primary)' }}>kaTuro AI</span>
+        <span className="admin-header-crumb" style={{ fontSize: 12, color: 'rgba(45,106,79,0.4)', margin: '0 2px' }}>›</span>
+        <span className="admin-header-title" style={{ fontSize: 13, fontWeight: 700, color: '#2d6a4f' }}>Admin Dashboard</span>
         <div style={{ flex: 1 }} />
 
         {/* Dark mode toggle */}
@@ -2983,7 +2991,7 @@ export default function AdminDashboard() {
           title={dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {dark ? <Sun size={14} /> : <Moon size={14} />}
-          {dark ? 'Light' : 'Dark'}
+          <span className="admin-btn-label">{dark ? 'Light' : 'Dark'}</span>
         </button>
 
         {/* Bell notification button */}
@@ -3012,7 +3020,7 @@ export default function AdminDashboard() {
 
           {/* Notification panel */}
           {showNotifs && (
-            <div style={{
+            <div className="admin-notif-panel" style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
               width: 340, maxWidth: 'calc(100vw - 24px)', background: 'var(--kt-card)', borderRadius: 14,
               border: '1px solid var(--kt-border)',
@@ -3101,10 +3109,10 @@ export default function AdminDashboard() {
           onClick={() => navigate('/dashboard')}
           style={{ ...btnSecondary, fontSize: 12 }}
         >
-          <LayoutDashboard size={13} /> App
+          <LayoutDashboard size={13} /> <span className="admin-btn-label">App</span>
         </button>
-        <button onClick={handleLogout} style={{ ...btnSecondary, fontSize: 12 }}>
-          <LogOut size={13} /> Sign Out
+        <button onClick={handleLogout} title="Sign out" aria-label="Sign out" style={{ ...btnSecondary, fontSize: 12 }}>
+          <LogOut size={13} /> <span className="admin-btn-label">Sign Out</span>
         </button>
       </header>
 

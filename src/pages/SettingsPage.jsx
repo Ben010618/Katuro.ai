@@ -252,7 +252,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Daily limits, with today's usage */}
-              <div style={{ border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12, overflow: 'hidden' }}>
+              <div className="kt-limits-table" style={{ border: '1px solid rgba(45,106,79,0.15)', borderRadius: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f5faf7', textAlign: 'left', color: 'var(--kt-form-label, #4a6357)' }}>

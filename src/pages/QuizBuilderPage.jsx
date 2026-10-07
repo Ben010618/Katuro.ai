@@ -53,7 +53,7 @@ function StepIndicator({ current }) {
               }}>
                 {done ? <CheckCircle size={13} color="#fff" /> : i + 1}
               </div>
-              <span style={{
+              <span className="kt-step-label" data-active={active ? 'true' : 'false'} style={{
                 fontSize: 12, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap',
                 color: active ? '#0d2218' : done ? '#2d6a4f' : '#4a6357',
               }}>{label}</span>
@@ -265,7 +265,8 @@ export default function QuizBuilderPage() {
       <div className="kt-split-sidebar" style={{ gap: 20, alignItems: 'start' }}>
 
       {/* ── LEFT: wizard card ── */}
-      <div style={{
+      <div className="kt-wizard-card" style={{
+        minWidth: 0,
         background: 'var(--kt-card)', borderRadius: 14,
         border: '1px solid var(--kt-border)',
         padding: '28px',

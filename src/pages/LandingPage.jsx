@@ -346,9 +346,10 @@ export default function LandingPage() {
         >
           {/* Agent Selection Strip */}
           <div
+            className="landing-agent-strip"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
+              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
               borderBottom: '1px solid rgba(52, 211, 153, 0.2)',
               background: 'rgba(6, 78, 59, 0.4)',
             }}

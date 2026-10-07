@@ -113,6 +113,11 @@ export default function FloatingSuggestButton() {
           animation: kt-bubble-in 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both;
           transform-origin: bottom right;
         }
+        @media (max-width: 768px) {
+          .kt-suggest-wrap { bottom: 12px !important; right: 12px !important; }
+          .kt-suggest-btn { width: 56px !important; height: 56px !important; }
+          .kt-suggest-bubble { bottom: 66px !important; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .kt-suggest-btn,
           .kt-suggest-btn[data-alert='true'] { animation: none; }
@@ -121,9 +126,9 @@ export default function FloatingSuggestButton() {
         }
       `}</style>
 
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 500 }}>
+      <div className="kt-suggest-wrap" style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 500 }}>
         {bubbleOpen && hasAnnouncement && (
-          <div style={{ position: 'absolute', bottom: 96, right: 0, zIndex: 1 }}>
+          <div className="kt-suggest-bubble" style={{ position: 'absolute', bottom: 96, right: 0, zIndex: 1 }}>
             <SpeechBubble
               title={announcement?.title || 'Announcement'}
               onClose={dismissAnnouncement}

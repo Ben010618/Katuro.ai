@@ -427,7 +427,9 @@ export default function AppShell() {
         .shell-main {
           flex: 1;
           overflow: auto;
-          padding: ${isShares ? '0' : '24px'};
+          --shell-pad-y: 24px;
+          --shell-pad-x: 24px;
+          padding: ${isShares ? '0' : 'var(--shell-pad-y) var(--shell-pad-x)'};
           position: relative;
           z-index: 1;
         }
@@ -435,7 +437,11 @@ export default function AppShell() {
           .shell-sidebar { display: none !important; }
           .shell-menu-btn { display: flex !important; }
           .shell-main {
-            padding: ${isShares ? '0' : '16px 12px'};
+            --shell-pad-y: 16px;
+            --shell-pad-x: 12px;
+            padding: ${isShares ? '0' : 'var(--shell-pad-y) var(--shell-pad-x)'};
+            /* room to scroll the last button out from under the floating mascot */
+            padding-bottom: ${isShares ? '0' : '84px'};
           }
           .shell-header-crumb {
             display: none !important;
