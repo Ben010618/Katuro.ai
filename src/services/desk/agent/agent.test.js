@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { callGeminiProxy } from '../../geminiConfig';
 import { runDeskAgentTurn, personaFor, docPersonaFor, clearAnswerMemory } from './deskAgent';
 import { getPersona, PERSONAS, timeOfDay } from '../personas';
+import { fastRoute } from './fastRoute';
 import { runTaskGraph } from './runner';
 import { createNameMasker } from './privacy';
 import { sanitizePlan, resolvePath, planOffline } from './planner';
@@ -310,6 +311,20 @@ describe('personas (Matt / Luna / Grey)', () => {
         expect(line).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u); // no emoji
       }
       expect(p.name && p.tagline && p.sample && p.style && p.thinking).toBeTruthy();
+    }
+  });
+
+  it('Lola Carmen: strict and brutally honest about the work, never the person', () => {
+    const carmen = personaFor(teacher, 'carmen');
+    expect(carmen).toMatch(/Your name is Lola Carmen/);
+    expect(carmen).toMatch(/retired College Dean/);
+    expect(carmen).toMatch(/criticize the work, never the person/);
+    expect(carmen).toMatch(/Every criticism comes with the exact fix/);
+    expect(docPersonaFor(teacher)).not.toMatch(/Carmen/);
+    expect(PERSONAS.carmen.sample).toMatch(/^Wait a minute\./);
+    expect(getPersona('carmen').greeting('Sir Ben', new Date(2026, 0, 1, 19))).toMatch(/^Good evening, Sir Ben\./);
+    for (const hi of ['Hi Lola Carmen', 'hello lola', 'Good morning Carmen!']) {
+      expect(fastRoute({ prompt: hi, persona: 'carmen', teacherName: 'Sir Ben' })?.reply).toMatch(/Let's get to work/);
     }
   });
 

@@ -9,12 +9,13 @@
 import mattAvatar from '../../assets/avatars/matt.webp';
 import lunaAvatar from '../../assets/avatars/luna.webp';
 import greyAvatar from '../../assets/avatars/grey.webp';
+import carmenAvatar from '../../assets/avatars/carmen.webp';
 import { getPersona } from '../../services/desk/personas';
 import AvatarImage from '../../components/AvatarImage';
 
-const PERSONA_AVATARS = { matt: mattAvatar, luna: lunaAvatar, grey: greyAvatar };
+const PERSONA_AVATARS = { matt: mattAvatar, luna: lunaAvatar, grey: greyAvatar, carmen: carmenAvatar };
 
-/** The assistant's face: Matt, Luna or Grey, per the persona chosen in Settings. */
+/** The assistant's face: Matt, Luna, Grey or Lola Carmen, per the persona chosen in Settings. */
 export function KaTuroAIAvatar({ size = 32, className = '', persona = 'matt' }) {
   const p = getPersona(persona);
   return (
