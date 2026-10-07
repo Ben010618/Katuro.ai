@@ -141,6 +141,26 @@ describe.skipIf(!ON)('Email codes end to end (emulators)', () => {
     }
   }, 60000);
 
+  it('no account without a name and school; a real sign-up is complete and its admin notice names the teacher', async () => {
+    await fb.auth.signOut();
+    await adminDb.doc('adminConfig/emailCode').set({ enabled: false });
+    try {
+      // Every required detail is checked on the server (an old or modified app cannot skip it).
+      for (const [field, msg] of [['givenName', /First name/], ['surname', /Last name/], ['school', /School name/]]) {
+        await expect(db.selfSignUp({ ...form(`miss-${field}@e2e.test`), [field]: '   ' })).rejects.toThrow(msg);
+        expect((await adminAuth.getUserByEmail(`miss-${field}@e2e.test`).catch(() => null))).toBeNull();
+      }
+      await db.selfSignUp({ ...form('dana@e2e.test'), givenName: 'Dana', surname: 'Cruz', school: 'Calauan NHS' });
+      const user = await adminAuth.getUserByEmail('dana@e2e.test');
+      const teacher = (await adminDb.doc(`teachers/${user.uid}`).get()).data();
+      expect(teacher).toMatchObject({ givenName: 'Dana', surname: 'Cruz', school: 'Calauan NHS', email: 'dana@e2e.test' });
+      const notice = (await adminDb.collection('adminNotifications').where('uid', '==', user.uid).get()).docs.map((d) => d.data());
+      expect(notice).toEqual([expect.objectContaining({ type: 'new_user', givenName: 'Dana', surname: 'Cruz', school: 'Calauan NHS', email: 'dana@e2e.test' })]);
+    } finally {
+      await adminDb.doc('adminConfig/emailCode').set({ enabled: true });
+    }
+  }, 60000);
+
   it('admin test email goes to the admin only', async () => {
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     const carl = await adminAuth.getUserByEmail('carl@e2e.test');

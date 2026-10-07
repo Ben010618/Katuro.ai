@@ -35,6 +35,7 @@ import {
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
   Cpu, Sparkles, ExternalLink, Megaphone, Bot,
 } from 'lucide-react';
+import { isSignupNotice } from '../features/admin/notices';
 import {
   saveGeminiKey, getGeminiKeyStatus, testGeminiKey,
   saveDeskGeminiKey, getDeskGeminiKeyStatus,
@@ -3060,7 +3061,32 @@ export default function AdminDashboard() {
                     <Bell size={24} style={{ opacity: 0.3, marginBottom: 8 }} />
                     <p style={{ margin: 0, fontSize: 12 }}>No notifications yet</p>
                   </div>
-                ) : notifications.map(n => (
+                ) : notifications.map(n => !isSignupNotice(n) ? (
+                  // System notices (e.g. the nightly inactivity cleanup): their own message, never shown as a sign-up.
+                  <div key={n.id} style={{
+                    display: 'flex', gap: 10, padding: '12px 16px',
+                    borderBottom: '1px solid rgba(45,106,79,0.06)',
+                    background: n.read ? '#fff' : '#fdf8ec',
+                  }}>
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: '#f3ead2', display: 'grid', placeItems: 'center', color: '#8a6d1f' }}>
+                      {n.type === 'inactivity_cleanup' ? <UserX size={15} /> : <Bell size={15} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#8a6d1f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {n.type === 'inactivity_cleanup' ? 'Inactivity cleanup' : 'System notice'}
+                        </span>
+                        {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05c5c', flexShrink: 0 }} />}
+                      </div>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, color: 'var(--kt-text-primary)', lineHeight: 1.45 }}>{n.message || 'No details were recorded for this notice.'}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 9, color: '#9bb8a5', display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+                          <Clock size={8} />{timeAgo(n.createdAt, now)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <div key={n.id} style={{
                     display: 'flex', gap: 10, padding: '12px 16px',
                     borderBottom: '1px solid rgba(45,106,79,0.06)',
