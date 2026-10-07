@@ -250,7 +250,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
   };
 
   return (
-    <aside className="w-64 lg:w-72 flex-shrink-0 flex flex-col h-full bg-[#1b2620] text-[#f4f7f5] border-r border-[#2d3e33] select-none relative">
+    <aside className="neu-sidebar neu-zone w-64 lg:w-72 flex-shrink-0 flex flex-col h-full bg-[#1b2620] text-[#f4f7f5] border-r border-[#2d3e33] select-none relative">
       {/* Workspace Header */}
       <div className="p-3 border-b border-[#2d3e33] bg-[#141e18]">
         <div className="flex items-center justify-between mb-2">

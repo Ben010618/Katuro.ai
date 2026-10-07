@@ -1,0 +1,255 @@
+/*
+ * KaTuroDesk neumorphic theme (light and dark).
+ *
+ * Style only: it re-skins the Tailwind classes the Desk already uses, scoped to
+ * .kt-neu, so no component logic changes. Tailwind 4 utilities live in a cascade
+ * layer, so these unlayered rules win without !important.
+ *
+ * Neumorphism = one soft surface color everywhere; raised parts cast a dark shadow
+ * bottom-right and a light one top-left; fields and selected items are pressed in.
+ * Text keeps WCAG AA contrast on the surface (the usual weakness of the style), and
+ * keyboard focus always shows a ring.
+ */
+
+.kt-neu[data-neu='light'] {
+  --neu-bg: #e4ebe6;
+  --neu-well: #dde5df;
+  --neu-hi: #ffffff;
+  --neu-lo: #b7c4bb;
+  --neu-text: #1d2b23;
+  --neu-text-2: #3f5046;
+  --neu-muted: #54655b;
+  --neu-line: rgba(60, 90, 72, 0.16);
+  --neu-hover: rgba(29, 107, 72, 0.07);
+  --neu-accent: #1d6b48;
+  --neu-accent-hover: #175a3c;
+  --neu-accent-text: #1a6343;
+  --neu-on-accent: #ffffff;
+  --neu-accent-soft: rgba(29, 107, 72, 0.1);
+  --neu-amber-soft: rgba(180, 110, 10, 0.11);
+  --neu-amber-text: #7a4a06;
+  --neu-red-soft: rgba(190, 40, 40, 0.09);
+  --neu-red-text: #a12020;
+  --neu-blue-text: #1d4f91;
+  --neu-paper: #ffffff;
+  --neu-overlay: rgba(30, 45, 37, 0.35);
+  color-scheme: light;
+}
+
+.kt-neu[data-neu='dark'] {
+  --neu-bg: #1f2824;
+  --neu-well: #1a221e;
+  --neu-hi: #2a3631;
+  --neu-lo: #121815;
+  --neu-text: #e6eee9;
+  --neu-text-2: #c0cec6;
+  --neu-muted: #9aaba1;
+  --neu-line: rgba(200, 225, 210, 0.1);
+  --neu-hover: rgba(120, 220, 170, 0.07);
+  --neu-accent: #3fae7b;
+  --neu-accent-hover: #4cc28a;
+  --neu-accent-text: #74d8a7;
+  --neu-on-accent: #0c1d14;
+  --neu-accent-soft: rgba(76, 194, 138, 0.14);
+  --neu-amber-soft: rgba(240, 180, 60, 0.12);
+  --neu-amber-text: #f0c46a;
+  --neu-red-soft: rgba(240, 90, 90, 0.13);
+  --neu-red-text: #ff9b9b;
+  --neu-blue-text: #8fbdf5;
+  --neu-paper: #ffffff;
+  --neu-overlay: rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+.kt-neu {
+  --neu-raised: 6px 6px 14px var(--neu-lo), -6px -6px 14px var(--neu-hi);
+  --neu-raised-sm: 3px 3px 7px var(--neu-lo), -3px -3px 7px var(--neu-hi);
+  --neu-raised-xs: 2px 2px 4px var(--neu-lo), -2px -2px 4px var(--neu-hi);
+  --neu-inset: inset 3px 3px 6px var(--neu-lo), inset -3px -3px 6px var(--neu-hi);
+  --neu-inset-sm: inset 2px 2px 4px var(--neu-lo), inset -2px -2px 4px var(--neu-hi);
+  background: var(--neu-bg);
+  color: var(--neu-text);
+}
+
+/* ── Surfaces: every panel, card and bar shares the one surface color ── */
+.kt-neu :is(
+  .bg-white, .bg-gray-50, .bg-gray-100,
+  .bg-\[\#f6f8f7\], .bg-\[\#f1f5f3\], .bg-\[\#16211a\], .bg-\[\#121b15\], .bg-\[\#141e18\],
+  .bg-\[\#141f17\], .bg-\[\#18231c\], .bg-\[\#1b2620\], .bg-\[\#1c2a20\], .bg-\[\#202e25\],
+  .bg-\[\#223328\], .bg-\[\#1f2b23\], .bg-\[\#243429\], .bg-\[\#213026\], .bg-\[\#0c130e\],
+  .bg-\[\#f8faf9\], .bg-\[\#e8ecea\], .bg-\[\#fbfcfb\], .bg-gray-50\/70
+) {
+  background-color: var(--neu-bg);
+}
+
+/* Borders become faint lines (tables and dividers still read). */
+.kt-neu :is(
+  .border-gray-100, .border-gray-200, .border-gray-300,
+  .border-\[\#2d3e33\], .border-\[\#2b3e32\], .border-\[\#27382d\], .border-\[\#2d4234\], .border-\[\#2b3f31\]
+) {
+  border-color: var(--neu-line);
+}
+
+/* ── Text ── */
+.kt-neu :is(.text-gray-900, .text-gray-800, .text-\[\#f4f7f5\], .text-\[\#d3e0d8\]) { color: var(--neu-text); }
+.kt-neu :is(.text-gray-700, .text-gray-600, .text-gray-300, .text-\[\#c6d6cb\]) { color: var(--neu-text-2); }
+.kt-neu :is(.text-gray-500, .text-gray-400, .text-\[\#a4baa9\], .text-\[\#b3c9bc\], .text-\[\#9eb6a6\], .text-\[\#8ca495\]) { color: var(--neu-muted); }
+.kt-neu :is(.text-emerald-400, .text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900, .text-emerald-200) { color: var(--neu-accent-text); }
+.kt-neu :is(.text-amber-300, .text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: var(--neu-amber-text); }
+.kt-neu :is(.text-red-600, .text-red-700, .text-red-800) { color: var(--neu-red-text); }
+.kt-neu :is(.text-blue-600, .text-blue-700, .text-blue-800) { color: var(--neu-blue-text); }
+.kt-neu ::placeholder { color: var(--neu-muted); opacity: 0.85; }
+
+/* The former dark zones (title bar, file sidebar): white text there becomes normal text. */
+.kt-neu .neu-zone .text-white { color: var(--neu-text); }
+.kt-neu .neu-zone .bg-emerald-900\/60 { background-color: var(--neu-accent-soft); }
+.kt-neu .neu-zone :is(.text-emerald-100, .text-emerald-50) { color: var(--neu-accent-text); }
+.kt-neu .neu-zone .border-emerald-800 { border-color: var(--neu-line); }
+
+/* ── Soft status tints ── */
+.kt-neu :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-50\/60, .bg-emerald-50\/90, .bg-emerald-100\/60) { background-color: var(--neu-accent-soft); }
+.kt-neu :is(.bg-amber-50, .bg-amber-100) { background-color: var(--neu-amber-soft); }
+.kt-neu :is(.bg-red-50, .bg-red-100, .bg-red-50\/60) { background-color: var(--neu-red-soft); }
+.kt-neu .bg-blue-50 { background-color: var(--neu-accent-soft); }
+/* A selected card is pressed in. */
+.kt-neu .border-emerald-600:is(.bg-emerald-50\/60) { box-shadow: var(--neu-inset-sm); }
+.kt-neu :is(.border-emerald-200, .border-amber-200, .border-red-200) { border-color: var(--neu-line); }
+.kt-neu .border-emerald-600 { border-color: var(--neu-accent); }
+.kt-neu .hover\:border-emerald-300:hover { border-color: var(--neu-accent); }
+
+/* ── Accent (primary) buttons and badges: KaTuro green, softly raised ── */
+.kt-neu :is(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\]) {
+  background-color: var(--neu-accent);
+  color: var(--neu-on-accent);
+  box-shadow: var(--neu-raised-xs);
+}
+.kt-neu :is(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\]) :is(.text-white, svg) { color: var(--neu-on-accent); }
+.kt-neu :is(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\]).text-white { color: var(--neu-on-accent); }
+.kt-neu :is(.hover\:bg-emerald-800, .hover\:bg-emerald-500, .hover\:bg-\[\#235841\]):hover { background-color: var(--neu-accent-hover); }
+.kt-neu :is(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\]):active:not(:disabled) { box-shadow: var(--neu-inset-sm); }
+.kt-neu .bg-red-600 { box-shadow: var(--neu-raised-xs); }
+
+/* Selected file in the tree: pressed in, accent text. */
+.kt-neu .bg-\[\#2d563f\] {
+  background-color: var(--neu-bg);
+  box-shadow: var(--neu-inset-sm);
+  color: var(--neu-accent-text);
+}
+.kt-neu .neu-zone .bg-\[\#2d563f\].text-white { color: var(--neu-accent-text); }
+
+/* ── Hover ── */
+.kt-neu :is(
+  .hover\:bg-gray-50, .hover\:bg-gray-100, .hover\:bg-gray-200, .hover\:bg-\[\#25352a\], .hover\:bg-\[\#223328\],
+  .hover\:bg-\[\#26372d\], .hover\:bg-\[\#2b4133\], .hover\:bg-\[\#2d4436\], .hover\:bg-\[\#e4ede7\], .hover\:bg-emerald-50, .hover\:bg-emerald-100
+):hover {
+  background-color: var(--neu-hover);
+}
+.kt-neu :is(.hover\:text-white, .hover\:text-gray-900, .hover\:text-gray-800):hover { color: var(--neu-text); }
+.kt-neu :is(.hover\:text-emerald-700, .hover\:text-emerald-800):hover { color: var(--neu-accent-text); }
+.kt-neu .hover\:text-red-600:hover { color: var(--neu-red-text); }
+.kt-neu :is(.hover\:border-\[\#2d3e33\], .hover\:border-gray-300, .hover\:border-gray-400):hover { border-color: var(--neu-line); }
+
+/* ── Raised parts ── */
+/* Cards, bubbles and panels inside the scrolling areas. */
+.kt-neu :is(.rounded-xl, .rounded-2xl, .rounded-lg):is(.bg-white, .bg-gray-50, .bg-\[\#202e25\], .bg-\[\#1c2a20\]):not(input, textarea, select) {
+  border-color: transparent;
+  box-shadow: var(--neu-raised-sm);
+}
+/* Dialogs float highest. */
+.kt-neu [role='dialog']:is(.bg-white, .rounded-2xl),
+.kt-neu [role='dialog'] > .bg-white {
+  box-shadow: 10px 10px 30px var(--neu-lo), -8px -8px 26px var(--neu-hi);
+  border-color: transparent;
+}
+.kt-neu :is(.bg-black\/40) { background-color: var(--neu-overlay); }
+
+/* Secondary buttons and chips: small raised pills that press in when clicked. */
+.kt-neu button:is(.border, .rounded-full):not(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\], .bg-red-600, .border-transparent, .bg-transparent) {
+  border-color: transparent;
+  box-shadow: var(--neu-raised-xs);
+}
+.kt-neu button:is(.border, .rounded-full):not(.bg-emerald-600, .bg-emerald-700, .bg-\[\#2d6a4f\], .bg-red-600, .border-transparent, .bg-transparent):active:not(:disabled),
+.kt-neu button[aria-pressed='true'],
+.kt-neu button[aria-selected='true'][role='tab'] {
+  box-shadow: var(--neu-inset-sm);
+}
+.kt-neu :is(.shadow-sm, .shadow-xs, .shadow-2xs, .shadow, .shadow-md):not(button) { box-shadow: var(--neu-raised-xs); }
+.kt-neu :is(.shadow-lg, .shadow-xl, .shadow-2xl) { box-shadow: var(--neu-raised); }
+
+/* ── Pressed-in fields ── */
+.kt-neu :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [hidden]), textarea, select) {
+  background-color: var(--neu-well);
+  color: var(--neu-text);
+  border-color: transparent;
+  box-shadow: var(--neu-inset-sm);
+}
+/* Fields that live inside a grid cell stay flat. */
+.kt-neu :is(td, th) :is(input, textarea) { background-color: transparent; box-shadow: none; }
+.kt-neu .neu-composer {
+  background-color: var(--neu-bg);
+  border-color: transparent;
+  box-shadow: var(--neu-inset);
+}
+.kt-neu .neu-composer :is(textarea, input) { background-color: transparent; box-shadow: none; }
+
+/* ── Structure ── */
+.kt-neu .neu-topbar {
+  background-color: var(--neu-bg);
+  color: var(--neu-text);
+  border-bottom-color: transparent;
+  box-shadow: 0 4px 10px -4px var(--neu-lo);
+  position: relative;
+  z-index: 25;
+}
+.kt-neu .neu-sidebar {
+  background-color: var(--neu-bg);
+  border-right-color: transparent;
+  box-shadow: 4px 0 12px -6px var(--neu-lo);
+  z-index: 15;
+}
+
+/* Documents keep white paper in both themes (what prints is what you see). */
+.kt-neu iframe { background-color: var(--neu-paper); }
+
+/* Keyboard focus is always visible. */
+.kt-neu :is(button, [role='button'], [role='tab'], [role='separator'], a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--neu-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbars that match the surface. */
+.kt-neu ::-webkit-scrollbar { width: 10px; height: 10px; }
+.kt-neu ::-webkit-scrollbar-track { background: transparent; }
+.kt-neu ::-webkit-scrollbar-thumb { background: var(--neu-line); border-radius: 8px; border: 2px solid var(--neu-bg); }
+.kt-neu ::-webkit-scrollbar-thumb:hover { background: var(--neu-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kt-neu * { transition-duration: 0s !important; }
+}
+
+/* Shared website parts shown inside the Desk (Messages, the profile form) read the
+   site's color variables: point them at the neumorphic surface. */
+.kt-neu {
+  --kt-card: var(--neu-bg);
+  --kt-surface: var(--neu-bg);
+  --kt-border: var(--neu-line);
+  --kt-text-primary: var(--neu-text);
+  --kt-text-secondary: var(--neu-muted);
+  --kt-green-ink: var(--neu-accent-text);
+  --kt-form-title: var(--neu-text);
+  --kt-form-label: var(--neu-text-2);
+  --kt-form-card-bg: var(--neu-bg);
+  --kt-form-card-border: var(--neu-line);
+  --kt-form-input-bg: var(--neu-well);
+  --kt-form-input-border: transparent;
+}
+/* Fields with inline colors (Messages) still become pressed-in wells. */
+.kt-neu :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [hidden]), textarea, select)[style] {
+  background-color: var(--neu-well) !important;
+  color: var(--neu-text) !important;
+  border-color: transparent !important;
+}
+.kt-neu :is(.neu-composer, td, th) :is(input, textarea)[style] {
+  background-color: transparent !important;
+  box-shadow: none;
+}

@@ -26,6 +26,7 @@ import { getPersona } from '../../services/desk/personas';
 import { planStatusText } from '../../services/plans';
 import DeskScheduleModal from './DeskScheduleModal';
 import ktLogo from '../../assets/KT-Favicon.webp';
+import './neumorphism.css';
 import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
 import MessagesPanel from '../../features/messages/MessagesPanel';
@@ -45,7 +46,7 @@ function deskNotify(title, body) {
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
-  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating } = useDeskStore();
+  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating, deskTheme } = useDeskStore();
   const { status: update, install: installUpdate } = useDeskUpdate();
 
   useEffect(() => {
@@ -169,8 +170,15 @@ export default function KaTuroDeskPage() {
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
 
+  // The desktop window's own title-bar buttons match the theme.
+  useEffect(() => {
+    window.katuroDeskApi?.setTitleBarColors?.(deskTheme === 'dark'
+      ? { color: '#1f2824', symbolColor: '#c0cec6' }
+      : { color: '#e4ebe6', symbolColor: '#3f5046' })?.catch?.(() => {});
+  }, [deskTheme]);
+
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans">
+    <div className="kt-neu flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans" data-neu={deskTheme}>
       <DeskSettingsModal key={settingsTab} initialTab={settingsTab} open={showSettings} onClose={() => setShowSettings(false)} user={user} profile={profile} />
       {showMessages && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowMessages(false)}>
@@ -201,7 +209,7 @@ export default function KaTuroDeskPage() {
       )}
       {/* Top Studio Bar (also the window's title bar in the desktop app) */}
       <div
-        className={`h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none ${IN_DESKTOP_WINDOW ? 'desk-titlebar' : ''}`}
+        className={`neu-topbar neu-zone h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none ${IN_DESKTOP_WINDOW ? 'desk-titlebar' : ''}`}
         style={IN_DESKTOP_WINDOW ? { paddingRight: WINDOW_CONTROLS_PX } : undefined}
       >
         <div className="flex items-center gap-2">

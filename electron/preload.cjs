@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   notify: (title, body) => ipcRenderer.invoke('app:notify', title, body),
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
   getUpdateStatus: () => ipcRenderer.invoke('update:getStatus'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

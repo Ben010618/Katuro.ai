@@ -405,7 +405,7 @@ export default function DeskAgentChatPanel({
               {importError && <span className="text-[11px] text-red-600">{importError}</span>}
             </div>
           )}
-          <div className="relative flex items-center bg-gray-50 border border-gray-300 rounded-xl focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-600 focus-within:bg-white transition p-1.5">
+          <div className="neu-composer relative flex items-center bg-gray-50 border border-gray-300 rounded-xl focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-600 focus-within:bg-white transition p-1.5">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isGenerating}
