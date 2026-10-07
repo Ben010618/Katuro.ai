@@ -52,6 +52,27 @@ service cloud.firestore {
       allow read:  if request.auth != null;
       allow write: if isAdmin();
     }
+    // KaTuroDesk rule cards (official DepEd rules the admin maintains): every signed-in
+    // teacher's KaTuroDesk reads them; only the admin edits them.
+    match /adminConfig/deskKnowledge {
+      allow read:  if request.auth != null;
+      allow write: if isAdmin();
+    }
+    // KaTuroDesk feedback (thumbs up/down + reason): no prompts, answers or learner data.
+    match /deskFeedback/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'rating', 'reason', 'comment', 'tools', 'persona', 'appVersion', 'at'])
+        && request.resource.data.rating in ['up', 'down', 'correction']
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 60
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 400
+        && request.resource.data.tools is list && request.resource.data.tools.size() <= 12
+        && request.resource.data.persona is string && request.resource.data.persona.size() <= 20
+        && request.resource.data.appVersion is string && request.resource.data.appVersion.size() <= 20
+        && request.resource.data.at == request.time;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
     // Email-code switch: the website reads it to know whether to ask for a code.
     match /adminConfig/emailCode {
       allow read:  if request.auth != null;

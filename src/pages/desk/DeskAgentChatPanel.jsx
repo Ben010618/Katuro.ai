@@ -30,6 +30,7 @@ import { getPersona } from '../../services/desk/personas';
 import { QUICK_PROMPTS } from '../../services/desk/agent/fastRoute';
 import { useVoiceInput } from './useVoiceInput';
 import { VoiceButton, VoiceStatus } from './VoiceControls';
+import AnswerFeedback from './AnswerFeedback';
 
 function StepIcon({ status }) {
   if (status === 'running') return <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />;
@@ -335,6 +336,10 @@ export default function DeskAgentChatPanel({
                       ))}
                     </div>
                   )}
+
+                  {isAssistant && msg.id !== 'msg-welcome' && !msg.isThinking && msg.content && !msg.pendingPlan && !(msg.choices?.length) && (msg.toolNames?.length || msg.artifacts?.length) ? (
+                    <AnswerFeedback msg={msg} uid={user?.uid} persona={persona} />
+                  ) : null}
 
                   {isAssistant && msg.artifacts?.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap gap-2">

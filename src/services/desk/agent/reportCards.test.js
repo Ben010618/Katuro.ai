@@ -102,14 +102,15 @@ describe('teacher knowledge: understanding what the teacher means', () => {
     expect(formsFor('make a quiz about El Nino')).toEqual([]);
   });
 
+  const OFF_CAL = new Date('2030-01-01T12:00:00+08:00'); // outside any known calendar: no date line
   it('the planner gets only what is relevant (a few hundred words, not everything)', () => {
-    const k = plannerKnowledge('consolidate all the grades for the cards', [], '2026-2027');
+    const k = plannerKnowledge('consolidate all the grades for the cards', [], '2026-2027', OFF_CAL);
     expect(k).toMatch(/Learner's Progress Report Card \(SF9\)/);
     expect(k).toMatch(/build_report_cards/);
     expect(k).toMatch(/average of the three Term Grades/);
     expect(k).toMatch(/Kindergarten and Grade 1 are DESCRIPTIVE/);
     expect(k.length).toBeLessThan(3500);
-    expect(plannerKnowledge('make a quiz about El Nino', [], '2026-2027')).toBe('');
+    expect(plannerKnowledge('make a quiz about El Nino', [], '2026-2027', OFF_CAL)).toBe('');
     // A short follow-up keeps the topic.
     expect(plannerKnowledge('Grade 5 Rizal po', [{ role: 'user', content: 'consolidate the grades' }], '2026-2027')).toMatch(/SF9/);
     expect(formKnowledgeFor('can you do the SF4?')).toBe('');
