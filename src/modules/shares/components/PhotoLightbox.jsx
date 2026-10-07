@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { isHTMLCaption, sanitizeHTML, renderPlainCaption } from '../utils/captionUtils';
@@ -38,8 +39,47 @@ export function PhotoLightbox({
   const authorPhotoURL = post?.authorPhotoURL;
   const authorBg = post?.avatarColor || avatarColor(post?.authorUid || '');
 
-  const prev = useCallback(() => setIdx(i => (i - 1 + urls.length) % urls.length), [urls.length]);
-  const next = useCallback(() => setIdx(i => (i + 1) % urls.length), [urls.length]);
+  // Zoom: click the photo to look closer (the zoom follows the mouse); click again to fit.
+  const [zoom, setZoom] = useState(null); // null | { x, y } in % of the photo
+  const swipe = useRef({ x: 0, y: 0, moved: false });
+
+  const prev = useCallback(() => { setZoom(null); setIdx(i => (i - 1 + urls.length) % urls.length); }, [urls.length]);
+  const next = useCallback(() => { setZoom(null); setIdx(i => (i + 1) % urls.length); }, [urls.length]);
+  const show = (i) => { setZoom(null); setIdx(i); };
+
+  // Load the photos on either side so arrows and swipes feel instant.
+  useEffect(() => {
+    if (urls.length < 2) return;
+    [urls[(idx + 1) % urls.length], urls[(idx - 1 + urls.length) % urls.length]].forEach((u) => { const im = new Image(); im.src = u; });
+  }, [idx, urls]);
+
+  const zoomAt = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 };
+  };
+  const onImageClick = (e) => {
+    e.stopPropagation();
+    if (swipe.current.moved) { swipe.current.moved = false; return; }
+    const at = zoomAt(e); // read now: React clears the event before a state updater runs
+    setZoom(z => (z ? null : at));
+  };
+  const onImageMove = (e) => { if (zoom) setZoom(zoomAt(e)); };
+
+  // Swipe left/right on touch screens (not while zoomed in).
+  const onPointerDown = (e) => { swipe.current = { x: e.clientX, y: e.clientY, moved: false }; };
+  const onPointerUp = (e) => {
+    const dx = e.clientX - swipe.current.x;
+    const dy = e.clientY - swipe.current.y;
+    if (!zoom && urls.length > 1 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      swipe.current.moved = true;
+      if (dx < 0) next(); else prev();
+    }
+  };
+  // A swipe ends with a click on the stage: that click must not close the viewer.
+  const onStageClick = () => {
+    if (swipe.current.moved) { swipe.current.moved = false; return; }
+    onClose();
+  };
 
   useEffect(() => {
     function onKey(e) {
@@ -55,12 +95,22 @@ export function PhotoLightbox({
     };
   }, [onClose, prev, next]);
 
-  return (
+  // Rendered on <body>: a post card's animation transform would otherwise trap the
+  // full-screen viewer inside the card (photo shrunk, part of it off screen).
+  return createPortal(
     <div className="sh-lightbox" onClick={onClose} role="dialog" aria-modal="true">
       <div className="sh-theater-container" onClick={e => e.stopPropagation()}>
         
         {/* Left / Center Photo Stage */}
-        <div className="sh-theater-stage" onClick={onClose}>
+        <div
+          className={`sh-theater-stage${urls.length > 1 ? ' sh-theater-stage--multi' : ''}`}
+          onClick={onStageClick}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+        >
+          {/* Soft, blurred copy of the photo fills the empty space around any photo shape */}
+          <div className="sh-theater-backdrop" style={{ backgroundImage: `url("${urls[idx]}")` }} aria-hidden="true" />
+
           {/* Close button (top-left on desktop) */}
           <button
             className="sh-theater-close"
@@ -87,8 +137,11 @@ export function PhotoLightbox({
             <img
               src={urls[idx]}
               alt={`Photo ${idx + 1} of ${urls.length}`}
-              className="sh-theater-img"
-              onClick={e => e.stopPropagation()}
+              className={`sh-theater-img${zoom ? ' sh-theater-img--zoomed' : ''}`}
+              style={zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined}
+              onClick={onImageClick}
+              onMouseMove={onImageMove}
+              title={zoom ? 'Click to fit the screen' : 'Click to zoom in'}
               draggable={false}
             />
           </div>
@@ -108,6 +161,24 @@ export function PhotoLightbox({
           {urls.length > 1 && (
             <div className="sh-theater-counter">
               {idx + 1} / {urls.length}
+            </div>
+          )}
+
+          {/* Thumbnails (posts with several photos) */}
+          {urls.length > 1 && (
+            <div className="sh-theater-thumbs" onClick={e => e.stopPropagation()}>
+              {urls.map((u, i) => (
+                <button
+                  key={`${u}-${i}`}
+                  type="button"
+                  className={`sh-theater-thumb${i === idx ? ' active' : ''}`}
+                  onClick={() => show(i)}
+                  aria-label={`Show photo ${i + 1} of ${urls.length}`}
+                  aria-current={i === idx ? 'true' : undefined}
+                >
+                  <img src={u} alt="" draggable={false} />
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -213,7 +284,8 @@ export function PhotoLightbox({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
