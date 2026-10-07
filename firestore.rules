@@ -417,10 +417,12 @@ service cloud.firestore {
               getAfter(/databases/$(database)/documents/conversations/$(cid)).data.type == 'dm' &&
               getAfter(/databases/$(database)/documents/conversations/$(cid)).data.createdBy == request.auth.uid &&
               memberUid in getAfter(/databases/$(database)/documents/conversations/$(cid)).data.members) ||
-            // A team admin adds one of their contacts (never across a block).
-            (request.resource.data.role == 'member' && memberUid != request.auth.uid &&
+            // A teacher joins a team they were invited to (accepting the invite, same batch
+            // that removes it). Admins never add people directly.
+            (request.resource.data.role == 'member' && memberUid == request.auth.uid &&
               get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
-              isChatAdmin(cid) && isContact(memberUid) && !blockedPair(request.auth.uid, memberUid))
+              exists(/databases/$(database)/documents/chatTeamInvites/$(memberUid)/pending/$(cid)) &&
+              !existsAfter(/databases/$(database)/documents/chatTeamInvites/$(memberUid)/pending/$(cid)))
           );
         // A team admin may make another member an admin (e.g. before leaving).
         allow update: if isChatAdmin(cid) &&
@@ -432,6 +434,20 @@ service cloud.firestore {
             request.auth.uid == memberUid ||                       // leave a team
             (memberUid != request.auth.uid && isChatAdmin(cid))     // an admin removes a member
           );
+      }
+
+      // Teachers invited to the team who have not answered yet.
+      match /invited/{invitedUid} {
+        allow read: if isChatMember(cid) || isAdmin() || (request.auth != null && request.auth.uid == invitedUid);
+        allow create: if isChatAdmin(cid) &&
+          get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
+          request.resource.data.keys().hasOnly(['uid', 'invitedBy', 'createdAt']) &&
+          request.resource.data.uid == invitedUid &&
+          request.resource.data.invitedBy == request.auth.uid &&
+          request.resource.data.createdAt == request.time &&
+          existsAfter(/databases/$(database)/documents/chatTeamInvites/$(invitedUid)/pending/$(cid));
+        allow delete: if request.auth != null && (request.auth.uid == invitedUid || isChatAdmin(cid));
+        allow update: if false;
       }
 
       match /messages/{messageId} {
@@ -483,6 +499,25 @@ service cloud.firestore {
       }
     }
 
+    // Team invites waiting for my answer. A team admin invites one of their contacts
+    // (never across a block, never someone already in the team); I accept or decline.
+    match /chatTeamInvites/{uid}/pending/{cid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create: if isChatAdmin(cid) &&
+        get(/databases/$(database)/documents/conversations/$(cid)).data.type == 'team' &&
+        request.resource.data.keys().hasOnly(['cid', 'teamName', 'from', 'fromUsername', 'createdAt']) &&
+        request.resource.data.cid == cid &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.fromUsername == myDir().username &&
+        request.resource.data.teamName == get(/databases/$(database)/documents/conversations/$(cid)).data.name &&
+        request.resource.data.createdAt == request.time &&
+        uid != request.auth.uid &&
+        isContact(uid) && !blockedPair(request.auth.uid, uid) &&
+        !exists(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid));
+      allow delete: if request.auth != null && (request.auth.uid == uid || isChatAdmin(cid));
+      allow update: if false;
+    }
+
     // Teachers you blocked (only you see or change your list).
     match /chatBlocks/{uid}/blocked/{otherUid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
@@ -499,8 +534,9 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)).data.addedBy == request.auth.uid
         );
       allow update: if request.auth != null && request.auth.uid == uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt', 'muted']) &&
-        (!('muted' in request.resource.data) || request.resource.data.muted is bool);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt', 'muted', 'clearedAt']) &&
+        (!('muted' in request.resource.data) || request.resource.data.muted is bool) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clearedAt']) || request.resource.data.clearedAt == request.time);
       allow delete: if request.auth != null && (
         request.auth.uid == uid ||
         (!existsAfter(/databases/$(database)/documents/conversations/$(cid)/chatMembers/$(uid)) && isChatAdmin(cid))

@@ -117,7 +117,7 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     await assertSucceeds(getDocs(collection(as('admin1'), `conversations/${cid}/messages`)));
   });
 
-  it('teams: any teacher creates one; the admin adds their contacts; members can leave', async () => {
+  it('teams: any teacher creates one; the admin invites contacts, who join only by accepting; members can leave', async () => {
     const db = as('teacher1');
     const cid = 'team_test1';
     const b = writeBatch(db);
@@ -126,21 +126,79 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
     b.set(doc(db, `chatInbox/teacher1/chats/${cid}`), { cid, type: 'team', addedAt: serverTimestamp(), lastReadAt: null });
     await assertSucceeds(b.commit());
 
-    const add = (adder, uid) => {
+    // An admin can no longer put someone in a team directly.
+    const addDirect = (adder, uid) => {
       const d = as(adder);
       const bb = writeBatch(d);
       bb.set(doc(d, `conversations/${cid}/chatMembers/${uid}`), { uid, role: 'member', addedBy: adder, joinedAt: serverTimestamp() });
       bb.set(doc(d, `chatInbox/${uid}/chats/${cid}`), { cid, type: 'team', addedAt: serverTimestamp(), lastReadAt: null });
       return bb.commit();
     };
-    await assertSucceeds(add('teacher1', 'teacher2'));
-    await assertFails(add('teacher1', 'teacher3'));                      // not a contact
+    await assertFails(addDirect('teacher1', 'teacher2'));
+
+    const invite = (from, fromUsername, uid, teamName = 'Grade 7 Science') => {
+      const d = as(from);
+      const bb = writeBatch(d);
+      bb.set(doc(d, `chatTeamInvites/${uid}/pending/${cid}`), { cid, teamName, from, fromUsername, createdAt: serverTimestamp() });
+      bb.set(doc(d, `conversations/${cid}/invited/${uid}`), { uid, invitedBy: from, createdAt: serverTimestamp() });
+      return bb.commit();
+    };
+    const accept = (uid) => {
+      const d = as(uid);
+      const bb = writeBatch(d);
+      bb.set(doc(d, `conversations/${cid}/chatMembers/${uid}`), { uid, role: 'member', addedBy: uid, joinedAt: serverTimestamp() });
+      bb.set(doc(d, `chatInbox/${uid}/chats/${cid}`), { cid, type: 'team', addedAt: serverTimestamp(), lastReadAt: null });
+      bb.delete(doc(d, `chatTeamInvites/${uid}/pending/${cid}`));
+      bb.delete(doc(d, `conversations/${cid}/invited/${uid}`));
+      return bb.commit();
+    };
+    // Not invited: cannot join.
+    await assertFails(accept('teacher2'));
+    await assertFails(invite('teacher1', 'ana', 'teacher2', 'Other name'));   // the real team name only
+    await assertFails(invite('teacher1', 'ben', 'teacher2'));                  // no fake inviter username
+    await assertSucceeds(invite('teacher1', 'ana', 'teacher2'));
+    // The invited teacher sees the invite; the team sees "invited"; others see nothing.
+    await assertSucceeds(getDoc(doc(as('teacher2'), `chatTeamInvites/teacher2/pending/${cid}`)));
+    await assertFails(getDoc(doc(as('teacher3'), `chatTeamInvites/teacher2/pending/${cid}`)));
+    await assertSucceeds(getDocs(collection(as('teacher1'), `conversations/${cid}/invited`)));
+    await assertFails(getDoc(doc(as('teacher2'), `conversations/${cid}`)));   // not a member before accepting
+    // Joining must remove the invite in the same step (no keeping it to rejoin later).
+    const d2 = as('teacher2');
+    const keep = writeBatch(d2);
+    keep.set(doc(d2, `conversations/${cid}/chatMembers/teacher2`), { uid: 'teacher2', role: 'member', addedBy: 'teacher2', joinedAt: serverTimestamp() });
+    await assertFails(keep.commit());
+    // Never as admin.
+    const asAdminJoin = writeBatch(d2);
+    asAdminJoin.set(doc(d2, `conversations/${cid}/chatMembers/teacher2`), { uid: 'teacher2', role: 'admin', addedBy: 'teacher2', joinedAt: serverTimestamp() });
+    asAdminJoin.delete(doc(d2, `chatTeamInvites/teacher2/pending/${cid}`));
+    await assertFails(asAdminJoin.commit());
+    await assertSucceeds(accept('teacher2'));
+    await assertSucceeds(send(cid, 'teacher2', 'Ben'));
+    await assertFails(invite('teacher1', 'ana', 'teacher2'));                  // already a member
+
+    await assertFails(invite('teacher1', 'ana', 'teacher3'));                  // not a contact
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatContacts/teacher1/list/teacher3'), { uid: 'teacher3', since: 1 }));
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher3/blocked/teacher1'), { at: 1 }));
-    await assertFails(add('teacher1', 'teacher3'));                      // a contact, but blocked
-    await assertFails(add('teacher2', 'teacher3'));                      // members cannot add
+    await assertFails(invite('teacher1', 'ana', 'teacher3'));                  // a contact, but blocked
+    await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), 'chatBlocks/teacher3/blocked/teacher1')));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatContacts/teacher2/list/teacher3'), { uid: 'teacher3', since: 1 }));
+    await assertFails(invite('teacher2', 'ben', 'teacher3'));                  // members cannot invite
+    await assertSucceeds(invite('teacher1', 'ana', 'teacher3'));
+    // Declining (the invited teacher) and cancelling (the admin) both remove it.
+    const d3 = as('teacher3');
+    const decline = writeBatch(d3);
+    decline.delete(doc(d3, `chatTeamInvites/teacher3/pending/${cid}`));
+    decline.delete(doc(d3, `conversations/${cid}/invited/teacher3`));
+    await assertSucceeds(decline.commit());
+    await assertFails(accept('teacher3'));                                     // the invite is gone
+    await assertSucceeds(invite('teacher1', 'ana', 'teacher3'));
+    await assertFails(deleteDoc(doc(as('teacher2'), `chatTeamInvites/teacher3/pending/${cid}`)));  // a member cannot cancel
+    const d1 = as('teacher1');
+    const cancel = writeBatch(d1);
+    cancel.delete(doc(d1, `chatTeamInvites/teacher3/pending/${cid}`));
+    cancel.delete(doc(d1, `conversations/${cid}/invited/teacher3`));
+    await assertSucceeds(cancel.commit());
     await assertFails(setDoc(doc(as('teacher3'), `conversations/${cid}/chatMembers/teacher3`), { uid: 'teacher3', role: 'admin', addedBy: 'teacher3', joinedAt: serverTimestamp() }));
-    await assertSucceeds(send(cid, 'teacher2', 'Ben'));
 
     const db2 = as('teacher2');
     const leave = writeBatch(db2);
@@ -189,6 +247,17 @@ describe.skipIf(!hasEmulator)('messages rules', () => {
   it('a new one-to-one chat cannot be started with someone who blocked you', async () => {
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'chatBlocks/teacher2/blocked/teacher1'), { at: 1 }));
     await assertFails(startDm('teacher2').commit());
+  });
+
+  it('"Delete chat" for me: only on my own inbox, only at the server time', async () => {
+    const { cid, commit } = startDm('teacher2');
+    await commit();
+    await assertSucceeds(updateDoc(doc(as('teacher1'), `chatInbox/teacher1/chats/${cid}`), { clearedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(as('teacher1'), `chatInbox/teacher1/chats/${cid}`), { clearedAt: new Date(0) }));
+    await assertFails(updateDoc(doc(as('teacher1'), `chatInbox/teacher2/chats/${cid}`), { clearedAt: serverTimestamp() }));
+    // The other teacher still reads every message.
+    await assertSucceeds(send(cid, 'teacher1', 'Ana'));
+    await assertSucceeds(getDocs(collection(as('teacher2'), `conversations/${cid}/messages`)));
   });
 
   it('mute is a boolean on your own inbox only', async () => {

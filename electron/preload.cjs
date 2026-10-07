@@ -17,7 +17,13 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   htmlToPdf: (html, options) => ipcRenderer.invoke('doc:htmlToPdf', html, options),
   getBackground: () => ipcRenderer.invoke('app:getBackground'),
   setBackground: (settings) => ipcRenderer.invoke('app:setBackground', settings),
-  notify: (title, body) => ipcRenderer.invoke('app:notify', title, body),
+  notify: (title, body, target) => ipcRenderer.invoke('app:notify', title, body, target),
+  setUnreadBadge: (count, pngDataUrl) => ipcRenderer.invoke('app:setUnreadBadge', count, pngDataUrl),
+  onNotificationClick: (callback) => {
+    const listener = (_, target) => callback(target);
+    ipcRenderer.on('notification:click', listener);
+    return () => ipcRenderer.removeListener('notification:click', listener);
+  },
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),

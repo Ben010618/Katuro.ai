@@ -17,18 +17,37 @@ if (!hasInstanceLock) app.quit();
 // Theme colors of the top studio bar, used for the window controls area.
 const TITLE_BAR = { color: '#e4ebe6', symbolColor: '#3f5046', height: 40 };
 
-// Background mode: keep running in the tray when the window is closed, so scheduled
-// tasks still run on time. Saved on this PC; off until the teacher turns it on.
+// Background mode: keep running in the tray when the window is closed, so messages
+// and scheduled tasks still arrive on time. Saved on this PC. On by default (until the
+// teacher turns it off in Settings); starting with Windows stays off until they choose it.
 const backgroundFile = () => path.join(app.getPath('userData'), 'background.json');
 function readBackgroundSettings() {
   try {
     const s = JSON.parse(fs.readFileSync(backgroundFile(), 'utf-8'));
     return { keepRunning: s.keepRunning === true, openAtLogin: s.keepRunning === true && s.openAtLogin === true };
   } catch (e) {
-    return { keepRunning: false, openAtLogin: false };
+    return { keepRunning: true, openAtLogin: false };
   }
 }
-let backgroundSettings = { keepRunning: false, openAtLogin: false };
+// Shown once: the first time closing the window keeps KaTuroDesk in the tray.
+const trayNoticeFile = () => path.join(app.getPath('userData'), 'tray-notice.json');
+function showTrayNoticeOnce() {
+  try {
+    if (fs.existsSync(trayNoticeFile())) return;
+    fs.writeFileSync(trayNoticeFile(), JSON.stringify({ shownAt: new Date().toISOString() }));
+  } catch (e) {
+    return;
+  }
+  if (!Notification.isSupported()) return;
+  const n = new Notification({
+    title: 'KaTuroDesk is still running',
+    body: 'It stays near the clock so your messages and scheduled tasks arrive. Quit from the tray icon, or turn this off in Settings > Notifications.',
+    icon: appIconPath(),
+  });
+  n.on('click', showMainWindow);
+  n.show();
+}
+let backgroundSettings = { keepRunning: true, openAtLogin: false };
 const startedHidden = process.argv.includes('--background');
 
 // ── Auto-update (GitHub Releases) ─────────────────────────────
@@ -183,9 +202,16 @@ function ensureTray() {
   if (tray || !backgroundSettings.keepRunning) return;
   const icon = nativeImage.createFromPath(appIconPath()).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
-  tray.setToolTip('KaTuroDesk — running in the background for your scheduled tasks');
+  tray.setToolTip(trayTooltip());
   refreshTrayMenu();
   tray.on('click', showMainWindow);
+}
+
+let unreadCount = 0;
+function trayTooltip() {
+  return unreadCount > 0
+    ? `KaTuroDesk: ${unreadCount} unread`
+    : 'KaTuroDesk: running in the background for your messages and scheduled tasks';
 }
 
 function refreshTrayMenu() {
@@ -256,7 +282,12 @@ function createWindow() {
     if (backgroundSettings.keepRunning && !isQuitting) {
       event.preventDefault();
       mainWindow.hide();
+      showTrayNoticeOnce();
     }
+  });
+  // A flashing taskbar button stops once the teacher comes back to the window.
+  mainWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.flashFrame(false);
   });
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -413,16 +444,52 @@ ipcMain.handle('app:getBackground', async () => ({ ...backgroundSettings, suppor
 
 ipcMain.handle('app:setBackground', async (_, next = {}) => applyBackgroundSettings(next || {}));
 
-ipcMain.handle('app:notify', async (_, title, body) => {
+// Only these fields come back to the page when a notification is clicked.
+function cleanNotifyTarget(target) {
+  if (!target || typeof target !== 'object') return null;
+  if (typeof target.cid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(target.cid)) return { cid: target.cid };
+  if (target.invites === true) return { invites: true };
+  return null;
+}
+
+ipcMain.handle('app:notify', async (_, title, body, target) => {
+  const open = cleanNotifyTarget(target);
+  // Open but behind other windows (or minimized): the taskbar button flashes too.
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
   if (!Notification.isSupported()) return { shown: false };
   const n = new Notification({
     title: String(title || 'KaTuroDesk').slice(0, 120),
     body: String(body || '').slice(0, 300),
     icon: appIconPath(),
+    // Messages and invites: the page plays the KaTuroDesk tone (or stays silent if muted).
+    silent: Boolean(open),
   });
-  n.on('click', showMainWindow);
+  n.on('click', () => {
+    showMainWindow();
+    if (open && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('notification:click', open);
+  });
   n.show();
   return { shown: true };
+});
+
+// Unread count on the taskbar button (a small badge drawn by the page) and in the tray.
+ipcMain.handle('app:setUnreadBadge', async (event, count, pngDataUrl) => {
+  const n = Math.max(0, Math.min(9999, Number(count) || 0));
+  unreadCount = n;
+  if (tray) tray.setToolTip(trayTooltip());
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return { success: false };
+  try {
+    if (process.platform === 'win32') {
+      const ok = n > 0 && typeof pngDataUrl === 'string' && pngDataUrl.startsWith('data:image/png;base64,') && pngDataUrl.length < 60000;
+      win.setOverlayIcon(ok ? nativeImage.createFromDataURL(pngDataUrl) : null, n > 0 ? `${n} unread` : '');
+    } else {
+      app.setBadgeCount(n);
+    }
+  } catch (e) {
+    return { success: false };
+  }
+  return { success: true };
 });
 
 ipcMain.handle('app:showWindow', async () => {

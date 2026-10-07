@@ -19,6 +19,10 @@
  *   conversations/{cid}/links/{id}      web links found in messages (written with the message)
  *   chatBlocks/{uid}/blocked/{otherUid} teachers I blocked (one-to-one chats)
  *   chatInbox/{uid}/chats/{cid}.muted   no notifications / badge for that chat
+ * Phase 2b:
+ *   chatInbox/{uid}/chats/{cid}.clearedAt "Delete chat" for me: older messages hidden for me only
+ *   chatTeamInvites/{uid}/pending/{cid} { cid, teamName, from, fromUsername, createdAt } team invite waiting for me
+ *   conversations/{cid}/invited/{uid}   { uid, invitedBy, createdAt } pending invites, seen by the team
  * Files are uploaded and downloaded through the uploadChatFile / downloadChatFile
  * functions (membership, block, type and size checked on the server; no public links).
  */
@@ -224,17 +228,57 @@ export async function openDirectChat(me, otherUid) {
   return cid;
 }
 
-/** Adds one teacher to a team (team admins only; one of my contacts). */
-export async function addTeamMember(me, cid, uid) {
+/**
+ * Invites one of my contacts to a team (team admins only). They join only when they
+ * accept; until then the team sees them as "invited".
+ */
+export async function inviteToTeam(me, cid, teamName, uid) {
   const batch = writeBatch(db);
-  batch.set(doc(db, 'conversations', cid, 'chatMembers', uid), { uid, role: 'member', addedBy: me.uid, joinedAt: serverTimestamp() });
-  batch.set(doc(db, 'chatInbox', uid, 'chats', cid), { cid, type: 'team', addedAt: serverTimestamp(), lastReadAt: null });
+  batch.set(doc(db, 'chatTeamInvites', uid, 'pending', cid), { cid, teamName, from: me.uid, fromUsername: me.username, createdAt: serverTimestamp() });
+  batch.set(doc(db, 'conversations', cid, 'invited', uid), { uid, invitedBy: me.uid, createdAt: serverTimestamp() });
   await batch.commit();
 }
 
+/** A team admin takes back an invite that was not answered yet. */
+export async function cancelTeamInvite(cid, uid) {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'chatTeamInvites', uid, 'pending', cid));
+  batch.delete(doc(db, 'conversations', cid, 'invited', uid));
+  await batch.commit();
+}
+
+/** I accept a team invite: I join as a member and the chat appears in my list. */
+export async function acceptTeamInvite(me, cid) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'conversations', cid, 'chatMembers', me.uid), { uid: me.uid, role: 'member', addedBy: me.uid, joinedAt: serverTimestamp() });
+  batch.set(doc(db, 'chatInbox', me.uid, 'chats', cid), { cid, type: 'team', addedAt: serverTimestamp(), lastReadAt: null });
+  batch.delete(doc(db, 'chatTeamInvites', me.uid, 'pending', cid));
+  batch.delete(doc(db, 'conversations', cid, 'invited', me.uid));
+  await batch.commit();
+}
+
+export async function declineTeamInvite(myUid, cid) {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'chatTeamInvites', myUid, 'pending', cid));
+  batch.delete(doc(db, 'conversations', cid, 'invited', myUid));
+  await batch.commit();
+}
+
+/** Team invites waiting for my answer, newest first. */
+export function subscribeTeamInvites(uid, cb, onError) {
+  return onSnapshot(collection(db, 'chatTeamInvites', uid, 'pending'), (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, kind: 'team', ...d.data({ serverTimestamps: 'estimate' }) })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)));
+  }, onError);
+}
+
+/** Teachers invited to a team who have not answered yet. */
+export function subscribeTeamInvited(cid, cb, onError) {
+  return onSnapshot(collection(db, 'conversations', cid, 'invited'), (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), onError);
+}
+
 /**
- * Creates a team with me as its admin, then adds each member (one small write each,
- * so one refused member never blocks the others). Returns { cid, failed: [uid] }.
+ * Creates a team with me as its admin, then invites each teacher (one small write
+ * each, so one refused invite never blocks the others). Returns { cid, failed: [uid] }.
  */
 export async function createTeam(me, name, memberUids = []) {
   const title = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
@@ -248,7 +292,7 @@ export async function createTeam(me, name, memberUids = []) {
   const failed = [];
   for (const uid of [...new Set(memberUids)].filter((u) => u !== me.uid).slice(0, MAX_TEAM_MEMBERS - 1)) {
     try {
-      await addTeamMember(me, ref.id, uid);
+      await inviteToTeam(me, ref.id, title, uid);
     } catch {
       failed.push(uid);
     }
@@ -306,9 +350,10 @@ export function subscribeMembers(cid, cb, onError) {
     (err) => onError?.(err));
 }
 
-/** The latest `count` messages, oldest first. */
-export function subscribeMessages(cid, count, cb, onError) {
-  return onSnapshot(query(collection(db, 'conversations', cid, 'messages'), orderBy('createdAt', 'desc'), limit(count)),
+/** The latest `count` messages, oldest first (only those after `sinceMs`: "Delete chat"). */
+export function subscribeMessages(cid, count, cb, onError, sinceMs = 0) {
+  const after = sinceMs ? [where('createdAt', '>', new Date(sinceMs))] : [];
+  return onSnapshot(query(collection(db, 'conversations', cid, 'messages'), ...after, orderBy('createdAt', 'desc'), limit(count)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })).reverse(), snap.size >= count),
     (err) => onError?.(err));
 }
@@ -362,7 +407,13 @@ const ms = (t) => (t?.toMillis ? t.toMillis() : (t instanceof Date ? t.getTime()
 export function isUnread(inboxItem, conversation, myUid) {
   if (!conversation?.lastMessageAt || !conversation.lastMessage) return false;
   if (conversation.lastMessage.senderUid === myUid) return false;
-  return ms(conversation.lastMessageAt) > ms(inboxItem?.lastReadAt);
+  return ms(conversation.lastMessageAt) > Math.max(ms(inboxItem?.lastReadAt), ms(inboxItem?.clearedAt));
+}
+
+/** A chat I deleted stays out of my list until someone writes again. */
+export function isClearedChat(inboxItem, conversation) {
+  const cleared = ms(inboxItem?.clearedAt);
+  return cleared > 0 && ms(conversation?.lastMessageAt) <= cleared;
 }
 
 // ── Phase 2: files, media, links, block, mute, divisions ─────────────────────
@@ -476,8 +527,9 @@ export function saveBlobAs(blob, name) {
 }
 
 /** Media ('media'), files ('files') or links ('links') of a chat, newest first. */
-export function subscribeAssets(cid, kind, count, cb, onError) {
-  return onSnapshot(query(collection(db, 'conversations', cid, kind), orderBy('createdAt', 'desc'), limit(count)),
+export function subscribeAssets(cid, kind, count, cb, onError, sinceMs = 0) {
+  const after = sinceMs ? [where('createdAt', '>', new Date(sinceMs))] : [];
+  return onSnapshot(query(collection(db, 'conversations', cid, kind), ...after, orderBy('createdAt', 'desc'), limit(count)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })), snap.size >= count),
     (err) => onError?.(err));
 }
@@ -496,6 +548,14 @@ export async function blockTeacher(myUid, otherUid) {
 export async function unblockTeacher(myUid, otherUid) {
   const { deleteDoc } = await import('firebase/firestore');
   await deleteDoc(doc(db, 'chatBlocks', myUid, 'blocked', otherUid));
+}
+
+/**
+ * "Delete chat" for me: the chat leaves my list and its messages so far are hidden
+ * for me only (the other teachers keep theirs). It comes back with the next message.
+ */
+export async function deleteChatForMe(uid, cid) {
+  await updateDoc(doc(db, 'chatInbox', uid, 'chats', cid), { clearedAt: serverTimestamp() });
 }
 
 export async function setChatMuted(uid, cid, muted) {

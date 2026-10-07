@@ -61,6 +61,11 @@ export const useDeskStore = create(
       // KaTuroDesk look (neumorphic): 'light' | 'dark'
       deskTheme: 'light',
 
+      // Messages: Windows notifications and the unread number on the taskbar button.
+      notifyMessages: true,
+      taskbarBadge: true,
+      messageSound: true,
+
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
       isGenerating: false,
@@ -161,6 +166,12 @@ export const useDeskStore = create(
       setPersona: (persona) => set({ persona }),
 
       setDeskTheme: (deskTheme) => set({ deskTheme: deskTheme === 'dark' ? 'dark' : 'light' }),
+
+      setNotifyMessages: (on) => set({ notifyMessages: on === true }),
+
+      setTaskbarBadge: (on) => set({ taskbarBadge: on === true }),
+
+      setMessageSound: (on) => set({ messageSound: on === true }),
 
       setActiveAgent: (agentId) => set({ activeAgentId: agentId }),
 
@@ -333,6 +344,9 @@ export const useDeskStore = create(
         privacyMode: state.privacyMode,
         persona: state.persona,
         deskTheme: state.deskTheme,
+        notifyMessages: state.notifyMessages,
+        taskbarBadge: state.taskbarBadge,
+        messageSound: state.messageSound,
         scheduledTasks: state.scheduledTasks,
         // Don't persist native handles or file bytes (not serializable / private)
       }),
