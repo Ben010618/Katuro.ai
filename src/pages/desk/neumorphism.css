@@ -253,3 +253,17 @@
   background-color: transparent !important;
   box-shadow: none;
 }
+
+/* Translucent white strips (the "Try:" suggestions bar, sticky footers). */
+.kt-neu :is(.bg-white\/70, .bg-white\/95) { background-color: var(--neu-bg); }
+.kt-neu .hover\:bg-gray-200:hover { background-color: var(--neu-hover); }
+
+/* Remaining sidebar captions and status texts. */
+.kt-neu :is(.text-\[\#718b7b\], .text-\[\#799583\], .text-\[\#6f8a7a\], .text-\[\#405749\]) { color: var(--neu-muted); }
+.kt-neu .neu-zone .text-emerald-300 { color: var(--neu-accent-text); }
+.kt-neu :is(.text-amber-950) { color: var(--neu-amber-text); }
+.kt-neu :is(.text-red-900, .text-red-800\/70, .text-red-500) { color: var(--neu-red-text); }
+.kt-neu :is(.border-\[\#375440\], .border-\[\#2b3d31\], .border-blue-200) { border-color: var(--neu-line); }
+
+/* Text on the teacher's own (green) chat bubble follows the accent's ink. */
+.kt-neu .bg-\[\#2d6a4f\] :is(.text-emerald-100\/90, .text-emerald-100, .text-emerald-50) { color: var(--neu-on-accent); opacity: 0.85; }
