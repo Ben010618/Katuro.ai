@@ -33,6 +33,8 @@ import { getPersona, timeOfDay } from '../personas.js';
 import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
 import { gradingRulesBrief } from '../knowledge/gradingRules.js';
 import { firstMissingDetails } from './requiredDetails.js';
+import { calendarContext } from '../knowledge/schoolCalendar.js';
+import { loadRuleCards, ruleCardsText } from '../knowledge/ruleCards.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
 
@@ -101,12 +103,14 @@ export function personaFor(teacher, personaId, now = new Date()) {
  * grading rules when grades come up). Sent in the prompt, not the system text, so the
  * fixed instructions stay identical between requests. '' when nothing is relevant.
  */
-export function plannerKnowledge(prompt, history = [], schoolYear = '') {
+export function plannerKnowledge(prompt, history = [], schoolYear = '', now = new Date(), cards = []) {
   // A short follow-up ("Grade 5 Rizal po") keeps the topic of the teacher's previous message.
   const lastTeacher = [...history].reverse().find((m) => m.role === 'user')?.content || '';
   const text = `${prompt}\n${String(prompt).length < 60 ? lastTeacher : ''}`;
-  const parts = [formKnowledgeFor(text)];
+  // Where we are in the school year (one short line; '' outside a known calendar).
+  const parts = [calendarContext(now), formKnowledgeFor(text)];
   if (talksAboutGrades(text)) parts.push(gradingRulesBrief(schoolYear));
+  parts.push(ruleCardsText(text, cards));
   return parts.filter(Boolean).join('\n\n');
 }
 
@@ -132,6 +136,22 @@ export function readPlanCheck(plan, unmask = (x) => x) {
 
 export function needsConfirmation(tasks) {
   return tasks.length > 3 || tasks.some((t) => CONFIRM_TOOLS.has(t.tool));
+}
+
+/**
+ * Ask, confirm or run — one decision used by every chat turn AND by the teacher exam,
+ * so the exam measures exactly what teachers get.
+ * → { action: 'answer'|'run'|'ask'|'confirm', gap? }
+ */
+export function decideAction({ tasks = [], check = null, prompt = '', teacher = {}, confirmed = false, autoApprove = false }) {
+  if (!tasks.length) return { action: 'answer' };
+  if (confirmed) return { action: 'run' };
+  // Required details, checked by code (no AI tokens).
+  const gap = firstMissingDetails(tasks, { prompt, teacher });
+  if (gap) return { action: 'ask', gap };
+  if (check && (check.confidence === 'low' || check.missing.length)) return { action: 'ask' };
+  if (check && check.confidence === 'medium' && !autoApprove && needsConfirmation(tasks)) return { action: 'confirm' };
+  return { action: 'run' };
 }
 
 /** Document voice: formal and neutral whatever the persona (remarks, slips, template fields). */
@@ -213,6 +233,7 @@ export async function runDeskAgentTurn({
   onUpdate,
   confirmedPlan = null, // { reply, tasks } the teacher approved with "Proceed": runs with no new AI call
   autoApprove = false, // scheduled tasks: approved when scheduled, so no "Proceed?" step
+  ruleCards, // the admin's rule cards (loaded from Firestore when not given)
 }) {
   const teacher = teacherFromProfile(profile, user);
   const persona = personaFor(teacher, personaId);
@@ -345,6 +366,7 @@ export async function runDeskAgentTurn({
     ({ tasks, problems } = sanitizePlan({ tasks: fast.tasks }, flat, attachedPaths));
   } else try {
     const fileIndex = buildFileIndex(tree, { attachedPaths, activePath, describe: folderIndex ? (p) => folderIndex.describe(p) : undefined });
+    const cards = ruleCards ?? await loadRuleCards();
     const plan = await callDeskLLM({
       kind: 'plan',
       system: `${buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() })}\n\n${teacher.facts}`,
@@ -357,7 +379,7 @@ export async function runDeskAgentTurn({
         activePath,
         activeArtifact,
         privacyOn: privacyMode,
-        knowledge: plannerKnowledge(prompt, history, ctx.schoolYear),
+        knowledge: plannerKnowledge(prompt, history, ctx.schoolYear, today, cards),
         answeringQuestion: lastReplyAsked(history),
       }),
       json: true,
@@ -397,21 +419,17 @@ export async function runDeskAgentTurn({
       : `${aiOffline} Without the AI I can only run item analysis, class records, attendance checks, and PDF tools on files you select.`;
   }
 
-  // ── 1c. Required details, checked by code (no AI tokens): ask instead of assuming ──
-  if (!confirmedPlan && tasks.length) {
-    const gap = firstMissingDetails(tasks, { prompt, teacher });
-    if (gap) {
-      const content = `**Needs your input** — ${gap.question}`; // the plan's "doing it now" reply is dropped: nothing runs yet
-      return { content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: gap.choices, asked: true };
-    }
+  // ── 1c. Think before acting: required details (code), then ask when unsure, confirm big jobs ──
+  const decision = decideAction({ tasks, check, prompt, teacher, confirmed: Boolean(confirmedPlan), autoApprove });
+  if (decision.action === 'ask' && decision.gap) {
+    const content = `**Needs your input** — ${decision.gap.question}`; // the plan's "doing it now" reply is dropped: nothing runs yet
+    return { content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: decision.gap.choices, asked: true };
   }
-
-  // ── 1d. Think before acting: ask when unsure, confirm big jobs when only fairly sure ──
-  if (check && tasks.length && (check.confidence === 'low' || check.missing.length)) {
+  if (decision.action === 'ask') {
     const ask = reply && /\?\s*$/.test(reply) ? reply : [reply, `**Needs your input** — ${check.missing.join('; ') || 'please tell me a bit more about what you need.'}`].filter(Boolean).join('\n\n');
     return { content: ask, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: check.choices, asked: true };
   }
-  if (check && tasks.length && check.confidence === 'medium' && !autoApprove && needsConfirmation(tasks)) {
+  if (decision.action === 'confirm') {
     const planLines = tasks.map((t) => `- ${masker.unmask(t.label || t.tool)}`);
     const content = [
       reply,
@@ -489,7 +507,7 @@ export async function runDeskAgentTurn({
     answerMemory.set(memoKey, { content, at: Date.now() });
   }
 
-  return { content, steps, artifacts, createdFiles, aiOffline, ...(check?.choices?.length && !tasks.length ? { choices: check.choices } : {}) };
+  return { content, steps, artifacts, createdFiles, aiOffline, tools: [...new Set(tasks.map((t) => t.tool))], ...(check?.choices?.length && !tasks.length ? { choices: check.choices } : {}) };
 }
 
 /** True when the assistant's last message asked the teacher something. */

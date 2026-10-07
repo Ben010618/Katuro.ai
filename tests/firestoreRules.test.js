@@ -6,7 +6,7 @@
 import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
@@ -137,5 +137,28 @@ describe.skipIf(!hasEmulator)('firestore.rules', () => {
     await assertFails(updateDoc(doc(db, 'shares_profiles/teacher2'), { followerCount: 50 }));   // only by one
     await assertFails(updateDoc(doc(db, 'shares_profiles/teacher2'), { bio: 'hacked' }));       // no other fields
     await assertFails(setDoc(doc(db, 'shares_follows/teacher2/followers/admin1'), { at: 1 }));  // not on behalf of others
+  });
+
+  it('KaTuroDesk rule cards: every signed-in teacher reads them; only admins change them', async () => {
+    await assertSucceeds(getDoc(doc(asTeacher(), 'adminConfig/deskKnowledge')));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'adminConfig/deskKnowledge')));
+    await assertFails(setDoc(doc(asTeacher(), 'adminConfig/deskKnowledge'), { cards: [] }));
+    await assertSucceeds(setDoc(doc(asAdmin(), 'adminConfig/deskKnowledge'), { cards: [] }));
+  });
+
+  it('KaTuroDesk feedback: teachers add their own rating only; only admins read; nobody edits', async () => {
+    const entry = (over = {}) => ({ uid: 'teacher1', rating: 'down', reason: 'Wrong file or data', comment: '', tools: ['edit_file'], persona: 'matt', appVersion: '1.9.3', at: serverTimestamp(), ...over });
+    const db = asTeacher();
+    const ref = await assertSucceeds(addDoc(collection(db, 'deskFeedback'), entry()));
+    await assertFails(addDoc(collection(db, 'deskFeedback'), entry({ uid: 'teacher2' })));          // not for someone else
+    await assertFails(addDoc(collection(db, 'deskFeedback'), entry({ rating: 'great' })));          // known ratings only
+    await assertFails(addDoc(collection(db, 'deskFeedback'), entry({ prompt: 'grades of Juan' }))); // no request text
+    await assertFails(addDoc(collection(db, 'deskFeedback'), entry({ comment: 'x'.repeat(401) })));
+    await assertFails(addDoc(collection(db, 'deskFeedback'), entry({ at: new Date(0) })));          // server time only
+    await assertFails(getDocs(collection(db, 'deskFeedback')));
+    await assertFails(updateDoc(doc(db, 'deskFeedback', ref.id), { rating: 'up' }));
+    await assertFails(deleteDoc(doc(db, 'deskFeedback', ref.id)));
+    await assertSucceeds(getDocs(collection(asAdmin(), 'deskFeedback')));
+    await assertFails(deleteDoc(doc(asAdmin(), 'deskFeedback', ref.id)));
   });
 });

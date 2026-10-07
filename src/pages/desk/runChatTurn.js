@@ -7,6 +7,7 @@ import { useDeskStore, folderIndex } from '../../store/deskStore';
 import { runDeskAgentTurn } from '../../services/deskAgentAI';
 import { getTeacherSalutationName } from '../../services/teacherProfileUtils';
 import { getPersona } from '../../services/desk/personas';
+import { isCorrection, sendFeedback, toolsOf } from '../../services/desk/feedback';
 
 /**
  * @param {object} o
@@ -26,6 +27,13 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
   const history = messages
     .filter((m) => m.id !== 'msg-welcome' && m.content && !m.isThinking)
     .map((m) => ({ role: m.role, content: m.content }));
+
+  // "No, I meant…" right after KaTuro ran a tool: count it as a correction (names of tools only).
+  if (!scheduled && !confirmedPlan && isCorrection(text)) {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && m.id !== 'msg-welcome');
+    const tools = toolsOf(lastAssistant);
+    if (tools.length && user?.uid) sendFeedback({ uid: user.uid, rating: 'correction', reason: 'Teacher corrected KaTuro', tools, persona }).catch(() => {});
+  }
 
   store.addMessage({ role: 'user', content: text, attachments, ...(scheduled ? { scheduled } : {}) });
   store.addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
@@ -54,6 +62,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
     const s = useDeskStore.getState();
     s.updateLastAssistantMessage({
       content: result.content, steps: result.steps, isThinking: false, artifacts: result.artifacts,
+      ...(result.tools?.length ? { toolNames: result.tools } : {}),
       // One-tap answers to a question, and a plan waiting for "Proceed".
       ...(result.choices?.length ? { choices: result.choices } : {}),
       ...(result.pendingPlan ? { pendingPlan: result.pendingPlan, pendingAttachments: attachments } : {}),

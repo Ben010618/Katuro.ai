@@ -19,6 +19,7 @@ import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
 import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
 import EmailCodeAdminCard from '../features/emailCode/EmailCodeAdminCard';
+import DeskAiAdmin from '../features/deskAi/DeskAiAdmin';
 import { db } from '../firebase';
 import {
   BarChart, Bar, LineChart, Line,
@@ -32,7 +33,7 @@ import {
   Bell, UserPlus, Clock, Moon, Sun, Trash2,
   ToggleLeft, ToggleRight, Bug, Gift, BarChart2, Download,
   FileSpreadsheet, UserCheck, MessageSquare, Lightbulb, UserX, Search,
-  Cpu, Sparkles, ExternalLink, Megaphone,
+  Cpu, Sparkles, ExternalLink, Megaphone, Bot,
 } from 'lucide-react';
 import {
   saveGeminiKey, getGeminiKeyStatus, testGeminiKey,
@@ -3118,6 +3119,7 @@ export default function AdminDashboard() {
             { id: 'featureReq',  label: 'Feature Requests', Icon: Lightbulb },
             { id: 'announce',    label: 'Announcement',     Icon: Megaphone },
             { id: 'inactivity',  label: 'Inactivity',       Icon: UserX },
+            { id: 'deskAi',      label: 'KaTuroDesk AI',    Icon: Bot },
           ].map(({ id, label, Icon, badge }) => (
             <button
               key={id}
@@ -3177,6 +3179,8 @@ export default function AdminDashboard() {
         {activeTab === 'announce' && <AnnouncementAdmin />}
 
         {activeTab === 'inactivity' && <InactiveUsersSection />}
+
+        {activeTab === 'deskAi' && <DeskAiAdmin adminUid={user?.uid} />}
 
         {activeTab === 'users' && <>
 
