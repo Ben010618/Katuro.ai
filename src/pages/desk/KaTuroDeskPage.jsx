@@ -30,6 +30,8 @@ import './neumorphism.css';
 import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
 import MessagesPanel from '../../features/messages/MessagesPanel';
+import { badgeDataUrl } from './unreadBadge';
+import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 import { flattenFileTree, findEntryByPath, readFileBytes, writeFileToDirectory, openInDefaultApp } from '../../services/localFileSystem';
 
@@ -39,14 +41,20 @@ const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined
 const IN_DESKTOP_WINDOW = Boolean(deskApi?.isElectron);
 const WINDOW_CONTROLS_PX = deskApi?.platform === 'darwin' ? 0 : 146;
 
-function deskNotify(title, body) {
+// Message notifications (Settings > Notifications can turn them off). `target` tells
+// KaTuroDesk what to open when the notification is clicked: { cid } or { invites }.
+function deskNotify(title, body, target) {
   const desk = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
-  if (desk?.notify) desk.notify(title, String(body || '').slice(0, 140)).catch(() => {});
+  const { notifyMessages, messageSound } = useDeskStore.getState();
+  if (!desk?.notify || !notifyMessages) return;
+  desk.notify(title, String(body || '').slice(0, 140), target || null).catch(() => {});
+  // KaTuroDesk's own tone (the Windows notification itself stays silent).
+  if (messageSound) playMessageTone();
 }
 
 export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
-  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating, deskTheme } = useDeskStore();
+  const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating, deskTheme, notifyMessages, taskbarBadge } = useDeskStore();
   const { status: update, install: installUpdate } = useDeskUpdate();
 
   useEffect(() => {
@@ -61,6 +69,7 @@ export default function KaTuroDeskPage() {
   const [settingsTab, setSettingsTab] = useState('assistant');
   const [showMessages, setShowMessages] = useState(false);
   const [openChatId, setOpenChatId] = useState(null);
+  const [messagesRequest, setMessagesRequest] = useState(null); // what a clicked notification asks to open
   // null = closed; {} = open on the list; { prompt, attachedPaths } = open on a new task
   const [schedule, setSchedule] = useState(null);
 
@@ -160,11 +169,25 @@ export default function KaTuroDeskPage() {
     chats: chatState.chats,
     invites: chatState.invites,
     invitesReady: chatState.invitesReady,
+    teamInvites: chatState.teamInvites,
+    teamInvitesReady: chatState.teamInvitesReady,
     ready: chatState.ready,
     openCid: openChatId,
     panelOpen: showMessages,
     notify: deskNotify,
   });
+
+  // A click on a message notification opens Messages at that chat (or the invites).
+  useEffect(() => window.katuroDeskApi?.onNotificationClick?.((target) => {
+    setShowMessages(true);
+    setMessagesRequest({ ...(target || {}), at: Date.now() });
+  }), []);
+
+  // Unread chats + invites as a number on the taskbar button (and the tray tooltip).
+  const badgeCount = taskbarBadge && notifyMessages ? chatState.badgeCount : 0;
+  useEffect(() => {
+    window.katuroDeskApi?.setUnreadBadge?.(badgeCount, badgeDataUrl(badgeCount))?.catch?.(() => {});
+  }, [badgeCount]);
   const activeTasks = scheduledTasks.filter((t) => t.enabled).length;
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
@@ -194,6 +217,7 @@ export default function KaTuroDeskPage() {
               user={user}
               deskFiles={deskFiles}
               onOpenChatChange={setOpenChatId}
+              openRequest={messagesRequest}
             />
           </div>
         </div>

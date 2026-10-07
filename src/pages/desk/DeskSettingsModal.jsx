@@ -6,6 +6,7 @@ import { KaTuroAIAvatar } from './DeskAvatar';
 import TeacherProfileForm from '../../components/TeacherProfileForm';
 import { useDeskUpdate, updateStatusText } from './useDeskUpdate';
 import TeacherExamPanel from './TeacherExamPanel';
+import DeskNotificationSettings from './DeskNotificationSettings';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
@@ -42,7 +43,7 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         </div>
 
         <div className="px-5 pt-3 flex gap-1 border-b border-gray-200" role="tablist">
-          {[['assistant', 'Assistant'], ['profile', 'My profile'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : [])].map(([id, label]) => (
+          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : [])].map(([id, label]) => (
             <button
               key={id}
               role="tab"
@@ -57,6 +58,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
 
         {tab === 'exam' && profile?.isAdmin ? (
           <TeacherExamPanel />
+        ) : tab === 'notifications' ? (
+          <DeskNotificationSettings />
         ) : tab === 'profile' ? (
           <div className="p-5 overflow-y-auto">
             <p className="text-[11px] text-gray-500 mb-3">KaTuroDesk uses this for your documents' headers and signatories. Blank fields are left out. Same profile as Settings on katuro.website.</p>

@@ -174,7 +174,7 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
     await expect(getDocFromServer(doc(fb.db, 'conversations', cid))).rejects.toMatchObject({ code: 'permission-denied' });
   }, 90000);
 
-  it('teams: create, only contacts can be added, members leave, admin hands over, report reaches the admin', async () => {
+  it('teams: create, only contacts are invited and join by accepting, members leave, admin hands over, report reaches the admin', async () => {
     await signIn('ana');
     const ana = await svc.syncDirectory();
     const { cid, failed } = await svc.createTeam(ana, 'Grade 7 Science', [users.ben.uid, users.carl.uid]);
@@ -183,17 +183,35 @@ describe.skipIf(!ON)('Messages end to end (emulators)', () => {
 
     await signIn('ben');
     const ben = await svc.syncDirectory();
+    // Ben is invited, not added: he sees the invite and joins by accepting.
+    const invites = await new Promise((resolve, reject) => {
+      const off = svc.subscribeTeamInvites(ben.uid, (list) => { if (list.length) { off(); resolve(list); } }, reject);
+    });
+    expect(invites[0]).toMatchObject({ cid, teamName: 'Grade 7 Science', fromUsername: 'ana' });
+    await svc.acceptTeamInvite(ben, cid);
+    expect((await adminDb.doc(`chatTeamInvites/${ben.uid}/pending/${cid}`).get()).exists).toBe(false);
     const members = await new Promise((resolve, reject) => {
       const off = svc.subscribeMembers(cid, (list) => { if (list.length === 2) { off(); resolve(list); } }, reject);
     });
     expect(members.find((m) => m.uid === ana.uid).role).toBe('admin');
-    await expect(svc.addTeamMember(ben, cid, users.carl.uid)).rejects.toBeTruthy(); // members cannot add
+    await expect(svc.inviteToTeam(ben, cid, 'Grade 7 Science', users.carl.uid)).rejects.toBeTruthy(); // members cannot invite
     const msgs = await new Promise((resolve, reject) => {
       const off = svc.subscribeMessages(cid, 50, (list) => { if (list.length) { off(); resolve(list); } }, reject);
     });
     await svc.reportMessage(cid, msgs[0], ben, 'Testing the report');
     const reports = await adminDb.collection('chatReports').where('cid', '==', cid).get();
     expect(reports.size).toBe(1);
+
+    // "Delete chat" for Ben: his older messages are hidden for him only; new ones show.
+    await svc.deleteChatForMe(ben.uid, cid);
+    const sinceMs = (await adminDb.doc(`chatInbox/${ben.uid}/chats/${cid}`).get()).get('clearedAt').toMillis();
+    const firstLoad = (since) => new Promise((resolve, reject) => {
+      const off = svc.subscribeMessages(cid, 50, (list) => { off(); resolve(list); }, reject, since);
+    });
+    expect(await firstLoad(sinceMs)).toEqual([]);
+    expect((await firstLoad(0)).length).toBeGreaterThan(0); // the messages still exist for the others
+    await svc.sendMessage(cid, ben, 'Back again.');
+    expect((await firstLoad(sinceMs)).map((m) => m.text)).toEqual(['Back again.']);
 
     // Ana (only admin) leaves: Ben becomes admin first, so the team keeps an admin.
     await signIn('ana');

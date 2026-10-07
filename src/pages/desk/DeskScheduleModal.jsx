@@ -75,51 +75,14 @@ function StatusPill({ status }) {
   return <span className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${cls}`}>{label}</span>;
 }
 
-function BackgroundSettings() {
-  const [bg, setBg] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!isElectron) return;
-    window.katuroDeskApi.getBackground().then(setBg).catch(() => setBg(null));
-  }, []);
-
-  if (!isElectron || !bg) {
-    return (
-      <p className="text-[11px] text-gray-500">
-        Tasks run while this KaTuroDesk page is open. A task that was missed while it was closed runs once when you come back.
-      </p>
-    );
-  }
-
-  const save = async (next) => {
-    setError('');
-    try {
-      setBg(await window.katuroDeskApi.setBackground(next));
-    } catch (e) {
-      setError(e.message || 'Could not save this setting.');
-    }
-  };
-
+/** Where tasks run: the background options themselves are in Settings > Notifications. */
+function BackgroundNote() {
   return (
-    <div className="space-y-2">
-      <label className="flex items-start gap-2.5 cursor-pointer">
-        <input type="checkbox" checked={bg.keepRunning} onChange={(e) => save({ keepRunning: e.target.checked, openAtLogin: e.target.checked && bg.openAtLogin })} className="mt-0.5 w-4 h-4 accent-emerald-600" />
-        <span>
-          <span className="text-xs font-semibold text-gray-800">Keep running in the background when I close the window</span>
-          <span className="block text-[11px] text-gray-500">KaTuroDesk stays in the system tray (near the clock) so tasks run on time. Quit it from the tray icon.</span>
-        </span>
-      </label>
-      <label className={`flex items-start gap-2.5 ${bg.keepRunning ? 'cursor-pointer' : 'opacity-50'}`}>
-        <input type="checkbox" disabled={!bg.keepRunning} checked={bg.openAtLogin} onChange={(e) => save({ keepRunning: true, openAtLogin: e.target.checked })} className="mt-0.5 w-4 h-4 accent-emerald-600" />
-        <span>
-          <span className="text-xs font-semibold text-gray-800">Start KaTuroDesk in the background when Windows starts</span>
-          <span className="block text-[11px] text-gray-500">So tasks still run on days you do not open the app. Your classroom folder reopens automatically.</span>
-        </span>
-      </label>
-      <p className="text-[11px] text-gray-500">Tasks cannot run while the computer is off or asleep. A missed task runs once when KaTuroDesk is back.</p>
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
-    </div>
+    <p className="text-[11px] text-gray-500">
+      {isElectron
+        ? 'Tasks run while KaTuroDesk is open or running in the tray. Whether it keeps running after you close the window, and whether it starts with Windows, is set in Settings > Notifications. Tasks cannot run while the computer is off or asleep; a missed task runs once when KaTuroDesk is back.'
+        : 'Tasks run while this KaTuroDesk page is open. A task that was missed while it was closed runs once when you come back.'}
+    </p>
   );
 }
 
@@ -454,7 +417,7 @@ export default function DeskScheduleModal({ onClose, prefill = null, user, profi
 
               <section className="border-t border-gray-100 pt-4">
                 <h3 className="text-xs font-bold text-gray-800 mb-2">When tasks run</h3>
-                <BackgroundSettings />
+                <BackgroundNote />
               </section>
             </>
           )}

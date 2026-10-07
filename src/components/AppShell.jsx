@@ -381,6 +381,8 @@ export default function AppShell() {
     chats: chatState.chats,
     invites: chatState.invites,
     invitesReady: chatState.invitesReady,
+    teamInvites: chatState.teamInvites,
+    teamInvitesReady: chatState.teamInvitesReady,
     ready: chatState.ready,
     openCid: null,
     panelOpen: location.pathname.startsWith('/messages'),

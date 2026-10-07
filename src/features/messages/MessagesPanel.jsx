@@ -8,7 +8,8 @@ import { Loader2, Plus, Users, Search, Send, X, ArrowLeft, Flag, Trash2, AtSign,
 import {
   syncDirectory, claimUsername, isUsernameFree, usernameProblem, normalizeUsername,
   searchTeachers, searchKey, SEARCH_MIN_CHARS, sendInvite, respondInvite, listContacts,
-  openDirectChat, createTeam, addTeamMember, removeTeamMember, leaveTeam,
+  openDirectChat, createTeam, inviteToTeam, cancelTeamInvite, acceptTeamInvite, declineTeamInvite, subscribeTeamInvited,
+  removeTeamMember, leaveTeam, deleteChatForMe,
   renameTeam, subscribeMembers, subscribeMessages, sendMessage, markRead, deleteMyMessage, reportMessage,
   getDirectoryCard, MAX_MESSAGE_LENGTH, MAX_TEAM_MEMBERS,
   uploadChatFile, fetchChatFile, saveBlobAs, subscribeAssets, subscribeBlocks, blockTeacher, unblockTeacher,
@@ -123,6 +124,23 @@ function UsernameForm({ uid, current = '', onDone, onCancel }) {
 
 /** Pick teachers from my school / division (plus exact username lookup). */
 /** Pick from my contacts (teachers who accepted an invite, or whose invite I accepted). */
+/** A button that asks once more before doing something that cannot be undone. */
+function ConfirmAction({ icon, label, question, confirmLabel, busy, onConfirm }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return <button type="button" disabled={busy} onClick={() => setAsking(true)} style={{ ...btnGhost, justifyContent: 'center', color: C.red }}>{icon} {label}</button>;
+  }
+  return (
+    <div role="alertdialog" aria-label={label} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 10, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span>{question}</span>
+      <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button type="button" onClick={() => setAsking(false)} style={btnGhost}>Cancel</button>
+        <button type="button" disabled={busy} onClick={async () => { await onConfirm(); setAsking(false); }} style={{ ...btn, background: C.red, color: '#fff' }}>{busy && <Loader2 size={12} className="animate-spin" />} {confirmLabel}</button>
+      </span>
+    </div>
+  );
+}
+
 function ColleaguePicker({ me, multiple, exclude = [], onPick, selected = [], max = MAX_TEAM_MEMBERS - 1 }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
@@ -275,11 +293,36 @@ function PeopleSearch({ onMessage }) {
 }
 
 /** The bell: invites waiting for my answer, with Accept and Decline. */
-function InviteBell({ me, invites, onAccepted }) {
+function InviteBell({ me, invites, teamInvites = [], onAccepted, onJoinedTeam, openSignal = 0 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const count = invites.length;
+  const count = invites.length + teamInvites.length;
+
+  // A click on an invite notification opens the list.
+  const [seenSignal, setSeenSignal] = useState(openSignal);
+  if (openSignal !== seenSignal) {
+    setSeenSignal(openSignal);
+    if (openSignal) setOpen(true);
+  }
+
+  async function answerTeam(inv, join) {
+    setBusy(`team:${inv.cid}`);
+    setError('');
+    try {
+      if (join) {
+        await acceptTeamInvite(me, inv.cid);
+        setOpen(false);
+        onJoinedTeam?.(inv.cid);
+      } else {
+        await declineTeamInvite(me.uid, inv.cid);
+      }
+    } catch (e) {
+      setError(e?.code === 'permission-denied' ? 'This invite is no longer valid (it may have been cancelled).' : (e?.message || 'That did not work. Please try again.'));
+    } finally {
+      setBusy('');
+    }
+  }
   const boxRef = useRef(null);
 
   // Clicking anywhere else closes the list.
@@ -323,6 +366,21 @@ function InviteBell({ me, invites, onAccepted }) {
           <p style={{ margin: 0, padding: '10px 12px', fontSize: 12.5, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>Invites</p>
           {!count && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No invites right now.</p>}
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {teamInvites.map((inv) => (
+              <div key={`team:${inv.cid}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(45,106,79,0.12)', color: C.green }}><Users size={16} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.teamName || 'Team'}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted }}>Team invite from @{inv.fromUsername}</span>
+                </span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={() => answerTeam(inv, true)} disabled={busy === `team:${inv.cid}`} style={{ ...btnPrimary, padding: '4px 10px', fontSize: 11.5 }}>
+                    {busy === `team:${inv.cid}` ? <Loader2 size={11} className="animate-spin" /> : 'Join'}
+                  </button>
+                  <button type="button" onClick={() => answerTeam(inv, false)} disabled={busy === `team:${inv.cid}`} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11.5 }}>Decline</button>
+                </span>
+              </div>
+            ))}
             {invites.map((inv) => (
               <div key={inv.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: `1px solid ${C.border}` }}>
                 <AvatarImage photoURL={inv.fromPhotoURL} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -364,9 +422,11 @@ function ChatTitle({ chat, me }) {
   return <>{card?.displayName || chat.conv?.lastMessage?.senderName || 'Teacher'}</>;
 }
 
-function TeamInfo({ me, chat, members, onClose, onLeft }) {
+function TeamInfo({ me, chat, members, blocked = new Set(), onClose, onLeft }) {
   const iAmAdmin = members.some((m) => m.uid === me.uid && m.role === 'admin');
   const [cards, setCards] = useState({});
+  const [invited, setInvited] = useState([]);
+  useEffect(() => subscribeTeamInvited(chat.cid, setInvited, () => setInvited([])), [chat.cid]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState(chat.conv?.name || '');
   const [error, setError] = useState('');
@@ -375,9 +435,10 @@ function TeamInfo({ me, chat, members, onClose, onLeft }) {
 
   useEffect(() => {
     let alive = true;
-    Promise.all(members.map((m) => getDirectoryCard(m.uid).then((c) => [m.uid, c]))).then((pairs) => alive && setCards(Object.fromEntries(pairs)));
+    const uids = [...new Set([...members.map((m) => m.uid), ...invited.map((i) => i.uid)])];
+    Promise.all(uids.map((u) => getDirectoryCard(u).then((c) => [u, c]))).then((pairs) => alive && setCards(Object.fromEntries(pairs)));
     return () => { alive = false; };
-  }, [members]);
+  }, [members, invited]);
 
   const run = async (fn) => {
     setError('');
@@ -403,16 +464,44 @@ function TeamInfo({ me, chat, members, onClose, onLeft }) {
               {cards[m.uid]?.username && <span style={{ display: 'block', fontSize: 11, color: C.muted }}>@{cards[m.uid].username}</span>}
             </span>
             {m.role === 'admin' && <span style={{ fontSize: 10, fontWeight: 800, color: C.green, border: `1px solid ${C.green}`, borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>}
+            {m.uid !== me.uid && (
+              <button type="button" disabled={busy} title={blocked.has(m.uid) ? 'Unblock this teacher' : 'Block: they cannot message you one-to-one or invite you'}
+                onClick={() => run(() => (blocked.has(m.uid) ? unblockTeacher(me.uid, m.uid) : blockTeacher(me.uid, m.uid)))}
+                style={{ ...btn, padding: '4px 8px', background: 'transparent', color: blocked.has(m.uid) ? C.text : C.red }}>
+                <Ban size={12} /> {blocked.has(m.uid) ? 'Unblock' : 'Block'}
+              </button>
+            )}
             {iAmAdmin && m.uid !== me.uid && (
               <button type="button" disabled={busy} onClick={() => run(() => removeTeamMember(chat.cid, m.uid))} style={{ ...btn, padding: '4px 8px', background: 'transparent', color: C.red }}>Remove</button>
             )}
           </div>
         ))}
       </div>
+      {invited.length > 0 && (
+        <>
+          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: C.muted }}>Invited, waiting for an answer ({invited.length})</p>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 12 }}>
+            {invited.map((i) => (
+              <div key={i.uid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                  <strong>{cards[i.uid]?.displayName || 'Teacher'}</strong>
+                  {cards[i.uid]?.username && <span style={{ display: 'block', fontSize: 11, color: C.muted }}>@{cards[i.uid].username}</span>}
+                </span>
+                {iAmAdmin && (
+                  <button type="button" disabled={busy} onClick={() => run(() => cancelTeamInvite(chat.cid, i.uid))} style={{ ...btn, padding: '4px 8px', background: 'transparent', color: C.red }}>Cancel invite</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {iAmAdmin && (adding ? (
-        <ColleaguePicker me={me} exclude={members.map((m) => m.uid)} onPick={(c) => run(async () => { await addTeamMember(me, chat.cid, c.id); setAdding(false); })} />
+        <>
+          <p style={{ margin: '0 0 6px', fontSize: 11.5, color: C.muted }}>They join when they accept the invite.</p>
+          <ColleaguePicker me={me} exclude={[...members.map((m) => m.uid), ...invited.map((i) => i.uid)]} onPick={(c) => run(async () => { await inviteToTeam(me, chat.cid, chat.conv?.name || '', c.id); setAdding(false); })} />
+        </>
       ) : (
-        <button type="button" onClick={() => setAdding(true)} disabled={members.length >= MAX_TEAM_MEMBERS} style={{ ...btnGhost, marginBottom: 12 }}><Plus size={13} /> Add a teacher</button>
+        <button type="button" onClick={() => setAdding(true)} disabled={members.length + invited.length >= MAX_TEAM_MEMBERS} style={{ ...btnGhost, marginBottom: 12 }}><Plus size={13} /> Invite a teacher</button>
       ))}
       {error && <p style={{ margin: '8px 0', fontSize: 12, color: C.red }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
@@ -592,7 +681,7 @@ function FolderPicker({ deskFiles, onPick, onClose }) {
 }
 
 /** Messenger-style chat info: about, mute/block, and Media / Files / Links. */
-function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenImage, onTeamSettings }) {
+function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenImage, onTeamSettings, onLeft, onDeleted }) {
   const [tab, setTab] = useState('media');
   const [count, setCount] = useState(30);
   const [items, setItems] = useState([]);
@@ -603,7 +692,8 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
   const other = useCardName(otherUid);
   const iBlocked = otherUid ? blocked.has(otherUid) : false;
 
-  useEffect(() => subscribeAssets(chat.cid, tab, count, (list, more) => { setItems(list); setHasMore(more); }, () => setError('Could not load.')), [chat.cid, tab, count]);
+  const sinceMs = ms(chat.inbox?.clearedAt);
+  useEffect(() => subscribeAssets(chat.cid, tab, count, (list, more) => { setItems(list); setHasMore(more); }, () => setError('Could not load.'), sinceMs), [chat.cid, tab, count, sinceMs]);
 
   const run = async (fn) => {
     setBusy(true);
@@ -634,6 +724,16 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
           <button disabled={busy} onClick={() => run(() => (iBlocked ? unblockTeacher(me.uid, otherUid) : blockTeacher(me.uid, otherUid)))} style={{ ...btnGhost, justifyContent: 'center', color: iBlocked ? C.text : C.red }}>
             <Ban size={13} /> {iBlocked ? 'Unblock this teacher' : 'Block this teacher'}
           </button>
+        )}
+        <ConfirmAction icon={<Trash2 size={13} />} label="Delete chat" confirmLabel="Delete" busy={busy}
+          question={chat.type === 'dm'
+            ? `Delete this chat? Its messages are removed from your Messages only${other?.username ? `; @${other.username} keeps theirs` : ''}. If a new message arrives, the chat comes back with only the new messages.`
+            : 'Delete this chat? Its messages are removed from your Messages only. You stay in the team; to leave, use Leave team.'}
+          onConfirm={() => run(async () => { await deleteChatForMe(me.uid, chat.cid); onDeleted?.(); })} />
+        {chat.type === 'team' && (
+          <ConfirmAction icon={<ArrowLeft size={13} />} label="Leave team" confirmLabel="Leave" busy={busy}
+            question="Leave this team? You will stop getting its messages. An admin can invite you again."
+            onConfirm={() => run(async () => { await leaveTeam(me, chat.cid, members); onLeft?.(); })} />
         )}
       </div>
       <div style={{ display: 'flex', gap: 6, padding: '10px 12px' }}>
@@ -692,8 +792,10 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
   const otherUid = chat.type === 'dm' ? (chat.conv?.members || []).find((u) => u !== me.uid) : null;
   const iBlocked = otherUid ? blocked.has(otherUid) : false;
 
+  // After "Delete chat", only messages that came later are shown (to me only).
+  const sinceMs = ms(chat.inbox?.clearedAt);
   useEffect(() => subscribeMessages(cid, count, (list, more) => { setMessages(list); setHasMore(more); },
-    (err) => setError(err?.code === 'permission-denied' ? 'You are no longer a member of this chat.' : 'Could not load messages.')), [cid, count]);
+    (err) => setError(err?.code === 'permission-denied' ? 'You are no longer a member of this chat.' : 'Could not load messages.'), sinceMs), [cid, count, sinceMs]);
 
   useEffect(() => (chat.type === 'team' ? subscribeMembers(cid, setMembers, () => setMembers([])) : undefined), [cid, chat.type]);
 
@@ -862,10 +964,10 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
 
       {showInfo && (
         <ChatInfoPanel me={me} chat={chat} members={members} blocked={blocked} deskFiles={deskFiles}
-          onClose={() => setShowInfo(false)} onOpenImage={setLightbox} onTeamSettings={() => setTeamSettings(true)} />
+          onClose={() => setShowInfo(false)} onOpenImage={setLightbox} onTeamSettings={() => setTeamSettings(true)} onLeft={onLeft} onDeleted={onLeft} />
       )}
 
-      {teamSettings && chat.type === 'team' && <TeamInfo me={me} chat={chat} members={members} onClose={() => setTeamSettings(false)} onLeft={() => { setTeamSettings(false); onLeft(); }} />}
+      {teamSettings && chat.type === 'team' && <TeamInfo me={me} chat={chat} members={members} blocked={blocked} onClose={() => setTeamSettings(false)} onLeft={() => { setTeamSettings(false); onLeft(); }} />}
       {lightbox && <Lightbox cid={cid} attachment={lightbox} deskFiles={deskFiles} onClose={() => setLightbox(null)} />}
       {picking && deskFiles && <FolderPicker deskFiles={deskFiles} onPick={sendFromFolder} onClose={() => setPicking(false)} />}
       {reporting && (
@@ -891,7 +993,11 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
   );
 }
 
-export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null, height = '100%' }) {
+/**
+ * openRequest: { cid } opens that chat, { invites: true } opens the invites list
+ * (a click on a notification); `at` makes a repeat request count again.
+ */
+export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null, height = '100%', openRequest = null }) {
   const uid = user?.uid;
   const [me, setMe] = useState(undefined); // undefined = loading, null = no username yet
   const [loadError, setLoadError] = useState('');
@@ -903,7 +1009,14 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
   const [teamPick, setTeamPick] = useState([]);
   const [dialogError, setDialogError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { chats, invites, ready, error } = useChats(me ? uid : null);
+  const { chats, invites, teamInvites, ready, error } = useChats(me ? uid : null);
+  const [bellSignal, setBellSignal] = useState(0);
+  const [handledRequest, setHandledRequest] = useState(null);
+  if (openRequest !== handledRequest) {
+    setHandledRequest(openRequest);
+    if (openRequest?.cid) setOpenCid(openRequest.cid);
+    else if (openRequest?.invites) setBellSignal((n) => n + 1);
+  }
   const [blocked, setBlocked] = useState(() => new Set());
   useEffect(() => (me && uid ? subscribeBlocks(uid, setBlocked) : undefined), [me, uid]);
 
@@ -944,6 +1057,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
   }
 
   const visible = chats.filter((c) => {
+    if (c.hidden && c.cid !== openCid) return false; // deleted by me, nothing new since
     const f = filter.trim().toLowerCase();
     if (!f) return true;
     return `${c.conv?.name || ''} ${c.conv?.lastMessage?.senderName || ''} ${c.conv?.lastMessage?.text || ''}`.toLowerCase().includes(f);
@@ -972,7 +1086,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
       setTeamName('');
       setTeamPick([]);
       setOpenCid(cid);
-      if (failed.length) setDialogError(`${failed.length} teacher(s) could not be added (only your contacts can be added).`);
+      if (failed.length) setDialogError(`${failed.length} teacher(s) could not be invited (only your contacts can be invited).`);
     } catch (err) {
       setDialogError(err?.message || 'Could not create the team.');
     } finally {
@@ -1004,7 +1118,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, flexWrap: 'wrap' }}>
         <Info size={13} />
         <span style={{ flex: 1, minWidth: 200 }}>The kaTuro admin can view messages for safety and child protection. Keep messages professional.</span>
-        <InviteBell me={me} invites={invites} onAccepted={(fromUid) => startDm({ id: fromUid })} />
+        <InviteBell me={me} invites={invites} teamInvites={teamInvites} openSignal={bellSignal} onAccepted={(fromUid) => startDm({ id: fromUid })} onJoinedTeam={(cid) => setOpenCid(cid)} />
         <button onClick={() => setDialog('username')} style={{ ...btn, padding: '2px 6px', background: 'transparent', color: C.green }}>@{me.username}</button>
       </div>
 
@@ -1023,7 +1137,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {!ready && <p style={{ padding: 14, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading chats…</p>}
             {error && <p style={{ padding: 14, fontSize: 12, color: C.red }}>{error}</p>}
-            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: 12, color: C.muted }}>{chats.length ? 'No chats match.' : 'No chats yet. Use New chat to find a teacher by @username and invite them.'}</p>}
+            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: 12, color: C.muted }}>{chats.some((c) => !c.hidden) ? 'No chats match.' : 'No chats yet. Use New chat to find a teacher by @username and invite them.'}</p>}
             {visible.map((c) => (
               <button key={c.cid} onClick={() => setOpenCid(c.cid)}
                 style={{ display: 'flex', width: '100%', gap: 8, textAlign: 'left', padding: '10px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: c.cid === openCid ? 'rgba(45,106,79,0.12)' : 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
