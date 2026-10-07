@@ -22,6 +22,8 @@ export const SIGNATORY_ROLES = [
 export const PROFILE_FIELDS = [
   'userName', 'name', 'honorific',
   'school', 'schoolId', 'district', 'division', 'region', 'designation',
+  // My classes (this school year): who the teacher is to their learners.
+  'advisoryClass', 'teachingLoad',
   ...SIGNATORY_ROLES.flatMap((r) => [`${r.key}Name`, `${r.key}Position`]),
 ];
 
@@ -55,6 +57,8 @@ export function teacherInfo(profile, user) {
     division: clean(p.division),
     region: clean(p.region),
     designation: clean(p.designation) || clean(p.position),
+    advisoryClass: clean(p.advisoryClass),
+    teachingLoad: clean(p.teachingLoad),
     signatories,
   };
 }
@@ -87,6 +91,9 @@ export function teacherFactsForAI(profile, user) {
   if (t.district) lines.push(`District: ${t.district}`);
   if (t.division) lines.push(`Division: ${t.division}`);
   if (t.region) lines.push(`Region: ${t.region}`);
+  // Classes: lets "my class", "my grades" and "consolidate the grades" be understood exactly.
+  if (t.advisoryClass) lines.push(`Class adviser of: ${t.advisoryClass}`);
+  if (t.teachingLoad) lines.push(`Teaching load (subjects and sections): ${t.teachingLoad}`);
   for (const r of SIGNATORY_ROLES) {
     const s = t.signatories[r.key];
     if (s.name) lines.push(`${r.role}: ${s.name}${s.position ? `, ${s.position}` : ''}`);

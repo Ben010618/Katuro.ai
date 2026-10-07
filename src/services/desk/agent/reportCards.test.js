@@ -254,3 +254,35 @@ describe('end to end: "consolidate all the grades for the report cards"', () => 
     }
   });
 });
+
+describe('official form layouts (from the reference files)', () => {
+  it('SF1: the planner sees the real columns and Remarks codes when SF1 comes up', () => {
+    const k = formKnowledgeFor('update my SF1 masterlist');
+    expect(k).toMatch(/Legal \(8\.5" × 14"\), landscape/);
+    expect(k).toMatch(/Age as of 1st Friday of June/);
+    expect(k).toMatch(/T\/O = Transferred Out/);
+    expect(k).toMatch(/LE = Late Enrollment \(Reason \(enrollment beyond 1st Friday of June\)\)/);
+    expect(formKnowledgeFor('make a quiz')).toBe('');
+  });
+});
+
+describe('report cards use the teacher profile, not guesses', () => {
+  beforeEach(() => {
+    resetTaskActionSupport();
+    clearAnswerMemory();
+    callGeminiProxy.mockReset();
+  });
+
+  it('files without a grade: the profile "Advisory class" supplies it; without it, KaTuro asks', async () => {
+    const ws = createVirtualWorkspace('G5');
+    ws.handle.saveVirtualFile('Grade 5/Mathematics.xlsx', math());
+    ws.files = ws.handle.getFiles();
+    callGeminiProxy.mockImplementation(async () => ({ text: JSON.stringify({ reply: 'OK.', tasks: [{ id: 't1', tool: 'build_report_cards', args: { sourcePaths: ['Grade 5/Mathematics.xlsx'] } }] }) }));
+    const asked = await runDeskAgentTurn({ prompt: 'report cards', workspace: ws, attachedPaths: ['Grade 5/Mathematics.xlsx'], user: { uid: 'u1' }, profile: { fullName: 'Ana Reyes' } });
+    expect(asked.content).toMatch(/Needs your input.*Which grade level is this class\?/);
+    clearAnswerMemory();
+    const done = await runDeskAgentTurn({ prompt: 'report cards', workspace: ws, attachedPaths: ['Grade 5/Mathematics.xlsx'], user: { uid: 'u1' }, profile: { fullName: 'Ana Reyes', advisoryClass: 'Grade 5 – Rizal' } });
+    expect(done.content).toMatch(/Prepared report cards for \*\*3 learner\(s\)\*\*/);
+    expect(done.createdFiles.find((f) => f.format === 'xlsx').name).toMatch(/Grade5_Rizal/);
+  });
+});

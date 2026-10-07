@@ -46,8 +46,27 @@ export const SCHOOL_FORMS = [
     id: 'sf1', code: 'SF1', title: 'School Form 1 – School Register',
     alsoCalled: ['sf1', 'school register', 'masterlist', 'master list', 'class list', 'enrolment list', 'enrollment list'],
     preparedBy: 'Class adviser', teacherForm: true, source: 'do6',
-    what: 'The official list of enrolled learners of a section with their LRN and basic details.',
+    what: 'The official list of enrolled learners of a section with their LRN and basic details (replaces Form 1, Master List and STS Form 2 – Family Background and Profile).',
     dataFrom: 'Enrolment (LIS).', feeds: ['SF2', 'SF9 (names and LRN)'],
+    // From the official SF1 workbook the user provided (structure only, no learner data).
+    layout: {
+      paper: 'Legal (8.5" × 14"), landscape',
+      header: ['School ID', 'Region', 'Division', 'District', 'School Name', 'School Year', 'Grade Level', 'Section'],
+      columns: ['LRN', 'Name (Last Name, First Name, Middle Name)', 'Sex (M/F)', 'Birth Date (mm/dd/yyyy)', 'Age as of 1st Friday of June', 'Birth Place (Province)', 'Mother Tongue', 'IP (Ethnic Group)', 'Religion',
+        'Address: House #/Street/Sitio/Purok', 'Address: Barangay', 'Address: Municipality/City', 'Address: Province',
+        "Father's Name (Last, First, Middle)", "Mother's Maiden Name (Last, First, Middle)", 'Guardian: Name', 'Guardian: Relationship', 'Contact Number of Parent or Guardian', 'Remarks'],
+      remarksCodes: [
+        ['T/O', 'Transferred Out', 'Name of Public (P) / Private (PR) school and effectivity date'],
+        ['T/I', 'Transferred In', 'Name of Public (P) / Private (PR) school and effectivity date'],
+        ['DRP', 'Dropped', 'Reason and effectivity date'],
+        ['LE', 'Late Enrollment', 'Reason (enrollment beyond 1st Friday of June)'],
+        ['CCT', 'CCT Recipient', 'CCT control/reference number and effectivity date'],
+        ['B/A', 'Balik-Aral', 'Name of school last attended and year'],
+        ['LWD', 'Learner With Disability', 'Specify'],
+        ['ACL', 'Accelerated', 'Specify level and effectivity data'],
+      ],
+      footer: 'Registered learners (Male, Female, Total) at BoSY and EoSY; Prepared by: adviser; Certified Correct: school head; BoSY and EoSY dates.',
+    },
   },
   {
     id: 'sf2', code: 'SF2', title: 'School Form 2 – Learner Daily Attendance Report',
@@ -120,6 +139,10 @@ export function formKnowledgeFor(prompt, { role = '' } = {}) {
   const lines = ['School forms knowledge (DepEd; use it to understand what the teacher means):'];
   for (const f of cards) {
     lines.push(`- ${f.title}: ${f.what} Prepared by: ${f.preparedBy}. Data from: ${f.dataFrom || '—'}${f.feeds?.length ? ` Feeds: ${f.feeds.join(', ')}.` : ''}${f.tool ? ` KaTuroDesk tool: ${f.tool}.` : ''}${f.understand ? ` ${f.understand}` : ''}`);
+    if (f.layout) {
+      const l = f.layout;
+      lines.push(`  Official layout: ${l.paper}. Header: ${l.header.join(', ')}. Columns: ${l.columns.join('; ')}.${l.remarksCodes ? ` Remarks codes: ${l.remarksCodes.map(([c, n, req]) => `${c} = ${n} (${req})`).join('; ')}.` : ''}${l.footer ? ` Footer: ${l.footer}` : ''}`);
+    }
   }
   if (role) lines.push(`The teacher's role: ${role}.`);
   if (/\bsf ?(4|6|7)\b/i.test(prompt)) lines.push(`Note: ${NOT_TEACHER_FORMS.join(', ')} are not teacher forms under ${FORM_SOURCES.do6}.`);

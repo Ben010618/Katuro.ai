@@ -32,6 +32,7 @@ import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
 import { getPersona, timeOfDay } from '../personas.js';
 import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
 import { gradingRulesBrief } from '../knowledge/gradingRules.js';
+import { firstMissingDetails } from './requiredDetails.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
 
@@ -67,6 +68,8 @@ export function teacherFromProfile(profile = {}, user = {}) {
   return {
     salutation: getTeacherSalutationName(profile, user),
     fullName: t.name,
+    advisoryClass: t.advisoryClass,
+    teachingLoad: t.teachingLoad,
     honorific: t.honorific,
     school: t.school,
     schoolId: t.schoolId,
@@ -394,7 +397,16 @@ export async function runDeskAgentTurn({
       : `${aiOffline} Without the AI I can only run item analysis, class records, attendance checks, and PDF tools on files you select.`;
   }
 
-  // ── 1c. Think before acting: ask when unsure, confirm big jobs when only fairly sure ──
+  // ── 1c. Required details, checked by code (no AI tokens): ask instead of assuming ──
+  if (!confirmedPlan && tasks.length) {
+    const gap = firstMissingDetails(tasks, { prompt, teacher });
+    if (gap) {
+      const content = `**Needs your input** — ${gap.question}`; // the plan's "doing it now" reply is dropped: nothing runs yet
+      return { content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: gap.choices, asked: true };
+    }
+  }
+
+  // ── 1d. Think before acting: ask when unsure, confirm big jobs when only fairly sure ──
   if (check && tasks.length && (check.confidence === 'low' || check.missing.length)) {
     const ask = reply && /\?\s*$/.test(reply) ? reply : [reply, `**Needs your input** — ${check.missing.join('; ') || 'please tell me a bit more about what you need.'}`].filter(Boolean).join('\n\n');
     return { content: ask, steps: [], artifacts: [], createdFiles: [], aiOffline: null, choices: check.choices, asked: true };

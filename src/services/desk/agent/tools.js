@@ -466,8 +466,11 @@ export const TOOLS = {
         found.grade ||= res.meta.grade; found.section ||= res.meta.section;
         fileResults.push({ path: p, records: res.records });
       }
-      const gradeLevel = String(grade || found.grade || '').trim();
-      const sectionName = String(section || found.section || '').trim();
+      // The teacher's own "Advisory class" (profile) counts as stated: "Grade 5 – Rizal".
+      const advisory = String(ctx.teacher.advisoryClass || '');
+      const [advGrade, advSection] = advisory.split(/\s+[–-]\s+/);
+      const gradeLevel = String(grade || found.grade || (gradeNumber(advGrade) !== null ? advGrade : '') || '').trim();
+      const sectionName = String(section || found.section || (advGrade && advSection ? advSection : '') || '').trim();
       const sy = String(schoolYear || ctx.schoolYear || '').trim();
       if (gradeNumber(gradeLevel) === null) {
         throw needsInfo('Which grade level is this class? The grading rules depend on it (for example, Grade 1 is descriptive in SY 2026–2027).');
