@@ -1180,6 +1180,79 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  pdf_page_tools: {
+    label: 'PDF page tools',
+    description: "Change the pages of a PDF in one go: remove pages, put pages in a new order, turn pages (90/180/270), add page numbers, a watermark such as \"DRAFT\" or \"SAMPLE\", or a logo image from the folder on every page. Pages are given as \"1,3-5\", \"all\", \"odd\", \"even\" or \"last\" (original page numbers). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",
+    args: '{ "path": string, "remove"?: string, "order"?: string, "rotate"?: { "pages": string, "degrees": 90 | 180 | 270 }, "pageNumbers"?: { "position"?: "bottom-center" | "bottom-right" | "top-right", "format"?: "Page {n} of {total}" | "{n}", "start"?: number }, "watermark"?: string, "logoPath"?: string, "logoPosition"?: "top-left" | "top-right" | "top-center", "logoWidthInches"?: number }',
+    async run({ path, remove, order, rotate, pageNumbers, watermark, logoPath, logoPosition, logoWidthInches }, ctx, report) {
+      if (!path || !/\.pdf$/i.test(path)) throw needsInfo('Which PDF should I work on?');
+      const { parsePages, applyPageTools } = await import('../generators/pdfPages.js');
+      const { getPdfPageCount } = await import('../generators/pdfTools.js');
+      const fileName = String(path).split('/').pop();
+      const bytes = await ctx.readBytes(path);
+      const total = await getPdfPageCount(bytes);
+      const pagesOf = (spec, what) => {
+        const r = parsePages(spec, total);
+        if (r.error) throw needsInfo(`For ${what}: ${r.error}. Which pages do you mean? (${fileName} has ${total} page${total > 1 ? 's' : ''}.)`);
+        return r.pages;
+      };
+      const ops = {};
+      if (remove) ops.remove = pagesOf(remove, 'removing pages');
+      if (order) {
+        const list = String(order).split(/[,\s]+/).filter(Boolean).flatMap((part) => pagesOf(part, 'the new order'));
+        if (new Set(list).size !== list.length) throw needsInfo('A page appears twice in the new order. Which order should the pages be in?');
+        ops.order = list;
+      }
+      if (rotate) {
+        const deg = Number(rotate.degrees);
+        if (![90, 180, 270, -90].includes(deg)) throw needsInfo('How far should I turn the pages: 90° (a quarter turn to the right), 180° (upside down) or 270° (a quarter turn to the left)?');
+        ops.rotate = { pages: pagesOf(rotate.pages || 'all', 'turning pages'), degrees: deg === -90 ? 270 : deg };
+      }
+      if (pageNumbers) ops.numbers = typeof pageNumbers === 'object' ? pageNumbers : {};
+      if (watermark) ops.watermark = { text: String(watermark).trim() };
+      if (logoPath) {
+        if (!/\.(png|jpe?g|heic|heif)$/i.test(logoPath)) throw needsInfo('The logo must be a picture (PNG or JPG). Which picture is the school logo?');
+        let logo = await ctx.readBytes(logoPath);
+        if (/\.(heic|heif)$/i.test(logoPath)) {
+          logo = await ctx.heicToJpeg(logo);
+          if (!logo) throw new Error('This logo is an iPhone photo (HEIC). Converting it needs the KaTuroDesk desktop app.');
+        }
+        ops.logo = { bytes: logo, position: logoPosition || 'top-left', widthIn: logoWidthInches };
+      }
+      if (!Object.keys(ops).length) throw needsInfo('What should I do to the pages: remove, reorder, turn, add page numbers, a watermark (e.g. DRAFT), or a logo?');
+      report('Working on the pages…');
+      const res = await applyPageTools(bytes, ops);
+      // Does the logo cover any of the page's own text? (checked on the pages as seen)
+      const covered = [];
+      if (res.logoBoxes.length) {
+        const { loadPdfjs } = await import('../readers/index.js');
+        const pdfjs = await loadPdfjs();
+        const doc = await pdfjs.getDocument({ data: res.bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
+        try {
+          for (let p = 1; p <= doc.numPages; p += 1) {
+            const page = await doc.getPage(p);
+            const vp = page.getViewport({ scale: 1 });
+            const box = res.logoBoxes[p - 1];
+            const hit = (await page.getTextContent()).items.some((it) => {
+              if (!String(it.str || '').trim() || it.str === ops.watermark?.text || /^Page \d+ of \d+$|^\d+$/.test(it.str)) return false;
+              const [X1, Y1] = vp.convertToViewportPoint(it.transform[4], it.transform[5]);
+              const [X2, Y2] = vp.convertToViewportPoint(it.transform[4] + it.width, it.transform[5] + Math.abs(it.transform[3] || 10));
+              return Math.min(X1, X2) < box.right && Math.max(X1, X2) > box.left && Math.min(Y1, Y2) < box.bottom && Math.max(Y1, Y2) > box.top;
+            });
+            if (hit) covered.push(p);
+          }
+        } finally {
+          doc.destroy?.();
+        }
+      }
+      const file = await ctx.saveWorkingCopy(path, res.bytes, 'pdf');
+      return {
+        summary: `Made ${file.name} (${res.pages} page${res.pages > 1 ? 's' : ''}): ${res.done.join('; ')}.${covered.length ? ` Warning: the logo covers some text on page${covered.length > 1 ? 's' : ''} ${covered.join(', ')}; ask me to put it at the top right or top center, or make it smaller.` : ''} The original ${fileName} was backed up and not changed.`,
+        artifacts: [{ type: 'files', title: 'PDF pages', subtitle: res.done.join('; '), files: [file] }],
+      };
+    },
+  },
+
   scan_to_editable: {
     label: 'Scan to Word/Excel',
     description: "Turn a whole PDF (scanned or digital) or a photo of a document into an editable Word file (headings, paragraphs and tables, page by page) or Excel file (every table on its own sheet). PDFs that have text are converted by code with the exact words; scans and photos are read by AI vision, which copies the words as written and marks unreadable parts [unclear]. For just ONE table into Excel, extract_table also works. The original is not changed.",
