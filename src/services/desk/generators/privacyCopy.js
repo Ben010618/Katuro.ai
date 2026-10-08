@@ -54,7 +54,8 @@ function learnersUnder(rows, h) {
   const name = last >= 0 && first >= 0 ? -1 : heads.findIndex((v) => NAME_HEADER.test(v) && !LRN_HEADER.test(v));
   const lrnCol = col(LRN_HEADER);
   for (const row of rows.slice(h + 1)) {
-    const cells = (row || []).map(text);
+    // Every column up to the widest heading (short rows like "MALE" have holes).
+    const cells = Array.from({ length: Math.max((row || []).length, heads.length) }, (_, i) => text((row || [])[i]));
     let full;
     let parts = null;
     if (name >= 0) {

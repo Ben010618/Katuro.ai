@@ -14,7 +14,7 @@ unless the feature needs reading a photo/scan.
 - [x] 5. Word: fill your own Word form without {{blanks}} (empty lines and table cells)
 
 ## Excel
-- [ ] 6. Computed columns written as formulas (Remarks Passed/Failed, rank, count passed/failed)
+- [x] 6. Computed columns written as formulas (Remarks Passed/Failed, rank, count passed/failed)
 
 ## Word
 - [ ] 7. DepEd formatting fix (long bond paper, margins, fonts, signatory block) in one step

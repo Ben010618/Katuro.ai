@@ -968,6 +968,46 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  add_formula_columns: {
+    label: 'Add formula columns',
+    description: "Add computed columns to the teacher's OWN Excel grade sheet as real formulas that update when grades change: Remarks (Passed when the grade is 75 or above, DO 15), Descriptor (Advancing/Benchmarking/Connecting/Developing/Emerging), Rank (highest = 1, ties share a rank), and counts of learners passed/failed under the table. Uses the Final Grade / General Average / Quarterly Grade column unless the teacher names one (gradeColumn: heading or column letter). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",
+    args: '{ "path": string, "columns": ["remarks" | "descriptor" | "rank" | "counts"], "gradeColumn"?: string, "sheet"?: string, "replace"?: boolean }',
+    async run({ path, columns = ['remarks'], gradeColumn, sheet, replace = false }, ctx, report) {
+      if (!path || !/\.xlsx$|\.xlsm$/i.test(path)) throw needsInfo(path && /\.(xls|csv)$/i.test(path) ? 'Formulas can only be added to an .xlsx file. Open it in Excel and Save As .xlsx first, then ask me again.' : 'Which Excel grade sheet (.xlsx) should I add the columns to?');
+      const kinds = [...new Set((Array.isArray(columns) ? columns : [columns]).map((c) => String(c).toLowerCase()).map((c) => (/remark/.test(c) ? 'remarks' : /descr/.test(c) ? 'descriptor' : /rank/.test(c) ? 'rank' : /count|pass|fail|number/.test(c) ? 'counts' : null)).filter(Boolean))];
+      if (!kinds.length) throw needsInfo('Which columns should I add: Remarks (Passed/Failed), Descriptor, Rank, or the number of learners passed/failed?');
+      const { locateGradeTable, addFormulaColumns, PASSING } = await import('../generators/formulaColumns.js');
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await ctx.readBytes(path));
+      const loc = locateGradeTable(wb, { sheet, gradeColumn });
+      if (loc.ask) throw needsInfo(loc.ask);
+      report(`Adding ${kinds.join(', ')} to ${loc.ws.name}…`);
+      const res = addFormulaColumns(wb, loc, kinds, { replace });
+      if (res.ask) throw needsInfo(res.ask);
+      const out = new Uint8Array(await wb.xlsx.writeBuffer());
+      const file = await ctx.saveWorkingCopy(path, out, 'xlsx');
+      const fileName = String(path).split('/').pop();
+      const n = loc.learnerRows.length;
+      const parts = res.added.map((a) => `${a.header} in column ${a.column}${a.reused ? ' (your existing column)' : ''}`);
+      if (res.counts) parts.push(`number passed and failed under the table (row ${res.counts.row}): ${res.counts.passed} passed, ${res.counts.failed} failed`);
+      const rows = loc.learnerRows.map((r, i) => {
+        const nameCell = loc.ws.getRow(r).getCell(loc.nameCol);
+        const row = [String(nameCell.text || '').trim(), res.grades[i] ?? ''];
+        for (const a of res.added) row.push(loc.ws.getRow(r).getCell(a.column).value?.result ?? '');
+        return row;
+      });
+      const spec = normalizeSheetSpec({
+        title: `Formula columns — ${fileName}`,
+        sheets: [{ name: loc.ws.name.slice(0, 31), columns: [{ header: 'Learner' }, { header: loc.gradeHeader }, ...res.added.map((a) => ({ header: a.header }))], rows }],
+      });
+      return {
+        summary: `Added to ${file.name} (sheet "${loc.ws.name}", ${n} learner(s), using ${loc.gradeHeader} in column ${loc.ws.getRow(loc.headerRow).getCell(loc.gradeCol).address.replace(/\d+$/, '')}): ${parts.join('; ')}. These are formulas, so they update when you change a grade. Passing mark ${PASSING} (DO 15 s. 2026).${res.blanks ? ` ${res.blanks} learner(s) have no grade yet; their cells stay empty until you type one.` : ''}${res.checks ? ` ${res.checks} grade(s) are not numbers (like INC); they show "Check".` : ''} The original ${fileName} was backed up and not changed. Done by code; nothing was sent to the AI.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${n} learner(s)`, spec, files: [file], editable: false }],
+      };
+    },
+  },
+
   fill_word_form: {
     label: 'Fill Word form',
     description: "Fill the teacher's OWN Word form that has ordinary blanks, no {{placeholders}}: lines like \"Name: ______\", \"Date: ......\", a label alone on its line (\"Section:\"), signature lines with a caption under them, and empty table cells next to a label. Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or the source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves an edited copy; the original is backed up and not changed.",
