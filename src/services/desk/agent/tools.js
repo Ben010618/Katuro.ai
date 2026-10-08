@@ -254,6 +254,54 @@ function numberOr(v, fallback) {
 // ───────────────────────────── Tools ─────────────────────────────
 
 export const TOOLS = {
+  search_files: {
+    label: 'Search my files',
+    description: "Find which files in the classroom folder contain something (\"which file has this learner's Term 1 grades?\", \"where is the SF2 for October?\", \"files that mention the Science fair\"). Searches inside every readable file (Excel rows with their column headings, Word paragraphs and tables, PDF pages, slides, file names) by code and lists the best files with where and what was found. Learner names match in any order; Term 1 also matches Quarter 1 / Q1. Nothing is sent to the AI; no file is changed.",
+    args: '{ "terms": [string], "query"?: string, "folder"?: string }',
+    async run({ terms = [], query = '', folder }, ctx, report) {
+      const S = await import('./fileSearch.js');
+      const list = (Array.isArray(terms) && terms.length ? terms : S.termsFromQuery(query)).map((t) => String(t).trim()).filter(Boolean).slice(0, 8);
+      if (!list.length) throw needsInfo('What should I look for in your files (a name, a word, or something like "Term 1 grades")?');
+      const patterns = list.map(S.termPattern);
+      const dir = folder ? String(folder).replace(/^\/+|\/+$/g, '').toLowerCase() : '';
+      const readable = /\.(xlsx|xlsm|xls|csv|tsv|docx|pdf|pptx|txt|md)$/i;
+      const all = ctx.allFiles().filter((f) => (!dir || f.path.toLowerCase().startsWith(`${dir}/`)));
+      const files = all.filter((f) => readable.test(f.path) && (f.size || 0) <= 25 * 1024 * 1024).slice(0, 400);
+      if (!files.length) throw needsInfo(folder ? `I found no files I can search in "${folder}".` : 'There are no files I can search in this folder yet.');
+      const results = [];
+      let scans = 0;
+      let unreadable = 0;
+      for (const [i, f] of files.entries()) {
+        if (i % 10 === 0) report(`Searching ${i + 1} of ${files.length} files…`);
+        let parsed;
+        try { parsed = await ctx.readParsed(f.path); } catch { unreadable += 1; continue; }
+        // A scan has no text to search, but its file name still counts.
+        if (parsed?.needsVision) scans += 1;
+        const hit = S.searchFile(parsed?.needsVision ? {} : parsed || {}, f.path, patterns);
+        if (hit) results.push({ path: f.path, ...hit });
+      }
+      const photoFiles = all.filter((f) => /\.(jpe?g|png|heic|heif)$/i.test(f.path));
+      const photos = photoFiles.length;
+      for (const f of photoFiles) { const hit = S.searchFile({}, f.path, patterns); if (hit) results.push({ path: f.path, ...hit }); }
+      results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+      const full = results.filter((r) => r.matched.size === list.length);
+      const notSearched = [scans && `${scans} scanned PDF(s)`, photos && `${photos} photo(s)`].filter(Boolean).join(' and ');
+      const tail = `${notSearched ? ` ${notSearched} could not be searched (their text is a picture).` : ''}${unreadable ? ` ${unreadable} file(s) could not be opened.` : ''} Searched ${files.length} file(s) by code; nothing was sent to the AI.`;
+      if (!results.length) return { summary: `I found no file with ${list.map((t) => `"${t}"`).join(', ')}.${tail}` };
+      const show = (full.length ? full : results).slice(0, 8);
+      const lines = show.map((r) => `${r.path} — ${r.hits.slice(0, 2).map((h) => `${h.where}: ${h.snippet}`).join(' / ')}`);
+      const spec = normalizeSheetSpec({
+        title: `Search — ${list.join(', ')}`,
+        sheets: [{ name: 'Found', columns: [{ header: 'File' }, { header: 'Terms found' }, { header: 'Where' }, { header: 'What' }],
+          rows: results.slice(0, 50).flatMap((r) => r.hits.slice(0, 3).map((h, k) => [k ? '' : r.path, k ? '' : `${r.matched.size} of ${list.length}`, h.where, h.snippet])) }],
+      });
+      return {
+        summary: `${full.length ? `${full.length} file(s) have all of ${list.map((t) => `"${t}"`).join(', ')}` : `No file has all of ${list.map((t) => `"${t}"`).join(', ')}; the closest ${Math.min(results.length, 8)}`}:\n${lines.map((l) => `- ${l}`).join('\n')}${results.length > show.length ? `\n(${results.length - show.length} more file(s) have some of the terms.)` : ''}\n${tail.trim()}`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${results.length} file(s)`, spec, files: [], editable: false }],
+      };
+    },
+  },
+
   read_files: {
     label: 'Read files',
     description: 'Read and understand files (docx, xlsx, csv, pptx, pdf, images, txt). Use before answering questions about file contents when no other tool fits.',

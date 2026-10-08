@@ -276,6 +276,8 @@ export async function runDeskAgentTurn({
     readBytes,
     /** True when the classroom folder has this file. */
     hasFile: (path) => Boolean(findEntryByPath(tree, path)),
+    /** Every file of the classroom folder (backups left out): [{ path, size, lastModified }]. */
+    allFiles: () => flattenFileTree(tree).filter((f) => !f.path.startsWith('KaTuro Backups/')).map((f) => ({ path: f.path, size: f.size, lastModified: f.lastModified })),
     /** Paths of the files directly inside a folder of the classroom folder (case-insensitive). */
     listFiles(folder) {
       const dir = String(folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
