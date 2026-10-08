@@ -187,6 +187,7 @@ function toBuffer(content) {
 }
 
 const appIconPath = () => path.join(__dirname, '../dist/favicon.png');
+const APP_ID = app.isPackaged ? 'ai.katuro.desk' : 'ai.katuro.desk.dev';
 
 function showMainWindow() {
   if (!mainWindow) {
@@ -273,6 +274,14 @@ function createWindow() {
 
   // Remove default menu bar for clean app feel
   mainWindow.setMenuBarVisibility(false);
+
+  // The taskbar button always shows the KaTuroDesk logo from the installed program
+  // (not an icon Windows may have cached for this app ID).
+  if (process.platform === 'win32' && app.isPackaged) {
+    try {
+      mainWindow.setAppDetails({ appId: APP_ID, appIconPath: process.execPath, appIconIndex: 0, relaunchDisplayName: 'KaTuroDesk' });
+    } catch (e) {}
+  }
 
   // Keep "KaTuroDesk" as the window/taskbar name instead of the web page title.
   mainWindow.on('page-title-updated', (event) => event.preventDefault());
@@ -540,8 +549,10 @@ app.on('before-quit', () => {
 
 app.whenReady().then(() => {
   if (!hasInstanceLock) return;
-  // Windows shows notifications under the app's ID (must match build.appId).
-  if (process.platform === 'win32') app.setAppUserModelId('ai.katuro.desk');
+  // Windows shows notifications and the taskbar button under the app's ID (must match
+  // build.appId). A development run (plain electron.exe) uses its own ID, so Windows
+  // never files the developer copy's default Electron icon under the real app.
+  if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
   backgroundSettings = readBackgroundSettings();
   createWindow();
   if (backgroundSettings.keepRunning) ensureTray();
