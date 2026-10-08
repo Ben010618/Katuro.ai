@@ -1225,6 +1225,143 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  hide_learner_details: {
+    label: 'Hide learner details',
+    description: "Make a copy of a file with the learners' details hidden before sharing it (Data Privacy Act): names become Learner 1, Learner 2, … (or initials, or blank) and LRNs are removed; birthdates, addresses, parents and contact numbers too when asked. Works on Excel, CSV, Word, PowerPoint and PDF (PDF pages become pictures so the hidden text cannot be copied back). Names come from the file's own names column, or from a class list (listPath). The original file is not changed. Done by code; nothing is sent to the AI.",
+    args: '{ "path": string, "listPath"?: string, "hide"?: ["names" | "lrn" | "birthdate" | "address" | "parents" | "contact"], "mode"?: "numbers" | "initials" | "blank", "keepKey"?: boolean }',
+    async run({ path, listPath, hide = ['names', 'lrn'], mode = 'numbers', keepKey = false }, ctx, report) {
+      const P = await import('../generators/privacyCopy.js');
+      const fileName = (p) => String(p).split('/').pop();
+      const ext = String(path || '').split('.').pop().toLowerCase();
+      if (!path || !['xlsx', 'xlsm', 'xls', 'csv', 'docx', 'pptx', 'pdf'].includes(ext)) {
+        throw needsInfo(path ? `I can hide learner details in Excel, CSV, Word, PowerPoint and PDF files, not .${ext} files.` : 'Which file should I make a privacy copy of?');
+      }
+      const want = new Set((Array.isArray(hide) && hide.length ? hide : ['names', 'lrn']).map((h) => String(h).toLowerCase()));
+      const hideNames = want.has('names') || want.has('name');
+      const hideLrn = want.has('lrn') || want.has('lrns');
+      const extra = Object.fromEntries(Object.keys(P.EXTRA_COLUMNS).map((k) => [k, want.has(k)]));
+      const base = fileName(path).replace(/\.[^.]+$/, '');
+
+      // Who the learners are: the class list (if given) and the file's own names column / tables.
+      const lists = [];
+      if (listPath) {
+        const parsed = await ctx.readParsed(listPath);
+        for (const sheet of parsed.sheets || []) lists.push(P.learnersFromRows(sheet.rows || []).learners);
+        if (!lists.flat().length) throw needsInfo(`I could not find the learners in ${fileName(listPath)}. It needs a heading row with a names column (e.g. "Name" or "Learner's Name").`);
+      }
+      const bytes = await ctx.readBytes(path);
+      let wb = null;
+      let rowsFile = null;
+      if (ext === 'xlsx' || ext === 'xlsm') {
+        const ExcelJS = (await import('exceljs')).default;
+        wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(bytes);
+        for (const s of P.workbookRows(wb)) lists.push(P.learnersFromRows(s.rows).learners);
+      } else if (ext === 'csv' || ext === 'xls') {
+        rowsFile = (await ctx.readParsed(path)).sheets || [];
+        for (const s of rowsFile) lists.push(P.learnersFromRows(s.rows || []).learners);
+      } else if (ext === 'docx') {
+        for (const t of await P.docxTables(bytes)) lists.push(P.learnersFromRows(t).learners);
+      }
+      const learners = P.mergeLearners(...lists);
+      if (hideNames && !learners.length) {
+        throw needsInfo(`I could not find the learners' names in ${fileName(path)}${ext === 'pdf' || ext === 'pptx' ? ' (I can only find names in a PDF or PowerPoint from a class list)' : ''}. Which class list has their names (Excel or CSV with a Name column)? Or tell me to hide only the LRNs.`);
+      }
+      if (!hideNames && !hideLrn && !Object.values(extra).some(Boolean)) throw needsInfo('What should I hide: names, LRNs, birthdates, addresses, parents, or contact numbers?');
+      const matcher = P.buildMatcher(learners, { mode, hideNames, hideLrn });
+      ctx.masker.addNames(learners.map((l) => l.name));
+
+      report('Hiding learner details…');
+      let out;
+      let count = 0;
+      let extraColumns = [];
+      let left = 0;
+      let outExt = ext;
+      let note = '';
+      if (wb) {
+        const res = P.maskWorkbook(wb, matcher, { extra });
+        count = res.count;
+        extraColumns = res.extraColumns;
+        out = new Uint8Array(await wb.xlsx.writeBuffer());
+        const ExcelJS = (await import('exceljs')).default;
+        const check = new ExcelJS.Workbook();
+        await check.xlsx.load(out);
+        left = matcher.find(P.workbookText(check));
+      } else if (rowsFile) {
+        const extraRes = Object.entries(P.EXTRA_COLUMNS).filter(([k]) => extra[k]).map(([, re]) => re);
+        const sheets = rowsFile.map((s) => {
+          const rows = (s.rows || []).map((r) => [...(r || [])]);
+          const found = P.learnersFromRows(rows);
+          const blankCols = found.header >= 0 ? (rows[found.header] || []).map((hd, i) => (extraRes.some((re) => re.test(String(hd ?? ''))) ? i : -1)).filter((i) => i >= 0) : [];
+          if (found.header >= 0) blankCols.forEach((i) => extraColumns.push(String(rows[found.header][i]).trim()));
+          return { name: s.name, rows: rows.map((r, ri) => r.map((v, ci) => {
+            if (found.header >= 0 && ri > found.header && blankCols.includes(ci) && String(v ?? '').trim()) { count += 1; return ''; }
+            if (typeof v === 'number' && hideLrn && Number.isInteger(v) && String(v).length === 12) { count += 1; return mode === 'blank' ? '' : '[LRN hidden]'; }
+            const r2 = matcher.replace(v ?? '');
+            count += r2.count;
+            return r2.count ? r2.text : v;
+          })) };
+        });
+        if (ext === 'csv') {
+          const cell = (v) => { const t = String(v ?? ''); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+          const csv = (sheets[0]?.rows || []).map((r) => r.map(cell).join(',')).join('\r\n');
+          out = new TextEncoder().encode(String.fromCharCode(0xfeff) + csv);
+          left = matcher.find(csv);
+        } else {
+          const ExcelJS = (await import('exceljs')).default;
+          const book = new ExcelJS.Workbook();
+          for (const s of sheets) book.addWorksheet(String(matcher.replace(s.name || 'Sheet').text || 'Sheet').replace(/[\\/?*[\]:]/g, '').slice(0, 31) || 'Sheet').addRows(s.rows);
+          out = new Uint8Array(await book.xlsx.writeBuffer());
+          outExt = 'xlsx';
+          note = ' The .xls file was saved as .xlsx; cell formatting was not kept.';
+          left = matcher.find(sheets.map((s) => s.rows.flat().join('\n')).join('\n'));
+        }
+        extraColumns = [...new Set(extraColumns)];
+      } else if (ext === 'docx' || ext === 'pptx') {
+        const res = await P.maskOfficeXml(bytes, matcher, ext, { extra });
+        count = res.count;
+        extraColumns = res.extraColumns;
+        out = res.bytes;
+        left = matcher.find(await P.officeText(out, ext));
+      } else {
+        const { loadPdfjs } = await import('../readers/index.js');
+        const pdfjs = await loadPdfjs();
+        const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
+        try {
+          const plan = await P.pdfRedactionBoxes(doc, matcher);
+          count = plan.reduce((n, pg) => n + pg.boxes.length, 0);
+          if (count) {
+            report(`Covering ${count} place(s) on ${plan.length} page(s)…`);
+            out = await P.redactPdf(doc, plan);
+            if (!out) throw new Error('Hiding details in a PDF needs the KaTuroDesk desktop app.');
+            note = ' The pages are now pictures, so the hidden text cannot be copied back out.';
+          }
+        } finally {
+          doc.destroy?.();
+        }
+      }
+      if (!count) {
+        return { summary: `I found no ${[hideNames && 'learner names', hideLrn && 'LRNs', ...Object.keys(extra).filter((k) => extra[k])].filter(Boolean).join(' or ')} to hide in ${fileName(path)}${ext === 'pdf' ? ' (if it is a scanned PDF, its text is a picture I cannot read here)' : ''}. I did not save a copy.` };
+      }
+      const files = [await ctx.saveOutput(`${base} (privacy copy).${outExt}`, out, outExt)];
+      if (keepKey && hideNames && mode !== 'blank') {
+        const spec = normalizeSheetSpec({
+          title: `Privacy key — ${base}`,
+          sheets: [{ name: 'Key', columns: [{ header: 'Shown as' }, { header: 'Learner' }, { header: 'LRN' }], rows: learners.map((l, i) => [matcher.labels[i], l.name, l.lrn || '']) }],
+        });
+        const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+        files.push(await ctx.saveOutput(`${base} privacy key (keep private).xlsx`, await buildSheetWorkbook(spec), 'xlsx'));
+      }
+      const shownAs = !hideNames ? '' : mode === 'blank' ? 'names removed' : mode === 'initials' ? 'names shown as initials' : `names shown as Learner 1 to Learner ${learners.length}`;
+      const parts = [shownAs, hideLrn && 'LRNs removed', extraColumns.length && `cleared: ${extraColumns.join(', ')}`].filter(Boolean).join('; ');
+      const checked = ext === 'pdf' ? 'Please look over the copy before sharing.' : left ? `Warning: ${left} place(s) still look like a learner's name or LRN; please check the copy before sharing.` : 'I checked the copy: no learner names or LRNs are left in its text.';
+      return {
+        summary: `Made ${files[0].name}: ${count} place(s) hidden (${parts}).${note} ${checked} Pictures inside the file (photos, signatures) are not changed. ${keepKey && files[1] ? `The key (who is who) is in ${files[1].name}; keep it private and do not send it with the copy. ` : ''}Your original file was not changed. Done by code; nothing was sent to the AI.`,
+        artifacts: [{ type: 'files', title: 'Privacy copy', subtitle: `${count} place(s) hidden`, files }],
+      };
+    },
+  },
+
   compress_pdf: {
     label: 'Make PDF smaller',
     description: 'Make a smaller copy of a PDF (for email, Messenger or upload limits): the photos and scans inside it are scaled down; text and layout stay. The original PDF is not changed.',

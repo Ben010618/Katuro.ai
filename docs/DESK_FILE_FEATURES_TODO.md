@@ -10,7 +10,7 @@ unless the feature needs reading a photo/scan.
 - [x] 1. Excel: grade-sheet error checker (missing grades, out-of-range, duplicate LRNs, misspelled names across files, totals that don't add up)
 - [x] 2. Word: one copy per learner (certificates, parent letters, comments, awards) from one template + a class list
 - [x] 3. Photos: many photos (JPEG/PNG/HEIC) into one clean PDF in order + PDF compression
-- [ ] 4. All files: hide learner details (names, LRNs) in a copy before sharing (Data Privacy Act)
+- [x] 4. All files: hide learner details (names, LRNs) in a copy before sharing (Data Privacy Act)
 - [ ] 5. Word: fill your own Word form without {{blanks}} (empty lines and table cells)
 
 ## Excel
