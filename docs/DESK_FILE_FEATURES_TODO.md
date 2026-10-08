@@ -31,7 +31,7 @@ unless the feature needs reading a photo/scan.
 - [x] 14. Batch answer-sheet checking from a folder of photos
 
 ## PowerPoint
-- [ ] 15. Edit an existing deck (fix typos, update content, restyle to a school template)
+- [x] 15. Edit an existing deck (fix typos, update content, restyle to a school template)
 - [ ] 16. Handouts: slides to a PDF handout / notes page
 
 ## Across all files

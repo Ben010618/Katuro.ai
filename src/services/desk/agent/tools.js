@@ -897,6 +897,80 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  edit_slides: {
+    label: 'Edit slides',
+    description: "Edit the teacher's OWN PowerPoint deck (.pptx) in place: fix spelling and grammar (fixTypos), change the words as the teacher says (instructions, e.g. \"update the dates to SY 2026-2027\", \"change Quarter to Term\"), and/or restyle it to a school template deck (templatePath: its colours, fonts and background). Layout, pictures and formatting stay. Shows every change; saves an edited copy; the original is backed up and not changed.",
+    args: '{ "path": string, "fixTypos"?: boolean, "instructions"?: string, "templatePath"?: string }',
+    async run({ path, fixTypos = false, instructions = '', templatePath }, ctx, report) {
+      if (!path || !/\.pptx$/i.test(path)) throw needsInfo(path && /\.ppt$/i.test(path) ? 'This is an old .ppt file. Open it in PowerPoint and Save As .pptx first, then ask me again.' : 'Which PowerPoint deck (.pptx) should I edit?');
+      if (!fixTypos && !String(instructions).trim() && !templatePath) throw needsInfo('What should I change in the slides: fix spelling and grammar, change some words (tell me what), or restyle it to a school template (which file)?');
+      if (templatePath && !/\.(pptx|potx)$/i.test(templatePath)) throw needsInfo('The school template must be a PowerPoint file (.pptx or .potx). Which one should I use?');
+      const T = await import('../generators/translateDoc.js');
+      const E = await import('../generators/slideEdit.js');
+      const fileName = String(path).split('/').pop();
+      let bytes = await ctx.readBytes(path);
+      const done = [];
+      const rows = [];
+
+      // 1. Words: the AI returns only the texts it changes; each change is checked.
+      if (fixTypos || String(instructions).trim()) {
+        const office = await T.collectOffice(bytes, 'pptx');
+        if (!office.items.length) throw needsInfo(`I found no text in ${fileName} to edit.`);
+        const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const P = await import('../generators/privacyCopy.js');
+        const nameRes = ctx.masker.names().sort((a, b) => b.length - a.length)
+          .map((n) => new RegExp(`(?<![\\p{L}])(?:${P.nameVariants(n).sort((a, b) => b.length - a.length).map(reEsc).join('|')})(?![\\p{L}])`, 'giu'));
+        const tokenOf = new Map();
+        const written = [];
+        const hide = (s) => nameRes.reduce((t, re) => t.replace(re, (m) => { if (!tokenOf.has(m)) { written.push(m); tokenOf.set(m, written.length); } return `⟪${tokenOf.get(m)}⟫`; }), s);
+        const show = (s) => String(s).replace(/⟪(\d+)⟫/g, (t, k) => written[Number(k) - 1] ?? t);
+        const list = office.items.map((it, i) => ({ i, where: E.slideLabel(it.part), text: hide(it.source) })).slice(0, 800);
+        report('Reading the slides…');
+        const task = [fixTypos && 'Fix spelling, grammar and punctuation mistakes only; keep the meaning, the wording and the style otherwise.', String(instructions).trim() && `Teacher's instructions: ${ctx.masker.mask(String(instructions).trim())}`].filter(Boolean).join('\n');
+        const res = await ctx.llm({
+          system: ctx.docPersona,
+          prompt: `These are the texts of a teacher's PowerPoint slides. ${task}\nRules: change only texts that need it; keep every ⟦n⟧ and ⟪n⟫ marker exactly and in order; never add new facts. Return ONLY JSON {"changes":[{"i": <number>, "text": "<the new text>"}]} (an empty list if nothing needs changing).\n${JSON.stringify(list)}`,
+          json: true,
+          maxTokens: 8000,
+        });
+        const map = new Map();
+        let refused = 0;
+        for (const c of Array.isArray(res?.changes) ? res.changes : []) {
+          const item = list[Number(c?.i)];
+          if (!item || typeof c.text !== 'string' || c.text === item.text) continue;
+          const marks = (s) => (s.match(/⟦\d+⟧|⟪\d+⟫/g) || []).join('');
+          const nums = (s) => (s.replace(/⟦\d+⟧|⟪\d+⟫/g, ' ').match(/\d+(?:[.,:/-]\d+)*/g) || []).sort().join(' ');
+          const bad = marks(item.text) !== marks(c.text) || (fixTypos && !String(instructions).trim() && (nums(item.text) !== nums(c.text) || E.closeness(item.text.replace(/⟦\d+⟧/g, ''), c.text.replace(/⟦\d+⟧/g, '')) < 0.5));
+          if (bad) { refused += 1; continue; }
+          const source = office.items[item.i].source;
+          map.set(source, show(c.text));
+          rows.push([item.where, source.replace(/⟦\d+⟧/g, ''), show(c.text).replace(/⟦\d+⟧/g, '')]);
+        }
+        if (map.size) {
+          bytes = T.buildOffice(office, map).bytes;
+          done.push(`${map.size} text(s) changed`);
+        } else if (!templatePath) {
+          return { summary: `I found nothing to change in ${fileName}${refused ? ` (${refused} suggested change(s) were not used because they changed numbers, names or too much of the wording)` : ''}. No copy was saved.` };
+        }
+        if (refused) done.push(`${refused} suggested change(s) not used (they changed numbers, names or too much)`);
+      }
+
+      // 2. Restyle to the school template.
+      if (templatePath) {
+        report('Applying the school template…');
+        const res = await E.applySchoolTheme(bytes, await ctx.readBytes(templatePath));
+        bytes = res.bytes;
+        done.push(`restyled to ${String(templatePath).split('/').pop()}: ${res.changes.join('; ')}`);
+      }
+      const file = await ctx.saveWorkingCopy(path, bytes, 'pptx');
+      const spec = rows.length ? normalizeSheetSpec({ title: `Slide changes — ${fileName}`, sheets: [{ name: 'Changes', columns: [{ header: 'Where' }, { header: 'Before' }, { header: 'After' }], rows }] }) : null;
+      return {
+        summary: `Edited ${file.name}: ${done.join('; ')}. Layout, pictures and formatting were kept. Please look through the slides before presenting. The original ${fileName} was backed up and not changed.`,
+        artifacts: [spec ? { type: 'sheet', title: spec.title, subtitle: `${rows.length} change(s)`, spec, files: [file], editable: false } : { type: 'files', title: 'Edited deck', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   check_answer_sheets: {
     label: 'Check answer sheets',
     description: "Check a stack of learners' answer sheets from photos (a folder of JPEG/PNG/HEIC pictures, one sheet each) against the answer key: AI reads each photo (the name and the answer marked for each item), then code scores every sheet, flags unclear or double-marked items and names not in the class list, and saves an Excel file with the scores and a 1/0 item sheet (ready for item analysis). The key comes from what the teacher typed (answerKey, e.g. \"1. A 2. C 3. B\" or \"ACBD\") or a file (answerKeyPath: Word, Excel, text or a photo of the key).",
