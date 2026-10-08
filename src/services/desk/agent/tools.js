@@ -1180,6 +1180,45 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  place_signature: {
+    label: 'Place my e-signature',
+    description: "Place the teacher's OWN saved e-signature (Settings > E-signature) above the teacher's OWN name on the signature lines of a Word (.docx) or PDF file (e.g. under \"Prepared by:\"). It never signs above anyone else's name. Always asks the teacher to confirm first. Saves a signed copy; the original is backed up and not changed.",
+    args: '{ "path": string, "widthInches"?: number }',
+    async run({ path, widthInches }, ctx, report) {
+      const ext = String(path || '').split('.').pop().toLowerCase();
+      if (!path || !['docx', 'pdf'].includes(ext)) throw needsInfo('Which Word or PDF file should I sign?');
+      if (!ctx.eSignature) throw needsInfo('You have no saved e-signature yet. Add it in Settings > E-signature (upload a photo of your signature or draw it), then ask me again.');
+      const name = String(ctx.teacher.fullName || '').trim();
+      if (!name) throw needsInfo('Your profile has no name yet. Add your full name in Settings > My profile so I know where you sign.');
+      const S = await import('../generators/placeSignature.js');
+      const fileName = String(path).split('/').pop();
+      const widthIn = Math.min(2.5, Math.max(0.8, Number(widthInches) || 1.5));
+      report('Placing your signature…');
+      const bytes = await ctx.readBytes(path);
+      let res;
+      if (ext === 'docx') {
+        res = await S.signDocx(bytes, ctx.eSignature, { fullName: name, widthIn });
+      } else {
+        const { loadPdfjs } = await import('../readers/index.js');
+        const { pageLines } = await import('../generators/pdfForm.js');
+        const pdfjs = await loadPdfjs();
+        const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
+        let lines;
+        try { lines = await pageLines(doc); } finally { doc.destroy?.(); }
+        if (!lines.some((p) => p.lines.length)) throw needsInfo(`${fileName} is a scanned PDF, so I cannot find your name in it. Please use the Word file, or a PDF made from it.`);
+        res = await S.signPdf(bytes, ctx.eSignature, lines, { fullName: name, widthIn });
+      }
+      if (!res.placed) {
+        throw needsInfo(`I could not find a signature line with your name (${name}) in ${fileName}${res.mentions ? ' (your name is there, but only inside other text)' : ''}. Type your name on its own line where you sign (e.g. under "Prepared by:"), then ask me again. I only sign above your own name.`);
+      }
+      const file = await ctx.saveWorkingCopy(path, res.bytes, ext);
+      return {
+        summary: `Signed ${file.name}: your e-signature is above your name in ${res.placed} place${res.placed > 1 ? 's' : ''}${res.pages?.length ? ` (page${res.pages.length > 1 ? 's' : ''} ${res.pages.join(', ')})` : ''}. Please check it before you send or print it. The original ${fileName} was backed up and not changed.`,
+        artifacts: [{ type: 'files', title: 'Signed copy', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   pdf_page_tools: {
     label: 'PDF page tools',
     description: "Change the pages of a PDF in one go: remove pages, put pages in a new order, turn pages (90/180/270), add page numbers, a watermark such as \"DRAFT\" or \"SAMPLE\", or a logo image from the folder on every page. Pages are given as \"1,3-5\", \"all\", \"odd\", \"even\" or \"last\" (original page numbers). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",

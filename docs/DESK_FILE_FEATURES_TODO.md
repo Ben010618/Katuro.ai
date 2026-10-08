@@ -25,7 +25,7 @@ unless the feature needs reading a photo/scan.
 - [x] 10. Fill PDF forms (fillable fields, and flat scanned forms)
 - [x] 11. Scanned PDF to editable Word or Excel (keeps the tables)
 - [x] 12. Page tools: rotate, reorder, delete pages, page numbers, "DRAFT" watermark, school logo
-- [ ] 13. Place your saved e-signature on a document
+- [x] 13. Place your saved e-signature on a document
 
 ## Photos
 - [ ] 14. Batch answer-sheet checking from a folder of photos

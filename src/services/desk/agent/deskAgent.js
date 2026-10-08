@@ -30,6 +30,7 @@ import {
 } from '../../localFileSystem.js';
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
+import { dataUrlBytes } from '../signature.js';
 import { getPersona, timeOfDay } from '../personas.js';
 import { formKnowledgeFor, talksAboutGrades } from '../knowledge/schoolForms.js';
 import { gradingRulesBrief } from '../knowledge/gradingRules.js';
@@ -136,6 +137,9 @@ export function readPlanCheck(plan, unmask = (x) => x) {
   };
 }
 
+/** Always asked first (unless already approved, e.g. a scheduled task): signing a document. */
+const ALWAYS_CONFIRM = new Set(['place_signature']);
+
 export function needsConfirmation(tasks) {
   return tasks.length > 3 || tasks.some((t) => CONFIRM_TOOLS.has(t.tool));
 }
@@ -152,6 +156,7 @@ export function decideAction({ tasks = [], check = null, prompt = '', history = 
   const gap = firstMissingDetails(tasks, { prompt, history, teacher });
   if (gap) return { action: 'ask', gap };
   if (check && (check.confidence === 'low' || check.missing.length)) return { action: 'ask' };
+  if (!autoApprove && tasks.some((t) => ALWAYS_CONFIRM.has(t.tool))) return { action: 'confirm' };
   if (check && check.confidence === 'medium' && !autoApprove && needsConfirmation(tasks)) return { action: 'confirm' };
   return { action: 'run' };
 }
@@ -236,6 +241,7 @@ export async function runDeskAgentTurn({
   confirmedPlan = null, // { reply, tasks } the teacher approved with "Proceed": runs with no new AI call
   autoApprove = false, // scheduled tasks: approved when scheduled, so no "Proceed?" step
   ruleCards, // the admin's rule cards (loaded from Firestore when not given)
+  eSignature = null, // the teacher's saved e-signature (PNG data URL, kept on this computer)
 }) {
   const teacher = teacherFromProfile(profile, user);
   const persona = personaFor(teacher, personaId);
@@ -333,6 +339,8 @@ export async function runDeskAgentTurn({
     getOutputFolder: () => outputFolder,
     htmlToPdf: (html, options) => renderHtmlToPdf(html, options),
     heicToJpeg: (bytes, quality) => convertHeicToJpeg(bytes, quality),
+    /** The teacher's own e-signature as PNG bytes, or null. */
+    eSignature: eSignature ? dataUrlBytes(eSignature) : null,
     async renderPdf(spec) {
       const { buildHtml } = await import('../generators/htmlFromSpec.js');
       const viaChromium = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), {

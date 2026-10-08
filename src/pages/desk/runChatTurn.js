@@ -51,6 +51,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       profile,
       privacyMode,
       persona,
+      eSignature: useDeskStore.getState().eSignature,
       fileIndex: folderIndex,
       confirmedPlan,
       autoApprove: Boolean(scheduled),

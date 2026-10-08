@@ -69,6 +69,9 @@ export const useDeskStore = create(
       // Calendar (top bar → Calendar): the teacher's own schedules, notes and alarms.
       calendarEvents: [],
 
+      // The teacher's e-signature (PNG data URL). Saved only on this computer, never uploaded.
+      eSignature: null,
+
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
       isGenerating: false,
@@ -175,6 +178,8 @@ export const useDeskStore = create(
       setTaskbarBadge: (on) => set({ taskbarBadge: on === true }),
 
       setMessageSound: (on) => set({ messageSound: on === true }),
+      // Only a PNG data URL is kept (or null to remove it).
+      setESignature: (dataUrl) => set({ eSignature: typeof dataUrl === 'string' && dataUrl.startsWith('data:image/png;base64,') ? dataUrl : null }),
 
       addCalendarEvent: (ev) => set((s) => ({
         calendarEvents: [...s.calendarEvents, {
@@ -366,6 +371,7 @@ export const useDeskStore = create(
         messageSound: state.messageSound,
         calendarEvents: state.calendarEvents,
         scheduledTasks: state.scheduledTasks,
+        eSignature: state.eSignature,
         // Don't persist native handles or file bytes (not serializable / private)
       }),
     }
