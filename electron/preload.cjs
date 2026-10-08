@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   setBackground: (settings) => ipcRenderer.invoke('app:setBackground', settings),
   notify: (title, body, target) => ipcRenderer.invoke('app:notify', title, body, target),
   setUnreadBadge: (count, pngDataUrl) => ipcRenderer.invoke('app:setUnreadBadge', count, pngDataUrl),
+  alarm: (title, body, id) => ipcRenderer.invoke('app:alarm', title, body, id),
   onNotificationClick: (callback) => {
     const listener = (_, target) => callback(target);
     ipcRenderer.on('notification:click', listener);

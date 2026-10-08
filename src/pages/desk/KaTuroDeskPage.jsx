@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
   CalendarClock,
+  CalendarDays,
   RefreshCw,
   MessageSquare,
   X,
@@ -31,6 +32,9 @@ import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
 import MessagesPanel from '../../features/messages/MessagesPanel';
 import { badgeDataUrl } from './unreadBadge';
+import DeskCalendarPanel from './calendar/DeskCalendarPanel';
+import CalendarAlarms from './calendar/CalendarAlarms';
+import { calendarPosition, manilaDate } from '../../services/desk/knowledge/schoolCalendar';
 import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 import { flattenFileTree, findEntryByPath, readFileBytes, writeFileToDirectory, openInDefaultApp } from '../../services/localFileSystem';
@@ -72,6 +76,11 @@ export default function KaTuroDeskPage() {
   const [messagesRequest, setMessagesRequest] = useState(null); // what a clicked notification asks to open
   // null = closed; {} = open on the list; { prompt, attachedPaths } = open on a new task
   const [schedule, setSchedule] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const schoolPos = calendarPosition(manilaDate());
+  const calendarLabel = schoolPos
+    ? (schoolPos.term ? `Term ${schoolPos.term} · ${{ opening: 'Opening Block', instructional: 'Instructional', endOfTerm: 'End-of-Term' }[schoolPos.block]}` : { betweenTerms: 'Between terms', eosyBreak: 'EOSY break' }[schoolPos.block])
+    : 'Calendar';
 
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -222,6 +231,8 @@ export default function KaTuroDeskPage() {
           </div>
         </div>
       )}
+      {showCalendar && <DeskCalendarPanel onClose={() => setShowCalendar(false)} />}
+      <CalendarAlarms />
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}
@@ -309,6 +320,16 @@ export default function KaTuroDeskPage() {
             {plan.plan === 'subscription' && <BadgeCheck size={12} />}
             <span className="font-semibold">{plan.label}</span>
           </span>
+
+          <button
+            onClick={() => setShowCalendar((v) => !v)}
+            title="School calendar: DepEd activities, where we are in the school year, and your schedules and alarms"
+            aria-expanded={showCalendar}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <CalendarDays size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">{calendarLabel}</span>
+          </button>
 
           <button
             onClick={() => setSchedule({})}

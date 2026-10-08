@@ -482,6 +482,27 @@ ipcMain.handle('app:notify', async (_, title, body, target) => {
   return { shown: true };
 });
 
+// Calendar alarm: the notification stays on screen (no timeout) and the taskbar button
+// flashes; the page plays the alarm tone until Dismiss / Snooze. A click opens the window.
+ipcMain.handle('app:alarm', async (_, title, body, id) => {
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
+  if (!Notification.isSupported()) return { shown: false };
+  const n = new Notification({
+    title: String(title || 'KaTuroDesk reminder').slice(0, 120),
+    body: String(body || '').slice(0, 300),
+    icon: appIconPath(),
+    silent: true,
+    timeoutType: 'never',
+    urgency: 'critical',
+  });
+  n.on('click', () => {
+    showMainWindow();
+    if (typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id) && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('alarm:click', { id });
+  });
+  n.show();
+  return { shown: true };
+});
+
 // Unread count on the taskbar button (a small badge drawn by the page) and in the tray.
 ipcMain.handle('app:setUnreadBadge', async (event, count, pngDataUrl) => {
   const n = Math.max(0, Math.min(9999, Number(count) || 0));
