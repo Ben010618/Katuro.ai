@@ -117,7 +117,7 @@ export function plannerKnowledge(prompt, history = [], schoolYear = '', now = ne
 
 // Plans that change the teacher's own files, or spend a long AI generation, get a
 // "Proceed?" when the planner was only medium-sure. Simple, clear jobs just run.
-const CONFIRM_TOOLS = new Set(['edit_file', 'fill_table_from_files', 'transfer_data', 'encode_scores', 'fill_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package']);
+const CONFIRM_TOOLS = new Set(['edit_file', 'fill_table_from_files', 'copy_per_learner', 'transfer_data', 'encode_scores', 'fill_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package']);
 
 /**
  * The planner's self-check (rule 11). Missing fields mean "high", so a planner reply
@@ -320,6 +320,8 @@ export async function runDeskAgentTurn({
     setOutputFolder(path) {
       outputFolder = path.replace(/^\/+|\/+$/g, '');
     },
+    /** Where saveOutput puts files right now (e.g. "KaTuro Outputs/2026-10-08"). */
+    getOutputFolder: () => outputFolder,
     htmlToPdf: (html, options) => renderHtmlToPdf(html, options),
     async renderPdf(spec) {
       const { buildHtml } = await import('../generators/htmlFromSpec.js');

@@ -968,6 +968,99 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  copy_per_learner: {
+    label: 'One copy per learner',
+    description: "Make one copy of the teacher's Word template for EVERY learner in a class list (certificates, parent letters, report-card comments, recognition awards, notices). Fields in the template are written {{Name}}, [Name], «Name» or <<Name>>, or the teacher names a sample text to replace (replaceText, e.g. {\"JUAN DELA CRUZ\": \"Name\"}). Each field is filled from the class-list column with the same heading; values the same for everyone come from 'values' or the teacher profile (School, Adviser, School Year). Output: one combined Word file (one learner per page, for printing) plus a folder of separate files. Computed by code, nothing is sent to the AI.",
+    args: '{ "templatePath": string, "listPath": string, "replaceText"?: { "<sample text in the template>": "<field>" }, "values"?: { "<field>": "<value for everyone>" }, "nameOrder"?: "as-written" | "first-last", "output"?: "both" | "combined" | "separate" }',
+    async run({ templatePath, listPath, replaceText = {}, values = {}, nameOrder = 'as-written', output = 'both' }, ctx, report) {
+      if (!templatePath || !/\.docx$/i.test(templatePath)) throw needsInfo('Which Word template (.docx) should I copy for each learner?');
+      if (!listPath) throw needsInfo('Which class list should I use (Excel or CSV with the learners\' names)?');
+      const { prepareMergeTemplate, renderMergeCopy, renderMergeCombined, mapMergeFields, firstNameFirst } = await import('../generators/mailMerge.js');
+      const fileName = (p) => String(p).split('/').pop();
+      const base = fileName(templatePath).replace(/\.docx$/i, '');
+
+      const prepared = await prepareMergeTemplate(await ctx.readBytes(templatePath), { replaceText });
+      if (!prepared.fields.length) {
+        throw needsInfo(`${fileName(templatePath)} has no fields to fill. Mark where each learner's details go by typing [Name] (or [LRN], [Award], …) in the Word file, or tell me which sample text to replace, e.g. "replace JUAN DELA CRUZ with each learner's name".`);
+      }
+
+      // The class list: heading row (with the names column) and one row per learner.
+      const parsed = await ctx.readParsed(listPath);
+      const text = (v) => (v === null || v === undefined ? '' : String(v)).trim();
+      let headers = null;
+      let learners = [];
+      for (const sheet of parsed.sheets || []) {
+        const rows = sheet.rows || [];
+        const h = rows.slice(0, 15).findIndex((row) => (row || []).some((v) => /name|pangalan|learner|student|pupil/i.test(text(v))));
+        if (h < 0) continue;
+        headers = (rows[h] || []).map((v, i) => text(v) || `Column ${i + 1}`);
+        const nameIdx = headers.findIndex((v) => /name|pangalan|learner|student|pupil/i.test(v));
+        learners = rows.slice(h + 1)
+          .filter((row) => /[A-Za-zÑñ]{2,}/.test(text((row || [])[nameIdx])) && !/^(male|female|boys?|girls?|total)\b/i.test(text((row || [])[nameIdx])))
+          .map((row) => Object.fromEntries(headers.map((hd, i) => [hd, text((row || [])[i])])));
+        if (learners.length) break;
+      }
+      if (!headers || !learners.length) throw needsInfo(`I could not find the learners in ${fileName(listPath)}. It needs a heading row with a names column (e.g. "Name" or "Learner's Name").`);
+      if (learners.length > 300) throw needsInfo(`${fileName(listPath)} has ${learners.length} rows. I can make up to 300 copies at a time; split the list first.`);
+      ctx.masker.addNames(learners.map((l) => Object.values(l)[0]));
+
+      // Fields: the teacher's own values first, then class-list columns, then the profile.
+      const t = ctx.teacher || {};
+      const profile = Object.fromEntries(Object.entries({
+        School: t.school, 'School Name': t.school, Adviser: t.fullName, 'Class Adviser': t.fullName, Teacher: t.fullName,
+        'School Year': ctx.schoolYear, SY: ctx.schoolYear, Division: t.division, District: t.district, Region: t.region,
+        Principal: (t.signatures || []).find((s) => /principal|school head/i.test(`${s.label} ${s.role}`))?.name,
+      }).filter(([, v]) => String(v || '').trim()));
+      const step1 = mapMergeFields(prepared.fields, [], values);
+      const step2 = mapMergeFields(step1.missing, headers, {});
+      const step3 = mapMergeFields(step2.missing, [], profile);
+      const map = { ...step1.map, ...step2.map, ...step3.map };
+      if (step3.missing.length) {
+        throw needsInfo(`I don't know what to put in ${step3.missing.map((f) => `[${f}]`).join(', ')}. Your class list has: ${headers.join(', ')}. Tell me which column to use, or the value for everyone (e.g. "${step3.missing[0]}: Grade 5 - Rizal").`);
+      }
+      const nameColumn = headers.find((h) => /name|pangalan|learner|student|pupil/i.test(h));
+      const blanks = new Map();
+      const copies = learners.map((l) => Object.fromEntries(prepared.fields.map((f) => {
+        const m = map[f];
+        let v = m.value !== undefined ? m.value : l[m.column] || '';
+        if (m.column === nameColumn && nameOrder === 'first-last') v = firstNameFirst(v);
+        else if (m.column === nameColumn) v = String(v).replace(/^\d{1,3}\s*[.)-]\s*/, '');
+        if (!String(v).trim()) blanks.set(f, (blanks.get(f) || 0) + 1);
+        return [f, v];
+      })));
+
+      // Fields in a header/footer cannot change page by page in one combined file.
+      const perLearnerInHeader = prepared.inHeaders.filter((f) => map[f]?.column);
+      const makeCombined = output !== 'separate' && !perLearnerInHeader.length;
+      const makeSeparate = output !== 'combined' || perLearnerInHeader.length > 0;
+      const files = [];
+      if (makeCombined) {
+        report(`Making ${copies.length} pages…`);
+        files.push(await ctx.saveOutput(`${base} - all learners.docx`, await renderMergeCombined(prepared.bytes, copies), 'docx'));
+      }
+      if (makeSeparate) {
+        const folder = `${ctx.getOutputFolder()}/${base} per learner`.replace(/[\\:*?"<>|]/g, '');
+        report(`Making ${copies.length} separate files…`);
+        for (const [i, c] of copies.entries()) {
+          const who = String(c[prepared.fields.find((f) => map[f]?.column === nameColumn)] || `Learner ${i + 1}`).replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
+          files.push(await ctx.saveOutput(`${base} - ${who}.docx`, await renderMergeCopy(prepared.bytes, c), 'docx', folder));
+        }
+      }
+      const notes = [];
+      if (blanks.size) notes.push(`left blank where the class list has no value: ${[...blanks.entries()].map(([f, n]) => `[${f}] for ${n} learner(s)`).join(', ')}`);
+      if (perLearnerInHeader.length && output !== 'separate') notes.push(`${perLearnerInHeader.map((f) => `[${f}]`).join(', ')} ${perLearnerInHeader.length > 1 ? 'are' : 'is'} in the page header/footer, so I made separate files only (a combined file cannot change the header page by page)`);
+      const filledFrom = prepared.fields.map((f) => `[${f}] ← ${map[f].column ? `column "${map[f].column}"` : `"${map[f].value}"`}`).join('; ');
+      const spec = normalizeSheetSpec({
+        title: `Copies made — ${base}`,
+        sheets: [{ name: 'Copies', columns: [{ header: '#' }, ...prepared.fields.map((f) => ({ header: f }))], rows: copies.map((c, i) => [i + 1, ...prepared.fields.map((f) => c[f])]) }],
+      });
+      return {
+        summary: `Made ${copies.length} cop${copies.length === 1 ? 'y' : 'ies'} of ${fileName(templatePath)}${makeCombined ? ' (one combined file, one learner per page' : ' ('}${makeSeparate ? `${makeCombined ? ', plus ' : ''}separate files in "${base} per learner"` : ''}). Filled: ${filledFrom}.${notes.length ? ` Notes: ${notes.join('; ')}.` : ''} Your template was not changed. Done by code; nothing was sent to the AI.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${copies.length} learner(s)`, spec, files: files.slice(0, 3), editable: false }],
+      };
+    },
+  },
+
   fill_table_from_files: {
     label: 'Fill my table from several files',
     description: "Fill the teacher's OWN existing Excel table (their consolidation sheet, template or class summary, e.g. conso.xlsx with columns AP | FILIPINO | MATH | SCIENCE | Average) with values taken from SEVERAL files, one column per file (e.g. AP_Term1.xlsx, Filipino_Term1.xlsx…). Learners are matched by name; each file goes to the column whose heading names the same subject (or as the teacher says); an empty Average column gets an =AVERAGE formula. Computed by code, no AI. Safe-edit SOP: the original is backed up and a working copy '<name> (KaTuro edit).xlsx' is filled. Use this, not consolidate_files, whenever the teacher wants their own file edited/completed/filled with data from other files.",
@@ -1045,7 +1138,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   fill_template: {
     label: 'Fill Word template',
-    description: 'Fill the teacher\'s own Word template that has {{placeholders}} (e.g. a school form or certificate) using AI and/or source files. Use list mode when the teacher wants one filled copy per learner.',
+    description: 'Fill ONE copy of the teacher\'s own Word template that has {{placeholders}} using AI and/or source files. For one copy per learner from a class list, use copy_per_learner.',
     args: '{ "templatePath": string, "instructions": string, "sourcePaths"?: [string] }',
     async run({ templatePath, instructions = '', sourcePaths = [] }, ctx, report) {
       const { fillDocxTemplate, listDocxPlaceholders } = await import('../generators/fillTemplates.js');
