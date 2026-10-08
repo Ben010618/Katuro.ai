@@ -425,6 +425,20 @@ ipcMain.handle('shell:showItemInFolder', async (_, filePath) => {
   return { success: true };
 });
 
+// iPhone photos (HEIC/HEIF) -> JPEG bytes. The decoder is bundled in vendor/heic.cjs
+// (loaded on first use; it is large). Bytes in, bytes out; nothing touches the disk.
+let heicConvert = null;
+ipcMain.handle('image:heicToJpeg', async (_, bytes, quality = 0.85) => {
+  if (!heicConvert) {
+    const mod = require('./vendor/heic.cjs');
+    heicConvert = mod.default || mod;
+  }
+  const input = Buffer.from(bytes);
+  if (input.length > 60 * 1024 * 1024) throw new Error('This photo is too large to convert (over 60 MB).');
+  const out = await heicConvert({ buffer: input, format: 'JPEG', quality: Math.min(1, Math.max(0.3, Number(quality) || 0.85)) });
+  return new Uint8Array(out);
+});
+
 // Renders print-ready HTML (a generated document, or a docx converted by mammoth)
 // to a real PDF using Chromium's print engine. Long bond paper = 8.5" x 13".
 ipcMain.handle('doc:htmlToPdf', async (_, html, options = {}) => {

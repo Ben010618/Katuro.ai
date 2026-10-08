@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   openPath: (filePath) => ipcRenderer.invoke('shell:openPath', filePath),
   showItemInFolder: (filePath) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
   htmlToPdf: (html, options) => ipcRenderer.invoke('doc:htmlToPdf', html, options),
+  heicToJpeg: (bytes, quality) => ipcRenderer.invoke('image:heicToJpeg', bytes, quality),
   getBackground: () => ipcRenderer.invoke('app:getBackground'),
   setBackground: (settings) => ipcRenderer.invoke('app:setBackground', settings),
   notify: (title, body, target) => ipcRenderer.invoke('app:notify', title, body, target),

@@ -353,6 +353,12 @@ export async function revealInFolder(dirHandle, relPath) {
   return true;
 }
 
+/** Desktop only: iPhone photo (HEIC/HEIF) to JPEG bytes. Returns Uint8Array or null. */
+export async function convertHeicToJpeg(bytes, quality) {
+  if (!desk()?.heicToJpeg) return null;
+  return toUint8(await desk().heicToJpeg(toUint8(bytes), quality));
+}
+
 /** Desktop only: Chromium print-to-PDF of a self-contained HTML page. Returns Uint8Array or null. */
 export async function renderHtmlToPdf(html, options = {}) {
   if (!desk()?.htmlToPdf) return null;

@@ -1162,15 +1162,23 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   convert_to_pdf: {
     label: 'Convert to PDF',
-    description: 'Convert Word documents or images (photos of documents) to PDF. Several images can become one PDF.',
-    args: '{ "paths": [string], "combineImages"?: boolean }',
-    async run({ paths = [], combineImages = true }, ctx, report) {
+    description: 'Convert Word documents or photos (JPEG, PNG, iPhone HEIC) to PDF. Many photos become ONE clean PDF, one photo per page, turned upright and made smaller so the file is easy to send. Photos go in file-name order (IMG_2 before IMG_10) unless order is "as-given". "folder" takes every photo in that folder.',
+    args: '{ "paths"?: [string], "folder"?: string, "combineImages"?: boolean, "order"?: "name" | "as-given", "paper"?: "long" | "a4" | "letter" | "legal", "quality"?: "small" | "standard" | "high", "outputName"?: string }',
+    async run({ paths = [], folder, combineImages = true, order = 'name', paper = 'long', quality = 'standard', outputName }, ctx, report) {
+      const { PHOTO_FILE, naturalSort, preparePhoto } = await import('../generators/photoPdf.js');
       const files = [];
-      const images = [];
-      for (const p of paths) {
+      const photoPaths = [];
+      let list = [...paths];
+      if (folder) {
+        const inFolder = ctx.listFiles(folder).filter((p) => PHOTO_FILE.test(p));
+        if (!inFolder.length) throw needsInfo(`I found no photos (JPEG, PNG or HEIC) directly inside "${folder}". Which folder or photos should I use?`);
+        list = [...list, ...inFolder.filter((p) => !list.includes(p))];
+      }
+      if (!list.length) throw needsInfo('Which photos or Word files should I turn into a PDF?');
+      for (const p of list) {
         const ext = p.split('.').pop().toLowerCase();
-        if (['png', 'jpg', 'jpeg'].includes(ext)) {
-          images.push({ bytes: await ctx.readBytes(p), mimeType: ext === 'png' ? 'image/png' : 'image/jpeg', name: p });
+        if (PHOTO_FILE.test(p)) {
+          photoPaths.push(p);
         } else if (ext === 'docx') {
           report(`Converting ${p}…`);
           const parsed = await ctx.readParsed(p);
@@ -1179,18 +1187,70 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
           if (!pdf) throw new Error('Word to PDF conversion needs the KaTuroDesk desktop app.');
           files.push(await ctx.saveOutput(`${p.split('/').pop().replace(/\.docx$/i, '')}.pdf`, pdf, 'pdf'));
         } else {
-          throw new Error(`I can convert Word files and images to PDF, but not .${ext} files yet. For Excel/PowerPoint, use Save As PDF in Office.`);
+          throw new Error(`I can convert Word files and photos (JPEG, PNG, HEIC) to PDF, but not .${ext} files yet. For Excel/PowerPoint, use Save As PDF in Office.`);
         }
       }
-      if (images.length) {
+      let photoNote = '';
+      if (photoPaths.length) {
+        if (photoPaths.length > 300) throw needsInfo(`That is ${photoPaths.length} photos. I can put up to 300 in one go; split them into smaller groups first.`);
         const { imagesToPdf } = await import('../generators/pdfTools.js');
-        if (combineImages) {
-          files.push(await ctx.saveOutput(`${slug(images[0].name.split('/').pop().replace(/\.[^.]+$/, ''))}${images.length > 1 ? `_and_${images.length - 1}_more` : ''}.pdf`, await imagesToPdf(images), 'pdf'));
-        } else {
-          for (const img of images) files.push(await ctx.saveOutput(`${img.name.split('/').pop().replace(/\.[^.]+$/, '')}.pdf`, await imagesToPdf([img]), 'pdf'));
+        const ordered = order === 'as-given' ? photoPaths : naturalSort(photoPaths);
+        const images = [];
+        let heic = 0;
+        let before = 0;
+        for (const [i, p] of ordered.entries()) {
+          report(`Preparing photo ${i + 1} of ${ordered.length}…`);
+          const bytes = await ctx.readBytes(p);
+          before += bytes.length;
+          const img = await preparePhoto({ bytes, name: p }, { heicToJpeg: ctx.heicToJpeg, level: quality });
+          if (img.converted) heic += 1;
+          images.push(img);
         }
+        const baseName = (p) => p.split('/').pop().replace(/\.[^.]+$/, '');
+        report('Building the PDF…');
+        const made = [];
+        if (combineImages) {
+          const name = outputName ? `${String(outputName).replace(/\.pdf$/i, '')}.pdf` : `${slug(baseName(ordered[0]))}${ordered.length > 1 ? `_and_${ordered.length - 1}_more` : ''}.pdf`;
+          made.push(await ctx.saveOutput(name.replace(/[\\/:*?"<>|]/g, ''), await imagesToPdf(images, { paper }), 'pdf'));
+        } else {
+          for (const img of images) made.push(await ctx.saveOutput(`${baseName(img.name)}.pdf`, await imagesToPdf([img], { paper }), 'pdf'));
+        }
+        files.push(...made);
+        const after = made.reduce((n, f) => n + (f.size || 0), 0);
+        const mb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+        const shown = ordered.slice(0, 5).map((p) => p.split('/').pop()).join(', ');
+        photoNote = ` ${ordered.length} photo(s), one per page, in ${order === 'as-given' ? 'the order you gave' : 'file-name order'}: ${shown}${ordered.length > 5 ? ', …' : ''}.${heic ? ` ${heic} iPhone (HEIC) photo(s) converted.` : ''} Photos ${mb(before)} → PDF ${mb(after)}. Your photos were not changed.`;
       }
-      return { summary: `Created ${files.map((f) => f.name).join(', ')}`, artifacts: [{ type: 'files', title: 'PDF conversion', subtitle: `${files.length} file(s)`, files }] };
+      return { summary: `Created ${files.map((f) => f.name).join(', ')}.${photoNote}`, artifacts: [{ type: 'files', title: 'PDF conversion', subtitle: `${files.length} file(s)`, files }] };
+    },
+  },
+
+  compress_pdf: {
+    label: 'Make PDF smaller',
+    description: 'Make a smaller copy of a PDF (for email, Messenger or upload limits): the photos and scans inside it are scaled down; text and layout stay. The original PDF is not changed.',
+    args: '{ "path": string, "level"?: "standard" | "small" }',
+    async run({ path, level = 'standard' }, ctx, report) {
+      if (!path || !/\.pdf$/i.test(path)) throw needsInfo('Which PDF should I make smaller?');
+      const { compressPdf } = await import('../generators/pdfTools.js');
+      const { browserShrink } = await import('../generators/photoPdf.js');
+      const preset = level === 'small' ? { maxPx: 1400, quality: 0.6 } : { maxPx: 2000, quality: 0.75 };
+      report('Making the PDF smaller…');
+      const res = await compressPdf(await ctx.readBytes(path), {
+        ...preset,
+        shrinkJpeg: ctx.shrinkJpeg || ((bytes, opts) => browserShrink(bytes, 'image/jpeg', { ...opts, asStored: true })),
+      });
+      const mb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+      const name = path.split('/').pop();
+      if (res.after >= res.before * 0.95) {
+        const why = !res.images ? 'it has no photos or scans inside, only text' : res.shrunk ? 'its photos are already small' : 'its images are already small or are a kind I cannot shrink safely';
+        return { summary: `${name} (${mb(res.before)}) is already about as small as I can make it: ${why}. I did not save a new copy.` };
+      }
+      const file = await ctx.saveOutput(`${name.replace(/\.pdf$/i, '')} (smaller).pdf`, res.bytes, 'pdf');
+      const pct = Math.round((1 - res.after / res.before) * 100);
+      return {
+        summary: `Made ${file.name}: ${mb(res.before)} → ${mb(res.after)} (${pct}% smaller). ${res.shrunk} image(s) scaled down${res.skipped ? `, ${res.skipped} left as is` : ''}; text and layout unchanged. Your original PDF was not changed.`,
+        artifacts: [{ type: 'files', title: 'Smaller PDF', subtitle: `${mb(res.before)} → ${mb(res.after)}`, files: [file] }],
+      };
     },
   },
 

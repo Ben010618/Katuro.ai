@@ -24,6 +24,7 @@ import {
   writeFileToDirectory,
   createDirectoryInWorkspace,
   renderHtmlToPdf,
+  convertHeicToJpeg,
   readerNameFor,
   saveWorkingCopy,
 } from '../../localFileSystem.js';
@@ -269,6 +270,14 @@ export async function runDeskAgentTurn({
     readBytes,
     /** True when the classroom folder has this file. */
     hasFile: (path) => Boolean(findEntryByPath(tree, path)),
+    /** Paths of the files directly inside a folder of the classroom folder (case-insensitive). */
+    listFiles(folder) {
+      const dir = String(folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+      return flattenFileTree(tree).map((f) => f.path).filter((p) => {
+        const at = p.lastIndexOf('/');
+        return (at < 0 ? '' : p.slice(0, at).toLowerCase()) === dir;
+      });
+    },
     async readParsed(path, { full = true } = {}) {
       const entry = findEntryByPath(tree, path);
       if (folderIndex && entry) {
@@ -323,6 +332,7 @@ export async function runDeskAgentTurn({
     /** Where saveOutput puts files right now (e.g. "KaTuro Outputs/2026-10-08"). */
     getOutputFolder: () => outputFolder,
     htmlToPdf: (html, options) => renderHtmlToPdf(html, options),
+    heicToJpeg: (bytes, quality) => convertHeicToJpeg(bytes, quality),
     async renderPdf(spec) {
       const { buildHtml } = await import('../generators/htmlFromSpec.js');
       const viaChromium = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), {

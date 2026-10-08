@@ -120,7 +120,7 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
       return { reply: ack(persona, teacherName, `the merge of ${files.length} PDFs`), tasks: [mk(1, 'merge_pdfs', { paths: files }, 'Merge PDFs')] };
     }
     case 'to_pdf': {
-      if (!files.every((p) => /\.(docx|png|jpe?g)$/i.test(p))) return null;
+      if (!files.every((p) => /\.(docx|png|jpe?g|heic|heif)$/i.test(p))) return null;
       return { reply: ack(persona, teacherName, 'the PDF conversion'), tasks: [mk(1, 'convert_to_pdf', { paths: files }, 'Convert to PDF')] };
     }
     case 'compare': {
