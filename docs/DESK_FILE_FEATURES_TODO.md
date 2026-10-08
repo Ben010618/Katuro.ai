@@ -18,7 +18,7 @@ unless the feature needs reading a photo/scan.
 
 ## Word
 - [x] 7. DepEd formatting fix (long bond paper, margins, fonts, signatory block) in one step
-- [ ] 8. Translate to Filipino / a mother tongue, keeping the layout
+- [x] 8. Translate to Filipino / a mother tongue, keeping the layout
 - [ ] 9. Tracked changes: what changed between two versions of a document
 
 ## PDF

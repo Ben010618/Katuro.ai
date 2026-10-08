@@ -968,6 +968,92 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  translate_document: {
+    label: 'Translate document',
+    description: "Translate the teacher's Word, PowerPoint or Excel file into Filipino, English, or a mother tongue (Cebuano, Hiligaynon, Ilocano, Waray, Bikol, Kapampangan, Pangasinan, Tausug, Maguindanaon, Maranao, Chavacano, and other MTB-MLE languages) keeping the same layout: tables, pictures, page setup and formatting stay; only the words change. Learner names are hidden from the AI; numbers are checked. Saves a new file; the original is not changed.",
+    args: '{ "path": string, "language": string, "keep"?: [string] }',
+    async run({ path, language, keep = [] }, ctx, report) {
+      const T = await import('../generators/translateDoc.js');
+      const ext = String(path || '').split('.').pop().toLowerCase();
+      if (!path || !['docx', 'pptx', 'xlsx'].includes(ext)) throw needsInfo(path ? `I can translate Word (.docx), PowerPoint (.pptx) and Excel (.xlsx) files, not .${ext}.` : 'Which file should I translate?');
+      const lang = T.languageName(language);
+      if (!lang) throw needsInfo(language ? `I don't know the language "${language}". Which one: Filipino, English, Cebuano, Hiligaynon, Ilocano, Waray, Bikol, Kapampangan, or another mother tongue?` : 'Which language should I translate it into (Filipino, or a mother tongue like Cebuano or Ilocano)?');
+      const fileName = String(path).split('/').pop();
+      const bytes = await ctx.readBytes(path);
+      const P = await import('../generators/privacyCopy.js');
+
+      // What to translate, and the learner names in it (kept away from the AI).
+      let office = null;
+      let wb = null;
+      let cells = [];
+      if (ext === 'xlsx') {
+        const ExcelJS = (await import('exceljs')).default;
+        wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(bytes);
+        for (const s of P.workbookRows(wb)) ctx.masker.addNames(P.learnersFromRows(s.rows).learners.map((l) => l.name));
+        wb.eachSheet((ws) => ws.eachRow((row) => row.eachCell((cell) => {
+          const v = cell.value;
+          const text = typeof v === 'string' ? v : v && Array.isArray(v.richText) ? v.richText.map((r) => r.text).join('') : null;
+          if (text !== null && !T.skipText(text)) cells.push({ cell, source: text, rich: typeof v !== 'string' });
+        })));
+      } else {
+        if (ext === 'docx') for (const t of await P.docxTables(bytes)) ctx.masker.addNames(P.learnersFromRows(t).learners.map((l) => l.name));
+        office = await T.collectOffice(bytes, ext);
+      }
+      const sources = office ? office.items.map((it) => it.source) : cells.map((c) => c.source);
+      if (!sources.length) return { summary: `I found no text to translate in ${fileName}.` };
+      if (new Set(sources).size > 1500) throw needsInfo(`${fileName} has a lot of text (${new Set(sources).size} parts). Please split it into smaller files, or tell me which pages or sheets to translate.`);
+
+      // Each learner name, exactly as written, → a ⟪n⟫ token the AI must keep; back word for word afterwards.
+      const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRes = ctx.masker.names().sort((a, b) => b.length - a.length)
+        .map((n) => new RegExp(`(?<![\\p{L}])(?:${P.nameVariants(n).sort((a, b) => b.length - a.length).map(reEsc).join('|')})(?![\\p{L}])`, 'giu'));
+      const tokenOf = new Map();
+      const written = [];
+      const hide = (s) => nameRes.reduce((t, re) => t.replace(re, (m) => {
+        if (!tokenOf.has(m)) { written.push(m); tokenOf.set(m, written.length); }
+        return `⟪${tokenOf.get(m)}⟫`;
+      }), s);
+      const show = (s) => String(s).replace(/⟪(\d+)⟫/g, (t, k) => written[Number(k) - 1] ?? t);
+      const keepList = (Array.isArray(keep) ? keep : [keep]).map((k) => String(k).trim()).filter(Boolean);
+      const translateBatch = async (strings) => {
+        const res = await ctx.llm({
+          system: ctx.docPersona,
+          prompt: `Translate each string below into ${lang} for a Philippine (DepEd) school document. Use clear, natural ${lang} that learners and parents understand; keep the meaning exactly. Rules: keep every ⟦n⟧ and ⟪n⟫ marker exactly as written and in the same order; keep numbers, dates, codes, names and units as they are${keepList.length ? `; do not translate these terms: ${keepList.join(', ')}` : ''}; keep leading/trailing spaces. Return ONLY JSON {"t": [...]} with exactly ${strings.length} strings in the same order.\n${JSON.stringify(strings)}`,
+          json: true,
+          maxTokens: 6000,
+        });
+        return Array.isArray(res?.t) ? res.t : [];
+      };
+      const hidden = sources.map(hide);
+      const { map } = await T.translateAll(hidden, translateBatch, { onProgress: (b, n) => report(`Translating part ${b} of ${n}…`) });
+      const translations = new Map();
+      sources.forEach((s, i) => { if (map.has(hidden[i])) translations.set(s, show(map.get(hidden[i]))); });
+      if (!translations.size) throw new Error('The translation did not come back correctly. Please try again in a moment.');
+
+      let out;
+      let richFlattened = 0;
+      if (office) {
+        out = T.buildOffice(office, translations).bytes;
+      } else {
+        for (const c of cells) {
+          const tr = translations.get(c.source);
+          if (tr === undefined) continue;
+          if (c.rich) richFlattened += 1;
+          c.cell.value = tr;
+        }
+        out = new Uint8Array(await wb.xlsx.writeBuffer());
+      }
+      const file = await ctx.saveOutput(`${fileName.replace(/\.[^.]+$/, '')} (${lang}).${ext}`, out, ext);
+      const total = new Set(sources).size;
+      const notDone = [...new Set(sources.filter((s) => !translations.has(s)))];
+      return {
+        summary: `Translated ${fileName} into ${lang}: ${total - notDone.length} of ${total} text part(s); the layout, tables, pictures and formatting are the same.${notDone.length ? ` ${notDone.length} part(s) were left in the original language because the translation did not keep its numbers or markers: ${notDone.slice(0, 3).map((s) => `"${s.replace(/⟦\d+⟧/g, '').slice(0, 40)}"`).join(', ')}${notDone.length > 3 ? ', …' : ''}.` : ''}${richFlattened ? ` ${richFlattened} Excel cell(s) with mixed formatting now use one style.` : ''} This is an AI translation: please have it read by a fluent ${lang} speaker before you use it in class. Your original file was not changed.`,
+        artifacts: [{ type: 'files', title: `Translated to ${lang}`, subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   deped_format_docx: {
     label: 'DepEd format',
     description: "Put the teacher's OWN Word file in the school print format in one step: paper (long bond by default), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (long bond, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. Saves an edited copy; the original is backed up and not changed.",
