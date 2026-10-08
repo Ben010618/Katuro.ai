@@ -968,6 +968,63 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  track_changes: {
+    label: 'Show changes',
+    description: "Show exactly what changed between two versions of the same document (an older and a newer one): for Word, PowerPoint, PDF or text files a Word file with real tracked changes (insertions and deletions you can Accept or Reject in Word's Review tab) plus a list of the changes; for Excel, every changed cell marked in a copy of the newer workbook with the old value in a note. Compares words and values, not formatting. Nothing is sent to the AI and neither file is changed. For learner data between two different forms (SF1 vs class record) use compare_files instead.",
+    args: '{ "pathOld": string, "pathNew": string }',
+    async run({ pathOld, pathNew }, ctx, report) {
+      if (!pathOld || !pathNew) throw needsInfo('Which two versions should I compare (the older one and the newer one)?');
+      if (pathOld === pathNew) throw needsInfo('Those are the same file. Which two versions should I compare?');
+      const D = await import('../generators/docDiff.js');
+      const extOf = (p) => String(p).split('.').pop().toLowerCase();
+      const nameOf = (p) => String(p).split('/').pop();
+      const [eo, en] = [extOf(pathOld), extOf(pathNew)];
+      const TEXT = ['docx', 'pptx', 'pdf', 'txt', 'md', 'csv'];
+      const SHEET = ['xlsx', 'xlsm'];
+      if (SHEET.includes(eo) !== SHEET.includes(en)) throw needsInfo('One file is a spreadsheet and the other is not. Please choose two versions of the same kind of file.');
+      if (![...TEXT, ...SHEET].includes(eo) || ![...TEXT, ...SHEET].includes(en)) throw needsInfo('I can compare versions of Word, PowerPoint, PDF, text and Excel (.xlsx) files.');
+      const base = nameOf(pathNew).replace(/\.[^.]+$/, '');
+      report('Comparing the two versions…');
+
+      if (SHEET.includes(en)) {
+        const ExcelJS = (await import('exceljs')).default;
+        const [a, b] = [new ExcelJS.Workbook(), new ExcelJS.Workbook()];
+        await a.xlsx.load(await ctx.readBytes(pathOld));
+        await b.xlsx.load(await ctx.readBytes(pathNew));
+        const res = D.diffWorkbooks(a, b);
+        if (!res.changes.length && !res.addedSheets.length && !res.removedSheets.length) return { summary: `No differences: every cell in ${nameOf(pathNew)} has the same value as in ${nameOf(pathOld)}.` };
+        D.markWorkbook(b, res.changes);
+        const file = await ctx.saveOutput(`${base} (changes marked).xlsx`, new Uint8Array(await b.xlsx.writeBuffer()), 'xlsx');
+        const spec = normalizeSheetSpec({ title: `Changes — ${nameOf(pathOld)} → ${nameOf(pathNew)}`, sheets: [{ name: 'Changes', columns: [{ header: 'Sheet' }, { header: 'Cell' }, { header: 'Before' }, { header: 'After' }], rows: res.changes.slice(0, 1000).map((c) => [c.sheet, c.cell, c.before, `${c.after}${c.formulaChanged ? ' (formula changed)' : ''}`]) }] });
+        const sheetsNote = [res.addedSheets.length && `new sheet(s): ${res.addedSheets.join(', ')}`, res.removedSheets.length && `removed sheet(s): ${res.removedSheets.join(', ')}`].filter(Boolean).join('; ');
+        return {
+          summary: `From ${nameOf(pathOld)} (older) to ${nameOf(pathNew)} (newer): ${res.changes.length} cell(s) changed${sheetsNote ? `; ${sheetsNote}` : ''}. In ${file.name} the changed cells are yellow and each has a note with the old value. Neither file was changed.`,
+          artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${res.changes.length} change(s)`, spec, files: [file], editable: false }],
+        };
+      }
+
+      const paragraphsOf = async (p, ext) => {
+        if (ext === 'docx' || ext === 'pptx') return D.officeParagraphs(await ctx.readBytes(p), ext);
+        const parsed = await ctx.readParsed(p);
+        if (parsed.needsVision) throw needsInfo(`${nameOf(p)} is a scanned PDF (a picture of text), so I cannot compare its words. Please use the Word versions.`);
+        return String(parsed.text || '').split(/\n+/).map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean).map((text) => ({ text }));
+      };
+      const [oldP, newP] = await Promise.all([paragraphsOf(pathOld, eo), paragraphsOf(pathNew, en)]);
+      const ops = D.diffParagraphs(oldP, newP);
+      const count = (t) => ops.filter((o) => o.type === t).length;
+      const [added, removed, edited] = [count('ins'), count('del'), count('mod')];
+      if (!added && !removed && !edited) return { summary: `No differences in the words: ${nameOf(pathNew)} says the same as ${nameOf(pathOld)} (formatting was not compared).` };
+      const file = await ctx.saveOutput(`${base} (tracked changes).docx`, await D.buildRedlineDocx(ops, { title: `Changes from ${nameOf(pathOld)} to ${nameOf(pathNew)}` }), 'docx');
+      const words = (o) => o.words.filter((w) => w.type !== 'same').map((w) => `${w.type === 'del' ? '−' : '+'}${w.text.trim()}`).filter((w) => w.length > 1).join(' ');
+      const rows = ops.filter((o) => o.type !== 'same').slice(0, 500).map((o) => [o.type === 'ins' ? 'Added' : o.type === 'del' ? 'Removed' : 'Changed', o.a || '', o.b || '', o.type === 'mod' ? words(o) : '', o.where || '']);
+      const spec = normalizeSheetSpec({ title: `Changes — ${nameOf(pathOld)} → ${nameOf(pathNew)}`, sheets: [{ name: 'Changes', columns: [{ header: 'Change' }, { header: 'Before' }, { header: 'After' }, { header: 'Words' }, { header: 'Where' }], rows }] });
+      return {
+        summary: `From ${nameOf(pathOld)} (older) to ${nameOf(pathNew)} (newer): ${edited} paragraph(s) changed, ${added} added, ${removed} removed. Open ${file.name} in Word to see each change as a tracked change (Review tab: Accept or Reject). Only the words were compared, not the formatting. Neither file was changed. Done by code; nothing was sent to the AI.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${edited + added + removed} change(s)`, spec, files: [file], editable: false }],
+      };
+    },
+  },
+
   translate_document: {
     label: 'Translate document',
     description: "Translate the teacher's Word, PowerPoint or Excel file into Filipino, English, or a mother tongue (Cebuano, Hiligaynon, Ilocano, Waray, Bikol, Kapampangan, Pangasinan, Tausug, Maguindanaon, Maranao, Chavacano, and other MTB-MLE languages) keeping the same layout: tables, pictures, page setup and formatting stay; only the words change. Learner names are hidden from the AI; numbers are checked. Saves a new file; the original is not changed.",
