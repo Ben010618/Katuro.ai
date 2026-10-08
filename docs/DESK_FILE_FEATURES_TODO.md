@@ -32,7 +32,7 @@ unless the feature needs reading a photo/scan.
 
 ## PowerPoint
 - [x] 15. Edit an existing deck (fix typos, update content, restyle to a school template)
-- [ ] 16. Handouts: slides to a PDF handout / notes page
+- [x] 16. Handouts: slides to a PDF handout / notes page
 
 ## Across all files
 - [ ] 17. Search inside every file in the folder ("which file has Juan's Term 1 grades?")

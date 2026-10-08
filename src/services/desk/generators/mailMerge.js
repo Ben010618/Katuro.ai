@@ -5,11 +5,11 @@
  * Fields in the template can be written {{Name}}, [Name], «Name» or <<Name>>, or the
  * teacher can name a sample text to replace ("JUAN DELA CRUZ" → each learner's name).
  */
-import { toUint8, interop } from './shared.js';
+import { toUint8, interop, unescapeXml } from './shared.js';
 
 const PARTS = /^word\/(document|header\d*|footer\d*)\.xml$/;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = unescapeXml;
 
 /** Field names usable in {{ }}: letters, digits, spaces, apostrophes, dots, dashes. */
 const FIELD = "[A-Za-zÑñ][A-Za-zÑñ0-9 .'_-]{0,40}";

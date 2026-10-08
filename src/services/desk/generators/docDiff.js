@@ -5,9 +5,9 @@
  *   Word's Review tab) is made, plus a list of changes.
  *   Excel: cell by cell, with the changed cells marked in a copy of the newer workbook.
  */
-import { toUint8, interop } from './shared.js';
+import { toUint8, interop, unescapeXml } from './shared.js';
 
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = unescapeXml;
 const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 
 /** The paragraphs of a Word or PowerPoint file, in reading order (table cells one by one). */

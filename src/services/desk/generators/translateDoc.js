@@ -6,7 +6,7 @@
  *
  * Word (.docx), PowerPoint (.pptx) and Excel (.xlsx text cells) are supported.
  */
-import { toUint8, interop } from './shared.js';
+import { toUint8, interop, unescapeXml } from './shared.js';
 
 /** DepEd's mother tongues (MTB-MLE) and Filipino/English, as teachers write them. */
 export const LANGUAGES = {
@@ -19,7 +19,7 @@ export const LANGUAGES = {
 };
 export const languageName = (s) => LANGUAGES[String(s || '').toLowerCase().replace(/[^a-z-]/g, '')] || null;
 
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = unescapeXml;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Nothing to translate: numbers, codes, links, blanks and lines, single letters. */

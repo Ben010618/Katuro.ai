@@ -7,9 +7,9 @@
  *   an empty table cell to the right of a label cell
  * Each value goes exactly where the blank was; everything else stays as it is.
  */
-import { toUint8, interop } from './shared.js';
+import { toUint8, interop, unescapeXml } from './shared.js';
 
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = unescapeXml;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const PIECE = /<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>|<w:tab\/>/g;
 const RUN = /<w:r[ >][\s\S]*?<\/w:r>/g;

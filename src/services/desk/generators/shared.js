@@ -19,6 +19,13 @@ export function portraitInches(paper) {
 
 export const MARGIN_IN = { top: 0.5, bottom: 0.5, left: 0.6, right: 0.6 };
 
+const fromCode = (n) => { try { return String.fromCodePoint(n); } catch { return ''; } };
+/** Text inside Office XML: named and numeric character references (&#x2022;) decoded, &amp; last. */
+export const unescapeXml = (s) => String(s)
+  .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => fromCode(parseInt(h, 16)))
+  .replace(/&#(\d+);/g, (_, d) => fromCode(Number(d)))
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+
 /** Header lines for the DepEd letterhead, in order. */
 export function headerLines(header) {
   if (!header) return [];

@@ -897,6 +897,33 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  slides_handout: {
+    label: 'Slides handout',
+    description: "Make a printable PDF handout from the teacher's PowerPoint deck: 1, 2, 3 (with lines for learners' notes), 4, 6 or 9 slides per page, or notes pages (each slide with its speaker notes, for the teacher). Long bond by default. Each slide is drawn in a simplified way (text, pictures, tables, colours). The deck is not changed.",
+    args: '{ "path": string, "perPage"?: 1 | 2 | 3 | 4 | 6 | 9, "notes"?: boolean, "paper"?: "long" | "a4" | "letter" }',
+    async run({ path, perPage = 3, notes = false, paper = 'long' }, ctx, report) {
+      if (!path || !/\.pptx$/i.test(path)) throw needsInfo(path && /\.ppt$/i.test(path) ? 'This is an old .ppt file. Open it in PowerPoint and Save As .pptx first, then ask me again.' : 'Which PowerPoint deck (.pptx) should I make a handout of?');
+      const per = Number(perPage);
+      if (!notes && ![1, 2, 3, 4, 6, 9].includes(per)) throw needsInfo('How many slides per page: 1, 2, 3 (with lines for notes), 4, 6 or 9?');
+      const { readDeck, buildHandout } = await import('../generators/slideHandout.js');
+      const fileName = String(path).split('/').pop();
+      report('Reading the slides…');
+      const deck = await readDeck(await ctx.readBytes(path));
+      if (!deck.slides.length) throw needsInfo(`${fileName} has no slides.`);
+      if (deck.slides.length > 300) throw needsInfo(`${fileName} has ${deck.slides.length} slides. I can make handouts of up to 300 slides at a time.`);
+      report('Drawing the handout…');
+      const base = fileName.replace(/\.pptx$/i, '');
+      const bytes = await buildHandout(deck, { perPage: per, notes, paper, title: base });
+      const withNotes = deck.slides.filter((s) => s.notes).length;
+      const file = await ctx.saveOutput(`${base} (${notes ? 'notes pages' : `handout, ${per} per page`}).pdf`, bytes, 'pdf');
+      const pages = notes ? deck.slides.length : Math.ceil(deck.slides.length / per);
+      return {
+        summary: `Made ${file.name}: ${deck.slides.length} slide(s) on ${pages} page(s)${notes ? `, with speaker notes (${withNotes} slide(s) have notes)` : per === 3 ? ', with lines beside each slide for notes' : ''}. The slides are drawn in a simplified way (text, pictures, tables and colours; special effects and some shapes are left out); for an exact copy use PowerPoint's Print > Handouts. Your deck was not changed.`,
+        artifacts: [{ type: 'files', title: 'Handout', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   edit_slides: {
     label: 'Edit slides',
     description: "Edit the teacher's OWN PowerPoint deck (.pptx) in place: fix spelling and grammar (fixTypos), change the words as the teacher says (instructions, e.g. \"update the dates to SY 2026-2027\", \"change Quarter to Term\"), and/or restyle it to a school template deck (templatePath: its colours, fonts and background). Layout, pictures and formatting stay. Shows every change; saves an edited copy; the original is backed up and not changed.",

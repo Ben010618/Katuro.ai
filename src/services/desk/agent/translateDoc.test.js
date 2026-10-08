@@ -107,6 +107,16 @@ describe('translate a document, keeping its layout', () => {
     expect([q.getCell('A1').value, q.getCell('A2').value, q.getCell('B2').value, q.getCell('B3').value.formula]).toEqual(['QUESTION', 'WHAT GIVES A PLANT WATER?', 2, 'SUM(B2:B2)']);
   });
 
+  it('characters written as XML numbers (&#x2022;) are read as the character, not as text', async () => {
+    const { collectOffice, buildOffice } = await import('../generators/translateDoc');
+    const zip = new PizZip();
+    zip.file('ppt/slides/slide1.xml', '<p:sld xmlns:a="a" xmlns:p="p"><a:p><a:r><a:t>&#x2022; Plants need water &amp; sun</a:t></a:r></a:p></p:sld>');
+    const c = await collectOffice(zip.generate({ type: 'uint8array' }), 'pptx');
+    expect(c.items.map((i) => i.source)).toEqual(['• Plants need water & sun']);
+    const out = new PizZip(buildOffice(c, new Map([['• Plants need water & sun', '• KAILANGAN NG HALAMAN ANG TUBIG & ARAW']])).bytes).file('ppt/slides/slide1.xml').asText();
+    expect(out).toContain('<a:t>• KAILANGAN NG HALAMAN ANG TUBIG &amp; ARAW</a:t>');
+  });
+
   it('asks for the language; batches are retried once', async () => {
     const ws = createVirtualWorkspace('Class');
     ws.handle.saveVirtualFile('Activity.docx', await lessonDoc());

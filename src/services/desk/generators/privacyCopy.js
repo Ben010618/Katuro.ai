@@ -4,7 +4,7 @@
  * are removed. Excel, CSV, Word, PowerPoint, and PDF (pages turned into pictures with the
  * details covered, so the hidden text cannot be copied back out).
  */
-import { toUint8, interop } from './shared.js';
+import { toUint8, interop, unescapeXml } from './shared.js';
 
 const LETTER = 'A-Za-zÑñÀ-ÿ';
 const NAME_HEADER = /name|pangalan|learner|student|pupil/i;
@@ -167,7 +167,7 @@ export function buildMatcher(learners, { mode = 'numbers', hideNames = true, hid
 
 /* ── Word / PowerPoint ─────────────────────────────────────────────────── */
 
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = unescapeXml;
 const escXml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Rewrites each innermost paragraph whose text changes; its runs are joined into the first run. */
