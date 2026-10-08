@@ -968,6 +968,35 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  deped_format_docx: {
+    label: 'DepEd format',
+    description: "Put the teacher's OWN Word file in the school print format in one step: paper (long bond by default), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (long bond, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. Saves an edited copy; the original is backed up and not changed.",
+    args: '{ "path": string, "paper"?: "long" | "a4" | "letter" | "legal", "margins"?: number | { "top"?: number, "right"?: number, "bottom"?: number, "left"?: number }, "font"?: string, "size"?: number, "letterhead"?: boolean, "signatures"?: boolean, "signers"?: [{ "label": string, "name": string, "role"?: string }] }',
+    async run({ path, paper = 'long', margins, font, size, letterhead = false, signatures = false, signers }, ctx, report) {
+      if (!path || !/\.docx$/i.test(path)) throw needsInfo(path && /\.doc$/i.test(path) ? 'This is an old .doc file. Open it in Word and Save As .docx first, then ask me again.' : 'Which Word file (.docx) should I format?');
+      const { formatDocx, HOUSE } = await import('../generators/depedFormat.js');
+      const m = typeof margins === 'number' ? { top: margins, right: margins, bottom: margins, left: margins } : (margins && typeof margins === 'object' ? margins : {});
+      for (const [k, v] of Object.entries(m)) if (!(Number(v) >= 0.2 && Number(v) <= 3)) throw needsInfo(`A ${k} margin of ${v} inch does not look right. Margins are usually between 0.5 and 1.5 inches. What margin should I use?`);
+      if (size !== undefined && !(Number(size) >= 8 && Number(size) <= 20)) throw needsInfo(`A text size of ${size} pt does not look right for a document (usually 10 to 14). What size should I use?`);
+      let people = null;
+      if (Array.isArray(signers) && signers.length) people = signers.filter((s) => s && s.name).map((s) => ({ label: /:$/.test(s.label || '') ? s.label : `${s.label || 'Prepared by'}:`, name: s.name, role: s.role || '' }));
+      else if (signatures) {
+        people = (ctx.teacher.signatures || []).filter((s) => s.name).map((s) => ({ label: s.label, name: s.name, role: s.role || '' }));
+        if (!people.length) throw needsInfo('Your profile has no signatories yet. Add them in Profile (Prepared by, Checked by, Noted by), or tell me the names and positions to put in the signature block.');
+      }
+      const head = letterhead ? { region: ctx.teacher.region, division: ctx.teacher.division, school: ctx.teacher.school } : null;
+      report('Formatting the document…');
+      const res = await formatDocx(await ctx.readBytes(path), { paper, margins: m, font: font || HOUSE.font, size: size ? Number(size) : null, signers: people, letterhead: head });
+      const file = await ctx.saveWorkingCopy(path, res.bytes, 'docx');
+      const fileName = String(path).split('/').pop();
+      const usedHouse = [!font && 'font', !Object.keys(m).length && 'margins'].filter(Boolean);
+      return {
+        summary: `Formatted ${file.name}: ${res.changes.join('; ')}.${res.notes.length ? ` Note: ${res.notes.join('; ')}.` : ''}${usedHouse.length ? ` The ${usedHouse.join(' and ')} follow KaTuroDesk's DepEd layout; tell me if your school uses others (e.g. "1 inch margins, Bookman Old Style 12").` : ''} The text itself was not changed. The original ${fileName} was backed up and not changed.`,
+        artifacts: [{ type: 'files', title: 'Formatted document', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   add_formula_columns: {
     label: 'Add formula columns',
     description: "Add computed columns to the teacher's OWN Excel grade sheet as real formulas that update when grades change: Remarks (Passed when the grade is 75 or above, DO 15), Descriptor (Advancing/Benchmarking/Connecting/Developing/Emerging), Rank (highest = 1, ties share a rank), and counts of learners passed/failed under the table. Uses the Final Grade / General Average / Quarterly Grade column unless the teacher names one (gradeColumn: heading or column letter). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",
