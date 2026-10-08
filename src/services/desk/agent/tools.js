@@ -897,6 +897,77 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  check_grade_sheets: {
+    label: 'Check grade sheets for errors',
+    description: "Check the teacher's grade sheets / class records / consolidation files for mistakes BEFORE they submit: missing grades, text where a grade should be, grades outside 0-100 or below 60, scores above the highest possible score, totals and averages that do not add up, duplicate or wrong LRNs, the same learner spelled differently across files, and learners missing from a file. Read-only (files are not changed); computed by code, nothing is sent to the AI. Use for 'check my grades', 'any errors before I submit', 'verify my class record'.",
+    args: '{ "sourcePaths": [string] }',
+    async run({ sourcePaths = [] }, ctx, report) {
+      const paths = [...new Set(sourcePaths)].filter((p) => /\.(xlsx|xlsm|xls|csv)$/i.test(p));
+      if (!paths.length) throw needsInfo('Which grade sheets should I check? Tick them in the explorer or name them (Excel or CSV).');
+      const { checkGradeFiles, cellsFromExcelJs } = await import('./gradeCheck.js');
+      const ExcelJS = (await import('exceljs')).default;
+      const fileName = (p) => String(p).split('/').pop();
+      const files = [];
+      const unreadable = [];
+      for (const p of paths) {
+        report(`Checking ${fileName(p)}…`);
+        try {
+          if (/\.(xlsx|xlsm)$/i.test(p)) {
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(await ctx.readBytes(p));
+            files.push({ name: fileName(p), sheets: wb.worksheets.filter((ws) => ws.state !== 'hidden').map((ws) => ({ name: ws.name, cells: cellsFromExcelJs(ws) })) });
+          } else {
+            const parsed = await ctx.readParsed(p);
+            files.push({ name: fileName(p), sheets: (parsed.sheets || []).map((s) => ({ name: s.name, cells: (s.rows || []).map((row) => (row || []).map((v) => ({ v: v ?? null, f: null }))) })) });
+          }
+        } catch (e) {
+          unreadable.push(`${fileName(p)} (${e?.message || 'could not be read'})`);
+        }
+      }
+      const { issues, checked } = checkGradeFiles(files);
+      if (!checked.learnerLists) throw needsInfo(`I could not find a learner list with grades in ${paths.map(fileName).join(', ')}. Each sheet needs a names column with a heading (e.g. "Learner's Name" or "STUDENT").`);
+
+      const errors = issues.filter((i) => i.severity === 'error');
+      const warnings = issues.filter((i) => i.severity === 'warning');
+      const byType = [...issues.reduce((m, i) => m.set(i.type, (m.get(i.type) || 0) + 1), new Map()).entries()];
+      const spec = normalizeSheetSpec({
+        title: `Grade check — ${issues.length ? `${issues.length} item(s) to check` : 'no problems found'}`,
+        sheets: [
+          {
+            name: 'Issues',
+            columns: [{ header: 'Level' }, { header: 'Problem' }, { header: 'File' }, { header: 'Sheet' }, { header: 'Cell' }, { header: 'Learner' }, { header: 'Details' }],
+            rows: issues.length
+              ? issues.map((i) => [i.severity === 'error' ? 'Error' : 'Check', i.type, i.file, i.sheet, i.cell, i.learner, i.detail])
+              : [['', 'No problems found', '', '', '', '', `Checked ${checked.learnerLists} learner list(s) in ${checked.files} file(s).`]],
+          },
+          {
+            name: 'What was checked',
+            columns: [{ header: 'Check' }, { header: 'Rule' }],
+            rows: [
+              ['Missing grades', 'An empty cell in a grade column that is otherwise filled.'],
+              ['Not a number', 'Text (or a stray symbol) where a grade or score should be.'],
+              ['Out of range', 'Grades must be 0 to 100; scores cannot be below 0.'],
+              ['Below 60', 'The lowest grade DepEd allows on report cards is 60 (DO 15, s. 2026, Annex D para 18).'],
+              ['Above highest possible score', 'A score higher than the HPS row of the class record.'],
+              ['Totals / averages', 'Hand-typed totals compared with the scores before them; formulas recomputed and compared with the saved result.'],
+              ['LRN', 'Duplicates, LRNs that are not 12 digits, one LRN with different names.'],
+              ['Across files', 'The same learner spelled differently, and learners missing from a list.'],
+            ],
+          },
+        ],
+      });
+      const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+      const out = await ctx.saveOutput(`${slug('Grade_Check')}.xlsx`, await buildSheetWorkbook(spec), 'xlsx');
+      const head = issues.length
+        ? `Found **${errors.length} error(s)** and **${warnings.length} item(s) to check** in ${checked.learnerLists} learner list(s): ${byType.map(([t, n]) => `${t} ${n}`).join(', ')}.`
+        : `**No problems found** in ${checked.learnerLists} learner list(s) from ${checked.files} file(s).`;
+      return {
+        summary: `${head}${unreadable.length ? ` Could not read: ${unreadable.join('; ')}.` : ''} Your files were not changed. Checked by code; nothing was sent to the AI. The list is in ${out.name}.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${errors.length} error(s) · ${warnings.length} to check`, spec, files: [out], editable: false }],
+      };
+    },
+  },
+
   fill_table_from_files: {
     label: 'Fill my table from several files',
     description: "Fill the teacher's OWN existing Excel table (their consolidation sheet, template or class summary, e.g. conso.xlsx with columns AP | FILIPINO | MATH | SCIENCE | Average) with values taken from SEVERAL files, one column per file (e.g. AP_Term1.xlsx, Filipino_Term1.xlsx…). Learners are matched by name; each file goes to the column whose heading names the same subject (or as the teacher says); an empty Average column gets an =AVERAGE formula. Computed by code, no AI. Safe-edit SOP: the original is backed up and a working copy '<name> (KaTuro edit).xlsx' is filled. Use this, not consolidate_files, whenever the teacher wants their own file edited/completed/filled with data from other files.",
