@@ -254,6 +254,76 @@ function numberOr(v, fallback) {
 // ───────────────────────────── Tools ─────────────────────────────
 
 export const TOOLS = {
+  organize_folder: {
+    label: 'Organize my folder',
+    description: "Make an ORGANIZED COPY of the classroom folder (or one subfolder): files are sorted into Grade / Section / Term folders with consistent names (e.g. \"Science - Class Record - Grade 5 Rizal - Term 1.xlsx\"), read from each file's path, name and first lines; exact duplicate files are found and copied only once; files whose grade is unclear go to \"Unsorted\". The original files are never moved, renamed or deleted. Done by code; nothing is sent to the AI.",
+    args: '{ "folder"?: string }',
+    async run({ folder }, ctx, report) {
+      const O = await import('./organizeFolder.js');
+      const dir = folder ? String(folder).replace(/^\/+|\/+$/g, '').toLowerCase() : '';
+      const files = ctx.allFiles().filter((f) => !f.path.startsWith('KaTuro Outputs/') && (!dir || f.path.toLowerCase().startsWith(`${dir}/`)));
+      if (!files.length) throw needsInfo(folder ? `I found no files in "${folder}".` : 'There are no files in this folder to organize yet.');
+      if (files.length > 500) throw needsInfo(`That is ${files.length} files. I can organize up to 500 at a time; tell me which subfolder to start with.`);
+      const big = files.filter((f) => (f.size || 0) > 50 * 1024 * 1024);
+      const work = files.filter((f) => (f.size || 0) <= 50 * 1024 * 1024);
+      const readable = /\.(xlsx|xlsm|xls|csv|docx|pdf|pptx|txt)$/i;
+      const seen = new Map(); // fingerprint → first path
+      const usedNames = new Set();
+      const rows = [];
+      let copied = 0;
+      const dupes = [];
+      const target = `${ctx.getOutputFolder()}/Organized folder`;
+      for (const [i, f] of work.entries()) {
+        if (i % 10 === 0) report(`Sorting ${i + 1} of ${work.length} files…`);
+        const bytes = await ctx.readBytes(f.path);
+        const fp = await O.fingerprint(bytes);
+        const name = f.path.split('/').pop();
+        if (seen.has(fp)) {
+          dupes.push([f.path, seen.get(fp)]);
+          rows.push([f.path, '(not copied)', '', '', '', '', `same file as ${seen.get(fp)}`]);
+          continue;
+        }
+        seen.set(fp, f.path);
+        let text = '';
+        const info0 = O.classify(f.path);
+        if (readable.test(name) && (!info0.grade || !info0.term || (!info0.subject && !info0.kind))) {
+          try {
+            const parsed = await ctx.readParsed(f.path);
+            text = parsed?.text || (parsed?.sheets || []).flatMap((s) => (s.rows || []).slice(0, 8)).map((r) => (r || []).join(' ')).join('\n');
+          } catch { text = ''; }
+        }
+        const info = O.classify(f.path, text);
+        const sub = O.folderFor(info);
+        let newName = O.consistentName(info, name);
+        // Two different files with the same new name: number the later ones.
+        const key = `${sub}/${newName}`.toLowerCase();
+        if (usedNames.has(key)) {
+          const ext = newName.includes('.') ? newName.slice(newName.lastIndexOf('.')) : '';
+          let n = 2;
+          while (usedNames.has(`${sub}/${newName.slice(0, newName.length - ext.length)} (${n})${ext}`.toLowerCase())) n += 1;
+          newName = `${newName.slice(0, newName.length - ext.length)} (${n})${ext}`;
+        }
+        usedNames.add(`${sub}/${newName}`.toLowerCase());
+        const ext = (name.split('.').pop() || '').toLowerCase();
+        await ctx.saveOutput(newName, bytes, ext, `${target}/${sub}`);
+        copied += 1;
+        rows.push([f.path, `${sub}/${newName}`, info.grade, info.section, info.term, [info.subject, info.kind || info.form].filter(Boolean).join(' / '), sub === 'Unsorted' ? 'grade not found in its name or first lines' : '']);
+      }
+      const spec = normalizeSheetSpec({
+        title: 'Organized folder — what went where',
+        sheets: [{ name: 'Files', columns: [{ header: 'Original' }, { header: 'Organized copy' }, { header: 'Grade' }, { header: 'Section' }, { header: 'Term' }, { header: 'Subject / kind' }, { header: 'Note' }], rows }],
+      });
+      const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+      const list = await ctx.saveOutput('Organized folder - what went where.xlsx', await buildSheetWorkbook(spec), 'xlsx', target);
+      const unsorted = rows.filter((r) => String(r[1]).startsWith('Unsorted/')).length;
+      const grades = [...new Set(rows.map((r) => r[2]).filter(Boolean))];
+      return {
+        summary: `Made an organized copy in "${target}": ${copied} file(s) sorted${grades.length ? ` into ${grades.join(', ')}` : ''}${unsorted ? `, ${unsorted} in "Unsorted" (no grade in the name or first lines)` : ''}.${dupes.length ? ` ${dupes.length} exact duplicate(s) were copied only once: ${dupes.slice(0, 3).map(([a, b]) => `${a} = ${b}`).join('; ')}${dupes.length > 3 ? '; …' : ''}.` : ' No duplicates found.'}${big.length ? ` ${big.length} very large file(s) were left out.` : ''} The list of what went where is in ${list.name}. Your original files were not moved, renamed or deleted; when you are happy with the copy, you can replace the old folder yourself.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${copied} file(s)`, spec, files: [list], editable: false }],
+      };
+    },
+  },
+
   search_files: {
     label: 'Search my files',
     description: "Find which files in the classroom folder contain something (\"which file has this learner's Term 1 grades?\", \"where is the SF2 for October?\", \"files that mention the Science fair\"). Searches inside every readable file (Excel rows with their column headings, Word paragraphs and tables, PDF pages, slides, file names) by code and lists the best files with where and what was found. Learner names match in any order; Term 1 also matches Quarter 1 / Q1. Nothing is sent to the AI; no file is changed.",
