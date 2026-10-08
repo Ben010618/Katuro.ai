@@ -22,7 +22,7 @@ unless the feature needs reading a photo/scan.
 - [x] 9. Tracked changes: what changed between two versions of a document
 
 ## PDF
-- [ ] 10. Fill PDF forms (fillable fields, and flat scanned forms)
+- [x] 10. Fill PDF forms (fillable fields, and flat scanned forms)
 - [ ] 11. Scanned PDF to editable Word or Excel (keeps the tables)
 - [ ] 12. Page tools: rotate, reorder, delete pages, page numbers, "DRAFT" watermark, school logo
 - [ ] 13. Place your saved e-signature on a document

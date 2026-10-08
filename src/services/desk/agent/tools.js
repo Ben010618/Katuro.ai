@@ -1180,6 +1180,93 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  fill_pdf_form: {
+    label: 'Fill PDF form',
+    description: "Fill a PDF form: fillable PDFs (form fields, check boxes, choices) and flat PDFs (blanks like \"Name: ______\"), including scanned forms (the blanks are found by reading the page). Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves a filled copy; the original is backed up and not changed.",
+    args: '{ "path": string, "values"?: { "<label in the form>": "<value>" }, "sourcePaths"?: [string], "instructions"?: string }',
+    async run({ path, values = {}, sourcePaths = [], instructions = '' }, ctx, report) {
+      if (!path || !/\.pdf$/i.test(path)) throw needsInfo('Which PDF form should I fill?');
+      const { scanPdfForm, fieldsFromBoxes, fillPdfForm } = await import('../generators/pdfForm.js');
+      const { profileValueFor, matchGivenValues } = await import('../generators/wordForm.js');
+      const { loadPdfjs } = await import('../readers/index.js');
+      const fileName = String(path).split('/').pop();
+      const bytes = await ctx.readBytes(path);
+      const pdfjs = await loadPdfjs();
+      const pdfDoc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
+      let scan;
+      try {
+        scan = await scanPdfForm(bytes, pdfDoc);
+        if (scan.kind === 'scanned') {
+          // A scanned form: read the page images to find where each blank is.
+          report('Reading the scanned form…');
+          const parsed = await ctx.readParsed(path);
+          const parts = await visionPartsFor(parsed, () => ctx.readBytes(path));
+          if (!parts.length) throw needsInfo(`${fileName} is a scanned form with ${pdfDoc.numPages} page(s); I can read scanned forms of up to 10 pages. Please split it first.`);
+          const sizes = [];
+          for (let p = 1; p <= pdfDoc.numPages; p += 1) { const v = (await pdfDoc.getPage(p)).getViewport({ scale: 1 }); sizes.push({ width: v.width, height: v.height }); }
+          const ans = await ctx.llm({
+            system: ctx.docPersona,
+            parts,
+            prompt: 'This is a scanned school form. List every blank a person must fill in (lines, boxes, spaces after a label). For each give its printed label and the box of the EMPTY writing space (not the label) as [ymin, xmin, ymax, xmax] on a 0-1000 scale of that page, with the page number. Skip blanks that are already filled. Return ONLY JSON {"fields":[{"label":"...","page":1,"box":[ymin,xmin,ymax,xmax]}]}.',
+            json: true,
+            maxTokens: 3000,
+          });
+          scan = { kind: 'scanned', fields: fieldsFromBoxes(ans?.fields, sizes) };
+        }
+      } finally {
+        pdfDoc.destroy?.();
+      }
+      const fields = scan.fields;
+      if (!fields.length) throw needsInfo(`I could not find blanks to fill in ${fileName}. I look for form fields, lines like "Name: ______", and a label at the end of a line ("Section:").`);
+
+      // 1. What the teacher said. 2. The profile. 3. Source files (AI, checked).
+      const filled = matchGivenValues(fields, values);
+      const from = Object.fromEntries(Object.keys(filled).map((id) => [id, 'you']));
+      for (const f of fields) {
+        if (filled[f.id] || f.type === 'check') continue;
+        const v = profileValueFor(f.label, { teacher: ctx.teacher, schoolYear: ctx.schoolYear, today: new Date() });
+        if (v) { filled[f.id] = v; from[f.id] = /^date$/i.test(f.label.replace(/\s*\(\d+\)$/, '')) ? "today's date" : 'your profile'; }
+      }
+      const open = fields.filter((f) => !filled[f.id]);
+      if (open.length && (sourcePaths.length || String(instructions).trim())) {
+        report('Reading your files for the missing details…');
+        const { text, visionParts } = sourcePaths.length ? await gatherSourceText(sourcePaths, ctx) : { text: '', visionParts: [] };
+        const labels = open.map((f) => f.label);
+        const ans = ctx.masker.unmask(await ctx.llm({
+          system: ctx.docPersona,
+          ...(visionParts.length ? { parts: visionParts } : {}),
+          prompt: `Fill these blanks of a school form. Return ONLY a JSON object whose keys are exactly: ${JSON.stringify(labels)}. Each value is a short plain string copied from the teacher's instructions or the source files. Use "" when the value is not stated there; never guess or make one up.\nTeacher's instructions: ${ctx.masker.mask(String(instructions || ''))}${text ? `\n\nSource files:\n${text}` : ''}`,
+          json: true,
+          maxTokens: 1500,
+        })) || {};
+        const allowed = allowedTextFor(ctx, instructions, text).toLowerCase().replace(/\s+/g, ' ');
+        for (const f of open) {
+          const v = String(ans?.[f.label] ?? '').trim();
+          if (v && allowed.includes(v.toLowerCase().replace(/\s+/g, ' '))) { filled[f.id] = v; from[f.id] = 'your files'; } else if (v && visionParts.length) { filled[f.id] = v; from[f.id] = 'a photo/scan (please check)'; }
+        }
+      }
+      const blank = fields.filter((f) => !filled[f.id]);
+      if (blank.length === fields.length) {
+        throw needsInfo(`${fileName} has ${fields.length} blank(s): ${fields.slice(0, 12).map((f) => f.label).join(', ')}${fields.length > 12 ? ', …' : ''}. What should go in them? You can type them (e.g. "${fields[0].label}: …") or tell me which file has the details.`);
+      }
+      report('Filling the form…');
+      const res = await fillPdfForm(bytes, scan, filled);
+      for (const s of res.skipped) delete filled[fields.find((f) => f.label === s.label)?.id];
+      const file = await ctx.saveWorkingCopy(path, res.bytes, 'pdf');
+      const done = fields.filter((f) => filled[f.id]).length;
+      const left = fields.filter((f) => !filled[f.id] && !res.skipped.some((s) => s.label === f.label));
+      const spec = normalizeSheetSpec({
+        title: `Form filled — ${fileName}`,
+        sheets: [{ name: 'Blanks', columns: [{ header: 'Blank' }, { header: 'Filled with' }, { header: 'From' }], rows: fields.map((f) => [f.label, filled[f.id] || '(left blank)', from[f.id] || '']) }],
+      });
+      const kindNote = scan.kind === 'fillable' ? 'Its form fields were filled, so you can still edit them in a PDF reader.' : scan.kind === 'scanned' ? 'This is a scanned form: I found the blanks by reading the page, so please check that each value sits in the right place before printing.' : 'The values were written on the blank lines.';
+      return {
+        summary: `Filled ${done} of ${fields.length} blank(s) in ${file.name}. ${kindNote}${left.length ? ` Left blank (tell me what to put): ${left.map((f) => f.label).join(', ')}.` : ''}${res.skipped.length ? ` Not filled: ${res.skipped.map((s) => `${s.label} (${s.why})`).join('; ')}.` : ''}${Object.values(from).includes("today's date") ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''} The original ${fileName} was backed up and not changed.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${done} of ${fields.length} filled`, spec, files: [file], editable: false }],
+      };
+    },
+  },
+
   fill_word_form: {
     label: 'Fill Word form',
     description: "Fill the teacher's OWN Word form that has ordinary blanks, no {{placeholders}}: lines like \"Name: ______\", \"Date: ......\", a label alone on its line (\"Section:\"), signature lines with a caption under them, and empty table cells next to a label. Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or the source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves an edited copy; the original is backed up and not changed.",

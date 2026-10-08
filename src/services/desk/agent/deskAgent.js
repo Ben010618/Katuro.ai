@@ -118,7 +118,7 @@ export function plannerKnowledge(prompt, history = [], schoolYear = '', now = ne
 
 // Plans that change the teacher's own files, or spend a long AI generation, get a
 // "Proceed?" when the planner was only medium-sure. Simple, clear jobs just run.
-const CONFIRM_TOOLS = new Set(['edit_file', 'fill_table_from_files', 'copy_per_learner', 'fill_word_form', 'add_formula_columns', 'deped_format_docx', 'transfer_data', 'encode_scores', 'fill_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package']);
+const CONFIRM_TOOLS = new Set(['edit_file', 'fill_table_from_files', 'copy_per_learner', 'fill_word_form', 'add_formula_columns', 'deped_format_docx', 'fill_pdf_form', 'transfer_data', 'encode_scores', 'fill_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package']);
 
 /**
  * The planner's self-check (rule 11). Missing fields mean "high", so a planner reply
