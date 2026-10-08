@@ -968,6 +968,67 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  fill_word_form: {
+    label: 'Fill Word form',
+    description: "Fill the teacher's OWN Word form that has ordinary blanks, no {{placeholders}}: lines like \"Name: ______\", \"Date: ......\", a label alone on its line (\"Section:\"), signature lines with a caption under them, and empty table cells next to a label. Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or the source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves an edited copy; the original is backed up and not changed.",
+    args: '{ "path": string, "values"?: { "<label in the form>": "<value>" }, "sourcePaths"?: [string], "instructions"?: string }',
+    async run({ path, values = {}, sourcePaths = [], instructions = '' }, ctx, report) {
+      if (!path || !/\.docx$/i.test(path)) throw needsInfo('Which Word form (.docx) should I fill?');
+      const { scanWordForm, fillWordForm, profileValueFor, matchGivenValues } = await import('../generators/wordForm.js');
+      const fileName = String(path).split('/').pop();
+      const bytes = await ctx.readBytes(path);
+      const { fields, grids } = await scanWordForm(bytes);
+      if (!fields.length) {
+        throw needsInfo(`I could not find blanks to fill in ${fileName}. I look for lines like "Name: ______", a label alone on its line ("Section:"), signature lines, and empty table cells next to a label.${grids ? ' Its table with a heading row and empty rows is a list; to fill it from other files, ask me to fill the table instead.' : ''}`);
+      }
+      // 1. What the teacher said. 2. The teacher profile. 3. The source files (AI, checked).
+      const filled = matchGivenValues(fields, values);
+      const from = Object.fromEntries(Object.keys(filled).map((id) => [id, 'you']));
+      const today = new Date();
+      for (const f of fields) {
+        if (filled[f.id]) continue;
+        const v = profileValueFor(f.label, { teacher: ctx.teacher, schoolYear: ctx.schoolYear, today });
+        if (v) { filled[f.id] = v; from[f.id] = /^date$/i.test(f.label.replace(/\s*\(\d+\)$/, '')) ? "today's date" : 'your profile'; }
+      }
+      const open = fields.filter((f) => !filled[f.id]);
+      if (open.length && (sourcePaths.length || String(instructions).trim())) {
+        report('Reading your files for the missing details…');
+        const { text, visionParts } = sourcePaths.length ? await gatherSourceText(sourcePaths, ctx) : { text: '', visionParts: [] };
+        const labels = open.map((f) => f.label);
+        const raw = await ctx.llm({
+          system: ctx.docPersona,
+          ...(visionParts.length ? { parts: visionParts } : {}),
+          prompt: `Fill these blanks of a school form. Return ONLY a JSON object whose keys are exactly: ${JSON.stringify(labels)}. Each value is a short plain string copied from the teacher's instructions or the source files. Use "" when the value is not stated there; never guess or make one up.\nTeacher's instructions: ${ctx.masker.mask(String(instructions || ''))}${text ? `\n\nSource files:\n${text}` : ''}`,
+          json: true,
+          maxTokens: 1500,
+        });
+        const ans = ctx.masker.unmask(raw) || {};
+        const allowed = allowedTextFor(ctx, instructions, text).toLowerCase().replace(/\s+/g, ' ');
+        for (const f of open) {
+          const v = String(ans?.[f.label] ?? '').trim();
+          // Keep only values that really appear in what the teacher gave (text can be checked; a photo cannot).
+          if (v && allowed.includes(v.toLowerCase().replace(/\s+/g, ' '))) { filled[f.id] = v; from[f.id] = 'your files'; } else if (v && visionParts.length) { filled[f.id] = v; from[f.id] = 'a photo/scan (please check)'; }
+        }
+      }
+      const blank = fields.filter((f) => !filled[f.id]);
+      if (blank.length === fields.length) {
+        throw needsInfo(`${fileName} has ${fields.length} blank(s): ${fields.slice(0, 12).map((f) => f.label).join(', ')}${fields.length > 12 ? ', …' : ''}. What should go in them? You can type them (e.g. "${fields[0].label}: …") or tell me which file has the details.`);
+      }
+      const out = await fillWordForm(bytes, filled);
+      const file = await ctx.saveWorkingCopy(path, out, 'docx');
+      const spec = normalizeSheetSpec({
+        title: `Form filled — ${fileName}`,
+        sheets: [{ name: 'Blanks', columns: [{ header: 'Blank' }, { header: 'Filled with' }, { header: 'From' }], rows: fields.map((f) => [f.label, filled[f.id] || '(left blank)', from[f.id] || '']) }],
+      });
+      const usedToday = Object.values(from).includes("today's date");
+      const fromPhoto = fields.filter((f) => /photo/.test(from[f.id] || '')).map((f) => f.label);
+      return {
+        summary: `Filled ${fields.length - blank.length} of ${fields.length} blank(s) in ${file.name}.${blank.length ? ` Left blank (tell me what to put): ${blank.map((f) => f.label).join(', ')}.` : ''}${usedToday ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''}${fromPhoto.length ? ` Read from a photo/scan, please check: ${fromPhoto.join(', ')}.` : ''} The original ${fileName} was backed up and not changed.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${fields.length - blank.length} of ${fields.length} filled`, spec, files: [file], editable: false }],
+      };
+    },
+  },
+
   copy_per_learner: {
     label: 'One copy per learner',
     description: "Make one copy of the teacher's Word template for EVERY learner in a class list (certificates, parent letters, report-card comments, recognition awards, notices). Fields in the template are written {{Name}}, [Name], «Name» or <<Name>>, or the teacher names a sample text to replace (replaceText, e.g. {\"SAMPLE NAME\": \"Name\"}). Each field is filled from the class-list column with the same heading; values the same for everyone come from 'values' or the teacher profile (School, Adviser, School Year). Output: one combined Word file (one learner per page, for printing) plus a folder of separate files. Computed by code, nothing is sent to the AI.",

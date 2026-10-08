@@ -11,7 +11,7 @@ unless the feature needs reading a photo/scan.
 - [x] 2. Word: one copy per learner (certificates, parent letters, comments, awards) from one template + a class list
 - [x] 3. Photos: many photos (JPEG/PNG/HEIC) into one clean PDF in order + PDF compression
 - [x] 4. All files: hide learner details (names, LRNs) in a copy before sharing (Data Privacy Act)
-- [ ] 5. Word: fill your own Word form without {{blanks}} (empty lines and table cells)
+- [x] 5. Word: fill your own Word form without {{blanks}} (empty lines and table cells)
 
 ## Excel
 - [ ] 6. Computed columns written as formulas (Remarks Passed/Failed, rank, count passed/failed)
