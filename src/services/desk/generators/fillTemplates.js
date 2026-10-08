@@ -151,7 +151,8 @@ function cellText(cell) {
 const HEADER_WORDS = /^(no\.?|names?|learners?'?s?'? ?names?|learners?|students?|pupils?|male|female|boys?|girls?|total|highest possible score|hps|sex|gender)$/i;
 
 function looksLikePersonName(text) {
-  const t = String(text || '').trim();
+  // A list number in front ("1. Jose Dela Cruz", "12) Ana Reyes") is not part of the name.
+  const t = String(text || '').trim().replace(/^\d{1,3}\s*[.)-]\s*/, '');
   if (!t || t.length < 4 || t.length > 80) return false;
   if (HEADER_WORDS.test(t)) return false;
   if (/\d/.test(t)) return false;
@@ -270,4 +271,85 @@ export async function writeScoresIntoWorkbook(workbookBytes, {
 
   const bytes = toUint8(await wb.xlsx.writeBuffer());
   return { bytes, written, unmatched, skippedExisting };
+}
+
+/** A cell with nothing a teacher typed on purpose: empty, or only spaces/symbols (e.g. a stray "`"). */
+function isBlankLike(value) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return !/[\p{L}\p{N}]/u.test(value);
+  return false;
+}
+
+/**
+ * Fills several columns of the teacher's own table at once (one source per column),
+ * matching learners by name, keeping every format and formula. Optionally adds an
+ * =AVERAGE() formula per learner in an empty "Average" column.
+ *   columns: [{ targetColumn, label, scores: [{ name, score }] }]
+ * → { bytes, filled: [{ label, letter, written, unmatched, keptExisting }], symbolCellsReplaced, averageRows, rows }
+ */
+export async function fillColumnsInWorkbook(workbookBytes, { sheetName, nameColumn = 'B', columns = [], averageColumn = null } = {}) {
+  const wb = await loadWorkbook(workbookBytes);
+  const ws = (sheetName && wb.getWorksheet(sheetName)) || wb.worksheets[0];
+  if (!ws) throw new Error('Workbook has no worksheets.');
+  const nameCol = resolveColumn(ws, nameColumn);
+  if (!nameCol) throw new Error(`Name column "${nameColumn}" not found.`);
+
+  const candidates = [];
+  for (let r = 1; r <= ws.rowCount; r++) {
+    const text = cellText(ws.getRow(r).getCell(nameCol)).trim();
+    if (looksLikePersonName(text)) candidates.push({ row: r, name: text });
+  }
+  if (!candidates.length) throw new Error('I could not find the learner names in your file.');
+
+  const filled = [];
+  const symbolCellsReplaced = [];
+  for (const col of columns) {
+    const letterCol = resolveColumn(ws, col.targetColumn);
+    if (!letterCol) throw new Error(`Column "${col.targetColumn}" not found in your file.`);
+    const used = new Set();
+    const report = { label: col.label, letter: numberToLetter(letterCol), written: 0, unmatched: [], keptExisting: [] };
+    for (const entry of col.scores || []) {
+      const name = String(entry?.name ?? '').trim();
+      if (!name) continue;
+      let best = null;
+      for (const cnd of candidates) {
+        if (used.has(cnd.row)) continue;
+        const s = matchLearnerName(name, cnd.name);
+        if (s >= MATCH_MIN && (!best || s > best.s)) best = { ...cnd, s };
+      }
+      if (!best) { report.unmatched.push(name); continue; }
+      used.add(best.row);
+      const cell = ws.getRow(best.row).getCell(letterCol);
+      if (!isBlankLike(cell.value)) { report.keptExisting.push(`${report.letter}${best.row}`); continue; }
+      if (cell.value !== null && cell.value !== undefined && cell.value !== '') symbolCellsReplaced.push({ cell: `${report.letter}${best.row}`, was: String(cell.value) });
+      const num = typeof entry.score === 'number' ? entry.score : Number(String(entry.score ?? '').trim());
+      cell.value = Number.isFinite(num) ? num : String(entry.score ?? '');
+      report.written += 1;
+    }
+    filled.push(report);
+  }
+
+  // =AVERAGE() of the filled columns, only where the teacher's Average cell is empty.
+  const averageRows = [];
+  const avgCol = averageColumn ? resolveColumn(ws, averageColumn) : null;
+  if (avgCol) {
+    const letters = filled.map((f) => f.letter);
+    for (const { row } of candidates) {
+      const cell = ws.getRow(row).getCell(avgCol);
+      if (!isBlankLike(cell.value)) continue;
+      const nums = letters.map((l) => ws.getCell(`${l}${row}`).value).filter((v) => typeof v === 'number');
+      if (!nums.length) continue;
+      const result = Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100;
+      cell.value = { formula: `AVERAGE(${letters.map((l) => `${l}${row}`).join(',')})`, result };
+      averageRows.push(row);
+    }
+  }
+
+  const rows = candidates.map(({ row, name }) => ({
+    row,
+    name,
+    values: [...filled.map((f) => ws.getCell(`${f.letter}${row}`).value), avgCol ? (ws.getRow(row).getCell(avgCol).value?.result ?? ws.getRow(row).getCell(avgCol).value) : undefined],
+  }));
+  const bytes = toUint8(await wb.xlsx.writeBuffer());
+  return { bytes, filled, symbolCellsReplaced, averageRows, rows };
 }

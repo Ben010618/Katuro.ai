@@ -28,6 +28,7 @@ export const EXAM_FILES = [
   'Lesson Notes Photosynthesis.docx',
   'Memo 2026-114.pdf',
   'Seminar Certificate.pdf',
+  'Grades/conso.xlsx',
 ].map((p) => file(p));
 
 const ADVISER = { advisoryClass: 'Grade 5 - Rizal', teachingLoad: 'Math 5, English 5' };
@@ -55,6 +56,7 @@ export const EXAM_CASES = [
   { id: 'consolidate-which', topic: 'Grades', prompt: 'consolidate the grades for the report cards', expect: { action: ['ask'] } },
   { id: 'report-card-rizal', topic: 'Grades', prompt: 'report cards for Grade 5 Rizal, Term 1', expect: { action: RUN, tools: ['build_report_cards'] } },
   { id: 'combine-files', topic: 'Grades', prompt: 'combine the three Grade 5 Rizal grade files into one sheet', expect: { action: RUN, tools: ['consolidate_files', 'build_report_cards', 'make_spreadsheet'] } },
+  { id: 'fill-own-conso', topic: 'Grades', prompt: 'Can you edit and complete my conso.xlsx with the grades from the Grade 5 Rizal Math, English and Science files?', expect: { action: RUN, tools: ['fill_table_from_files'] } },
   { id: 'final-grade-nofile', topic: 'Grades', prompt: 'compute the final grade of my learner', expect: { action: ['ask'] } },
   { id: 'transfer', topic: 'Encoding', prompt: 'transfer the Quiz 1 scores of Grade 7 Sampaguita into my Class Record Grade 7 Science', expect: { action: RUN, tools: ['transfer_data', 'encode_scores'] } },
   { id: 'sf1-edit', topic: 'School forms', prompt: 'In the SF1 Grade 7 Sampaguita, put T/O in the remarks of the learner in row 12', expect: { action: RUN, tools: ['edit_file'] } },
