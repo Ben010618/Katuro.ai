@@ -148,6 +148,43 @@ function documentArtifact(spec, files, extra = {}) {
 }
 
 /** Finds the score table in a parsed spreadsheet (or asks the vision model for a photo/scan). */
+/**
+ * Names and the ONE value column of a simple grade/score file (e.g. STUDENT | Grade).
+ * Several number columns: the one headed Grade / Rating / Final / Term / Average is
+ * used; otherwise KaTuro asks. → [{ name, score }]
+ */
+async function readOneValueColumn(path, ctx) {
+  const parsed = await ctx.readParsed(path);
+  const file = String(path).split('/').pop();
+  const sheet = (parsed.sheets || []).find((s) => (s.rows || []).length > 1);
+  if (!sheet) throw needsInfo(`${file} has no table I can read (it should have a names column and a grade column).`);
+  const rows = sheet.rows;
+  const text = (v) => (v === null || v === undefined ? '' : String(v)).trim();
+  let headerRow = -1; let nameCol = -1;
+  for (let r = 0; r < Math.min(rows.length, 15) && headerRow < 0; r++) {
+    (rows[r] || []).forEach((v, c) => { if (headerRow < 0 && /name|learner|pangalan|student|pupil/i.test(text(v))) { headerRow = r; nameCol = c; } });
+  }
+  if (headerRow < 0) throw needsInfo(`I could not find the names column in ${file}.`);
+  const learners = rows.slice(headerRow + 1).filter((row) => /[A-Za-zÑñ]{2,}/.test(text((row || [])[nameCol])) && !/^(total|average|mean|highest|lowest|male|female|boys?|girls?)\b/i.test(text((row || [])[nameCol])));
+  const width = Math.max(...rows.slice(headerRow, headerRow + 1 + learners.length).map((r) => (r || []).length));
+  const numericCols = [];
+  for (let c = 0; c < width; c++) {
+    if (c === nameCol) continue;
+    const vals = learners.map((row) => text((row || [])[c])).filter(Boolean);
+    const nums = vals.filter((v) => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100);
+    if (learners.length && nums.length >= Math.max(1, Math.ceil(learners.length * 0.6))) numericCols.push({ c, header: text(rows[headerRow][c]) });
+  }
+  let col = numericCols.length === 1 ? numericCols[0] : null;
+  if (!col && numericCols.length > 1) {
+    const named = numericCols.filter((x) => /grade|rating|final|term|average|ave\b/i.test(x.header) && !/total|hps|highest/i.test(x.header));
+    if (named.length === 1) col = named[0];
+    else throw needsInfo(`${file} has several number columns (${numericCols.map((x) => x.header || `column ${x.c + 1}`).join(', ')}). Which one should go into your table?`);
+  }
+  if (!col) throw needsInfo(`I could not find a grade or score column in ${file}.`);
+  return learners.map((row) => ({ name: text(row[nameCol]), score: text(row[col.c]) === '' ? null : Number(text(row[col.c])) }))
+    .filter((v) => v.score !== null && Number.isFinite(v.score));
+}
+
 async function loadScoreTable(path, ctx, { sheet } = {}) {
   const parsed = await ctx.readParsed(path);
   if (parsed.sheets?.length) {
@@ -387,7 +424,7 @@ export const TOOLS = {
 
   consolidate_files: {
     label: 'Combine files into one Excel',
-    description: "Combine MANY existing files into ONE Excel workbook (consolidate, compile, merge or put together the data of several files or a whole folder). Every spreadsheet sheet and Word table is copied exactly by code (never retyped), photos/scans of tables are read one by one, and an Index sheet lists each file and what was taken. Always use this, not make_spreadsheet, when the data comes from several existing files.",
+    description: "Combine MANY existing files into ONE Excel workbook (consolidate, compile, merge or put together the data of several files or a whole folder). Every spreadsheet sheet and Word table is copied exactly by code (never retyped), photos/scans of tables are read one by one, and an Index sheet lists each file and what was taken. Always use this, not make_spreadsheet, when the data comes from several existing files. NOT for filling or completing the teacher's own existing table/template (use fill_table_from_files), and not for report cards (use build_report_cards).",
     args: '{ "sourcePaths": [string], "title"?: string }',
     async run({ sourcePaths = [], title = '' }, ctx, report) {
       const paths = [...new Set(sourcePaths)];
@@ -857,6 +894,81 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         sheets: [{ name: 'Encoded', columns: [{ header: 'Learner (source)' }, { header: 'Matched name in your file' }, { header: 'Row' }, { header: 'Score' }], rows: result.written.map((w) => [w.name, w.matchedName, w.row, w.score]) }],
       });
       return { summary: `${parts.join('; ')}. Your original is untouched (backup in ${file.backups[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); edited copy: ${file.name}`, artifacts: [{ type: 'sheet', title: spec.title, subtitle: parts.join(' · '), spec, files: [file], editable: false }] };
+    },
+  },
+
+  fill_table_from_files: {
+    label: 'Fill my table from several files',
+    description: "Fill the teacher's OWN existing Excel table (their consolidation sheet, template or class summary, e.g. conso.xlsx with columns AP | FILIPINO | MATH | SCIENCE | Average) with values taken from SEVERAL files, one column per file (e.g. AP_Term1.xlsx, Filipino_Term1.xlsx…). Learners are matched by name; each file goes to the column whose heading names the same subject (or as the teacher says); an empty Average column gets an =AVERAGE formula. Computed by code, no AI. Safe-edit SOP: the original is backed up and a working copy '<name> (KaTuro edit).xlsx' is filled. Use this, not consolidate_files, whenever the teacher wants their own file edited/completed/filled with data from other files.",
+    args: '{ "targetPath": string, "sourcePaths": [string], "columnFor"?: { "<source file name>": "<column heading or letter in the target>" }, "sheetName"?: string }',
+    async run({ targetPath, sourcePaths = [], columnFor = {}, sheetName }, ctx, report) {
+      if (!targetPath || !/\.xlsx$/i.test(targetPath)) throw new Error('Tell me which Excel file to fill (it must be .xlsx).');
+      const sources = [...new Set(sourcePaths)].filter((p) => p && p !== targetPath);
+      if (!sources.length) throw needsInfo('Which files should I take the data from?');
+      const { matchLearningArea } = await import('../knowledge/gradingRules.js');
+      const { findWorkbookColumns, fillColumnsInWorkbook } = await import('../generators/fillTemplates.js');
+      const fileName = (p) => String(p).split('/').pop();
+      const stem = (p) => fileName(p).replace(/\.[^.]+$/, '');
+
+      // The teacher's table: its header row (the one with the names heading) and columns.
+      const targetBytes = await ctx.readBytes(targetPath);
+      const { headers } = await findWorkbookColumns(targetBytes, sheetName);
+      const nameHeader = headers.find((h) => /name|learner|pangalan|student|pupil/i.test(h.text));
+      if (!nameHeader) throw needsInfo(`I could not find the names column in ${fileName(targetPath)}. Which column has the learners' names?`);
+      const headerRow = headers.filter((h) => h.row === nameHeader.row && h.col !== nameHeader.col);
+      const averageHeader = headerRow.find((h) => /^(average|ave\.?|avg\.?|general\s+average|gen\.?\s*ave\.?|mean)$/i.test(h.text.trim()));
+      const fillable = headerRow.filter((h) => h !== averageHeader);
+
+      // Each source → one column of the table.
+      const pick = (src) => {
+        const asked = columnFor[fileName(src)] || columnFor[src] || columnFor[stem(src)];
+        if (asked) return fillable.find((h) => h.letter === String(asked).toUpperCase() || h.text.trim().toLowerCase() === String(asked).trim().toLowerCase()) || null;
+        const area = matchLearningArea(stem(src));
+        if (!area) return null;
+        const hits = fillable.filter((h) => matchLearningArea(h.text)?.key === area.key);
+        return hits.length === 1 ? hits[0] : null;
+      };
+      const plan = sources.map((src) => ({ src, header: pick(src) }));
+      const unplaced = plan.filter((p) => !p.header);
+      const taken = new Map();
+      for (const p of plan.filter((x) => x.header)) taken.set(p.header.letter, [...(taken.get(p.header.letter) || []), fileName(p.src)]);
+      const clash = [...taken.entries()].find(([, files]) => files.length > 1);
+      const columnList = fillable.map((h) => `${h.text.trim()} (column ${h.letter})`).join(', ');
+      if (unplaced.length) throw needsInfo(`I could not tell which column of ${fileName(targetPath)} ${unplaced.map((p) => fileName(p.src)).join(', ')} ${unplaced.length > 1 ? 'belong' : 'belongs'} to. Your columns: ${columnList}. Tell me, e.g. "${fileName(unplaced[0].src)} goes to ${fillable[0]?.text.trim() || 'column B'}".`);
+      if (clash) throw needsInfo(`${clash[1].join(' and ')} both look like column ${clash[0]} of ${fileName(targetPath)}. Which file goes to which column? Your columns: ${columnList}.`);
+
+      // Each source's values: names + its one grade/score column.
+      const columns = [];
+      for (const { src, header } of plan) {
+        report(`Reading ${fileName(src)}…`);
+        const values = await readOneValueColumn(src, ctx);
+        ctx.masker.addNames(values.map((v) => v.name));
+        columns.push({ targetColumn: header.letter, label: `${header.text.trim()} ← ${fileName(src)}`, scores: values });
+      }
+
+      report(`Filling ${fileName(targetPath)}…`);
+      const result = await fillColumnsInWorkbook(targetBytes, { sheetName, nameColumn: nameHeader.letter, columns, averageColumn: averageHeader?.letter || null });
+      const file = await ctx.saveWorkingCopy(targetPath, result.bytes, 'xlsx');
+
+      const parts = result.filled.map((f) => `${f.label}: ${f.written} filled${f.unmatched.length ? `, ${f.unmatched.length} name(s) not found (${f.unmatched.slice(0, 3).join(', ')}${f.unmatched.length > 3 ? '…' : ''})` : ''}${f.keptExisting.length ? `, ${f.keptExisting.length} cell(s) already had a value and were kept (${f.keptExisting.slice(0, 3).join(', ')})` : ''}`);
+      const notes = [];
+      if (result.averageRows.length) notes.push(`${averageHeader.text.trim()} (column ${averageHeader.letter}) = the plain average of the filled subjects (=AVERAGE formula, not rounded; change it if your school rounds)`);
+      if (result.symbolCellsReplaced.length) notes.push(`replaced stray symbols in ${result.symbolCellsReplaced.map((s) => `${s.cell} ("${s.was}")`).join(', ')}`);
+      const empty = fillable.filter((h) => !plan.some((p) => p.header === h));
+      if (empty.length) notes.push(`no file was given for ${empty.map((h) => h.text.trim()).join(', ')}, so ${empty.length > 1 ? 'those columns stay' : 'that column stays'} as it was`);
+
+      const spec = normalizeSheetSpec({
+        title: `Filled — ${file.name}`,
+        sheets: [{
+          name: 'Filled table',
+          columns: [{ header: 'Row' }, { header: nameHeader.text.trim() }, ...result.filled.map((f) => ({ header: f.label.split(' ← ')[0] })), ...(averageHeader ? [{ header: averageHeader.text.trim() }] : [])],
+          rows: result.rows.map((r) => [r.row, r.name, ...r.values.slice(0, result.filled.length).map((v) => (v === null || v === undefined ? '' : v)), ...(averageHeader ? [r.values[result.filled.length] ?? ''] : [])]),
+        }],
+      });
+      return {
+        summary: `Filled your ${fileName(targetPath)} from ${columns.length} file(s). ${parts.join('; ')}.${notes.length ? ` Notes: ${notes.join('; ')}.` : ''} Your original is untouched (backup in ${file.backups?.[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); the filled copy is ${file.name}. Done by code; no names or grades were sent to the AI.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${columns.length} column(s) filled`, spec, files: [file], editable: false }],
+      };
     },
   },
 
