@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
+import process from 'node:process';
 import ExcelJS from 'exceljs';
 import PizZip from 'pizzip';
 import { callGeminiProxy } from '../../geminiConfig';
