@@ -897,6 +897,127 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  check_answer_sheets: {
+    label: 'Check answer sheets',
+    description: "Check a stack of learners' answer sheets from photos (a folder of JPEG/PNG/HEIC pictures, one sheet each) against the answer key: AI reads each photo (the name and the answer marked for each item), then code scores every sheet, flags unclear or double-marked items and names not in the class list, and saves an Excel file with the scores and a 1/0 item sheet (ready for item analysis). The key comes from what the teacher typed (answerKey, e.g. \"1. A 2. C 3. B\" or \"ACBD\") or a file (answerKeyPath: Word, Excel, text or a photo of the key).",
+    args: '{ "folder"?: string, "paths"?: [string], "answerKey"?: string, "answerKeyPath"?: string, "listPath"?: string, "title"?: string }',
+    async run({ folder, paths = [], answerKey, answerKeyPath, listPath, title }, ctx, report) {
+      const A = await import('../generators/answerSheets.js');
+      const { PHOTO_FILE, naturalSort } = await import('../generators/photoPdf.js');
+      let photos = [...paths];
+      if (folder) photos = [...photos, ...ctx.listFiles(folder).filter((p) => PHOTO_FILE.test(p) && p !== answerKeyPath)];
+      photos = naturalSort([...new Set(photos.filter((p) => PHOTO_FILE.test(p)))]);
+      if (!photos.length) throw needsInfo(folder ? `I found no photos (JPEG, PNG or HEIC) directly inside "${folder}". Which folder has the answer sheet photos?` : 'Which folder (or photos) has the answer sheets?');
+      if (photos.length > 120) throw needsInfo(`That is ${photos.length} photos. I can check up to 120 sheets at a time; split them into smaller folders.`);
+
+      const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return typeof btoa === 'function' ? btoa(s) : globalThis.Buffer.from(s, 'binary').toString('base64'); };
+      const photoParts = async (p) => {
+        let bytes = await ctx.readBytes(p);
+        let mime = /\.png$/i.test(p) ? 'image/png' : 'image/jpeg';
+        if (/\.(heic|heif)$/i.test(p)) {
+          bytes = await ctx.heicToJpeg(bytes);
+          if (!bytes) throw new Error(`${p.split('/').pop()} is an iPhone photo (HEIC). Converting it needs the KaTuroDesk desktop app.`);
+          mime = 'image/jpeg';
+        }
+        return visionPartsFor({ needsVision: true, vision: { mimeType: mime, base64: toB64(bytes) } }, async () => bytes);
+      };
+
+      // 1. The answer key (typed, a file, or a photo of the key).
+      let keyText = answerKey || '';
+      let keyFromPhoto = false;
+      if (!keyText && answerKeyPath) {
+        if (PHOTO_FILE.test(answerKeyPath)) {
+          report('Reading the answer key photo…');
+          const k = await ctx.llm({ system: ctx.docPersona, parts: await photoParts(answerKeyPath), prompt: 'This is a test answer key. Copy the correct answer for every item in order. Return ONLY JSON {"answers": {"1": "A", "2": "C", ...}}. Write "?" for any you cannot read.', json: true, maxTokens: 2000 });
+          const obj = k?.answers || {};
+          keyText = Object.keys(obj).sort((a, b) => Number(a) - Number(b)).map((n) => `${n}. ${obj[n]}`).join(' ');
+          keyFromPhoto = true;
+        } else {
+          keyText = String((await ctx.readParsed(answerKeyPath)).text || '');
+        }
+      }
+      if (!keyText.trim()) throw needsInfo('What is the answer key? Type it (e.g. "1. A 2. C 3. B …" or "ACBDA…"), or tell me which file has it.');
+      const parsedKey = A.parseAnswerKey(keyText);
+      if (parsedKey.error || parsedKey.key.includes('?')) throw needsInfo(`I could not use that answer key (${parsedKey.error || 'some answers could not be read'}). Please type it like "1. A 2. C 3. B …".`);
+      const key = parsedKey.key;
+      if (key.length > 150) throw needsInfo(`The key has ${key.length} items. I can check tests of up to 150 items.`);
+
+      // 2. Class list (optional) for matching the names written on the sheets.
+      let roster = [];
+      if (listPath) {
+        const P = await import('../generators/privacyCopy.js');
+        const parsed = await ctx.readParsed(listPath);
+        roster = P.mergeLearners(...(parsed.sheets || []).map((s) => P.learnersFromRows(s.rows || []).learners)).map((l) => l.name);
+        if (!roster.length) throw needsInfo(`I could not find the learners in ${listPath.split('/').pop()}. It needs a heading row with a names column.`);
+      }
+      const { matchLearnerName } = await import('../generators/fillTemplates.js');
+
+      // 3. Read each sheet (AI), score it (code).
+      const results = [];
+      const failed = [];
+      let next = 0;
+      const worker = async () => {
+        while (next < photos.length) {
+          const i = next;
+          next += 1;
+          const p = photos[i];
+          report(`Reading sheet ${i + 1} of ${photos.length}…`);
+          try {
+            const read = await ctx.llm({
+              system: `You read learners' answer sheets for a Filipino DepEd teacher. Copy exactly what the learner marked or wrote; never correct it or guess.\n${GROUNDING_RULES}`,
+              parts: await photoParts(p),
+              prompt: `This photo is one learner's answer sheet for a ${key.length}-item test. Return ONLY JSON {"name": "<the learner's name as written, or empty>", "answers": {"1": "<answer>", ...}} for items 1 to ${key.length}. Use the letter marked/shaded/encircled or the word written; "" when the item is left blank; "?" when it is unclear, erased, or has two answers.`,
+              json: true,
+              maxTokens: 2500,
+            });
+            const s = A.scoreSheet(read, key);
+            const name = String(read?.name || '').trim();
+            let matched = '';
+            if (roster.length && name) {
+              const best = roster.map((r) => ({ r, score: matchLearnerName(name, r) })).sort((a, b) => b.score - a.score)[0];
+              if (best && best.score >= 0.8) matched = best.r;
+            }
+            results[i] = { file: p.split('/').pop(), name, matched, ...s };
+          } catch (err) {
+            failed.push(`${p.split('/').pop()} (${err?.message || 'could not be read'})`);
+          }
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+      const done = results.filter(Boolean);
+      if (!done.length) throw new Error(`None of the ${photos.length} photos could be read. ${failed.slice(0, 2).join('; ')}`);
+
+      // 4. Results workbook: Scores + Responses (1/0 per item, for item analysis).
+      const checkNote = (r) => [
+        !r.name && 'no name read',
+        roster.length && r.name && !r.matched && 'name not in the class list',
+        r.unclear.length && `unclear: item${r.unclear.length > 1 ? 's' : ''} ${r.unclear.join(', ')}`,
+        r.blank.length && `blank: ${r.blank.join(', ')}`,
+      ].filter(Boolean).join('; ');
+      const label = (r) => r.matched || r.name || `(no name) ${r.file}`;
+      const spec = normalizeSheetSpec({
+        title: title || 'Answer sheet results',
+        sheets: [
+          { name: 'Scores', columns: [{ header: 'No.' }, { header: 'Learner' }, ...(roster.length ? [{ header: 'Name as written' }] : []), { header: 'Score' }, { header: 'Items' }, { header: 'Percent' }, { header: 'Wrong items' }, { header: 'Please check' }, { header: 'Photo' }],
+            rows: done.map((r, i) => [i + 1, label(r), ...(roster.length ? [r.name] : []), r.score, r.total, Math.round((r.score / r.total) * 100), r.wrong.join(', '), checkNote(r), r.file]) },
+          { name: 'Responses', columns: [{ header: 'Name' }, ...key.map((_, i) => ({ header: String(i + 1) })), { header: 'Total' }],
+            rows: done.map((r) => [label(r), ...r.responses, r.score]) },
+          { name: 'Answer key', columns: [{ header: 'Item' }, { header: 'Answer' }], rows: key.map((k, i) => [i + 1, k]) },
+        ],
+      });
+      const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+      const file = await ctx.saveOutput(`${slug(spec.title)}.xlsx`, await buildSheetWorkbook(spec), 'xlsx');
+      const scores = done.map((r) => r.score);
+      const avg = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+      const flagged = done.filter((r) => checkNote(r)).length;
+      const hard = A.hardestItems(done, key.length).slice(0, 3).filter((h) => h.percent < 75);
+      return {
+        summary: `Checked ${done.length} of ${photos.length} answer sheet(s) against the ${key.length}-item key${keyFromPhoto ? ' (read from the photo of the key; please check it on the Answer key sheet)' : ''}: average ${avg}/${key.length}, highest ${Math.max(...scores)}, lowest ${Math.min(...scores)}.${hard.length ? ` Most missed: ${hard.map((h) => `item ${h.item} (${h.percent}% correct)`).join(', ')}.` : ''} ${flagged ? `${flagged} sheet(s) need a quick look (see "Please check").` : 'No unclear items.'}${failed.length ? ` Could not read: ${failed.join('; ')}.` : ''} The answers were read from photos by AI and scored by code: please spot-check a few sheets before recording. Saved ${file.name}; ask me for an item analysis of it next.`,
+        artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${done.length} sheet(s)`, spec, files: [file], editable: true }],
+      };
+    },
+  },
+
   check_grade_sheets: {
     label: 'Check grade sheets for errors',
     description: "Check the teacher's grade sheets / class records / consolidation files for mistakes BEFORE they submit: missing grades, text where a grade should be, grades outside 0-100 or below 60, scores above the highest possible score, totals and averages that do not add up, duplicate or wrong LRNs, the same learner spelled differently across files, and learners missing from a file. Read-only (files are not changed); computed by code, nothing is sent to the AI. Use for 'check my grades', 'any errors before I submit', 'verify my class record'.",

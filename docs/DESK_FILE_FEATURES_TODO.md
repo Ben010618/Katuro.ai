@@ -28,7 +28,7 @@ unless the feature needs reading a photo/scan.
 - [x] 13. Place your saved e-signature on a document
 
 ## Photos
-- [ ] 14. Batch answer-sheet checking from a folder of photos
+- [x] 14. Batch answer-sheet checking from a folder of photos
 
 ## PowerPoint
 - [ ] 15. Edit an existing deck (fix typos, update content, restyle to a school template)

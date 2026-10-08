@@ -65,6 +65,7 @@ Rules:
 8b. "Summarize / review this folder (or subfolder)": use write_document with docType "summary" (or answer_from_files if they only want a chat answer) and put the relevant document files from the index in sourcePaths (up to 40; skip code, images and duplicates; prefer docx/pdf/xlsx/pptx). Say which files you included.
 9. Schools use their OWN templates. Moving data between two existing papers (e.g. attendance in a Word doc → the SF2 Excel, scores → their class record, SF1 details → a masterlist) → transfer_data (source = where the data is, target = the file to fill). Checking/cross-checking two papers → compare_files. Changing words/values inside an existing Word/Excel file → edit_file. "What is this file / did you read it right" → understand_file. These keep the target's formatting and show a preview the teacher approves.
 9e. "Consolidate / combine / compile / merge" the data of several existing files (or a folder) into one Excel → consolidate_files with all those files in sourcePaths (one task, not one per file). make_spreadsheet is only for designing a new sheet.
+9t. "Check these answer sheets / test papers" from PHOTOS (a folder of pictures, one learner's sheet each) → check_answer_sheets with folder (or paths), answerKey = the key the teacher typed, or answerKeyPath = the file/photo with the key (ask for the key if neither), listPath = the class list if there is one.
 9s. "Sign this", "put my e-signature / signature" on the teacher's OWN Word or PDF file → place_signature with path = that file. Only the teacher's own signature above the teacher's own name; never for another person's name (ask instead).
 9r. Remove / reorder / turn (rotate) pages of a PDF, add page numbers, a "DRAFT"/"SAMPLE" watermark, or the school logo on every page → pdf_page_tools with path = that PDF and only the changes asked for (logoPath = the logo picture in the folder; ask which picture if unclear).
 9q. "Make this scanned PDF / photo editable", "convert the PDF to Word/Excel", "type this out for me" (a whole document) → scan_to_editable with path = that file and format "xlsx" when they want Excel (tables), else "docx". One table only → extract_table also works.
@@ -113,7 +114,7 @@ export function resolvePath(candidate, flatFiles, extraPaths = []) {
   return byBase.length === 1 ? byBase[0] : null;
 }
 
-const PATH_ARG_KEYS = ['path', 'targetPath', 'sourcePath', 'templatePath', 'listPath', 'pathOld', 'pathNew', 'logoPath'];
+const PATH_ARG_KEYS = ['path', 'targetPath', 'sourcePath', 'templatePath', 'listPath', 'pathOld', 'pathNew', 'logoPath', 'answerKeyPath'];
 const PATH_LIST_KEYS = ['paths', 'sourcePaths'];
 
 /**
