@@ -2059,6 +2059,102 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  submission_pack: {
+    label: 'Submission pack',
+    description: "Put several files together as ONE ready-to-submit PDF, in the order given: PDFs, Word, Excel, PowerPoint (one slide per page) and photos are turned into pages, page numbers are added, a cover page goes in front (DepEd header, title, submitted by/to, date, and the contents with the page each document starts on), and the result is made smaller for sending. \"folder\" takes every file in that folder in file-name order. The original files are not changed.",
+    args: '{ "paths"?: [string], "folder"?: string, "title": string, "subtitle"?: string, "submittedTo"?: string, "cover"?: boolean, "pageNumbers"?: boolean }',
+    async run({ paths = [], folder, title, subtitle, submittedTo, cover = true, pageNumbers = true }, ctx, report) {
+      const { naturalSort, PHOTO_FILE, preparePhoto } = await import('../generators/photoPdf.js');
+      let list = [...paths];
+      if (folder) list = [...list, ...naturalSort(ctx.listFiles(folder)).filter((p) => !list.includes(p))];
+      const OK = /\.(pdf|docx|xlsx|xlsm|csv|pptx|jpe?g|png|heic|heif)$/i;
+      const skipped = list.filter((p) => !OK.test(p));
+      list = list.filter((p) => OK.test(p));
+      if (!list.length) throw needsInfo('Which files should go into the submission pack, and in what order?');
+      if (list.length > 60) throw needsInfo(`That is ${list.length} files. I can put up to 60 files in one pack.`);
+      if (!String(title || '').trim()) throw needsInfo('What is the title of this submission (for the cover page)? For example "Term 1 Submission - Grade 5 Rizal".');
+      const { imagesToPdf, compressPdf } = await import('../generators/pdfTools.js');
+      const { joinPdfs, addCover, numberPages } = await import('../generators/submissionPack.js');
+      const nameOf = (p) => String(p).split('/').pop();
+      const pdfs = [];
+      const notes = [];
+      // 1. Every file as PDF pages.
+      for (const [i, p] of list.entries()) {
+        report(`Preparing ${i + 1} of ${list.length}: ${nameOf(p)}…`);
+        const ext = p.split('.').pop().toLowerCase();
+        if (ext === 'pdf') {
+          pdfs.push(await ctx.readBytes(p));
+        } else if (PHOTO_FILE.test(p)) {
+          const img = await preparePhoto({ bytes: await ctx.readBytes(p), name: p }, { heicToJpeg: ctx.heicToJpeg });
+          pdfs.push(await imagesToPdf([img]));
+        } else if (ext === 'pptx') {
+          const { readDeck, buildHandout } = await import('../generators/slideHandout.js');
+          pdfs.push(await buildHandout(await readDeck(await ctx.readBytes(p)), { perPage: 1, paper: 'long' }));
+          notes.push(`${nameOf(p)}: slides drawn in a simplified way`);
+        } else if (ext === 'docx') {
+          const parsed = await ctx.readParsed(p);
+          const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.35}table{border-collapse:collapse;width:100%}td,th{border:1px solid #444;padding:4px;vertical-align:top}img{max-width:100%}</style></head><body>${parsed.html || ''}</body></html>`;
+          let pdf = await ctx.htmlToPdf(html);
+          if (!pdf) {
+            // Outside the desktop app: the words and tables, plainly laid out.
+            const blocks = [];
+            String(parsed.text || '').split(/\n+/).forEach((t) => { if (t.trim()) blocks.push({ type: 'paragraph', text: t.trim() }); });
+            for (const t of parsed.tables || []) { const rows = (Array.isArray(t) ? t : t.rows || []).map((r) => r.map((c) => String(c ?? ''))); if (rows.length) blocks.push({ type: 'table', columns: rows[0], rows: rows.slice(1) }); }
+            pdf = await ctx.renderPdf(normalizeDocumentSpec({ title: nameOf(p).replace(/\.docx$/i, ''), blocks }));
+            notes.push(`${nameOf(p)}: plain layout (open KaTuroDesk for the full Word look)`);
+          }
+          pdfs.push(pdf);
+        } else {
+          // Excel / CSV: each sheet as a table.
+          const parsed = await ctx.readParsed(p);
+          const blocks = [];
+          for (const s of parsed.sheets || []) {
+            const rows = (s.rows || []).filter((r) => (r || []).some((v) => String(v ?? '').trim())).map((r) => (r || []).map((v) => String(v ?? '')));
+            if (!rows.length) continue;
+            const width = Math.max(...rows.map((r) => r.length));
+            const pad = (r) => [...r, ...Array(width - r.length).fill('')];
+            blocks.push({ type: 'heading', level: 2, text: s.name }, { type: 'table', columns: pad(rows[0]), rows: rows.slice(1).map(pad) });
+          }
+          if (!blocks.length) { notes.push(`${nameOf(p)}: empty, left out`); continue; }
+          const wide = Math.max(...blocks.filter((b) => b.type === 'table').map((b) => b.columns.length)) > 7;
+          pdfs.push(await ctx.renderPdf(normalizeDocumentSpec({ title: nameOf(p).replace(/\.[^.]+$/, ''), orientation: wide ? 'landscape' : 'portrait', blocks })));
+        }
+      }
+      const included = list.filter((p) => !notes.some((n) => n.startsWith(`${nameOf(p)}: empty`)));
+      // 2. Join, number, cover.
+      report('Putting the pack together…');
+      const joined = await joinPdfs(pdfs);
+      let bytes = pageNumbers ? await numberPages(joined.bytes) : joined.bytes;
+      if (cover) {
+        const t = ctx.teacher;
+        bytes = await addCover(bytes, {
+          title: String(title).trim(),
+          subtitle,
+          header: t.school || t.division || t.region ? { region: t.region, division: t.division, school: t.school } : null,
+          submittedBy: t.fullName,
+          position: t.position,
+          submittedTo,
+          date: new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }),
+        }, included.map((p, i) => ({ title: nameOf(p).replace(/\.[^.]+$/, '').replace(/^\d{1,3}[\s._)-]+(?=\S)/, ''), page: joined.starts[i] }))); // "1 SF2" → "SF2" (the list is numbered)
+      }
+      // 3. Smaller for sending (only kept when it really is smaller).
+      const before = bytes.length;
+      try {
+        const { browserShrink } = await import('../generators/photoPdf.js');
+        const small = await compressPdf(bytes, { shrinkJpeg: ctx.shrinkJpeg || ((b, o) => browserShrink(b, 'image/jpeg', { ...o, asStored: true })) });
+        if (small.after < before * 0.95) bytes = small.bytes;
+      } catch {
+        // keep the uncompressed pack
+      }
+      const file = await ctx.saveOutput(`${String(title).trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 80)}.pdf`, bytes, 'pdf');
+      const mb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+      return {
+        summary: `Made ${file.name}: ${included.length} document(s), ${joined.pages} page(s)${cover ? ' plus the cover page with the contents' : ''}${pageNumbers ? ', page numbers at the bottom' : ''}; ${mb(bytes.length)}${bytes.length < before ? ` (made smaller from ${mb(before)})` : ''}. Order: ${included.map(nameOf).join(', ')}.${notes.length ? ` Notes: ${notes.join('; ')}.` : ''}${skipped.length ? ` Left out (not a document or photo): ${skipped.map(nameOf).join(', ')}.` : ''} Your original files were not changed.`,
+        artifacts: [{ type: 'files', title: 'Submission pack', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   convert_to_pdf: {
     label: 'Convert to PDF',
     description: 'Convert Word documents or photos (JPEG, PNG, iPhone HEIC) to PDF. Many photos become ONE clean PDF, one photo per page, turned upright and made smaller so the file is easy to send. Photos go in file-name order (IMG_2 before IMG_10) unless order is "as-given". "folder" takes every photo in that folder.',

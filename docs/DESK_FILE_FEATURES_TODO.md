@@ -37,4 +37,4 @@ unless the feature needs reading a photo/scan.
 ## Across all files
 - [x] 17. Search inside every file in the folder ("which file has Juan's Term 1 grades?")
 - [x] 18. Organize the folder (Grade / Section / Term folders, consistent names, flag duplicates)
-- [ ] 19. Submission pack: merge + page numbers + cover page + compress → one ready PDF
+- [x] 19. Submission pack: merge + page numbers + cover page + compress → one ready PDF
