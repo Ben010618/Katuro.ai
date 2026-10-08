@@ -13,7 +13,7 @@ import { isLabel, cleanLabel } from './wordForm.js';
 const lib = () => import('pdf-lib');
 
 /** Text items of each page, grouped into lines (pdfjs). → [[{ str, x, y, w, h }]] per page */
-async function pageLines(pdfjsDoc) {
+export async function pageLines(pdfjsDoc) {
   const pages = [];
   for (let p = 1; p <= pdfjsDoc.numPages; p += 1) {
     const page = await pdfjsDoc.getPage(p);

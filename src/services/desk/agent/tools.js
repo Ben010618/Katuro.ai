@@ -1180,6 +1180,93 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     },
   },
 
+  scan_to_editable: {
+    label: 'Scan to Word/Excel',
+    description: "Turn a whole PDF (scanned or digital) or a photo of a document into an editable Word file (headings, paragraphs and tables, page by page) or Excel file (every table on its own sheet). PDFs that have text are converted by code with the exact words; scans and photos are read by AI vision, which copies the words as written and marks unreadable parts [unclear]. For just ONE table into Excel, extract_table also works. The original is not changed.",
+    args: '{ "path": string, "format"?: "docx" | "xlsx" }',
+    async run({ path, format = 'docx' }, ctx, report) {
+      const ext = String(path || '').split('.').pop().toLowerCase();
+      if (!path || !['pdf', 'jpg', 'jpeg', 'png', 'heic', 'heif'].includes(ext)) throw needsInfo('Which scanned PDF or photo should I turn into an editable file?');
+      const out = format === 'xlsx' ? 'xlsx' : 'docx';
+      const S = await import('../generators/scanConvert.js');
+      const fileName = String(path).split('/').pop();
+      const base = fileName.replace(/\.[^.]+$/, '');
+      let blocks = [];
+      let how = 'ai';
+      let bytes = await ctx.readBytes(path);
+      const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return typeof btoa === 'function' ? btoa(s) : globalThis.Buffer.from(s, 'binary').toString('base64'); };
+      const askAI = async (parts, label) => {
+        const res = await ctx.llm({
+          system: `You transcribe scanned school documents for a Filipino DepEd teacher. Copy every word and number exactly as written, in reading order; never summarize, correct, translate or add anything. Write [unclear] for any word or value you cannot read.\n${GROUNDING_RULES}`,
+          prompt: `Transcribe ${label} into JSON {"blocks":[...]} where each block is {"type":"heading","level":1|2|3,"text":"..."}, {"type":"paragraph","text":"..."}, {"type":"table","columns":["..."],"rows":[["..."]]} (keep every row and column of each table, "" for empty cells), or {"type":"pageBreak"} between pages.`,
+          parts,
+          json: true,
+          maxTokens: 16000,
+        });
+        return S.tidyBlocks(res?.blocks);
+      };
+      if (ext === 'pdf') {
+        const { loadPdfjs } = await import('../readers/index.js');
+        const { pageLines } = await import('../generators/pdfForm.js');
+        const pdfjs = await loadPdfjs();
+        const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
+        let pages;
+        try { pages = await pageLines(doc); } finally { doc.destroy?.(); }
+        if (pages.length > 60) throw needsInfo(`${fileName} has ${pages.length} pages. I can convert up to 60 pages at a time; tell me which pages you need, or split it first.`);
+        const textPages = pages.filter((p) => p.lines.length > 2).length;
+        if (textPages >= Math.ceil(pages.length / 2)) {
+          report('Converting the text of the PDF…');
+          blocks = S.textLayerBlocks(pages);
+          how = 'code';
+        } else {
+          // A scan: 10 pages per AI request.
+          const { splitPdf } = await import('../generators/pdfTools.js');
+          const ranges = [];
+          for (let a = 1; a <= pages.length; a += 10) ranges.push([a, Math.min(pages.length, a + 9)]);
+          const chunks = ranges.length > 1 ? await splitPdf(bytes, ranges) : [bytes];
+          for (const [k, chunk] of chunks.entries()) {
+            report(`Reading pages ${ranges[k][0]}–${ranges[k][1]} of ${pages.length}…`);
+            const u8 = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+            const parts = await visionPartsFor({ needsVision: true, vision: { mimeType: 'application/pdf', base64: toB64(u8) } }, async () => u8);
+            const got = await askAI(parts, `pages ${ranges[k][0]} to ${ranges[k][1]} of this scanned document`);
+            if (blocks.length && got.length) blocks.push({ type: 'pageBreak' });
+            blocks.push(...got);
+          }
+        }
+      } else {
+        let mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+        if (ext === 'heic' || ext === 'heif') {
+          const jpg = await ctx.heicToJpeg(bytes);
+          if (!jpg) throw new Error(`${fileName} is an iPhone photo (HEIC). Converting it needs the KaTuroDesk desktop app.`);
+          bytes = jpg;
+          mime = 'image/jpeg';
+        }
+        report('Reading the photo…');
+        const parts = await visionPartsFor({ needsVision: true, vision: { mimeType: mime, base64: toB64(bytes) } }, async () => bytes);
+        blocks = await askAI(parts, 'this photo of a document');
+      }
+      const tables = blocks.filter((b) => b.type === 'table');
+      if (!blocks.some((b) => b.type !== 'pageBreak')) throw new Error(`I could not read any text from ${fileName}.`);
+      if (out === 'xlsx' && !tables.length) throw needsInfo(`${fileName} has no tables, only text. Should I make a Word file instead?`);
+      const unclear = S.unclearCount(blocks);
+      let file;
+      if (out === 'docx') {
+        const { buildDocx } = await import('../generators/docxFromSpec.js');
+        const spec = normalizeDocumentSpec({ title: base, blocks });
+        file = await ctx.saveOutput(`${base} (editable).docx`, await buildDocx(spec), 'docx');
+      } else {
+        const { buildSheetWorkbook } = await import('../generators/xlsxWriters.js');
+        const spec = normalizeSheetSpec({ title: base, sheets: tables.map((t, i) => ({ name: `Table ${i + 1}`, columns: t.columns.map((h, c) => ({ header: h || `Column ${c + 1}` })), rows: t.rows.map((r) => r.map(S.cellValue)) })) });
+        file = await ctx.saveOutput(`${base} (editable).xlsx`, await buildSheetWorkbook(spec), 'xlsx');
+      }
+      const paras = blocks.filter((b) => b.type === 'paragraph' || b.type === 'heading').length;
+      return {
+        summary: `Made ${file.name} from ${fileName}: ${out === 'docx' ? `${paras} heading(s)/paragraph(s) and ${tables.length} table(s)` : `${tables.length} table(s), one per sheet`}. ${how === 'code' ? 'The words come straight from the PDF\'s text (no AI); check that the tables lined up as expected.' : `Read from the scan by AI: please proofread it against the original before using it.${unclear ? ` ${unclear} part(s) could not be read and are marked [unclear].` : ''}`} Your original file was not changed.`,
+        artifacts: [{ type: 'files', title: 'Editable copy', subtitle: file.name, files: [file] }],
+      };
+    },
+  },
+
   fill_pdf_form: {
     label: 'Fill PDF form',
     description: "Fill a PDF form: fillable PDFs (form fields, check boxes, choices) and flat PDFs (blanks like \"Name: ______\"), including scanned forms (the blanks are found by reading the page). Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves a filled copy; the original is backed up and not changed.",
