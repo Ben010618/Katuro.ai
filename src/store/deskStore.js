@@ -66,6 +66,9 @@ export const useDeskStore = create(
       taskbarBadge: true,
       messageSound: true,
 
+      // Calendar (top bar → Calendar): the teacher's own schedules, notes and alarms.
+      calendarEvents: [],
+
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
       isGenerating: false,
@@ -172,6 +175,20 @@ export const useDeskStore = create(
       setTaskbarBadge: (on) => set({ taskbarBadge: on === true }),
 
       setMessageSound: (on) => set({ messageSound: on === true }),
+
+      addCalendarEvent: (ev) => set((s) => ({
+        calendarEvents: [...s.calendarEvents, {
+          id: `cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          title: ev.title, date: ev.date, time: ev.time || '', note: ev.note || '',
+          remindMinutes: ev.remindMinutes ?? null, doneAt: null, snoozeUntil: null, createdAt: Date.now(),
+        }].slice(-500),
+      })),
+
+      updateCalendarEvent: (id, patch) => set((s) => ({
+        calendarEvents: s.calendarEvents.map((ev) => (ev.id === id ? { ...ev, ...patch, id } : ev)),
+      })),
+
+      removeCalendarEvent: (id) => set((s) => ({ calendarEvents: s.calendarEvents.filter((ev) => ev.id !== id) })),
 
       setActiveAgent: (agentId) => set({ activeAgentId: agentId }),
 
@@ -347,6 +364,7 @@ export const useDeskStore = create(
         notifyMessages: state.notifyMessages,
         taskbarBadge: state.taskbarBadge,
         messageSound: state.messageSound,
+        calendarEvents: state.calendarEvents,
         scheduledTasks: state.scheduledTasks,
         // Don't persist native handles or file bytes (not serializable / private)
       }),

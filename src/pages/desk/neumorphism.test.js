@@ -8,7 +8,11 @@ import { readFileSync, readdirSync } from 'node:fs';
  */
 const dir = new URL('./', import.meta.url);
 const css = readFileSync(new URL('neumorphism.css', dir), 'utf8');
-const jsx = readdirSync(dir).filter((f) => f.endsWith('.jsx')).map((f) => [f, readFileSync(new URL(f, dir), 'utf8')]);
+// Every .jsx in the Desk folder and its subfolders (e.g. calendar/).
+const jsx = readdirSync(dir, { recursive: true })
+  .map((f) => String(f).split('\\').join('/'))
+  .filter((f) => f.endsWith('.jsx'))
+  .map((f) => [f, readFileSync(new URL(f, dir), 'utf8')]);
 
 // Kept as they are in both themes, on purpose.
 const UNCHANGED = new Set([
