@@ -18,6 +18,7 @@ import FeedbackArchive from '../features/feedback/FeedbackArchive';
 import FeatureRequestAdmin from '../features/feedback/FeatureRequestAdmin';
 import AnnouncementAdmin from '../features/feedback/AnnouncementAdmin';
 import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
+import { userStats } from '../features/admin/userStats';
 import EmailCodeAdminCard from '../features/emailCode/EmailCodeAdminCard';
 import DeskAiAdmin from '../features/deskAi/DeskAiAdmin';
 import { db } from '../firebase';
@@ -2823,12 +2824,25 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Deliberate suppression, not an oversight: this is the standard "fetch when
-  // the input changes" effect, and the loading flag has to be raised before the
-  // await or the spinner never appears. The rule is guarding against cascading
-  // renders; the one extra pass here is the intended behaviour.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { fetchTeachers(); }, [fetchTeachers]);
+  // The user list is LIVE: added, deleted (e.g. Inactivity Cleanup) or changed accounts
+  // show at once, so Total / Active / Subscribed always match the database.
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'teachers'),
+      (snap) => {
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        all.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+        setTeachers(all);
+        setListErr('');
+        setLoadingList(false);
+      },
+      (ex) => {
+        setListErr(ex.message || 'Could not load users. Check Firestore rules.');
+        setLoadingList(false);
+      },
+    );
+    return unsub;
+  }, []);
 
   // Activity color-coding — Green: used kaTuro in the last 7 days. Orange:
   // used it 8-30 days ago. Red: no activity in 30+ days, or never logged in.
@@ -2935,8 +2949,7 @@ export default function AdminDashboard() {
     navigate('/login', { replace: true });
   }
 
-  const subscribedCount = teachers.filter((t) => planInfo(t).plan === 'subscription').length;
-  const activeCount   = teachers.filter(t => !t.disabled).length;
+  const { total: totalCount, active: activeCount, subscribed: subscribedCount } = userStats(teachers);
   const pendingCount  = teachers.filter(t => t.pendingApproval).length;
 
   // Pending users appear first, then sort all groups by registration date (oldest → newest)
@@ -3183,9 +3196,10 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="kt-grid-4" style={{ gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total Users',      value: teachers.length, Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
+            { label: 'Total Users',      value: totalCount,      Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
             { label: 'Active Users',     value: activeCount,     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },
-            { label: 'Pending Approval', value: pendingCount,    Icon: ShieldOff,   accent: pendingCount > 0 ? '#fef9e7' : '#f5faf7', iconColor: pendingCount > 0 ? '#d97706' : '#9BB8A5' },
+            // Free-trial counting is not built yet: the card shows a dash until it is.
+            { label: 'Under Free Trial', value: '—',             Icon: ShieldOff,   accent: '#f5faf7', iconColor: '#9BB8A5' },
             { label: 'Subscribed',       value: subscribedCount, Icon: BadgeCheck,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
           ].map(({ label, value, Icon, accent, iconColor }) => (
             <div key={label} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14 }}>

@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { UserX, RotateCcw, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { db } from '../../firebase';
-import { adminDeleteInactiveNow } from '../../services/db';
+import { adminDeleteInactiveNow, adminPurgeLeftovers } from '../../services/db';
 
 const card = {
   background: 'var(--kt-card)', borderRadius: 14,
@@ -47,6 +47,9 @@ export default function InactiveUsersSection() {
   const [typed, setTyped]       = useState('');
   const [deleting, setDeleting] = useState(false);
   const [result, setResult]     = useState(null); // { ok, text }
+  const [leftovers, setLeftovers] = useState(null); // null | { found } (counted, waiting for confirmation)
+  const [leftTyped, setLeftTyped] = useState('');
+  const [leftBusy, setLeftBusy]   = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -85,8 +88,18 @@ export default function InactiveUsersSection() {
     setDeleting(true);
     setResult(null);
     try {
-      const r = await adminDeleteInactiveNow(deletable.map((t) => t.id));
-      const parts = [`${r.deleted} account(s) permanently deleted`];
+      // A long list is deleted in rounds (each round stops before the server's time limit).
+      const ids = deletable.map((t) => t.id);
+      const r = { deleted: 0, failed: 0, skipped: 0 };
+      for (let round = 0; round < 20; round += 1) {
+        const step = await adminDeleteInactiveNow(ids);
+        r.deleted += step.deleted;
+        r.failed += step.failed;
+        if (round === 0) r.skipped = step.skipped;
+        if (!step.remaining) break;
+        setResult({ ok: true, text: `Deleted ${r.deleted} so far; continuing…` });
+      }
+      const parts = [`${r.deleted} account(s) permanently deleted, with all their data and files`];
       if (r.failed) parts.push(`${r.failed} failed (see the audit log below)`);
       if (r.skipped) parts.push(`${r.skipped} skipped (logged back in, already gone, or an admin)`);
       setResult({ ok: !r.failed, text: `${parts.join('; ')}.` });
@@ -96,6 +109,41 @@ export default function InactiveUsersSection() {
       setResult({ ok: false, text: `Nothing was deleted: ${err?.message || 'the request failed'}. Please try again.` });
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function countLeftovers() {
+    setLeftBusy(true);
+    setResult(null);
+    try {
+      const r = await adminPurgeLeftovers({ dryRun: true });
+      if (!r.found) setResult({ ok: true, text: 'No leftovers: every deleted account is fully removed.' });
+      else { setLeftovers({ found: r.found }); setLeftTyped(''); }
+    } catch (err) {
+      setResult({ ok: false, text: `Could not check: ${err?.message || 'the request failed'}.` });
+    } finally {
+      setLeftBusy(false);
+    }
+  }
+
+  async function removeLeftovers() {
+    if (leftTyped.trim() !== CONFIRM_WORD) return;
+    setLeftBusy(true);
+    try {
+      let deleted = 0;
+      let failed = 0;
+      for (let round = 0; round < 20; round += 1) {
+        const step = await adminPurgeLeftovers();
+        deleted += step.deleted;
+        failed += step.failed;
+        if (!step.remaining) break;
+      }
+      setResult({ ok: !failed, text: `Removed the leftovers of ${deleted} deleted account(s)${failed ? `; ${failed} failed (see the audit log)` : ''}.` });
+      setLeftovers(null);
+    } catch (err) {
+      setResult({ ok: false, text: `Nothing more was removed: ${err?.message || 'the request failed'}. Please try again.` });
+    } finally {
+      setLeftBusy(false);
     }
   }
 
@@ -143,6 +191,35 @@ export default function InactiveUsersSection() {
               {deleting ? 'Deleting…' : `Delete ${deletable.length} account${deletable.length > 1 ? 's' : ''}`}
             </button>
             <button type="button" onClick={() => { setConfirming(false); setTyped(''); }} disabled={deleting} style={btnSecondary}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 11, color: 'var(--kt-text-secondary)' }}>Deleting an account removes everything of it: data, chats, posts, files and login.</span>
+        {!leftovers && (
+          <button type="button" onClick={countLeftovers} disabled={leftBusy} style={{ ...btnSecondary, opacity: leftBusy ? 0.6 : 1 }} title="Find data still left by accounts deleted before the complete removal existed">
+            {leftBusy ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={11} />} Clean up leftovers
+          </button>
+        )}
+      </div>
+
+      {leftovers && (
+        <div role="alertdialog" aria-label="Confirm leftover cleanup" style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(224,92,92,0.06)', border: '1px solid rgba(224,92,92,0.3)' }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#c0392b' }}>
+            {leftovers.found} deleted account{leftovers.found > 1 ? 's still have' : ' still has'} data left behind.
+          </p>
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
+            These accounts have no profile and no login any more, but their usage logs, usernames, chats, posts or files are still stored. Removing them cannot be undone.
+          </p>
+          <label style={{ display: 'block', margin: '10px 0 4px', fontSize: 11, fontWeight: 600, color: 'var(--kt-text-primary)' }} htmlFor="kt-leftover-confirm">Type {CONFIRM_WORD} to confirm</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input id="kt-leftover-confirm" value={leftTyped} onChange={(e) => setLeftTyped(e.target.value)} autoComplete="off" disabled={leftBusy}
+              style={{ flex: '1 1 160px', fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--kt-border)', background: 'var(--kt-surface)', color: 'var(--kt-text-primary)', fontFamily: 'inherit' }} />
+            <button type="button" onClick={removeLeftovers} disabled={leftTyped.trim() !== CONFIRM_WORD || leftBusy} style={{ ...btnDanger, opacity: leftTyped.trim() !== CONFIRM_WORD || leftBusy ? 0.5 : 1, cursor: leftTyped.trim() !== CONFIRM_WORD || leftBusy ? 'not-allowed' : 'pointer' }}>
+              {leftBusy ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={11} />} {leftBusy ? 'Removing…' : 'Remove leftovers'}
+            </button>
+            <button type="button" onClick={() => setLeftovers(null)} disabled={leftBusy} style={btnSecondary}>Cancel</button>
           </div>
         </div>
       )}
@@ -200,9 +277,11 @@ export default function InactiveUsersSection() {
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
-                  {l.displayName || l.email || l.uid}
-                  {l.reason === 'inactivity_delete_failed' && <span style={{ marginLeft: 6, fontSize: 10, color: '#e05c5c' }}>(failed: {l.error})</span>}
-                  {l.reason === 'inactivity_deleted_by_admin' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--kt-text-secondary)' }}>(deleted by an admin)</span>}
+                  {l.email || l.uid}
+                  {String(l.reason || '').endsWith('_failed') && <span style={{ marginLeft: 6, fontSize: 10, color: '#e05c5c' }}>(failed: {l.error})</span>}
+                  {l.reason === 'inactivity_deleted_by_admin' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--kt-text-secondary)' }}>(inactive, deleted by an admin)</span>}
+                  {l.reason === 'deleted_by_admin' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--kt-text-secondary)' }}>(deleted by an admin)</span>}
+                  {l.reason === 'leftovers_of_deleted_account' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--kt-text-secondary)' }}>(leftovers removed)</span>}
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: 10, color: '#9bb8a5' }}>{ts(l.deletedAt)}</p>
               </div>

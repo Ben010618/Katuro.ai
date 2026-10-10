@@ -15,6 +15,7 @@ const { onDocumentCreated }  = require('firebase-functions/v2/firestore');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 const { createEmailCodes, codeEmail } = require('./emailCode');
+const { purgeAccounts, findLeftoverUids } = require('./accountPurge');
 const { createGeminiSseParser } = require('./lib/sse');
 
 admin.initializeApp();
@@ -2113,11 +2114,9 @@ exports.adminDeleteUser = onCall(
       throw new HttpsError('permission-denied', 'Admin accounts cannot be deleted.');
     }
 
-    // Delete all Firestore data under teachers/{uid} including all subcollections
-    await db.recursiveDelete(db.doc(`teachers/${uid}`));
-
-    // Delete the Firebase Auth user
-    await admin.auth().deleteUser(uid);
+    // Everything of the account, everywhere, and the login (accountPurge.js).
+    const res = await purgeAccounts([{ uid, teacher: targetSnap.exists ? targetSnap.data() : null }], purgeDeps('deleted_by_admin', req.auth.uid));
+    if (res.failed.length) throw new HttpsError('internal', `The account was only partly deleted: ${res.failed[0].error}. Please try again.`);
 
     return { success: true };
   }
@@ -2388,44 +2387,34 @@ exports.onUsageEventCreated = onDocumentCreated(
   }
 );
 
-// ── Inactivity: permanently delete one deactivated account (and log it) ───────
-// Shared by the nightly cleanup and the admin "Delete all now" button, so both
-// remove exactly the same data. Returns true when deleted, false when it failed
-// (the failure is written to deletionLogs).
-async function deleteInactiveAccount(doc, reason, extraLog = {}) {
-  const uid = doc.id;
-  const t = doc.data();
-  try {
-    // Class sections live in their own top-level collection (adviser-
-    // owned, not nested under teachers/{uid}) — recursiveDelete on the
-    // teacher doc alone would miss these and orphan student rosters.
-    const sectionsSnap = await db.collection('sections').where('adviserUid', '==', uid).get();
-    for (const sectionDoc of sectionsSnap.docs) {
-      await db.recursiveDelete(sectionDoc.ref);
-    }
+// ── Account deletion: everything of the account, everywhere (accountPurge.js) ──
+// Used by the admin "Delete account", the nightly inactivity cleanup, "Delete all
+// now" and the leftover cleanup, so every path removes exactly the same data.
+const PURGE_CHUNK = 10;
+function purgeDeps(reason, deletedBy = null) {
+  return {
+    db, admin, bucket: admin.storage().bucket(), reason, deletedBy,
+    // What this server keeps in memory about the account goes too.
+    onPurged: (uid) => { _planAccessCache.delete(uid); _directoryCache = { at: 0, list: null }; },
+  };
+}
 
-    await db.recursiveDelete(doc.ref);
-    await admin.auth().deleteUser(uid).catch(() => {}); // already-gone Auth user is fine
-
-    await db.collection('deletionLogs').add({
-      uid, email: t.email || null, displayName: t.displayName || null,
-      lastActiveAt: t.lastActiveAt || null,
-      deactivatedForInactivityAt: t.deactivatedForInactivityAt || null,
-      reason,
-      ...extraLog,
-      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return true;
-  } catch (err) {
-    await db.collection('deletionLogs').add({
-      uid, email: t.email || null,
-      reason: 'inactivity_delete_failed',
-      error: String(err?.message || err).slice(0, 300),
-      ...extraLog,
-      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return false;
+/**
+ * Deletes these accounts completely, in rounds, stopping before the time limit.
+ * → { deleted, failed, done: [uid] } (accounts not reached are left for the next run)
+ */
+async function deleteAccountsFully(list, reason, { deletedBy = null, deadline = Date.now() + 450000 } = {}) {
+  let deleted = 0;
+  let failed = 0;
+  const done = [];
+  for (let i = 0; i < list.length; i += PURGE_CHUNK) {
+    if (Date.now() > deadline) break;
+    const res = await purgeAccounts(list.slice(i, i + PURGE_CHUNK), purgeDeps(reason, deletedBy));
+    deleted += res.purged.length;
+    failed += res.failed.length;
+    done.push(...res.purged, ...res.failed.map((f) => f.uid));
   }
+  return { deleted, failed, done };
 }
 
 // ── Scheduled: inactivity policy — deactivate at 90 days, delete at 120 ──────
@@ -2447,10 +2436,11 @@ exports.cleanupInactiveUsers = onSchedule(
       .where('deactivatedForInactivityAt', '<', admin.firestore.Timestamp.fromMillis(now - DELETE_AFTER_MS))
       .get();
 
-    let deletedCount = 0;
-    for (const doc of toDeleteSnap.docs) {
-      if (await deleteInactiveAccount(doc, 'inactivity_90d_plus_30d_grace')) deletedCount++;
-    }
+    const { deleted: deletedCount } = await deleteAccountsFully(
+      toDeleteSnap.docs.filter((d) => !d.data().isAdmin).map((d) => ({ uid: d.id, teacher: d.data() })),
+      'inactivity_90d_plus_30d_grace',
+      { deadline: now + 300000 }, // leaves time for pass 2; the rest is deleted tomorrow
+    );
 
     // ── Pass 2: deactivate accounts inactive 90+ days (not already flagged) ─
     const activeSnap = await db.collection('teachers')
@@ -2537,19 +2527,19 @@ exports.adminDeleteInactiveNow = onCall(
       .where('deactivatedForInactivityAt', '>', admin.firestore.Timestamp.fromMillis(0))
       .get();
     const wanted = new Set(seen);
-    let deleted = 0;
-    let failed = 0;
     let skipped = 0;
+    const todo = [];
     for (const doc of pendingSnap.docs) {
       if (!wanted.has(doc.id)) continue;
       wanted.delete(doc.id);
       const t = doc.data();
       if (t.isAdmin || doc.id === req.auth.uid) { skipped++; continue; }
-      const ok = await deleteInactiveAccount(doc, 'inactivity_deleted_by_admin', { deletedBy: req.auth.uid });
-      if (ok) deleted++; else failed++;
+      todo.push({ uid: doc.id, teacher: t });
     }
     // Listed by the admin but no longer pending (logged back in, or already deleted).
     skipped += wanted.size;
+    const { deleted, failed, done } = await deleteAccountsFully(todo, 'inactivity_deleted_by_admin', { deletedBy: req.auth.uid });
+    const remaining = todo.length - done.length; // not reached in time: the button runs again
 
     if (deleted > 0 || failed > 0) {
       await db.collection('adminNotifications').add({
@@ -2559,7 +2549,25 @@ exports.adminDeleteInactiveNow = onCall(
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-    return { deleted, failed, skipped };
+    return { deleted, failed, skipped, remaining };
+  }
+);
+
+// ── Admin: leftovers of accounts deleted before the complete purge existed ────
+// Finds IDs that still have data somewhere but no teacher record and no login,
+// then removes those leftovers. dryRun only counts.
+exports.adminPurgeLeftovers = onCall(
+  { region: 'us-central1', timeoutSeconds: 540, memory: '512MiB' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+    const uids = (await findLeftoverUids({ db, admin })).filter((u) => u !== req.auth.uid);
+    if (req.data?.dryRun) return { found: uids.length };
+    const { deleted, failed, done } = await deleteAccountsFully(uids.map((uid) => ({ uid })), 'leftovers_of_deleted_account', { deletedBy: req.auth.uid });
+    return { found: uids.length, deleted, failed, remaining: uids.length - done.length };
   }
 );
 

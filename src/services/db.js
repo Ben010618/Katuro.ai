@@ -344,6 +344,17 @@ export async function adminDeleteInactiveNow(uids) {
   return result.data;
 }
 
+// ─── Admin: leftovers of accounts deleted earlier ────────────────────────────
+// dryRun: only counts. Otherwise removes them (returns remaining > 0 when a long
+// list needs another round).
+export async function adminPurgeLeftovers({ dryRun = false } = {}) {
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminPurgeLeftovers', { timeout: 540000 });
+  const result = await fn({ dryRun });
+  return result.data;
+}
+
 // ─── Admin: change a user's password ─────────────────────────────────────────
 // Done on the server with the Firebase Auth admin API: it works at once for every
 // account (self-registered too) and the password is never stored in Firestore.
