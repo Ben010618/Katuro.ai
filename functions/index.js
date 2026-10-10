@@ -2388,6 +2388,46 @@ exports.onUsageEventCreated = onDocumentCreated(
   }
 );
 
+// ── Inactivity: permanently delete one deactivated account (and log it) ───────
+// Shared by the nightly cleanup and the admin "Delete all now" button, so both
+// remove exactly the same data. Returns true when deleted, false when it failed
+// (the failure is written to deletionLogs).
+async function deleteInactiveAccount(doc, reason, extraLog = {}) {
+  const uid = doc.id;
+  const t = doc.data();
+  try {
+    // Class sections live in their own top-level collection (adviser-
+    // owned, not nested under teachers/{uid}) — recursiveDelete on the
+    // teacher doc alone would miss these and orphan student rosters.
+    const sectionsSnap = await db.collection('sections').where('adviserUid', '==', uid).get();
+    for (const sectionDoc of sectionsSnap.docs) {
+      await db.recursiveDelete(sectionDoc.ref);
+    }
+
+    await db.recursiveDelete(doc.ref);
+    await admin.auth().deleteUser(uid).catch(() => {}); // already-gone Auth user is fine
+
+    await db.collection('deletionLogs').add({
+      uid, email: t.email || null, displayName: t.displayName || null,
+      lastActiveAt: t.lastActiveAt || null,
+      deactivatedForInactivityAt: t.deactivatedForInactivityAt || null,
+      reason,
+      ...extraLog,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  } catch (err) {
+    await db.collection('deletionLogs').add({
+      uid, email: t.email || null,
+      reason: 'inactivity_delete_failed',
+      error: String(err?.message || err).slice(0, 300),
+      ...extraLog,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return false;
+  }
+}
+
 // ── Scheduled: inactivity policy — deactivate at 90 days, delete at 120 ──────
 // (90 days inactive -> disabled, 30-day grace window -> permanently deleted).
 // Deliberately NOT an immediate hard-delete at 90 days: a 30-day recoverable
@@ -2409,36 +2449,7 @@ exports.cleanupInactiveUsers = onSchedule(
 
     let deletedCount = 0;
     for (const doc of toDeleteSnap.docs) {
-      const uid = doc.id;
-      const t   = doc.data();
-      try {
-        // Class sections live in their own top-level collection (adviser-
-        // owned, not nested under teachers/{uid}) — recursiveDelete on the
-        // teacher doc alone would miss these and orphan student rosters.
-        const sectionsSnap = await db.collection('sections').where('adviserUid', '==', uid).get();
-        for (const sectionDoc of sectionsSnap.docs) {
-          await db.recursiveDelete(sectionDoc.ref);
-        }
-
-        await db.recursiveDelete(doc.ref);
-        await admin.auth().deleteUser(uid).catch(() => {}); // already-gone Auth user is fine
-
-        await db.collection('deletionLogs').add({
-          uid, email: t.email || null, displayName: t.displayName || null,
-          lastActiveAt: t.lastActiveAt || null,
-          deactivatedForInactivityAt: t.deactivatedForInactivityAt || null,
-          reason: 'inactivity_90d_plus_30d_grace',
-          deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        deletedCount++;
-      } catch (err) {
-        await db.collection('deletionLogs').add({
-          uid, email: t.email || null,
-          reason: 'inactivity_delete_failed',
-          error: String(err?.message || err).slice(0, 300),
-          deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
+      if (await deleteInactiveAccount(doc, 'inactivity_90d_plus_30d_grace')) deletedCount++;
     }
 
     // ── Pass 2: deactivate accounts inactive 90+ days (not already flagged) ─
@@ -2502,6 +2513,53 @@ exports.cleanupInactiveUsers = onSchedule(
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
+  }
+);
+
+// ── Admin: delete every account in the Inactivity Cleanup list now ────────────
+// Skips the rest of the 30-day grace window for accounts ALREADY deactivated for
+// inactivity. Only accounts the admin saw in the list (uids) AND still pending
+// on the server are deleted: anyone who logged back in (reactivated) or appeared
+// after the admin looked is never touched. Admins and the caller are never deleted.
+exports.adminDeleteInactiveNow = onCall(
+  { region: 'us-central1', timeoutSeconds: 540 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+    const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
+    }
+    const seen = Array.isArray(req.data?.uids) ? [...new Set(req.data.uids.filter((u) => typeof u === 'string' && u))] : [];
+    if (!seen.length) throw new HttpsError('invalid-argument', 'No accounts were selected.');
+    if (seen.length > 1000) throw new HttpsError('invalid-argument', 'Too many accounts at once.');
+
+    const pendingSnap = await db.collection('teachers')
+      .where('deactivatedForInactivityAt', '>', admin.firestore.Timestamp.fromMillis(0))
+      .get();
+    const wanted = new Set(seen);
+    let deleted = 0;
+    let failed = 0;
+    let skipped = 0;
+    for (const doc of pendingSnap.docs) {
+      if (!wanted.has(doc.id)) continue;
+      wanted.delete(doc.id);
+      const t = doc.data();
+      if (t.isAdmin || doc.id === req.auth.uid) { skipped++; continue; }
+      const ok = await deleteInactiveAccount(doc, 'inactivity_deleted_by_admin', { deletedBy: req.auth.uid });
+      if (ok) deleted++; else failed++;
+    }
+    // Listed by the admin but no longer pending (logged back in, or already deleted).
+    skipped += wanted.size;
+
+    if (deleted > 0 || failed > 0) {
+      await db.collection('adminNotifications').add({
+        type: 'inactivity_cleanup',
+        message: `Inactivity cleanup (by an admin): ${deleted} deactivated account(s) permanently deleted${failed ? `, ${failed} failed (see the audit log)` : ''}.`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    return { deleted, failed, skipped };
   }
 );
 

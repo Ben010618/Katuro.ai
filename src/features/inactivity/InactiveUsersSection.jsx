@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore';
 import { UserX, RotateCcw, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { db } from '../../firebase';
+import { adminDeleteInactiveNow } from '../../services/db';
 
 const card = {
   background: 'var(--kt-card)', borderRadius: 14,
@@ -17,7 +18,15 @@ const btnSecondary = {
   display: 'flex', alignItems: 'center', gap: 5,
 };
 
+const btnDanger = {
+  background: '#e05c5c', color: '#fff', border: '1px solid #e05c5c',
+  borderRadius: 8, padding: '6px 12px', fontSize: 11,
+  fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  display: 'flex', alignItems: 'center', gap: 5,
+};
+
 const GRACE_DAYS = 30;
+const CONFIRM_WORD = 'DELETE';
 
 function ts(t) {
   if (!t) return '';
@@ -34,6 +43,10 @@ export default function InactiveUsersSection() {
   const [pending, setPending] = useState([]);
   const [logs, setLogs]       = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped]       = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [result, setResult]     = useState(null); // { ok, text }
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -64,6 +77,27 @@ export default function InactiveUsersSection() {
   }
 
   const pendingSorted = [...pending].sort((a, b) => daysSince(b.deactivatedForInactivityAt) - daysSince(a.deactivatedForInactivityAt));
+  // Admin accounts are never deleted (the server skips them too).
+  const deletable = pendingSorted.filter((t) => !t.isAdmin);
+
+  async function deleteAllNow() {
+    if (typed.trim() !== CONFIRM_WORD || !deletable.length) return;
+    setDeleting(true);
+    setResult(null);
+    try {
+      const r = await adminDeleteInactiveNow(deletable.map((t) => t.id));
+      const parts = [`${r.deleted} account(s) permanently deleted`];
+      if (r.failed) parts.push(`${r.failed} failed (see the audit log below)`);
+      if (r.skipped) parts.push(`${r.skipped} skipped (logged back in, already gone, or an admin)`);
+      setResult({ ok: !r.failed, text: `${parts.join('; ')}.` });
+      setConfirming(false);
+      setTyped('');
+    } catch (err) {
+      setResult({ ok: false, text: `Nothing was deleted: ${err?.message || 'the request failed'}. Please try again.` });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div style={{ ...card, marginBottom: 16 }}>
@@ -80,7 +114,42 @@ export default function InactiveUsersSection() {
             Accounts inactive 90+ days are deactivated automatically, then permanently deleted after a {GRACE_DAYS}-day grace window. Logging in reactivates an account.
           </p>
         </div>
+        {deletable.length > 0 && !confirming && (
+          <button type="button" onClick={() => { setConfirming(true); setTyped(''); setResult(null); }} style={{ ...btnDanger, marginLeft: 'auto', flexShrink: 0 }} title="Permanently delete every account in this list now, without waiting for the grace window">
+            <Trash2 size={11} /> Delete all now
+          </button>
+        )}
       </div>
+
+      {confirming && (
+        <div role="alertdialog" aria-label="Confirm delete all" style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(224,92,92,0.06)', border: '1px solid rgba(224,92,92,0.3)' }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#c0392b', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={14} /> Permanently delete {deletable.length} account{deletable.length > 1 ? 's' : ''} now?
+          </p>
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--kt-text-secondary)', lineHeight: 1.5 }}>
+            Every account in this list loses its login and all its data (lesson files, class records, sections) right away, instead of at the end of the {GRACE_DAYS}-day grace window. This cannot be undone.
+            Accounts that log back in before you confirm are kept, and admin accounts are never deleted. Each deletion is written to the audit log.
+          </p>
+          <label style={{ display: 'block', margin: '10px 0 4px', fontSize: 11, fontWeight: 600, color: 'var(--kt-text-primary)' }} htmlFor="kt-delete-all-confirm">
+            Type {CONFIRM_WORD} to confirm
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              id="kt-delete-all-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" disabled={deleting}
+              style={{ flex: '1 1 160px', fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--kt-border)', background: 'var(--kt-surface)', color: 'var(--kt-text-primary)', fontFamily: 'inherit' }}
+            />
+            <button type="button" onClick={deleteAllNow} disabled={typed.trim() !== CONFIRM_WORD || deleting} style={{ ...btnDanger, opacity: typed.trim() !== CONFIRM_WORD || deleting ? 0.5 : 1, cursor: typed.trim() !== CONFIRM_WORD || deleting ? 'not-allowed' : 'pointer' }}>
+              {deleting ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={11} />}
+              {deleting ? 'Deleting…' : `Delete ${deletable.length} account${deletable.length > 1 ? 's' : ''}`}
+            </button>
+            <button type="button" onClick={() => { setConfirming(false); setTyped(''); }} disabled={deleting} style={btnSecondary}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <p role="status" style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 600, color: result.ok ? '#2d6a4f' : '#c0392b' }}>{result.text}</p>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 20 }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>
@@ -133,6 +202,7 @@ export default function InactiveUsersSection() {
                 <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--kt-text-primary)' }}>
                   {l.displayName || l.email || l.uid}
                   {l.reason === 'inactivity_delete_failed' && <span style={{ marginLeft: 6, fontSize: 10, color: '#e05c5c' }}>(failed: {l.error})</span>}
+                  {l.reason === 'inactivity_deleted_by_admin' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--kt-text-secondary)' }}>(deleted by an admin)</span>}
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: 10, color: '#9bb8a5' }}>{ts(l.deletedAt)}</p>
               </div>

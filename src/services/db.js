@@ -333,6 +333,17 @@ export async function adminDeleteUser(targetUid) {
   return result.data;
 }
 
+// ─── Admin: delete every account in the Inactivity Cleanup list now ──────────
+// uids = the accounts the admin saw in the list; the server deletes only those
+// that are still pending (never admins, never someone who logged back in).
+export async function adminDeleteInactiveNow(uids) {
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const app = (await import('../firebase')).default;
+  const fn = httpsCallable(getFunctions(app, 'us-central1'), 'adminDeleteInactiveNow', { timeout: 540000 });
+  const result = await fn({ uids });
+  return result.data;
+}
+
 // ─── Admin: change a user's password ─────────────────────────────────────────
 // Done on the server with the Firebase Auth admin API: it works at once for every
 // account (self-registered too) and the password is never stored in Firestore.
