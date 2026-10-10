@@ -11,6 +11,7 @@ import {
   Settings,
   CalendarClock,
   CalendarDays,
+  GraduationCap,
   RefreshCw,
   MessageSquare,
   X,
@@ -34,6 +35,8 @@ import MessagesPanel from '../../features/messages/MessagesPanel';
 import { badgeDataUrl } from './unreadBadge';
 import DeskCalendarPanel from './calendar/DeskCalendarPanel';
 import CalendarAlarms from './calendar/CalendarAlarms';
+import TeachingAssistant from './teaching/TeachingAssistant';
+import MyClassesModal from './teaching/MyClassesModal';
 import { calendarPosition, manilaDate } from '../../services/desk/knowledge/schoolCalendar';
 import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
@@ -77,6 +80,7 @@ export default function KaTuroDeskPage() {
   // null = closed; {} = open on the list; { prompt, attachedPaths } = open on a new task
   const [schedule, setSchedule] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showClasses, setShowClasses] = useState(false);
   const schoolPos = calendarPosition(manilaDate());
   const calendarLabel = schoolPos
     ? (schoolPos.term ? `Term ${schoolPos.term} · ${{ opening: 'Opening Block', instructional: 'Instructional', endOfTerm: 'End-of-Term' }[schoolPos.block]}` : { betweenTerms: 'Between terms', eosyBreak: 'EOSY break' }[schoolPos.block])
@@ -233,6 +237,8 @@ export default function KaTuroDeskPage() {
       )}
       {showCalendar && <DeskCalendarPanel onClose={() => setShowCalendar(false)} />}
       <CalendarAlarms />
+      <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
+      <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}
@@ -329,6 +335,15 @@ export default function KaTuroDeskPage() {
           >
             <CalendarDays size={14} />
             <span className="text-[11px] font-semibold hidden sm:inline">{calendarLabel}</span>
+          </button>
+
+          <button
+            onClick={() => setShowClasses(true)}
+            title="My classes: your class schedule, lessons prepared ahead, and reminders before each class"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <GraduationCap size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">My classes</span>
           </button>
 
           <button

@@ -14,6 +14,7 @@ import {
 
 import { createFileIndex } from '../services/desk/index/fileIndex';
 import { createTask, updateTask, recoverInterrupted } from '../services/desk/schedule/schedule';
+import { DEFAULT_SETTINGS as DEFAULT_TEACHING_SETTINGS, pruneFired } from '../services/desk/teaching/teachingDay';
 
 export const IMPORTS_ROOT = 'KaTuro Imports';
 
@@ -71,6 +72,15 @@ export const useDeskStore = create(
 
       // The teacher's e-signature (PNG data URL). Saved only on this computer, never uploaded.
       eSignature: null,
+
+      // Teaching assistant (My classes): the class schedule, each class's lesson sequence,
+      // days without classes / lessons to repeat, settings, prepared lessons and shown reminders.
+      myClasses: [],
+      lessonSequences: {},
+      teachingLog: { noClass: [], noClassFor: {}, repeat: {} },
+      teachingSettings: { ...DEFAULT_TEACHING_SETTINGS },
+      preparedLessons: {},
+      assistantFired: {},
 
       // Conversation Stream
       messages: [INITIAL_WELCOME_MESSAGE],
@@ -179,6 +189,60 @@ export const useDeskStore = create(
 
       setMessageSound: (on) => set({ messageSound: on === true }),
       // Only a PNG data URL is kept (or null to remove it).
+      saveClass: (cls) => set((s) => {
+        const id = cls.id || `cls-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const clean = {
+          id,
+          subject: String(cls.subject || '').trim(),
+          grade: String(cls.grade || ''),
+          section: String(cls.section || '').trim(),
+          room: String(cls.room || '').trim(),
+          days: [...new Set((cls.days || []).map(Number).filter((d) => d >= 0 && d <= 6))].sort(),
+          start: String(cls.start || ''),
+          end: String(cls.end || ''),
+          materialsFolder: String(cls.materialsFolder || '').trim(),
+        };
+        const exists = s.myClasses.some((c) => c.id === id);
+        return { myClasses: exists ? s.myClasses.map((c) => (c.id === id ? clean : c)) : [...s.myClasses, clean].slice(0, 30) };
+      }),
+      removeClass: (id) => set((s) => {
+        const sequences = { ...s.lessonSequences };
+        delete sequences[id];
+        return { myClasses: s.myClasses.filter((c) => c.id !== id), lessonSequences: sequences };
+      }),
+      setLessonSequence: (id, seq) => set((s) => ({ lessonSequences: { ...s.lessonSequences, [id]: seq } })),
+      setTeachingSettings: (patch) => set((s) => ({ teachingSettings: { ...s.teachingSettings, ...patch } })),
+      /** No classes on a day: for every class (classId null) or one class. on=false undoes it. */
+      setNoClass: (iso, classId = null, on = true) => set((s) => {
+        const log = { noClass: [], noClassFor: {}, repeat: {}, ...s.teachingLog };
+        if (!classId) {
+          const list = new Set(log.noClass);
+          if (on) list.add(iso); else list.delete(iso);
+          return { teachingLog: { ...log, noClass: [...list].sort() } };
+        }
+        const list = new Set(log.noClassFor[classId] || []);
+        if (on) list.add(iso); else list.delete(iso);
+        return { teachingLog: { ...log, noClassFor: { ...log.noClassFor, [classId]: [...list].sort() } } };
+      }),
+      /** The lesson of this meeting was not finished: the same session comes again next time. */
+      setRepeat: (classId, iso, on = true) => set((s) => {
+        const log = { noClass: [], noClassFor: {}, repeat: {}, ...s.teachingLog };
+        const list = new Set(log.repeat[classId] || []);
+        if (on) list.add(iso); else list.delete(iso);
+        return { teachingLog: { ...log, repeat: { ...log.repeat, [classId]: [...list].sort() } } };
+      }),
+      setPreparedLesson: (key, rec) => set((s) => ({ preparedLessons: { ...s.preparedLessons, [key]: { ...rec, at: rec.at || Date.now() } } })),
+      markAssistantFired: (keys) => set((s) => ({ assistantFired: { ...s.assistantFired, ...Object.fromEntries((keys || []).map((k) => [k, Date.now()])) } })),
+      /** Old shown-reminder keys and prepared lessons of past days are dropped. */
+      pruneAssistant: (now = Date.now()) => set((s) => {
+        const cutoff = new Date(now - 21 * 86400000).toISOString().slice(0, 10);
+        return {
+          assistantFired: pruneFired(s.assistantFired, now),
+          // Keys start with the lesson's date ("2026-10-26|…") or "dll|<monday>|…".
+          preparedLessons: Object.fromEntries(Object.entries(s.preparedLessons).filter(([k]) => (k.startsWith('dll|') ? k.split('|')[1] : k.split('|')[0]) >= cutoff)),
+        };
+      }),
+
       setESignature: (dataUrl) => set({ eSignature: typeof dataUrl === 'string' && dataUrl.startsWith('data:image/png;base64,') ? dataUrl : null }),
 
       addCalendarEvent: (ev) => set((s) => ({
@@ -360,6 +424,9 @@ export const useDeskStore = create(
         ...current,
         ...(persisted || {}),
         scheduledTasks: recoverInterrupted(Array.isArray(persisted?.scheduledTasks) ? persisted.scheduledTasks : []),
+        // Settings added in later versions get their defaults.
+        teachingSettings: { ...DEFAULT_TEACHING_SETTINGS, ...(persisted?.teachingSettings || {}) },
+        teachingLog: { noClass: [], noClassFor: {}, repeat: {}, ...(persisted?.teachingLog || {}) },
       }),
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
@@ -372,6 +439,12 @@ export const useDeskStore = create(
         calendarEvents: state.calendarEvents,
         scheduledTasks: state.scheduledTasks,
         eSignature: state.eSignature,
+        myClasses: state.myClasses,
+        lessonSequences: state.lessonSequences,
+        teachingLog: state.teachingLog,
+        teachingSettings: state.teachingSettings,
+        preparedLessons: state.preparedLessons,
+        assistantFired: state.assistantFired,
         // Don't persist native handles or file bytes (not serializable / private)
       }),
     }

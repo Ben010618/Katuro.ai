@@ -27,6 +27,14 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
     return () => ipcRenderer.removeListener('notification:click', listener);
   },
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
+  // Teaching assistant bubble: what it shows, its clicks, and "is a slideshow on screen?".
+  setBubble: (state) => ipcRenderer.invoke('bubble:set', state),
+  onBubbleAction: (callback) => {
+    const listener = (_, action) => callback(action);
+    ipcRenderer.on('bubble:action', listener);
+    return () => ipcRenderer.removeListener('bubble:action', listener);
+  },
+  isPresenting: () => ipcRenderer.invoke('app:isPresenting'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
   getUpdateStatus: () => ipcRenderer.invoke('update:getStatus'),

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file: data: http://localhost:5173; style-src 'self'; script-src 'self'">
+<title>KaTuro assistant</title>
+<link rel="stylesheet" href="bubble.css">
+</head>
+<body>
+  <div id="card" class="card" role="dialog" aria-live="polite" aria-label="KaTuro assistant" hidden>
+    <div class="head-row">
+      <div>
+        <div id="who" class="who"></div>
+        <div id="mood" class="mood"></div>
+      </div>
+      <button id="close" class="icon-btn" type="button" title="Make small" aria-label="Make small">&#x2212;</button>
+    </div>
+    <div id="title" class="title"></div>
+    <div id="text" class="text"></div>
+    <div id="reply" class="reply" hidden></div>
+    <div id="actions" class="actions"></div>
+    <form id="ask" class="ask">
+      <input id="askText" type="text" maxlength="500" autocomplete="off" placeholder="Ask me anything…" aria-label="Ask the assistant">
+      <button type="submit" class="btn primary">Send</button>
+    </form>
+  </div>
+  <button id="face" class="face" type="button" aria-label="KaTuro assistant">
+    <img id="avatar" alt="" draggable="false">
+    <span id="dot" class="dot" hidden></span>
+    <span id="badge" class="badge" hidden></span>
+  </button>
+  <script src="bubble.js"></script>
+</body>
+</html>

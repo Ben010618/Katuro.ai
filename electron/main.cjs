@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, Notification, nativeImage, screen } = require('electron');
+const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -540,6 +541,145 @@ ipcMain.handle('app:setUnreadBadge', async (event, count, pngDataUrl) => {
 ipcMain.handle('app:showWindow', async () => {
   showMainWindow();
   return { success: true };
+});
+
+// ── Teaching assistant bubble ─────────────────────────────────────────────
+// A small round persona head that floats above all apps (like a chat head). The page
+// (main window) decides what it shows; the bubble only displays it and sends back clicks.
+// It never takes the focus, never shows in the taskbar, and hides when KaTuroDesk quits.
+let bubbleWindow = null;
+let bubbleState = { visible: false, expanded: false };
+const BUBBLE_SIZE = { small: 84, wideW: 380, wideH: 330 };
+const bubbleFile = () => path.join(app.getPath('userData'), 'bubble.json');
+
+function savedBubbleCorner() {
+  try {
+    const p = JSON.parse(fs.readFileSync(bubbleFile(), 'utf8'));
+    if (Number.isFinite(p.right) && Number.isFinite(p.bottom)) return p;
+  } catch (e) {}
+  return null;
+}
+
+/** Keeps the bubble's bottom-right corner on a visible screen (the teacher's own screen first). */
+function bubbleBounds(width, height) {
+  const corner = savedBubbleCorner();
+  const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const shown = corner && displays.find((d) => corner.right > d.workArea.x + 40 && corner.right <= d.workArea.x + d.workArea.width + 1 && corner.bottom > d.workArea.y + 40 && corner.bottom <= d.workArea.y + d.workArea.height + 1);
+  const area = (shown || primary).workArea;
+  const right = shown ? corner.right : area.x + area.width - 16;
+  const bottom = shown ? corner.bottom : area.y + area.height - 96;
+  const x = Math.min(Math.max(area.x, right - width), area.x + area.width - width);
+  const y = Math.min(Math.max(area.y, bottom - height), area.y + area.height - height);
+  return { x: Math.round(x), y: Math.round(y), width, height };
+}
+
+function ensureBubble() {
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
+  bubbleWindow = new BrowserWindow({
+    ...bubbleBounds(BUBBLE_SIZE.small, BUBBLE_SIZE.small),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    show: false,
+    title: 'KaTuro assistant',
+    webPreferences: {
+      preload: path.join(__dirname, 'bubble', 'bubble-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+  bubbleWindow.setAlwaysOnTop(true, 'floating');
+  bubbleWindow.setMenuBarVisibility(false);
+  bubbleWindow.loadFile(path.join(__dirname, 'bubble', 'bubble.html'));
+  bubbleWindow.webContents.on('did-finish-load', () => {
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.webContents.send('bubble:state', bubbleState);
+  });
+  bubbleWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  bubbleWindow.webContents.on('will-navigate', (e) => e.preventDefault());
+  bubbleWindow.on('closed', () => { bubbleWindow = null; });
+  return bubbleWindow;
+}
+
+function applyBubble() {
+  if (!bubbleState.visible) {
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.hide();
+    return;
+  }
+  const win = ensureBubble();
+  const w = bubbleState.expanded ? BUBBLE_SIZE.wideW : BUBBLE_SIZE.small;
+  const h = bubbleState.expanded ? BUBBLE_SIZE.wideH : BUBBLE_SIZE.small;
+  // Grow up and to the left from the head's corner, so the head stays where the teacher put it.
+  const now = win.getBounds();
+  const corner = win.isVisible() ? { right: now.x + now.width, bottom: now.y + now.height } : null;
+  if (corner) {
+    try { fs.writeFileSync(bubbleFile(), JSON.stringify(corner)); } catch (e) {}
+  }
+  win.setBounds(bubbleBounds(w, h));
+  if (!win.webContents.isLoading()) win.webContents.send('bubble:state', bubbleState);
+  if (!win.isVisible()) win.showInactive();
+}
+
+// From the page: what the bubble shows (visible, expanded, mood, avatar, message, actions…).
+ipcMain.handle('bubble:set', async (event, state = {}) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) return false;
+  bubbleState = { ...state, visible: state.visible === true, expanded: state.expanded === true };
+  applyBubble();
+  return true;
+});
+
+// From the bubble: a click on a button, the head, or a question typed in it.
+ipcMain.on('bubble:action', (event, action = {}) => {
+  if (!bubbleWindow || event.sender !== bubbleWindow.webContents) return;
+  const id = String(action.id || '').slice(0, 40);
+  if (id === 'openApp') showMainWindow();
+  if (id === 'toggle') {
+    bubbleState = { ...bubbleState, expanded: !bubbleState.expanded };
+    applyBubble();
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bubble:action', { id, text: typeof action.text === 'string' ? action.text.slice(0, 1000) : undefined, expanded: bubbleState.expanded });
+});
+
+// Dragging the head: the window follows the pointer; the place is remembered.
+ipcMain.on('bubble:drag', (event, d = {}) => {
+  if (!bubbleWindow || event.sender !== bubbleWindow.webContents) return;
+  const b = bubbleWindow.getBounds();
+  const dx = Math.max(-400, Math.min(400, Math.round(Number(d.dx) || 0)));
+  const dy = Math.max(-400, Math.min(400, Math.round(Number(d.dy) || 0)));
+  bubbleWindow.setBounds({ ...b, x: b.x + dx, y: b.y + dy });
+  if (d.end) {
+    const n = bubbleWindow.getBounds();
+    try { fs.writeFileSync(bubbleFile(), JSON.stringify({ right: n.x + n.width, bottom: n.y + n.height })); } catch (e) {}
+  }
+});
+
+// Is a full-screen app showing (a slideshow, a video)? Windows tells: then the bubble stays quiet.
+let presentingCache = { at: 0, value: false };
+function queryPresenting() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(false);
+    const script = "Add-Type -Namespace KT -Name Q -MemberDefinition '[DllImport(\"shell32.dll\")] public static extern int SHQueryUserNotificationState(out int s);'; $s = 0; [void][KT.Q]::SHQueryUserNotificationState([ref]$s); $s";
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { windowsHide: true, timeout: 8000 }, (err, stdout) => {
+      if (err) return resolve(false);
+      // 2 = busy (a full-screen app), 3 = full-screen game/video, 4 = presentation mode.
+      resolve([2, 3, 4].includes(Number(String(stdout).trim())));
+    });
+  });
+}
+ipcMain.handle('app:isPresenting', async () => {
+  if (Date.now() - presentingCache.at < 20000) return presentingCache.value;
+  const value = await queryPresenting();
+  presentingCache = { at: Date.now(), value };
+  return value;
 });
 
 ipcMain.handle('app:getVersion', async () => app.getVersion());
