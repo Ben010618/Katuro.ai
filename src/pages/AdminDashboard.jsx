@@ -2949,7 +2949,7 @@ export default function AdminDashboard() {
     navigate('/login', { replace: true });
   }
 
-  const { total: totalCount, active: activeCount, subscribed: subscribedCount } = userStats(teachers);
+  const { total: totalCount, active: activeCount, subscribed: subscribedCount } = userStats(teachers, { recentUids: new Set(Object.keys(activityStatus)) });
   const pendingCount  = teachers.filter(t => t.pendingApproval).length;
 
   // Pending users appear first, then sort all groups by registration date (oldest → newest)
@@ -3197,11 +3197,11 @@ export default function AdminDashboard() {
         <div className="kt-grid-4" style={{ gap: 14, marginBottom: 24 }}>
           {[
             { label: 'Total Users',      value: totalCount,      Icon: Users,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
-            { label: 'Active Users',     value: activeCount,     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },
+            { label: 'Active Users',     value: activeCount,     hint: 'Used kaTuro in the last 30 days',     Icon: ShieldCheck, accent: '#d8f3dc', iconColor: '#2d6a4f' },
             // Free-trial counting is not built yet: the card shows a dash until it is.
             { label: 'Under Free Trial', value: '—',             Icon: ShieldOff,   accent: '#f5faf7', iconColor: '#9BB8A5' },
             { label: 'Subscribed',       value: subscribedCount, Icon: BadgeCheck,       accent: '#d8f3dc', iconColor: '#2d6a4f' },
-          ].map(({ label, value, Icon, accent, iconColor }) => (
+          ].map(({ label, value, hint, Icon, accent, iconColor }) => (
             <div key={label} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: accent, display: 'grid', placeItems: 'center' }}>
                 <Icon size={18} color={iconColor} />
@@ -3209,6 +3209,7 @@ export default function AdminDashboard() {
               <div>
                 <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--kt-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: 'var(--kt-text-primary)', fontFamily: '"DM Mono", monospace' }}>{value}</p>
+                {hint && <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--kt-text-secondary)' }}>{hint}</p>}
               </div>
             </div>
           ))}
