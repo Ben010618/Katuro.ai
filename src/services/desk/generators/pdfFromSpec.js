@@ -4,7 +4,7 @@
  */
 
 import { normalizeDocumentSpec, parseInlineRuns } from '../docSpec.js';
-import { MARGIN_IN, pageInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows, toUint8, interop } from './shared.js';
+import { marginsOf, pageInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows, toUint8, interop } from './shared.js';
 
 const PT = 72;
 
@@ -28,6 +28,7 @@ export async function buildPdf(rawSpec) {
   const doc = new jsPDF({ unit: 'pt', format: [page.landscape ? H : W, page.landscape ? W : H], orientation: page.landscape ? 'landscape' : 'portrait', compress: true });
   doc.setProperties({ title: pdfSafe(spec.title), creator: 'KaTuroDesk' });
 
+  const MARGIN_IN = marginsOf(spec);
   const left = MARGIN_IN.left * PT;
   const right = W - MARGIN_IN.right * PT;
   const top = MARGIN_IN.top * PT;

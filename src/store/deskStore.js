@@ -13,6 +13,14 @@ import {
 } from '../services/localFileSystem';
 
 import { createFileIndex } from '../services/desk/index/fileIndex';
+import { setDefaultPaper as applyDefaultPaper, PAPER_SIZES } from '../services/desk/docSpec';
+
+/** The saved default paper, applied to the document engine as the store loads. */
+function applyPersistedPaper(paper) {
+  const p = PAPER_SIZES[paper] ? paper : 'long';
+  applyDefaultPaper(p);
+  return p;
+}
 import { createTask, updateTask, recoverInterrupted } from '../services/desk/schedule/schedule';
 import { DEFAULT_SETTINGS as DEFAULT_TEACHING_SETTINGS, pruneFired } from '../services/desk/teaching/teachingDay';
 
@@ -61,6 +69,8 @@ export const useDeskStore = create(
 
       // KaTuroDesk look (neumorphic): 'light' | 'dark'
       deskTheme: 'light',
+      // Paper for new documents when the request does not name one (Settings > Documents).
+      defaultPaper: 'long',
 
       // Messages: Windows notifications and the unread number on the taskbar button.
       notifyMessages: true,
@@ -182,6 +192,11 @@ export const useDeskStore = create(
       setPersona: (persona) => set({ persona }),
 
       setDeskTheme: (deskTheme) => set({ deskTheme: deskTheme === 'dark' ? 'dark' : 'light' }),
+      setDefaultPaper: (paper) => {
+        if (!PAPER_SIZES[paper]) return;
+        applyDefaultPaper(paper);
+        set({ defaultPaper: paper });
+      },
 
       setNotifyMessages: (on) => set({ notifyMessages: on === true }),
 
@@ -394,7 +409,7 @@ export const useDeskStore = create(
               import('../services/desk/generators/htmlFromSpec'),
               import('../services/localFileSystem'),
             ]);
-            bytes = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), { pageSize: spec.paper, landscape: spec.orientation === 'landscape' });
+            bytes = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), { pageSize: spec.paper, landscape: spec.orientation === 'landscape', cssPage: true });
             if (!bytes) {
               const { buildPdf } = await import('../services/desk/generators/pdfFromSpec');
               bytes = await buildPdf(spec);
@@ -427,12 +442,14 @@ export const useDeskStore = create(
         // Settings added in later versions get their defaults.
         teachingSettings: { ...DEFAULT_TEACHING_SETTINGS, ...(persisted?.teachingSettings || {}) },
         teachingLog: { noClass: [], noClassFor: {}, repeat: {}, ...(persisted?.teachingLog || {}) },
+        defaultPaper: applyPersistedPaper(persisted?.defaultPaper),
       }),
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
         privacyMode: state.privacyMode,
         persona: state.persona,
         deskTheme: state.deskTheme,
+        defaultPaper: state.defaultPaper,
         notifyMessages: state.notifyMessages,
         taskbarBadge: state.taskbarBadge,
         messageSound: state.messageSound,

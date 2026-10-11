@@ -4,7 +4,7 @@
  */
 
 import { normalizeDocumentSpec, parseInlineRuns } from '../docSpec.js';
-import { MARGIN_IN, pageInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows } from './shared.js';
+import { marginsOf, fontOf, pageInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows } from './shared.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -14,15 +14,35 @@ export function escapeHtml(s) {
 
 const inline = (text) => parseInlineRuns(text).map((r) => (r.bold ? `<strong>${escapeHtml(r.text)}</strong>` : escapeHtml(r.text))).join('');
 
+// Word's "single" line spacing is about 1.17 times the font size (Arial).
+const LINE_FACTOR = 1.17;
+
+/** Inline CSS for a block's own formatting ('' when it has none). */
+export function styleCss(st, { list = false } = {}) {
+  if (!st) return '';
+  const css = [];
+  if (st.align) css.push(`text-align:${st.align}`);
+  const hanging = st.firstLine < 0 ? -st.firstLine : 0;
+  if (st.indent || hanging) css.push(`margin-left:${((st.indent || 0) + (list ? 0 : hanging)).toFixed(2)}in`);
+  if (st.firstLine && !list) css.push(`text-indent:${st.firstLine}in`);
+  if (st.lineSpacing) css.push(`line-height:${(st.lineSpacing * LINE_FACTOR).toFixed(2)}`);
+  if (st.spaceAfter !== undefined) css.push(`margin-bottom:${st.spaceAfter}pt`);
+  if (st.bold) css.push('font-weight:bold');
+  if (st.italic) css.push('font-style:italic');
+  if (st.underline) css.push('text-decoration:underline');
+  if (st.size) css.push(`font-size:${st.size}pt`);
+  return css.length ? ` style="${css.join(';')}"` : '';
+}
+
 function renderBlock(b) {
   switch (b.type) {
     case 'heading':
-      return `<h${b.level + 1} class="h${b.level}">${escapeHtml(b.text)}</h${b.level + 1}>`;
+      return `<h${b.level + 1} class="h${b.level}"${styleCss(b.style)}>${escapeHtml(b.text)}</h${b.level + 1}>`;
     case 'paragraph':
-      return `<p>${inline(b.text)}</p>`;
+      return `<p${styleCss(b.style)}>${inline(b.text)}</p>`;
     case 'bullets': {
       const tag = b.ordered ? 'ol' : 'ul';
-      return `<${tag}>${b.items.map((i) => `<li>${inline(i)}</li>`).join('')}</${tag}>`;
+      return `<${tag}${styleCss(b.style, { list: true })}>${b.items.map((i) => `<li>${inline(i)}</li>`).join('')}</${tag}>`;
     }
     case 'table': {
       const fr = widthFractions(b.columns.length, b.widths);
@@ -81,7 +101,11 @@ export function specToHtmlBody(rawSpec) {
 
 function pageCss(spec) {
   const p = pageInches(spec);
-  return `@page { size: ${p.width}in ${p.height}in; margin: ${MARGIN_IN.top}in ${MARGIN_IN.right}in ${MARGIN_IN.bottom}in ${MARGIN_IN.left}in; }`;
+  const m = marginsOf(spec);
+  const f = fontOf(spec);
+  const font = spec.font ? `
+body { font-family: '${f.family}', Arial, Helvetica, sans-serif; font-size: ${f.size}pt; }` : '';
+  return `@page { size: ${p.width}in ${p.height}in; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in; }${font}`;
 }
 
 const CSS = `
@@ -144,9 +168,10 @@ const SCREEN_CSS = `
 export function buildHtml(rawSpec, { forPrint = false } = {}) {
   const spec = normalizeDocumentSpec(rawSpec);
   const p = pageInches(spec);
+  const m = marginsOf(spec);
   const sheetCss = forPrint
     ? ''
-    : `${SCREEN_CSS}@media screen { .sheet { width: ${p.width}in; min-height: ${p.height}in; padding: ${MARGIN_IN.top}in ${MARGIN_IN.right}in ${MARGIN_IN.bottom}in ${MARGIN_IN.left}in; max-width: 100%; } }`;
+    : `${SCREEN_CSS}@media screen { .sheet { width: ${p.width}in; min-height: ${p.height}in; padding: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in; max-width: 100%; } }`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -154,8 +179,8 @@ export function buildHtml(rawSpec, { forPrint = false } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(spec.title)}</title>
 <style>
-${pageCss(spec)}
 ${CSS}
+${pageCss(spec)}
 ${sheetCss}
 </style>
 </head>

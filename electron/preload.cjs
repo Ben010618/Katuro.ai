@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
     return () => ipcRenderer.removeListener('bubble:action', listener);
   },
   isPresenting: () => ipcRenderer.invoke('app:isPresenting'),
+  // Printing a KaTuro document to a printer the teacher picks.
+  listPrinters: () => ipcRenderer.invoke('print:printers'),
+  printDocument: (html, options) => ipcRenderer.invoke('print:document', html, options),
   // Bubble-sheet photos from the teacher's phone, saved into the quiz's Photos folder.
   startPhoneCapture: (dirPath, title) => ipcRenderer.invoke('capture:start', dirPath, title),
   stopPhoneCapture: () => ipcRenderer.invoke('capture:stop'),

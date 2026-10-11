@@ -3,11 +3,8 @@
  */
 
 import { normalizeDocumentSpec, parseInlineRuns } from '../docSpec.js';
-import { MARGIN_IN, portraitInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows, toUint8 } from './shared.js';
+import { marginsOf, fontOf, portraitInches, headerLines, choiceLetter, choiceLayout, isCompactSpec, answerKeyGroups, widthFractions, metaRows, toUint8 } from './shared.js';
 
-const FONT = 'Arial';
-const BODY = 22; // half-points (11pt)
-const SMALL = 20; // 10pt (tables)
 const TWIP = 1440;
 
 export async function buildDocx(rawSpec) {
@@ -20,7 +17,11 @@ export async function buildDocx(rawSpec) {
 
   const page = portraitInches(spec.paper);
   const landscape = spec.orientation === 'landscape';
-  const contentW = Math.round(((landscape ? page.height : page.width) - MARGIN_IN.left - MARGIN_IN.right) * TWIP);
+  const margin = marginsOf(spec);
+  const contentW = Math.round(((landscape ? page.height : page.width) - margin.left - margin.right) * TWIP);
+  const FONT = fontOf(spec).family;
+  const BODY = Math.round(fontOf(spec).size * 2); // half-points (11pt = 22)
+  const SMALL = BODY - 2; // tables
 
   const thin = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
@@ -28,13 +29,13 @@ export async function buildDocx(rawSpec) {
   const allNone = { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none };
   const shade = { type: ShadingType.CLEAR, color: 'auto', fill: 'E7E6E6' };
 
-  const run = (text, o = {}) => new TextRun({ text: String(text ?? ''), font: FONT, size: o.size || BODY, bold: o.bold, italics: o.italic, color: o.color });
+  const run = (text, o = {}) => new TextRun({ text: String(text ?? ''), font: FONT, size: o.size || BODY, bold: o.bold, italics: o.italic, underline: o.underline ? {} : undefined, color: o.color });
   const inlineRuns = (text, o = {}) => parseInlineRuns(text).map((r) => run(r.text, { ...o, bold: o.bold || r.bold }));
   const para = (children, o = {}) => new Paragraph({
     children: Array.isArray(children) ? children : [run(children, o)],
     alignment: o.align,
-    spacing: { after: o.after ?? 80, before: o.before ?? 0 },
-    indent: o.indent ? { left: o.indent } : undefined,
+    spacing: { after: o.after ?? 80, before: o.before ?? 0, ...(o.line ? { line: o.line } : {}) },
+    indent: o.indent || o.firstLine || o.hanging ? { left: o.indent || 0, ...(o.firstLine ? { firstLine: o.firstLine } : {}), ...(o.hanging ? { hanging: o.hanging } : {}) } : undefined,
     keepNext: o.keepNext,
     border: o.border,
     numbering: o.numbering,
@@ -48,6 +49,25 @@ export async function buildDocx(rawSpec) {
     margins: { top: 40, bottom: 40, left: 80, right: 80 },
     columnSpan: o.span,
   });
+
+  // A block's own formatting (from the Canvas editor) as paragraph and text options.
+  const ALIGN = { center: AlignmentType.CENTER, right: AlignmentType.RIGHT, justify: AlignmentType.JUSTIFIED };
+  const tw = (inches) => Math.round(inches * TWIP);
+  const paraStyle = (st, base) => {
+    if (!st) return base;
+    const o = { ...base };
+    if (st.align) o.align = ALIGN[st.align];
+    if (st.indent) o.indent = tw(st.indent);
+    if (st.firstLine > 0) o.firstLine = tw(st.firstLine);
+    if (st.firstLine < 0) {
+      o.hanging = tw(-st.firstLine);
+      o.indent = tw((st.indent || 0) - st.firstLine);
+    }
+    if (st.lineSpacing) o.line = Math.round(240 * st.lineSpacing);
+    if (st.spaceAfter !== undefined) o.after = Math.round(st.spaceAfter * 20);
+    return o;
+  };
+  const runStyle = (st, base = {}) => (st ? { ...base, ...(st.bold ? { bold: true } : {}), ...(st.italic ? { italic: true } : {}), ...(st.underline ? { underline: true } : {}), ...(st.size ? { size: Math.round(st.size * 2) } : {}) } : base);
 
   const children = [];
 
@@ -93,19 +113,22 @@ export async function buildDocx(rawSpec) {
     switch (b.type) {
       case 'heading': {
         const size = b.level === 1 ? 26 : b.level === 2 ? 24 : BODY;
-        children.push(para([run(b.text, { bold: true, size })], { before: b.level === 1 ? 200 : 140, after: 80, keepNext: true }));
+        children.push(para([run(b.text, runStyle(b.style, { bold: true, size }))], paraStyle(b.style, { before: b.level === 1 ? 200 : 140, after: 80, keepNext: true })));
         break;
       }
       case 'paragraph':
-        children.push(para(inlineRuns(b.text), { after: 120 }));
+        children.push(para(inlineRuns(b.text, runStyle(b.style)), paraStyle(b.style, { after: 120 })));
         break;
       case 'bullets': {
         orderedInstance += 1;
         for (const item of b.items) {
-          children.push(para(inlineRuns(item), {
+          const listed = paraStyle(b.style ? { ...b.style, firstLine: undefined } : undefined, {
             after: 40,
             numbering: b.ordered ? { reference: 'ks-ordered', level: 0, instance: orderedInstance } : { reference: 'ks-bullets', level: 0 },
-          }));
+          });
+          // A list moved right keeps its bullet hanging in front of the text.
+          if (b.style?.indent) Object.assign(listed, { indent: 540 + tw(b.style.indent), hanging: b.ordered ? 360 : 270 });
+          children.push(para(inlineRuns(item, runStyle(b.style)), listed));
         }
         children.push(para('', { after: 40 }));
         break;
@@ -240,10 +263,10 @@ export async function buildDocx(rawSpec) {
             orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
           },
           margin: {
-            top: MARGIN_IN.top * TWIP,
-            bottom: MARGIN_IN.bottom * TWIP,
-            left: Math.round(MARGIN_IN.left * TWIP),
-            right: Math.round(MARGIN_IN.right * TWIP),
+            top: Math.round(margin.top * TWIP),
+            bottom: Math.round(margin.bottom * TWIP),
+            left: Math.round(margin.left * TWIP),
+            right: Math.round(margin.right * TWIP),
           },
         },
       },

@@ -18,6 +18,8 @@ import {
   History,
   Loader2,
   X,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import {
@@ -26,9 +28,12 @@ import {
   readFileBytes,
   findEntryByPath,
 } from '../../services/localFileSystem';
-import { normalizeDocumentSpec } from '../../services/desk/docSpec';
+import { normalizeDocumentSpec, PAPER_SIZES, getDefaultPaper } from '../../services/desk/docSpec';
+import { pageInches } from '../../services/desk/generators/shared';
+import { emptyHistory, record, undo, redo } from '../../services/desk/specEdits';
 import { buildHtml } from '../../services/desk/generators/htmlFromSpec';
 import DeskSpecEditor from './DeskSpecEditor';
+import DeskPrintDialog from './DeskPrintDialog';
 import DeskSheetGrid from './DeskSheetGrid';
 import DeskFilePreview from './DeskFilePreview';
 import DeskChangesView from './DeskChangesView';
@@ -103,6 +108,8 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
   const [showOutputs, setShowOutputs] = useState(false);
+  const [showPrint, setShowPrint] = useState(false);
+  const [history, setHistory] = useState(emptyHistory);
   const iframeRef = useRef(null);
   const viewportRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(440);
@@ -124,6 +131,8 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
     setIsEditing(false);
     setDraftSpec(null);
     setError('');
+    setShowPrint(false);
+    setHistory(emptyHistory());
   }
 
   const art = activeArtifact;
@@ -131,7 +140,7 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
   const pageWidthPx = useMemo(() => {
     if (art?.type !== 'document' || !spec) return 0;
     try {
-      return (normalizeDocumentSpec(spec).orientation === 'landscape' ? 13 : 8.5) * 96 + 48;
+      return pageInches(normalizeDocumentSpec(spec)).width * 96 + 48;
     } catch {
       return 0;
     }
@@ -157,6 +166,24 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
   }, [zoom]);
   useEffect(() => { applyZoom(); }, [applyZoom]);
 
+  // Every change in the editor can be undone (quick typing in one box is one step).
+  const changeDraft = (next) => {
+    setHistory((h) => record(h, draftSpec));
+    setDraftSpec(next);
+  };
+  const handleUndo = () => {
+    const r = undo(history, draftSpec);
+    if (!r) return;
+    setHistory(r.history);
+    setDraftSpec(r.spec);
+  };
+  const handleRedo = () => {
+    const r = redo(history, draftSpec);
+    if (!r) return;
+    setHistory(r.history);
+    setDraftSpec(r.spec);
+  };
+
   const handleSave = async () => {
     if (!draftSpec || !art) return;
     setIsSaving(true);
@@ -165,6 +192,7 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
       const toSave = art.type === 'document' ? normalizeDocumentSpec(draftSpec) : draftSpec;
       await saveArtifactEdits(art.id, toSave);
       setDraftSpec(null);
+      setHistory(emptyHistory());
       setIsEditing(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -211,6 +239,11 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
   };
 
   const handlePrint = () => {
+    // The desktop app has its own Print panel (printer list, paper, copies…).
+    if (typeof window !== 'undefined' && window.katuroDeskApi?.printDocument) {
+      setShowPrint(true);
+      return;
+    }
     const win = iframeRef.current?.contentWindow;
     if (win) win.print();
     else window.print();
@@ -270,7 +303,7 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
             Click a file on the left to preview it, or ask your Co-Teacher to create a document. Generated Word, Excel, PowerPoint and PDF files appear here.
           </p>
           <div className="inline-flex items-center px-3 py-1 rounded-full bg-white border border-gray-200 text-[10.5px] font-medium text-emerald-800 shadow-2xs">
-            DepEd Long Bond Paper (8.5" × 13")
+            New documents: {PAPER_SIZES[getDefaultPaper()].label}
           </div>
         </div>
       </aside>
@@ -310,6 +343,16 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
               {isEditing ? <Eye size={12} /> : <Edit3 size={12} />}
             </button>
           )}
+          {isEditing && draftSpec && (
+            <>
+              <button onClick={handleUndo} disabled={!history.past.length} title="Undo" className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded border border-gray-200 transition disabled:opacity-30">
+                <Undo2 size={12} />
+              </button>
+              <button onClick={handleRedo} disabled={!history.future.length} title="Redo" className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded border border-gray-200 transition disabled:opacity-30">
+                <Redo2 size={12} />
+              </button>
+            </>
+          )}
           {draftSpec && (
             <button
               onClick={handleSave}
@@ -348,6 +391,8 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
           )}
         </div>
       </div>
+
+      {showPrint && art.type === 'document' && spec && <DeskPrintDialog spec={normalizeDocumentSpec(spec)} onClose={() => setShowPrint(false)} />}
 
       {/* Output files */}
       {files.length > 0 && (
@@ -394,7 +439,7 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
           <BubbleQuizView key={art.id} art={art} />
         ) : art.type === 'document' ? (
           isEditing && draftSpec ? (
-            <DeskSpecEditor spec={draftSpec} onChange={setDraftSpec} />
+            <DeskSpecEditor spec={draftSpec} onChange={changeDraft} />
           ) : (
             <iframe
               ref={iframeRef}

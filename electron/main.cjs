@@ -449,8 +449,14 @@ ipcMain.handle('doc:htmlToPdf', async (_, html, options = {}) => {
   });
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(String(html))}`);
+    // KaTuro documents carry their own paper, orientation and margins (@page): use them exactly.
+    if (options.cssPage === true) {
+      const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true });
+      return new Uint8Array(pdf.buffer, pdf.byteOffset, pdf.byteLength);
+    }
     const pageSize = options.pageSize === 'a4' ? 'A4'
       : options.pageSize === 'letter' ? 'Letter'
+      : options.pageSize === 'legal' ? 'Legal'
       : { width: 8.5, height: 13 };
     const pdf = await win.webContents.printToPDF({
       pageSize,
@@ -715,6 +721,73 @@ ipcMain.handle('update:check', async () => {
 });
 
 ipcMain.handle('update:install', async () => ({ started: installUpdateNow() }));
+
+// ── Printing KaTuro documents straight to a chosen printer ───
+// The printer list comes from Chromium (what it can print to); Windows adds which one is
+// the default and whether it is offline or out of paper (best effort: drivers differ).
+const PRINTER_ERRORS = { 3: 'Low on paper', 4: 'Out of paper', 5: 'Low on ink or toner', 6: 'Out of ink or toner', 7: 'Cover is open', 8: 'Paper jam', 9: 'Offline', 10: 'Needs attention', 11: 'Output tray full' };
+function windowsPrinterStates() {
+  if (process.platform !== 'win32') return Promise.resolve({});
+  const script = 'Get-CimInstance Win32_Printer | Select-Object Name,Default,WorkOffline,PrinterStatus,DetectedErrorState | ConvertTo-Json -Compress';
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, timeout: 15000 }, (err, stdout) => {
+      if (err) return resolve({});
+      try {
+        const list = [].concat(JSON.parse(String(stdout).trim() || '[]'));
+        resolve(Object.fromEntries(list.map((p) => {
+          const offline = p.WorkOffline === true || p.PrinterStatus === 7 || p.DetectedErrorState === 9;
+          const problem = offline ? 'Offline' : PRINTER_ERRORS[p.DetectedErrorState] || (p.PrinterStatus === 6 ? 'Stopped' : '');
+          return [p.Name, { isDefault: p.Default === true, problem }];
+        })));
+      } catch (e) {
+        resolve({});
+      }
+    });
+  });
+}
+
+ipcMain.handle('print:printers', async (event) => {
+  const [list, states] = await Promise.all([event.sender.getPrintersAsync(), windowsPrinterStates()]);
+  return list.map((p) => ({
+    name: p.name,
+    displayName: p.displayName || p.name,
+    isDefault: Boolean(states[p.name]?.isDefault),
+    problem: states[p.name]?.problem || '',
+    savesFile: /print to pdf|xps document writer|onenote|adobe pdf|fax/i.test(p.name),
+  }));
+});
+
+// Prints one document's HTML. The HTML already has the chosen paper and orientation
+// (@page), and the job asks the printer for the same paper, so nothing is shrunk or cut.
+ipcMain.handle('print:document', async (event, html, opts = {}) => {
+  const printers = await event.sender.getPrintersAsync();
+  const useDialog = opts.dialog === true;
+  if (!useDialog && !printers.some((p) => p.name === opts.deviceName)) throw new Error('That printer is no longer installed. Choose another printer.');
+  const copies = Math.min(99, Math.max(1, Math.floor(Number(opts.copies) || 1)));
+  const pageRanges = (Array.isArray(opts.pageRanges) ? opts.pageRanges : [])
+    .filter((r) => Number.isInteger(r?.from) && Number.isInteger(r?.to) && r.from >= 0 && r.to >= r.from)
+    .slice(0, 50);
+  const size = opts.pageSizeInches || {};
+  const win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true, contextIsolation: true } });
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(String(html))}`);
+    return await new Promise((resolve) => {
+      win.webContents.print({
+        silent: !useDialog,
+        ...(useDialog ? {} : { deviceName: opts.deviceName }),
+        printBackground: true,
+        copies,
+        color: opts.color !== false,
+        landscape: opts.landscape === true,
+        ...(pageRanges.length ? { pageRanges } : {}),
+        ...(opts.duplex === 'long' ? { duplexMode: 'longEdge' } : opts.duplex === 'short' ? { duplexMode: 'shortEdge' } : { duplexMode: 'simplex' }),
+        ...(size.width > 0 && size.height > 0 ? { pageSize: { width: Math.round(size.width * 25400), height: Math.round(size.height * 25400) } } : {}),
+      }, (success, failureReason) => resolve({ success, reason: success ? '' : String(failureReason || '') }));
+    });
+  } finally {
+    setTimeout(() => { if (!win.isDestroyed()) win.destroy(); }, 1500);
+  }
+});
 
 // ── Phone photos for bubble-sheet quizzes (same Wi-Fi or the phone's hotspot) ──
 const phoneCapture = require('./phoneCapture.cjs');

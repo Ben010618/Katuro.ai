@@ -348,6 +348,7 @@ export async function runDeskAgentTurn({
       const viaChromium = await renderHtmlToPdf(buildHtml(spec, { forPrint: true }), {
         pageSize: spec.paper,
         landscape: spec.orientation === 'landscape',
+        cssPage: true,
       });
       if (viaChromium) return viaChromium;
       const { buildPdf } = await import('../generators/pdfFromSpec.js');

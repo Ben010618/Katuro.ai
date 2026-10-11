@@ -19,6 +19,7 @@ import {
   computeQuarterlyGrade,
 } from '../depedGrading.js';
 import {
+  getDefaultPaper,
   normalizeDocumentSpec,
   normalizeSlidesSpec,
   normalizeSheetSpec,
@@ -31,7 +32,7 @@ import { buildConsolidatedSpec } from './consolidate.js';
 const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
 {
   "title": string, "subtitle"?: string,
-  "paper": "long" | "a4" | "letter",            // DepEd default "long" (8.5x13)
+  "paper"?: "long" | "a4" | "letter" | "legal", // ONLY when the teacher named a paper size (letter = short bond 8.5x11); otherwise leave it out and the teacher's default paper is used
   "orientation": "portrait" | "landscape",      // landscape for wide tables (DLL, TOS, class records)
   "meta": [{ "label": string, "value": string }], // info strip: School, Grade Level, Learning Area, Quarter, Teacher, Date...
   "blocks": [
@@ -1017,9 +1018,9 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   slides_handout: {
     label: 'Slides handout',
-    description: "Make a printable PDF handout from the teacher's PowerPoint deck: 1, 2, 3 (with lines for learners' notes), 4, 6 or 9 slides per page, or notes pages (each slide with its speaker notes, for the teacher). Long bond by default. Each slide is drawn in a simplified way (text, pictures, tables, colours). The deck is not changed.",
-    args: '{ "path": string, "perPage"?: 1 | 2 | 3 | 4 | 6 | 9, "notes"?: boolean, "paper"?: "long" | "a4" | "letter" }',
-    async run({ path, perPage = 3, notes = false, paper = 'long' }, ctx, report) {
+    description: "Make a printable PDF handout from the teacher's PowerPoint deck: 1, 2, 3 (with lines for learners' notes), 4, 6 or 9 slides per page, or notes pages (each slide with its speaker notes, for the teacher). On the teacher's default paper unless they name one. Each slide is drawn in a simplified way (text, pictures, tables, colours). The deck is not changed.",
+    args: '{ "path": string, "perPage"?: 1 | 2 | 3 | 4 | 6 | 9, "notes"?: boolean, "paper"?: "long" | "a4" | "letter" | "legal" }',
+    async run({ path, perPage = 3, notes = false, paper = getDefaultPaper() }, ctx, report) {
       if (!path || !/\.pptx$/i.test(path)) throw needsInfo(path && /\.ppt$/i.test(path) ? 'This is an old .ppt file. Open it in PowerPoint and Save As .pptx first, then ask me again.' : 'Which PowerPoint deck (.pptx) should I make a handout of?');
       const per = Number(perPage);
       if (!notes && ![1, 2, 3, 4, 6, 9].includes(per)) throw needsInfo('How many slides per page: 1, 2, 3 (with lines for notes), 4, 6 or 9?');
@@ -1453,9 +1454,9 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   deped_format_docx: {
     label: 'DepEd format',
-    description: "Put the teacher's OWN Word file in the school print format in one step: paper (long bond by default), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (long bond, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. Saves an edited copy; the original is backed up and not changed.",
+    description: "Put the teacher's OWN Word file in the school print format in one step: paper (the teacher's default paper unless they name one), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (the teacher's default paper, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. Saves an edited copy; the original is backed up and not changed.",
     args: '{ "path": string, "paper"?: "long" | "a4" | "letter" | "legal", "margins"?: number | { "top"?: number, "right"?: number, "bottom"?: number, "left"?: number }, "font"?: string, "size"?: number, "letterhead"?: boolean, "signatures"?: boolean, "signers"?: [{ "label": string, "name": string, "role"?: string }] }',
-    async run({ path, paper = 'long', margins, font, size, letterhead = false, signatures = false, signers }, ctx, report) {
+    async run({ path, paper = getDefaultPaper(), margins, font, size, letterhead = false, signatures = false, signers }, ctx, report) {
       if (!path || !/\.docx$/i.test(path)) throw needsInfo(path && /\.doc$/i.test(path) ? 'This is an old .doc file. Open it in Word and Save As .docx first, then ask me again.' : 'Which Word file (.docx) should I format?');
       const { formatDocx, HOUSE } = await import('../generators/depedFormat.js');
       const m = typeof margins === 'number' ? { top: margins, right: margins, bottom: margins, left: margins } : (margins && typeof margins === 'object' ? margins : {});
@@ -2089,7 +2090,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
           pdfs.push(await imagesToPdf([img]));
         } else if (ext === 'pptx') {
           const { readDeck, buildHandout } = await import('../generators/slideHandout.js');
-          pdfs.push(await buildHandout(await readDeck(await ctx.readBytes(p)), { perPage: 1, paper: 'long' }));
+          pdfs.push(await buildHandout(await readDeck(await ctx.readBytes(p)), { perPage: 1, paper: getDefaultPaper() }));
           notes.push(`${nameOf(p)}: slides drawn in a simplified way`);
         } else if (ext === 'docx') {
           const parsed = await ctx.readParsed(p);
@@ -2159,7 +2160,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     label: 'Convert to PDF',
     description: 'Convert Word documents or photos (JPEG, PNG, iPhone HEIC) to PDF. Many photos become ONE clean PDF, one photo per page, turned upright and made smaller so the file is easy to send. Photos go in file-name order (IMG_2 before IMG_10) unless order is "as-given". "folder" takes every photo in that folder.',
     args: '{ "paths"?: [string], "folder"?: string, "combineImages"?: boolean, "order"?: "name" | "as-given", "paper"?: "long" | "a4" | "letter" | "legal", "quality"?: "small" | "standard" | "high", "outputName"?: string }',
-    async run({ paths = [], folder, combineImages = true, order = 'name', paper = 'long', quality = 'standard', outputName }, ctx, report) {
+    async run({ paths = [], folder, combineImages = true, order = 'name', paper = getDefaultPaper(), quality = 'standard', outputName }, ctx, report) {
       const { PHOTO_FILE, naturalSort, preparePhoto } = await import('../generators/photoPdf.js');
       const files = [];
       const photoPaths = [];

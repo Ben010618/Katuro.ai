@@ -4,6 +4,7 @@ import { useDeskStore } from '../../store/deskStore';
 import { readFileBytes, findEntryByPath, readerNameFor } from '../../services/localFileSystem';
 import DeskSheetGrid from './DeskSheetGrid';
 import { QUIZ_FILE, parseQuiz } from '../../services/desk/bubble/quiz';
+import DeskWordPageSetup from './DeskWordPageSetup';
 
 const IMAGE_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
@@ -101,6 +102,7 @@ function FilePreview({ path }) {
         <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">{parsed.warnings.join(' ')}</div>
       )}
 
+      {parsed.kind === 'docx' && /\.docx$/i.test(path) && <DeskWordPageSetup path={path} />}
       {parsed.kind === 'docx' && parsed.html && (
         <iframe
           title="Word preview"

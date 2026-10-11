@@ -7,14 +7,18 @@
  *
  * DocumentSpec  { kind:'document', title, subtitle?, hideTitle?, paper?, orientation?, header?, meta?, blocks[], signatures? }
  *   hideTitle:    true = title is used for the file name/Canvas only, not printed (e.g. 2-up slips)
- *   paper:        'long' (8.5x13, DepEd default) | 'a4' | 'letter'
+ *   paper:        'long' (8.5x13) | 'a4' | 'letter' (8.5x11) | 'legal' (8.5x14); when left out, the teacher's default (Settings)
  *   orientation:  'portrait' | 'landscape'
+ *   margins:      { top, bottom, left, right } in inches (optional; KaTuro's 0.5/0.6 when left out)
+ *   font:         { family, size } (optional; Arial 11 when left out)
  *   header:       { deped: true, region?, division?, school? } | null
  *   meta:         [{ label, value }]  — info strip (Learning Area, Grade, Quarter...)
  *   blocks:
- *     { type:'heading',   text, level: 1|2|3 }
- *     { type:'paragraph', text }               — inline **bold** allowed
- *     { type:'bullets',   items: string[], ordered?: boolean }
+ *     { type:'heading',   text, level: 1|2|3, style? }
+ *     { type:'paragraph', text, style? }       — inline **bold** allowed
+ *     { type:'bullets',   items: string[], ordered?: boolean, style? }
+ *       style: { align?: 'left'|'center'|'right'|'justify', indent?: in, firstLine?: in (below 0 = hanging),
+ *                lineSpacing?: 1|1.15|1.5|2, spaceAfter?: pt, bold?, italic?, underline?, size?: pt }
  *     { type:'table',     columns: string[], rows: string[][], widths?: number[] }
  *     { type:'questions', items: [{ question, choices?: string[], answer? }], showAnswers?: boolean, start?: number }  — start: first item number (continue across Test I / Test II)
  *     { type:'answerLines', count }
@@ -28,10 +32,82 @@
  */
 
 export const PAPER_SIZES = {
-  long: { label: 'Long Bond (8.5" × 13")', widthIn: 8.5, heightIn: 13 },
+  long: { label: 'Long bond (8.5" × 13")', widthIn: 8.5, heightIn: 13 },
   a4: { label: 'A4', widthIn: 8.27, heightIn: 11.69 },
-  letter: { label: 'Letter (8.5" × 11")', widthIn: 8.5, heightIn: 11 },
+  letter: { label: 'Short bond (8.5" × 11")', widthIn: 8.5, heightIn: 11 },
+  legal: { label: 'Legal (8.5" × 14")', widthIn: 8.5, heightIn: 14 },
 };
+
+// The paper new documents get when the request does not name one (Settings > Documents).
+let defaultPaper = 'long';
+export function setDefaultPaper(paper) {
+  if (PAPER_SIZES[paper]) defaultPaper = paper;
+}
+export const getDefaultPaper = () => defaultPaper;
+
+export const FONTS = ['Arial', 'Calibri', 'Times New Roman', 'Cambria', 'Bookman Old Style', 'Century Gothic', 'Tahoma', 'Verdana'];
+export const DEFAULT_FONT = { family: 'Arial', size: 11 };
+
+/** Margin presets in inches. "katuro" is what documents had before margins could be set. */
+export const MARGIN_PRESETS = {
+  katuro: { label: 'KaTuro (0.5" top/bottom, 0.6" sides)', top: 0.5, bottom: 0.5, left: 0.6, right: 0.6 },
+  normal: { label: 'Normal (1")', top: 1, bottom: 1, left: 1, right: 1 },
+  narrow: { label: 'Narrow (0.5")', top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 },
+  moderate: { label: 'Moderate (1" top/bottom, 0.75" sides)', top: 1, bottom: 1, left: 0.75, right: 0.75 },
+  wide: { label: 'Wide (1" top/bottom, 2" sides)', top: 1, bottom: 1, left: 2, right: 2 },
+};
+export const LINE_SPACINGS = [1, 1.15, 1.5, 2];
+const ALIGNS = ['left', 'center', 'right', 'justify'];
+
+const num = (v, lo, hi) => {
+  if (v === null || v === undefined || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= lo && n <= hi ? Math.round(n * 100) / 100 : undefined;
+};
+
+/** A paragraph's formatting, kept only when valid; undefined when there is none. */
+export function normalizeStyle(raw) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const st = {};
+  if (ALIGNS.includes(raw.align) && raw.align !== 'left') st.align = raw.align;
+  const indent = num(raw.indent, 0, 4);
+  if (indent) st.indent = indent;
+  const firstLine = num(raw.firstLine, -2, 2);
+  if (firstLine) st.firstLine = firstLine;
+  if (LINE_SPACINGS.includes(Number(raw.lineSpacing))) st.lineSpacing = Number(raw.lineSpacing);
+  const after = num(raw.spaceAfter, 0, 48);
+  if (after !== undefined) st.spaceAfter = after;
+  for (const k of ['bold', 'italic', 'underline']) if (raw[k] === true) st[k] = true;
+  const size = num(raw.size, 8, 28);
+  if (size) st.size = size;
+  return Object.keys(st).length ? st : undefined;
+}
+
+/** Page margins in inches, or undefined when not set or when they leave less than 2" for the text. */
+export function normalizeMargins(raw, paper = 'long', orientation = 'portrait') {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const m = { top: num(raw.top, 0.2, 3), bottom: num(raw.bottom, 0.2, 3), left: num(raw.left, 0.2, 3), right: num(raw.right, 0.2, 3) };
+  if (Object.values(m).some((v) => v === undefined)) return undefined;
+  const p = PAPER_SIZES[paper] || PAPER_SIZES.long;
+  const [w, h] = orientation === 'landscape' ? [p.heightIn, p.widthIn] : [p.widthIn, p.heightIn];
+  if (w - m.left - m.right < 2 || h - m.top - m.bottom < 2) return undefined;
+  return m;
+}
+
+/** The document's font, or undefined for the KaTuro default (Arial 11). */
+export function normalizeFont(raw) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const family = FONTS.includes(raw.family) ? raw.family : undefined;
+  const size = num(raw.size, 8, 16);
+  if (!family && !size) return undefined;
+  const font = { family: family || DEFAULT_FONT.family, size: size || DEFAULT_FONT.size };
+  return font.family === DEFAULT_FONT.family && font.size === DEFAULT_FONT.size ? undefined : font;
+}
+
+function withStyle(block, raw) {
+  const style = normalizeStyle(raw.style);
+  return style ? { ...block, style } : block;
+}
 
 const BLOCK_TYPES = new Set(['heading', 'paragraph', 'bullets', 'table', 'questions', 'answerLines', 'pageBreak', 'cutLine']);
 
@@ -42,12 +118,12 @@ function normalizeBlock(b) {
   const type = BLOCK_TYPES.has(b.type) ? b.type : b.text ? 'paragraph' : null;
   switch (type) {
     case 'heading':
-      return { type, text: str(b.text), level: [1, 2, 3].includes(Number(b.level)) ? Number(b.level) : 2 };
+      return withStyle({ type, text: str(b.text), level: [1, 2, 3].includes(Number(b.level)) ? Number(b.level) : 2 }, b);
     case 'paragraph':
-      return str(b.text).trim() ? { type, text: str(b.text) } : null;
+      return str(b.text).trim() ? withStyle({ type, text: str(b.text) }, b) : null;
     case 'bullets': {
       const items = (Array.isArray(b.items) ? b.items : []).map(str).filter((s) => s.trim());
-      return items.length ? { type, items, ordered: Boolean(b.ordered) } : null;
+      return items.length ? withStyle({ type, items, ordered: Boolean(b.ordered) }, b) : null;
     }
     case 'table': {
       const columns = (Array.isArray(b.columns) ? b.columns : []).map(str);
@@ -87,13 +163,19 @@ function normalizeBlock(b) {
 /** Makes an AI-produced document spec safe to render. Never throws. */
 export function normalizeDocumentSpec(raw = {}) {
   const spec = raw && typeof raw === 'object' ? raw : {};
+  const paper = PAPER_SIZES[spec.paper] ? spec.paper : defaultPaper;
+  const orientation = spec.orientation === 'landscape' ? 'landscape' : 'portrait';
+  const margins = normalizeMargins(spec.margins, paper, orientation);
+  const font = normalizeFont(spec.font);
   return {
     kind: 'document',
     title: str(spec.title) || 'KaTuro Document',
     ...(spec.subtitle ? { subtitle: str(spec.subtitle) } : {}),
     ...(spec.hideTitle ? { hideTitle: true } : {}),
-    paper: PAPER_SIZES[spec.paper] ? spec.paper : 'long',
-    orientation: spec.orientation === 'landscape' ? 'landscape' : 'portrait',
+    paper,
+    orientation,
+    ...(margins ? { margins } : {}),
+    ...(font ? { font } : {}),
     header: spec.header === null ? null : { deped: true, ...(typeof spec.header === 'object' ? spec.header : {}) },
     meta: (Array.isArray(spec.meta) ? spec.meta : [])
       .filter((m) => m && str(m.label))

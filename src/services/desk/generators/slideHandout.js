@@ -203,7 +203,7 @@ export async function readDeck(bytes) {
   return { width, height, slides, media: (target) => zip.file(target)?.asUint8Array() || null };
 }
 
-const PAPER = { long: [612, 936], a4: [595.28, 841.89], letter: [612, 792] };
+const PAPER = { long: [612, 936], a4: [595.28, 841.89], letter: [612, 792], legal: [612, 1008] };
 const hex = (h, rgb) => rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
 
 /**

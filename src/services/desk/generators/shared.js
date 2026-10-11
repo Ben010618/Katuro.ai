@@ -2,7 +2,7 @@
  * shared.js — small helpers shared by the KaTuroDesk file generators.
  */
 
-import { PAPER_SIZES } from '../docSpec.js';
+import { PAPER_SIZES, DEFAULT_FONT } from '../docSpec.js';
 
 /** Page size in inches for a normalized spec, already swapped for landscape. */
 export function pageInches(spec) {
@@ -18,6 +18,12 @@ export function portraitInches(paper) {
 }
 
 export const MARGIN_IN = { top: 0.5, bottom: 0.5, left: 0.6, right: 0.6 };
+
+/** The page margins of a normalized spec (inches): the teacher's own, or KaTuro's. */
+export const marginsOf = (spec) => spec?.margins || MARGIN_IN;
+
+/** The body font of a normalized spec: { family, size (pt) }. */
+export const fontOf = (spec) => spec?.font || DEFAULT_FONT;
 
 const fromCode = (n) => { try { return String.fromCodePoint(n); } catch { return ''; } };
 /** Text inside Office XML: named and numeric character references (&#x2022;) decoded, &amp; last. */

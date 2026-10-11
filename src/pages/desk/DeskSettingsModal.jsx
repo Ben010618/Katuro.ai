@@ -8,10 +8,11 @@ import { useDeskUpdate, updateStatusText } from './useDeskUpdate';
 import TeacherExamPanel from './TeacherExamPanel';
 import DeskNotificationSettings from './DeskNotificationSettings';
 import DeskSignatureSettings from './DeskSignatureSettings';
+import { PAPER_SIZES } from '../../services/desk/docSpec';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
-  const { persona, setPersona, privacyMode, setPrivacyMode, deskTheme, setDeskTheme } = useDeskStore();
+  const { persona, setPersona, privacyMode, setPrivacyMode, deskTheme, setDeskTheme, defaultPaper, setDefaultPaper } = useDeskStore();
   const [tab, setTab] = useState(initialTab);
   const { status: update, appVersion, check, install } = useDeskUpdate();
   const busy = update.state === 'checking' || update.state === 'downloading';
@@ -44,7 +45,7 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         </div>
 
         <div className="px-5 pt-3 flex gap-1 border-b border-gray-200" role="tablist">
-          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['signature', 'E-signature'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : [])].map(([id, label]) => (
+          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : [])].map(([id, label]) => (
             <button
               key={id}
               role="tab"
@@ -61,6 +62,27 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
           <TeacherExamPanel />
         ) : tab === 'notifications' ? (
           <DeskNotificationSettings />
+        ) : tab === 'documents' ? (
+          <div className="p-5 space-y-3 overflow-y-auto">
+            <section>
+              <h3 className="text-xs font-bold text-gray-800 mb-0.5">Paper for new documents</h3>
+              <p className="text-[11px] text-gray-500 mb-3">Used when you do not name a paper size in your request. You can still change the paper of any document in the Canvas (Edit, then Page setup) and when you print.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.entries(PAPER_SIZES).map(([id, p]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setDefaultPaper(id)}
+                    aria-pressed={defaultPaper === id}
+                    className={`text-left rounded-lg border-2 px-3 py-2 text-xs transition ${defaultPaper === id ? 'border-emerald-600 bg-emerald-50/60 font-semibold text-emerald-900' : 'border-gray-200 hover:border-emerald-300 text-gray-700'}`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-3">Bubble sheets have their own paper choice. School forms with an official size keep it.</p>
+            </section>
+          </div>
         ) : tab === 'signature' ? (
           <DeskSignatureSettings />
         ) : tab === 'profile' ? (
