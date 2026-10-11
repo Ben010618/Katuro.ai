@@ -151,7 +151,7 @@ export default function DeskVoiceScoresView({ art }) {
           <span className={label}>Highest possible score{d.maxFromFile && String(column?.max) === String(d.maxScore) ? ' (from your file)' : ''}</span>
           <input type="number" min="1" value={d.maxScore || ''} onChange={(e) => save(() => ({ maxScore: e.target.value, maxFromFile: false }))} placeholder="e.g. 20" className="w-full border border-gray-300" style={box} />
         </label>
-        <div className="space-y-1 sm:col-span-2">
+        {!d.fromQuiz && <div className="space-y-1 sm:col-span-2">
           <span className={label}>How you will read</span>
           <div className="flex gap-1.5">
             {[['named', 'Name and score'], ['list', 'Scores in list order']].map(([key, text]) => (
@@ -166,11 +166,17 @@ export default function DeskVoiceScoresView({ art }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
 
+      {d.fromQuiz && (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+          Scores from the bubble quiz <span className="font-semibold">{d.fromQuiz.title}</span> ({d.fromQuiz.items} items), checked on this computer. Choose the column, check the list, then tap Review changes.
+        </p>
+      )}
+
       {/* Microphone */}
-      <div className="rounded-lg border border-gray-200 bg-white p-3">
+      {!d.fromQuiz && <div className="rounded-lg border border-gray-200 bg-white p-3">
         <VoiceStatus voice={voice} />
         <div className="flex items-center gap-2">
           <VoiceButton voice={voice} disabled={!column} />
@@ -182,7 +188,7 @@ export default function DeskVoiceScoresView({ art }) {
                 : <>Read names and scores in English: <span className="italic">"Alvarez 18, Bautista 15, Cruz absent"</span>. Add the first name when two learners share a surname.</>}
           </p>
         </div>
-      </div>
+      </div>}
 
       {/* Questions */}
       {session.issues.length > 0 && (

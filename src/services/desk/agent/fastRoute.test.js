@@ -15,7 +15,7 @@ describe('fastRoute', () => {
 
   it('routes every quick prompt when suitable files are attached', () => {
     const files = {
-      item_analysis: ['a.xlsx'], remedial: ['a.xlsx'], class_record: ['a.xlsx'], attendance: ['sf2.xlsx'], voice_scores: ['Rizal.xlsx'],
+      item_analysis: ['a.xlsx'], remedial: ['a.xlsx'], class_record: ['a.xlsx'], attendance: ['sf2.xlsx'], voice_scores: ['Rizal.xlsx'], bubble_sheets: ['Class List.xlsx'],
       dll: ['Lesson.docx'], slides: ['Lesson.docx'], photo_table: ['photo.jpg'], merge_pdfs: ['a.pdf', 'b.pdf'],
     };
     for (const q of QUICK_PROMPTS) {
@@ -39,6 +39,15 @@ describe('fastRoute', () => {
     expect(route('Encode scores by voice', ['a.xlsx', 'b.xlsx'])).toBeNull();
     // Without voice words, the e-Class Record route is unchanged.
     expect(route('Encode the attached scores into an official DepEd e-Class Record with transmutation.', ['a.xlsx']).tasks[0].tool).toBe('make_class_record');
+  });
+
+  it('bubble sheets: a class list opens a new quiz; a saved quiz file opens that quiz', () => {
+    expect(route('Make bubble sheets for the attached class list.', ['G7/Class List.xlsx']).tasks).toEqual([
+      { id: 't1', tool: 'bubble_quiz', args: { listPath: 'G7/Class List.xlsx' }, label: 'Bubble sheets – Class List.xlsx', dependsOn: [] },
+    ]);
+    expect(route('check my bubble quiz', ['Bubble Quizzes/Quiz 1/KaTuro bubble quiz.json']).tasks[0].args).toEqual({ quizPath: 'Bubble Quizzes/Quiz 1/KaTuro bubble quiz.json' });
+    expect(route('bubble sheets please', ['photo.jpg'])).toBeNull();
+    expect(route('bubble sheets please', ['a.xlsx', 'b.xlsx'])).toBeNull();
   });
 
   it('builds dependent remedial tasks per file', () => {

@@ -716,10 +716,31 @@ ipcMain.handle('update:check', async () => {
 
 ipcMain.handle('update:install', async () => ({ started: installUpdateNow() }));
 
+// ── Phone photos for bubble-sheet quizzes (same Wi-Fi or the phone's hotspot) ──
+const phoneCapture = require('./phoneCapture.cjs');
+const sendToWindow = (channel, payload) => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+};
+ipcMain.handle('capture:start', async (_, dirPath, title) => {
+  const dir = resolveInsideRoot(dirPath);
+  return phoneCapture.start({
+    dir,
+    title: String(title || 'Bubble quiz').slice(0, 120),
+    onPhoto: (p) => sendToWindow('capture:photo', p),
+    onEnd: () => sendToWindow('capture:ended', {}),
+  });
+});
+ipcMain.handle('capture:stop', async () => {
+  phoneCapture.stop();
+  return { stopped: true };
+});
+ipcMain.handle('capture:status', async () => phoneCapture.status());
+
 app.on('second-instance', () => showMainWindow());
 
 app.on('before-quit', () => {
   isQuitting = true;
+  phoneCapture.stop();
 });
 
 app.whenReady().then(() => {

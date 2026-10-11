@@ -65,6 +65,7 @@ Rules:
 8b. "Summarize / review this folder (or subfolder)": use write_document with docType "summary" (or answer_from_files if they only want a chat answer) and put the relevant document files from the index in sourcePaths (up to 40; skip code, images and duplicates; prefer docx/pdf/xlsx/pptx). Say which files you included.
 9. Schools use their OWN templates. Moving data between two existing papers (e.g. attendance in a Word doc → the SF2 Excel, scores → their class record, SF1 details → a masterlist) → transfer_data (source = where the data is, target = the file to fill). Checking/cross-checking two papers → compare_files. Changing words/values inside an existing Word/Excel file → edit_file. "What is this file / did you read it right" → understand_file. These keep the target's formatting and show a preview the teacher approves.
 9e. "Consolidate / combine / compile / merge" the data of several existing files (or a folder) into one Excel → consolidate_files with all those files in sourcePaths (one task, not one per file). make_spreadsheet is only for designing a new sheet.
+9z. "Make bubble sheets / answer sheets with the learners' names", "bubble sheets for this class list", or checking/recording a bubble-sheet quiz KaTuro made (a "KaTuro bubble quiz.json" file or its folder in "Bubble Quizzes") → bubble_quiz with listPath = the class list file (new sheets) or quizPath = that quiz file (photos, checking, recording); title/items/choices only when said. Photos of sheets KaTuro did NOT make stay check_answer_sheets.
 9y. "Make a submission pack / compile these into one PDF with a cover / ready to submit" → submission_pack with paths in the teacher's order (or folder), title = what the teacher called it (ask if not said), submittedTo when said. Only merging PDFs with nothing else → merge_pdfs.
 9x. "Organize / arrange / clean up my folder", "sort my files by grade and section", "find duplicate files" → organize_folder (folder only when the teacher named a subfolder). It makes an organized COPY; say so.
 9w. "Which file has / where is / find the file with …" across the folder → search_files with terms = the key words, names and periods from the question (e.g. a learner's full name and "Term 1"; leave out words like "grades" or "file" that may not be written in it); folder only when the teacher named one. To answer a question FROM known files use answer_from_files instead.
@@ -119,7 +120,7 @@ export function resolvePath(candidate, flatFiles, extraPaths = []) {
   return byBase.length === 1 ? byBase[0] : null;
 }
 
-const PATH_ARG_KEYS = ['path', 'targetPath', 'sourcePath', 'templatePath', 'listPath', 'pathOld', 'pathNew', 'logoPath', 'answerKeyPath'];
+const PATH_ARG_KEYS = ['path', 'targetPath', 'sourcePath', 'templatePath', 'listPath', 'pathOld', 'pathNew', 'logoPath', 'answerKeyPath', 'quizPath'];
 const PATH_LIST_KEYS = ['paths', 'sourcePaths'];
 
 /**

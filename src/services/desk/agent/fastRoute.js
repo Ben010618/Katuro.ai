@@ -22,6 +22,7 @@ const stem = (p) => base(p).replace(/\.[^.]+$/, '');
 export const QUICK_PROMPTS = [
   { route: 'item_analysis', label: 'Item Analysis & LMC', prompt: 'Run an item analysis on the attached score sheet. Show the MPS, mastery level, and least mastered competencies.' },
   { route: 'remedial', label: 'Remedial Slips & Re-test', prompt: 'Do an item analysis of the attached score sheet, then make a 1-page remedial practice slip and a 5-item quick re-test for 2-up printing based on the least mastered items.' },
+  { route: 'bubble_sheets', label: 'Bubble sheets', prompt: 'Make bubble sheets for the attached class list.' },
   { route: 'voice_scores', label: 'Encode scores by voice', prompt: 'Encode scores by voice into the attached class record.' },
   { route: 'class_record', label: 'e-Class Record', prompt: 'Encode the attached scores into an official DepEd e-Class Record with transmutation.' },
   { route: 'attendance', label: 'Attendance & SARDO', prompt: 'Check the attached attendance sheet for learners with 3 or more consecutive absences and prepare home visitation notices.' },
@@ -37,6 +38,7 @@ const THANKS = /^(thanks?|thank\s*you|ty|salamat|maraming\s*salamat)\b[\s\S]{0,3
 /** Intent rules for short free-text requests; each needs matching files to be confident. */
 const INTENTS = [
   { route: 'voice_scores', test: /\b(by voice|using (my )?voice|voice (input|encoding)|dictat\w*|speak (the )?(scores|grades)|say the (scores|grades)|read (the )?(scores|grades) (aloud|out)|read (them|it) aloud)\b/i, needs: /\b(scores?|grades?|class record|encod\w*)\b/i },
+  { route: 'bubble_sheets', test: /\bbubble\s*(sheets?|quiz)\b/i },
   { route: 'remedial', test: /\b(remedia|re-?test|intervention slip)/i, needs: /\b(item analysis|least mastered|lmc|score|quiz|test)\b/i },
   { route: 'item_analysis', test: /\b(item analysis|least mastered|\blmc\b|\bmps\b|mastery level)\b/i },
   { route: 'class_record', test: /\b(e-?class record|class record|\becr\b|transmut)/i },
@@ -131,6 +133,12 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
       if (files.length !== 1 || !EDITABLE.test(files[0])) return null; // the planner asks which file
       const col = text.match(/\bcolumn\s+([A-Z]{1,3})\b/i)?.[1] || text.match(/\b((?:WW|PT|QA)\s?\d{1,2})\b/i)?.[1];
       return { reply: ack(persona, teacherName, 'voice encoding'), tasks: [mk(1, 'voice_encode_scores', { targetPath: files[0], ...(col ? { column: col.replace(/\s+/g, '') } : {}) }, `Voice encoding – ${base(files[0])}`)] };
+    }
+    case 'bubble_sheets': {
+      if (files.length !== 1) return null;
+      const quiz = base(files[0]) === 'KaTuro bubble quiz.json';
+      if (!quiz && !/\.(xlsx|xlsm|xls|csv|docx|pdf)$/i.test(files[0])) return null;
+      return { reply: ack(persona, teacherName, quiz ? 'your bubble quiz' : 'the bubble sheets'), tasks: [mk(1, 'bubble_quiz', quiz ? { quizPath: files[0] } : { listPath: files[0] }, quiz ? `Bubble quiz – ${base(files[0].split('/').slice(0, -1).join('/') || files[0])}` : `Bubble sheets – ${base(files[0])}`)] };
     }
     case 'understand': {
       if (files.length !== 1) return null;

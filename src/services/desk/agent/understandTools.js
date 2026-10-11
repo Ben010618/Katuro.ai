@@ -296,6 +296,126 @@ export const UNDERSTAND_TOOLS = {
     },
   },
 
+  bubble_quiz: {
+    label: 'Bubble sheets',
+    description: "Open the Bubble quiz panel: make bubble sheets (answer sheets to shade) printed with each learner's name, LRN and a learner code from the teacher's class list (several sheets per page, cut-and-stack order); then take photos of the answered sheets with a phone over Wi-Fi or the phone's hotspot (no internet needed), check them on this computer against the answer key (no AI), review unclear marks, and record the scores into the teacher's class record (review, then Apply). listPath = the class list for new sheets; quizPath = a quiz KaTuro made before (its \"KaTuro bubble quiz.json\").",
+    args: '{ "listPath"?: string, "quizPath"?: string, "title"?: string, "items"?: number, "choices"?: 4|5 }',
+    async run({ listPath, quizPath, title, items, choices }, ctx, report) {
+      const B = await import('../bubble/quiz.js');
+      if (quizPath) {
+        const quiz = B.parseQuiz(new TextDecoder().decode(await ctx.readBytes(quizPath)));
+        if (!quiz) throw new Error(`${quizPath.split('/').pop()} is not a bubble quiz this version of KaTuroDesk can read.`);
+        const folder = quizPath.split('/').slice(0, -1).join('/');
+        return {
+          summary: `${quiz.title}: ${quiz.learners.length} learners, ${quiz.items} items. Take the photos with your phone, then check them in the Canvas.`,
+          artifacts: [{ type: 'bubble_quiz', title: `Bubble quiz: ${quiz.title}`, subtitle: `${quiz.learners.length} learners, ${quiz.items} items`, files: [], editable: false, data: { stage: 'photos', folder, quiz } }],
+        };
+      }
+      if (!listPath) throw new Error('Which class list should I use for the names? Attach your class list (Excel, Word, CSV or PDF), or open a quiz KaTuro made before.');
+      report(`Reading the learner list in ${listPath}…`);
+      const u = await understandFile(listPath, ctx);
+      const table = pickTable(u.data);
+      if (!table) throw new Error(`I couldn't find a learner list in ${listPath}. It needs a column of names.`);
+      const learners = table.learners.map((l) => ({ name: l.name, lrn: l.lrn ? String(l.lrn).replace(/\s/g, '') : '', include: true }));
+      const withLrn = learners.filter((l) => l.lrn).length;
+      const n = Number(items);
+      return {
+        summary: `${learners.length} learners found in ${listPath.split('/').pop()}${withLrn ? ` (${withLrn} with LRN)` : ' (no LRN column found)'}. Check the names, choose the settings in the Canvas, then make the sheets.`,
+        artifacts: [{
+          type: 'bubble_quiz',
+          title: `Bubble sheets: ${listPath.split('/').pop()}`,
+          subtitle: `${learners.length} learners`,
+          files: [],
+          editable: false,
+          data: {
+            stage: 'setup',
+            listPath,
+            learners,
+            setup: { title: String(title || '').trim(), section: '', items: Number.isInteger(n) && n > 0 ? n : '', choices: Number(choices) === 5 ? 5 : 4, paper: 'a4', perPage: 4, blanks: 0 },
+          },
+        }],
+      };
+    },
+  },
+
+  record_quiz_scores: {
+    label: 'Record bubble quiz scores',
+    description: "Put the checked scores of a bubble-sheet quiz KaTuro made (its \"KaTuro bubble quiz.json\", checked in the Bubble quiz panel) into the teacher's OWN class record or score sheet (Excel or Word). Learners are matched by LRN, then by name; the teacher chooses the column and reviews every change before Apply (original backed up, working copy edited). Learners without a sheet are left blank.",
+    args: '{ "quizPath": string, "targetPath": string, "column"?: string (header or column letter, only if the teacher said it) }',
+    async run({ quizPath, targetPath: chosenPath, column }, ctx, report) {
+      if (!EDITABLE.test(chosenPath || '')) throw new Error('Scores can be recorded into an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
+      const B = await import('../bubble/quiz.js');
+      const quiz = B.parseQuiz(new TextDecoder().decode(await ctx.readBytes(quizPath)));
+      if (!quiz) throw new Error(`${quizPath.split('/').pop()} is not a bubble quiz this version of KaTuroDesk can read.`);
+      const folder = quizPath.split('/').slice(0, -1).join('/');
+      let check;
+      try {
+        check = JSON.parse(new TextDecoder().decode(await ctx.readBytes(`${folder}/${B.CHECK_FILE}`)));
+      } catch {
+        check = null;
+      }
+      if (!check?.answerKey) throw new Error('Check the photos and enter the answer key in the Bubble quiz panel first.');
+      const sheets = Object.fromEntries(Object.entries(check.sheets || {}).filter(([p]) => (ctx.hasFile ? ctx.hasFile(p) : true)));
+      const review = B.reviewSheets(quiz, check.answerKey, sheets, check.decisions || {});
+      const scores = B.finalScores(quiz, review);
+      if (!scores) throw new Error(`${review.open} thing(s) on the photos still need your decision in the Bubble quiz panel.`);
+      const scored = scores.filter((s) => s.score !== null);
+      if (!scored.length) throw new Error('No learner has a score yet.');
+
+      // Continue in an earlier KaTuro edit of the record, like voice encoding does.
+      const { workingCopyPath } = await import('../../localFileSystem.js');
+      const copy = workingCopyPath(chosenPath);
+      const targetPath = copy !== chosenPath && ctx.hasFile?.(copy) ? copy : chosenPath;
+      report(`Reading the learner list in ${targetPath}…`);
+      const u = await understandFile(targetPath, ctx);
+      if (!u.editable) throw new Error(`${targetPath} can't be edited (it may be protected or read-only).`);
+      const table = pickTable(u.data, 'class_record');
+      if (!table) throw new Error(`I couldn't find a learner list in ${targetPath}.`);
+      const columns = table.columns
+        .filter((c) => c.meaning === 'score' || c.meaning === 'other')
+        .map((c) => ({ key: c.key, header: c.header || '', column: String(c.column ?? ''), meaning: c.meaning, ...(c.component ? { component: c.component } : {}), ...(Number.isFinite(c.item) ? { item: c.item } : {}), ...(Number.isFinite(c.max) && c.max > 0 ? { max: c.max } : {}) }));
+      if (!columns.length) throw new Error(`I couldn't find a score column in ${targetPath}.`);
+      const wanted = String(column || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const pre = wanted ? columns.find((c) => c.header.toLowerCase().replace(/[^a-z0-9]+/g, '') === wanted || c.column.toLowerCase() === wanted) : null;
+
+      // LRN first, then a clear name match; anyone else is a question for the teacher.
+      const { matchLearners } = await import('../understand/transfer.js');
+      const targets = table.learners.map((l, i) => ({ ...l, index: i }));
+      const { pairs, unmatched } = matchLearners(scored.map((s) => ({ name: s.name, lrn: s.lrn, score: s.score })), targets);
+      const session = { assignments: {}, cursor: 0, issues: [], nextIssueId: 1 };
+      for (const p of pairs) session.assignments[p.target.index] = { value: p.source.score, heard: `#quiz ${p.by}` };
+      for (const x of unmatched) {
+        const near = x.closest ? targets.filter((t) => t.name === x.closest.name).map((t) => t.index) : [];
+        session.issues.push({ id: session.nextIssueId++, kind: near.length ? 'confirm' : 'unknown', heard: x.learner.name, value: x.learner.score, candidates: near });
+      }
+      const name = targetPath.split('/').pop();
+      const noSheet = scores.length - scored.length;
+      const summary = `${pairs.length} of ${scored.length} scores matched to learners in ${name}${pairs.some((p) => p.by === 'name') ? ' (some by name, as the LRN was missing)' : ''}${unmatched.length ? `; ${unmatched.length} need your choice` : ''}${noSheet ? `; ${noSheet} learner(s) without a sheet are left blank` : ''}. ${pre ? `Column ${pre.header || pre.column} is selected.` : 'Choose the score column in the Canvas.'} Then tap Review changes.`;
+      return {
+        summary,
+        artifacts: [{
+          type: 'voice_scores',
+          title: `${quiz.title} scores: ${name}`,
+          subtitle: `${scored.length} scores`,
+          files: [],
+          editable: false,
+          data: {
+            targetPath,
+            kind: u.map.kind,
+            learners: table.learners.map((l) => ({ name: l.name, values: l.values, cells: l.cells })),
+            columns,
+            columnKey: pre?.key || '',
+            fromQuiz: { title: quiz.title, items: quiz.items },
+            session,
+            maxScore: String(quiz.items),
+            maxFromFile: false,
+            ...(targetPath !== chosenPath ? { continuedFrom: chosenPath } : {}),
+          },
+        }],
+      };
+    },
+  },
+
   edit_file: {
     label: 'Edit file',
     description: 'Make specific changes inside an existing Word or Excel file while keeping its exact formatting: e.g. "change the school year to 2026-2027", "fill the remarks column: Passed if grade ≥ 75", "put my name as adviser", "correct Juan\'s LRN". Only the needed cells/paragraphs change. Produces a change preview for approval; original backed up, working copy edited.',

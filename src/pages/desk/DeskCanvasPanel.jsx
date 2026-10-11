@@ -33,6 +33,7 @@ import DeskSheetGrid from './DeskSheetGrid';
 import DeskFilePreview from './DeskFilePreview';
 import DeskChangesView from './DeskChangesView';
 import DeskVoiceScoresView from './DeskVoiceScoresView';
+import BubbleQuizView from './bubble/BubbleQuizView';
 import { getFileIcon } from './deskFileIcons';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
@@ -45,7 +46,7 @@ const MIME = {
 };
 
 function TypeBadge({ type }) {
-  const label = { document: 'DOC', slides: 'SLIDES', sheet: 'SHEET', table: 'TABLE', files: 'FILES', preview: 'FILE', changes: 'CHANGES', voice_scores: 'VOICE' }[type] || String(type || '').toUpperCase();
+  const label = { document: 'DOC', slides: 'SLIDES', sheet: 'SHEET', table: 'TABLE', files: 'FILES', preview: 'FILE', changes: 'CHANGES', voice_scores: 'VOICE', quiz_scores: 'SCORES', bubble_quiz: 'QUIZ' }[type] || String(type || '').toUpperCase();
   return (
     <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 flex-shrink-0">{label}</span>
   );
@@ -286,7 +287,7 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
       <div className="p-2.5 bg-white border-b border-gray-200 flex items-center justify-between shadow-2xs z-10 gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <TypeBadge type={art.type} />
+            <TypeBadge type={art.type === 'voice_scores' && art.data?.fromQuiz ? 'quiz_scores' : art.type} />
             <h2 className="text-xs font-bold text-gray-900 truncate" title={art.title}>{art.title}</h2>
           </div>
           <p className="text-[9.5px] text-gray-500 truncate" title={art.subtitle}>{isPreview ? art.path : art.subtitle}</p>
@@ -389,6 +390,8 @@ export default function DeskCanvasPanel({ onCollapse, width }) {
           <DeskChangesView key={art.id} art={art} />
         ) : art.type === 'voice_scores' ? (
           <DeskVoiceScoresView key={art.id} art={art} />
+        ) : art.type === 'bubble_quiz' ? (
+          <BubbleQuizView key={art.id} art={art} />
         ) : art.type === 'document' ? (
           isEditing && draftSpec ? (
             <DeskSpecEditor spec={draftSpec} onChange={setDraftSpec} />

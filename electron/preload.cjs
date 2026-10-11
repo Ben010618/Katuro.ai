@@ -35,6 +35,20 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
     return () => ipcRenderer.removeListener('bubble:action', listener);
   },
   isPresenting: () => ipcRenderer.invoke('app:isPresenting'),
+  // Bubble-sheet photos from the teacher's phone, saved into the quiz's Photos folder.
+  startPhoneCapture: (dirPath, title) => ipcRenderer.invoke('capture:start', dirPath, title),
+  stopPhoneCapture: () => ipcRenderer.invoke('capture:stop'),
+  phoneCaptureStatus: () => ipcRenderer.invoke('capture:status'),
+  onCapturePhoto: (callback) => {
+    const listener = (_, p) => callback(p);
+    ipcRenderer.on('capture:photo', listener);
+    return () => ipcRenderer.removeListener('capture:photo', listener);
+  },
+  onCaptureEnded: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('capture:ended', listener);
+    return () => ipcRenderer.removeListener('capture:ended', listener);
+  },
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
   getUpdateStatus: () => ipcRenderer.invoke('update:getStatus'),

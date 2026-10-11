@@ -353,6 +353,12 @@ export async function revealInFolder(dirHandle, relPath) {
   return true;
 }
 
+/** Desktop only: the full path on this computer of a workspace path (null elsewhere). */
+export function absolutePath(dirHandle, relPath) {
+  if (dirHandle?.kind !== 'electron') return null;
+  return joinRoot(dirHandle.rootPath, cleanRelPath(relPath));
+}
+
 /** Desktop only: iPhone photo (HEIC/HEIF) to JPEG bytes. Returns Uint8Array or null. */
 export async function convertHeicToJpeg(bytes, quality) {
   if (!desk()?.heicToJpeg) return null;

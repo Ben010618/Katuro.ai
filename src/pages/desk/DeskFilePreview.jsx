@@ -3,11 +3,45 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { readFileBytes, findEntryByPath, readerNameFor } from '../../services/localFileSystem';
 import DeskSheetGrid from './DeskSheetGrid';
+import { QUIZ_FILE, parseQuiz } from '../../services/desk/bubble/quiz';
 
 const IMAGE_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
+/** A bubble quiz KaTuro made: open it again in the Bubble quiz panel (photos, checking, recording). */
+function BubbleQuizFile({ path }) {
+  const { workspace, addArtifacts, setActiveArtifact } = useDeskStore();
+  const [state, setState] = useState({ loading: true });
+  useEffect(() => {
+    let cancelled = false;
+    readFileBytes(workspace?.handle, findEntryByPath(workspace?.files || [], path) || path)
+      .then((bytes) => { if (!cancelled) setState({ quiz: parseQuiz(new TextDecoder().decode(bytes)) }); })
+      .catch((err) => { if (!cancelled) setState({ error: err.message }); });
+    return () => { cancelled = true; };
+  }, [path, workspace]);
+  if (state.loading) return <p className="p-4 text-xs text-gray-500">Reading the quiz…</p>;
+  if (!state.quiz) return <p className="p-4 text-xs text-red-700">{state.error ? `Could not read this file: ${state.error}` : 'This is not a bubble quiz this version of KaTuroDesk can read.'}</p>;
+  const q = state.quiz;
+  const open = () => {
+    const art = { id: `art-${Date.now()}-quiz`, createdAt: Date.now(), type: 'bubble_quiz', title: `Bubble quiz: ${q.title}`, subtitle: `${q.learners.length} learners, ${q.items} items`, files: [], editable: false, data: { stage: 'photos', folder: path.split('/').slice(0, -1).join('/'), quiz: q } };
+    addArtifacts([art]);
+    setActiveArtifact(art);
+  };
+  return (
+    <div className="w-full space-y-2 rounded-lg border border-gray-200 bg-white p-4 text-xs text-gray-800">
+      <p className="text-sm font-semibold text-gray-900">{q.title}{q.section ? ` (${q.section})` : ''}</p>
+      <p>Bubble quiz made by KaTuroDesk: {q.learners.length} learners, {q.items} items.</p>
+      <button type="button" onClick={open} className="rounded-lg bg-[#2d6a4f] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#235841]">Open in the Bubble quiz panel</button>
+    </div>
+  );
+}
+
 /** Read-only preview of any workspace file, parsed by the same readers the agent uses. */
 export default function DeskFilePreview({ path }) {
+  if (path.split("/").pop() === QUIZ_FILE) return <BubbleQuizFile key={path} path={path} />;
+  return <FilePreview path={path} />;
+}
+
+function FilePreview({ path }) {
   const workspace = useDeskStore((s) => s.workspace);
   const [state, setState] = useState({ loading: true });
 
