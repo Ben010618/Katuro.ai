@@ -38,6 +38,13 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   // Printing a KaTuro document to a printer the teacher picks.
   listPrinters: () => ipcRenderer.invoke('print:printers'),
   printDocument: (html, options) => ipcRenderer.invoke('print:document', html, options),
+  // Wake phrase: the offline speech model's bytes (downloaded once, checked), and download progress.
+  getWakeModel: () => ipcRenderer.invoke('wake:model'),
+  onWakeProgress: (callback) => {
+    const listener = (_, p) => callback(p);
+    ipcRenderer.on('wake:progress', listener);
+    return () => ipcRenderer.removeListener('wake:progress', listener);
+  },
   // Bubble-sheet photos from the teacher's phone, saved into the quiz's Photos folder.
   startPhoneCapture: (dirPath, title) => ipcRenderer.invoke('capture:start', dirPath, title),
   stopPhoneCapture: () => ipcRenderer.invoke('capture:stop'),

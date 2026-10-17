@@ -14,6 +14,7 @@ let context = { user: null, profile: null, onOpenCanvas: null };
 export function setTalkContext(next) {
   context = { ...context, ...next };
 }
+export const getTalkContext = () => context;
 
 const listeners = new Set();
 let talk = null;
@@ -34,7 +35,7 @@ function speak(text) {
 export function deskTalk() {
   if (talk) return talk;
   talk = createTalk({
-    record: () => startRecording({}),
+    record: (opts) => startRecording(opts || {}),
     transcribe: (wav) => transcribeAudio(wav, { prompt: TALK_PROMPT, clean: cleanTalk }),
     async ask(text, { onReply }) {
       const s = useDeskStore.getState();

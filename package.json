@@ -41,6 +41,7 @@
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0",
     "recharts": "^3.9.0",
+    "vosk-browser": "^0.0.8",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.14"
   },

@@ -809,6 +809,62 @@ ipcMain.handle('capture:stop', async () => {
 });
 ipcMain.handle('capture:status', async () => phoneCapture.status());
 
+// ── Wake phrase ("Hello Matt"): the offline speech model (Vosk small English, Apache-2.0) ──
+// Downloaded once when the teacher turns the wake phrase on (not in the installer), checked
+// against its SHA-256, kept in the app's data folder. Listening itself runs in the window.
+const WAKE_MODEL = {
+  file: 'vosk-model-small-en-us-0.15.tar.gz',
+  sha256: 'f0b24bb92a48ca575b6a96500d6b543f0f079c573dfe85bbe16001fc0404e1d8',
+  urls: [
+    'https://github.com/Ben010618/Katuro.ai/releases/download/voice-model-1/vosk-model-small-en-us-0.15.tar.gz',
+    'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
+  ],
+};
+let wakeDownload = null;
+async function ensureWakeModel(sender) {
+  const crypto = require('crypto');
+  const dir = path.join(app.getPath('userData'), 'voice-models');
+  const target = path.join(dir, WAKE_MODEL.file);
+  const sha = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
+  if (fs.existsSync(target)) {
+    const buf = await fs.promises.readFile(target);
+    if (sha(buf) === WAKE_MODEL.sha256) return buf;
+    await fs.promises.unlink(target).catch(() => {});
+  }
+  await fs.promises.mkdir(dir, { recursive: true });
+  let lastErr = null;
+  for (const url of WAKE_MODEL.urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10 * 60 * 1000) });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const total = Number(res.headers.get('content-length')) || 41184862;
+      const chunks = [];
+      let received = 0;
+      let lastSent = 0;
+      for await (const chunk of res.body) {
+        chunks.push(Buffer.from(chunk));
+        received += chunk.length;
+        if (received - lastSent > 512 * 1024 && sender && !sender.isDestroyed()) {
+          lastSent = received;
+          sender.send('wake:progress', { received, total });
+        }
+      }
+      const buf = Buffer.concat(chunks);
+      if (sha(buf) !== WAKE_MODEL.sha256) throw new Error('The downloaded voice model did not pass its check.');
+      await fs.promises.writeFile(target, buf);
+      return buf;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(`The voice model could not be downloaded (${lastErr?.message || 'no internet'}). Check the internet connection and try again.`);
+}
+ipcMain.handle('wake:model', async (event) => {
+  if (!wakeDownload) wakeDownload = ensureWakeModel(event.sender).finally(() => { wakeDownload = null; });
+  const buf = await wakeDownload;
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+});
+
 app.on('second-instance', () => showMainWindow());
 
 app.on('before-quit', () => {

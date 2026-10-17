@@ -45,6 +45,9 @@ export function intentOf(text) {
   return null;
 }
 
+// Hands-free listening (after the wake phrase). Levels are 0..1 from the recorder.
+export const AUTO = { speak: 0.12, quiet: 0.07, silenceMs: 1300, waitMs: 6000, maxMs: 20000 };
+
 export const LINES = {
   notHeard: "Sorry, I didn't catch that. Hold the button and try again.",
   declined: "Okay, I won't do it. Tell me what to change.",
@@ -71,8 +74,11 @@ export function createTalk(deps) {
     deps.onState?.(state);
   };
 
-  /** Hold-to-talk pressed. → true when listening started. */
-  async function begin() {
+  /**
+   * Hold-to-talk pressed (or the wake phrase was heard, with { auto: true }: then listening
+   * ends by itself a moment after the teacher stops talking). → true when listening started.
+   */
+  async function begin({ auto = false } = {}) {
     if (state.phase === 'thinking') {
       deps.say(LINES.busy);
       return false;
@@ -80,7 +86,7 @@ export function createTalk(deps) {
     if (rec) return true;
     deps.stopSpeaking();
     try {
-      rec = await deps.record();
+      rec = await deps.record(auto ? { onLevel: autoStopper() } : {});
     } catch (err) {
       rec = null;
       set({ phase: 'idle', error: err?.message || 'The microphone could not be started.' });
@@ -152,6 +158,38 @@ export function createTalk(deps) {
     // The agent's first words were already spoken while it worked: do not repeat them.
     if (alreadySaid && content === alreadySaid && !waiting) return;
     deps.say(answer);
+  }
+
+  /**
+   * Hands-free listening: watches the microphone level. After the teacher has spoken, a
+   * pause of AUTO.silenceMs ends it (and it is answered); no speech at all within
+   * AUTO.waitMs cancels it quietly; AUTO.maxMs is the longest one request can be.
+   */
+  function autoStopper() {
+    const now = deps.now || Date.now;
+    const started = now();
+    let spokeAt = 0;
+    let quietSince = 0;
+    let done = false;
+    const finish = (send) => {
+      if (done) return;
+      done = true;
+      if (send) end();
+      else cancel();
+    };
+    return (level) => {
+      if (done || !rec) return;
+      const t = now();
+      if (level >= AUTO.speak) {
+        spokeAt = spokeAt || t;
+        quietSince = 0;
+      } else if (spokeAt && level < AUTO.quiet) {
+        quietSince = quietSince || t;
+      }
+      if (spokeAt && quietSince && t - quietSince >= AUTO.silenceMs) finish(true);
+      else if (!spokeAt && t - started >= AUTO.waitMs) finish(false);
+      else if (t - started >= AUTO.maxMs) finish(true);
+    };
   }
 
   /** Let go outside the button, or the panel closed: nothing is sent. */

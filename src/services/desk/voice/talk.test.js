@@ -106,6 +106,34 @@ describe('talking with the persona', () => {
     expect(nomic.talk.getState()).toMatchObject({ phase: 'idle', error: 'No microphone was found.' });
   });
 
+  it('hands-free (after the wake phrase): ends by itself after a pause; no speech at all cancels quietly', async () => {
+    let t = 0;
+    let level = null;
+    const s = setup();
+    s.deps.now = () => t;
+    s.deps.record.mockImplementation(async ({ onLevel } = {}) => { level = onLevel; return { stop: async () => new Uint8Array([1]), cancel: vi.fn() }; });
+    const { talk, deps } = { talk: createTalk(s.deps), deps: s.deps };
+    await talk.begin({ auto: true });
+    expect(typeof level).toBe('function');
+    for (const [ms, lv] of [[100, 0.02], [500, 0.4], [900, 0.5], [1300, 0.3], [1500, 0.03], [2000, 0.02]]) { t = ms; level(lv); }
+    expect(deps.transcribe).not.toHaveBeenCalled(); // only 500 ms of quiet so far
+    t = 2900; level(0.02);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(deps.transcribe).toHaveBeenCalledTimes(1);
+
+    const q = setup();
+    let lv2 = null;
+    let tt = 0;
+    q.deps.now = () => tt;
+    q.deps.record.mockImplementation(async ({ onLevel } = {}) => { lv2 = onLevel; return { stop: async () => new Uint8Array([1]), cancel: vi.fn() }; });
+    const quiet = createTalk(q.deps);
+    await quiet.begin({ auto: true });
+    tt = 6100; lv2(0.01);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(q.deps.transcribe).not.toHaveBeenCalled();
+    expect(quiet.getState().phase).toBe('idle');
+  });
+
   it('letting go outside the button sends nothing', async () => {
     const { talk, deps } = setup();
     await talk.begin();

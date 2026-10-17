@@ -73,7 +73,7 @@ export const useDeskStore = create(
       defaultPaper: 'long',
       // The persona's voice: natural voice (5 minutes a day, then this computer's voice),
       // chat replies read aloud, volume. Bubble reminders have their own switch (My classes).
-      speechSettings: { natural: true, replies: false, volume: 0.9 },
+      speechSettings: { natural: true, replies: false, volume: 0.9, wake: false, wakeCustom: [] },
 
       // Messages: Windows notifications and the unread number on the taskbar button.
       notifyMessages: true,
@@ -447,7 +447,7 @@ export const useDeskStore = create(
         teachingSettings: { ...DEFAULT_TEACHING_SETTINGS, ...(persisted?.teachingSettings || {}) },
         teachingLog: { noClass: [], noClassFor: {}, repeat: {}, ...(persisted?.teachingLog || {}) },
         defaultPaper: applyPersistedPaper(persisted?.defaultPaper),
-        speechSettings: { natural: true, replies: false, volume: 0.9, ...(persisted?.speechSettings || {}) },
+        speechSettings: { natural: true, replies: false, volume: 0.9, wake: false, wakeCustom: [], ...(persisted?.speechSettings || {}) },
       }),
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
