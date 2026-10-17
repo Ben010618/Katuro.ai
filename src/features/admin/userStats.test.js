@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { userStats, isActiveUser, isEnabledAccount } from './userStats';
+import { userStats, isActiveUser, isEnabledAccount, recordBreakdown } from './userStats';
 
 const DAY = 86400000;
 const now = Date.UTC(2026, 9, 11);
@@ -25,6 +25,16 @@ describe('admin Users cards', () => {
     expect(isActiveUser(teachers.find((t) => t.id === 'c'), { now })).toBe(false);
     expect(isEnabledAccount(teachers.find((t) => t.id === 'c'))).toBe(true);
     expect(userStats(undefined)).toEqual({ total: 0, active: 0, subscribed: 0 });
+  });
+
+  it('the records under Total: every account in exactly one group, adding up to Total', () => {
+    const list = [...teachers, { id: 'adm', isAdmin: true, disabled: true, deactivatedForInactivityAt: { seconds: 2 } }, { id: 'p2', disabled: false, pendingApproval: true }];
+    const b = recordBreakdown(list, { selfUid: 'a' });
+    expect(b).toEqual({ switchedOn: 5, waiting: 2, turnedOff: 1, awaitingApproval: 2, deletableIds: ['h'] });
+    expect(b.switchedOn + b.waiting + b.turnedOff + b.awaitingApproval).toBe(userStats(list).total);
+    // Never yourself, even if your own account were waiting.
+    expect(recordBreakdown([{ id: 'me', deactivatedForInactivityAt: { seconds: 1 } }], { selfUid: 'me' }).deletableIds).toEqual([]);
+    expect(recordBreakdown(undefined)).toEqual({ switchedOn: 0, waiting: 0, turnedOff: 0, awaitingApproval: 0, deletableIds: [] });
   });
 
   it('exactly 30 days ago still counts; 31 does not', () => {

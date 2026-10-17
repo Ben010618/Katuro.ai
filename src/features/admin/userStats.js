@@ -25,6 +25,28 @@ export function isActiveUser(t, { recentUids = new Set(), now = Date.now() } = {
   return recentUids.has(t.id) || now - ms(t.lastActiveAt) <= ACTIVE_DAYS * 86400000;
 }
 
+/**
+ * What the Total Users records are, each account in exactly one group (they add up to Total):
+ *   waiting:          deactivated for inactivity, in the 30-day grace before deletion
+ *   turnedOff:        switched off by an admin
+ *   awaitingApproval: signed up, not approved yet
+ *   switchedOn:       everyone else
+ * deletableIds: the waiting accounts an admin may delete now (never an admin, never yourself).
+ */
+export function recordBreakdown(teachers = [], { selfUid = '' } = {}) {
+  const out = { switchedOn: 0, waiting: 0, turnedOff: 0, awaitingApproval: 0, deletableIds: [] };
+  for (const t of Array.isArray(teachers) ? teachers : []) {
+    if (!t) continue;
+    if (t.deactivatedForInactivityAt) {
+      out.waiting += 1;
+      if (!t.isAdmin && t.id !== selfUid) out.deletableIds.push(t.id);
+    } else if (t.pendingApproval) out.awaitingApproval += 1; // also switched off until approved
+    else if (t.disabled) out.turnedOff += 1;
+    else out.switchedOn += 1;
+  }
+  return out;
+}
+
 export function userStats(teachers = [], opts = {}) {
   const list = Array.isArray(teachers) ? teachers : [];
   return {
