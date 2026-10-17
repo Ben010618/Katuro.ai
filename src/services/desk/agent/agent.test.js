@@ -318,13 +318,17 @@ describe('personas (Matt / Luna / Grey)', () => {
     const carmen = personaFor(teacher, 'carmen');
     expect(carmen).toMatch(/Your name is Lola Carmen/);
     expect(carmen).toMatch(/retired College Dean/);
-    expect(carmen).toMatch(/criticize the work, never the person/);
-    expect(carmen).toMatch(/Every criticism comes with the exact fix/);
+    // Ruthlessly strict about the work, with hard limits that never move.
+    expect(carmen).toMatch(/brutally honest with no filter about the WORK/);
+    expect(carmen).toMatch(/criticize the work and the habits, never the person's worth/);
+    expect(carmen).toMatch(/no profanity, slurs, threats or humiliation/);
+    expect(carmen).toMatch(/never harsh about learners/);
+    expect(carmen).toMatch(/Every criticism names the exact fix/);
     expect(docPersonaFor(teacher)).not.toMatch(/Carmen/);
-    expect(PERSONAS.carmen.sample).toMatch(/^Wait a minute\./);
-    expect(getPersona('carmen').greeting('Sir Ben', new Date(2026, 0, 1, 19))).toMatch(/^Good evening, Sir Ben\./);
+    expect(PERSONAS.carmen.sample).toMatch(/^Ay, anak, ano ba 'yan\?/);
+    expect(getPersona('carmen').greeting('Sir Ben')).toBe("Sir Ben. You're here. Good. What did you bring me, and is it finished this time?");
     for (const hi of ['Hi Lola Carmen', 'hello lola', 'Good morning Carmen!']) {
-      expect(fastRoute({ prompt: hi, persona: 'carmen', teacherName: 'Sir Ben' })?.reply).toMatch(/Let's get to work/);
+      expect(fastRoute({ prompt: hi, persona: 'carmen', teacherName: 'Sir Ben' })?.reply).toMatch(/is it finished this time\?/);
     }
   });
 

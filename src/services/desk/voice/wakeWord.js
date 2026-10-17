@@ -79,10 +79,10 @@ export function stableWake(s, phrases, now) {
 
 // How each persona answers its name (short, so the teacher can talk right after).
 const ACKS = {
-  matt: ['Yes, {t}? What can I do for you?', "Hi {t}! I'm listening."],
-  luna: ['Yes, {t}? How may I help?', "I'm here, {t}. Go ahead."],
-  grey: ['Listening, {t}.', 'Yes, {t}? Go ahead.'],
-  carmen: ['Yes, anak? What do you need?', "I'm here, {t}. Tell me."],
+  matt: ['Yow {t}! What can I do for you?', "Hey {t}! Matt here, I'm all ears!"],
+  luna: ['Yes, {t}? How may I help you?', "I'm here, {t}. Please go ahead."],
+  grey: ['Listening, {t}.', 'Yes, {t}. State your request.'],
+  carmen: ['What is it, {t}? Make it quick.', 'Yes? Speak clearly, {t}. I am listening.'],
 };
 
 /** The acknowledgement after the wake phrase. pick: 0..1 (random by default). */

@@ -20,7 +20,7 @@ export const getTalkContext = () => context;
 const listeners = new Set();
 let talk = null;
 
-const ONE_MOMENT = { matt: 'Okay, one sec!', luna: 'One moment, please.', grey: 'Working on it.', carmen: 'Sige, anak. Sandali lang.' };
+const ONE_MOMENT = { matt: 'Okay, one sec! Hehe.', luna: 'One moment, please.', grey: 'Processing.', carmen: 'Wait. I am checking.' };
 
 /** The plan waiting for Proceed: only in the newest reply (an older plan is never run by voice). */
 function pendingPlan() {

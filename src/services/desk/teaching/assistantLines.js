@@ -30,11 +30,11 @@ const LINES = {
     noSequence: (f) => `${f.name}, ${f.cls} at ${f.time}. The next lesson is unknown: set the lesson sequence in My classes.`,
   },
   carmen: {
-    brief: (f) => `${f.name}. ${f.count} class${f.count > 1 ? 'es' : ''} today: ${list(f.classes)}. ${f.readyText} Be ready before the bell.`,
-    remind: (f) => `${f.name}, ${f.minutes} minutes. ${f.cls} is waiting. ${f.statusText} Check it before you walk in.`,
-    special: (f) => `${f.name}, ${f.cls} at ${f.time}. ${f.special}. No new lesson today, so prepare for that instead.`,
-    after: (f) => `${f.name}, ${f.cls} is done. Did you really finish "${f.topic}"? Tell me the truth. No answer means finished.`,
-    noSequence: (f) => `${f.name}, ${f.cls} is at ${f.time} and you have not told me the lessons. Set them in My classes. Now.`,
+    brief: (f) => `${f.name}. ${f.count} class${f.count > 1 ? 'es' : ''} today: ${list(f.classes)}. ${f.readyText} No excuses today. Be ready before the bell, not after.`,
+    remind: (f) => `${f.name}. ${f.minutes} minutes. ${f.cls} is waiting and the learners will not wait for you. ${f.statusText} Check it now, not at the door.`,
+    special: (f) => `${f.name}, ${f.cls} at ${f.time}. ${f.special}. No new lesson today. That is not a free period. Prepare for it.`,
+    after: (f) => `${f.name}, ${f.cls} is over. Did you actually finish "${f.topic}", or are you going to pretend? Tell me the truth. No answer means finished, and I will hold you to it.`,
+    noSequence: (f) => `${f.name}, ${f.cls} is at ${f.time} and you still have not set your lessons. Ano ba 'yan? Set them in My classes. Now.`,
   },
 };
 

@@ -74,6 +74,22 @@ describe('the persona speaks', () => {
     expect((await notReady.say('Hi.', { persona: 'grey' })).engine).toBe('system');
   });
 
+  it("each persona's voice is fixed, and the laptop voice plays at the persona's pace", async () => {
+    const { PIPER_VOICES, PLAYBACK_RATE, voiceOf } = await import('./piperVoice');
+    expect(PIPER_VOICES).toEqual({ matt: 'en_US-ryan-medium', grey: 'en_GB-alan-medium', luna: 'en_US-hfc_female-medium', carmen: 'en_US-kristin-medium' });
+    expect(voiceOf('carmen')).toBe('en_US-kristin-medium');
+    expect(voiceOf('nobody')).toBe('en_US-ryan-medium');
+    expect(PLAYBACK_RATE.matt).toBeGreaterThan(1);
+    expect(PLAYBACK_RATE.carmen).toBeLessThan(1);
+    const playWav = vi.fn(() => { const e = ended(); setTimeout(e.finish, 1); return e; });
+    const sp = createSpeaker({ callTts: async () => ({ fallback: 'unavailable' }), localTts: async () => new Uint8Array([1]), playWav, systemSay: vi.fn(), localRate: (p) => PLAYBACK_RATE[p] });
+    await sp.say('Again. Properly this time.', { persona: 'carmen' });
+    expect(playWav.mock.calls[0][2]).toBe(0.94);
+    const natural = createSpeaker({ callTts: async () => ({ audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }), playWav, systemSay: vi.fn(), localRate: () => 2 });
+    await natural.say('Hello.', { persona: 'matt' });
+    expect(playWav.mock.calls.at(-1)[2]).toBe(1); // online voices keep their own pace
+  });
+
   it('a long answer: the first sentence plays while the next one is being prepared', async () => {
     const order = [];
     const callTts = vi.fn(async ({ text }) => { order.push(`make:${text.slice(0, 6)}`); return { audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }; });

@@ -85,11 +85,12 @@ export const OFFLINE_COOLDOWN_MS = 2 * 60 * 1000;
  * The speaker. deps (all replaceable in tests):
  *   callTts({ text, persona }) → server answer, or throws (offline)      natural voice
  *   localTts(text, persona) → WAV bytes, or null when not ready          voice on this computer (Piper)
- *   playWav(bytes, volume) → { done: Promise, stop() }
+ *   playWav(bytes, volume, rate) → { done: Promise, stop() }
  *   systemSay(text, tuning, volume) → { done: Promise, stop() }           last resort (Windows)
+ *   localRate(persona) → playback rate for the laptop voice (persona character)
  *   now() → ms
  */
-export function createSpeaker({ callTts, localTts = null, playWav, systemSay, now = Date.now }) {
+export function createSpeaker({ callTts, localTts = null, playWav, systemSay, localRate = () => 1, now = Date.now }) {
   const listeners = new Set();
   const cache = new Map(); // persona|text → { engine, wav } (repeated reminders cost nothing)
   let current = null; // { stop }
@@ -172,7 +173,7 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, no
       if (mine !== token) return { engine: 'none', reason: 'replaced' };
       if (i + 1 < chunks.length) next = synth(chunks[i + 1], persona, natural);
       first = first || res;
-      current = res.wav ? playWav(res.wav, vol) : systemSay(chunks[i], SYSTEM_TUNING[persona] || SYSTEM_TUNING.matt, vol);
+      current = res.wav ? playWav(res.wav, vol, res.engine === 'local' ? localRate(persona) : 1) : systemSay(chunks[i], SYSTEM_TUNING[persona] || SYSTEM_TUNING.matt, vol);
       emit({ speaking: true, engine: res.engine });
       await current.done.catch(() => {});
       if (mine !== token) return { engine: first.engine, reason: first.reason || undefined };
@@ -193,10 +194,14 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, no
 }
 
 // ── The app's speaker (browser / KaTuroDesk window) ──────────────────────────
-export function browserPlayWav(bytes, volume) {
+export function browserPlayWav(bytes, volume, rate = 1) {
   const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
   const audio = new Audio(url);
   audio.volume = volume;
+  if (rate !== 1) {
+    audio.preservesPitch = false; // a little higher and quicker, or lower and slower
+    audio.playbackRate = rate;
+  }
   const done = new Promise((resolve, reject) => {
     audio.onended = resolve;
     audio.onerror = () => reject(new Error('audio'));
@@ -227,6 +232,9 @@ async function serverTts(payload) {
   return res.data;
 }
 
+// Same as PLAYBACK_RATE in piperVoice.js (kept here so the speaker loads without Piper).
+const LOCAL_RATE = { matt: 1.06, grey: 0.97, luna: 1.0, carmen: 0.94 };
+
 let appSpeaker = null;
 export function deskSpeaker() {
   if (!appSpeaker) {
@@ -237,6 +245,7 @@ export function deskSpeaker() {
         const { piperSpeak } = await import('./piperVoice.js');
         return piperSpeak(text, persona);
       },
+      localRate: (persona) => LOCAL_RATE[persona] || 1,
       playWav: browserPlayWav,
       systemSay: browserSystemSay,
     });

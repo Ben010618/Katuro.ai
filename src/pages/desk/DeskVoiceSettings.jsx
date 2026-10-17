@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDeskStore } from '../../store/deskStore';
 import { getPersona } from '../../services/desk/personas';
-import { deskSpeaker, browserPlayWav } from '../../services/desk/voice/speech';
-import { PIPER_CHOICES, PIPER_VOICES, previewVoice, setVoiceChoices } from '../../services/desk/voice/piperVoice';
+import { deskSpeaker } from '../../services/desk/voice/speech';
 import { wakePhrases, normalizePhrase } from '../../services/desk/voice/wakeWord';
 import { wakeSupported, subscribeWake, testWakePhrase } from './wakeController';
 
@@ -56,52 +55,8 @@ export default function DeskVoiceSettings() {
       </div>
       {note && <p className="text-[11px] text-gray-600" role="status">{note}</p>}
       <p className="text-[10.5px] text-gray-400">Bubble reminders are spoken only when "Say reminders out loud" is on in My classes &gt; Assistant.</p>
-      {wakeSupported() && <LocalVoicePicker key={persona} />}
       {wakeSupported() && <WakeSettings />}
     </section>
-  );
-}
-
-/** The persona's voice on this computer (free, offline): choose and preview. */
-function LocalVoicePicker() {
-  const { persona, speechSettings, setSpeechSettings } = useDeskStore();
-  const p = getPersona(persona);
-  const v = speechSettings || {};
-  const current = v.localVoices?.[persona] || PIPER_VOICES[persona] || PIPER_VOICES.matt;
-  const [picked, setPicked] = useState(current);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState('');
-  const preview = async () => {
-    setBusy(true);
-    setNote('Getting this voice ready (one time, about 60 MB)…');
-    try {
-      const wav = await previewVoice(picked, `Hello! This is ${p.name}. I can help you with your lessons today.`);
-      setNote('');
-      await browserPlayWav(wav, v.volume ?? 0.9).done.catch(() => {});
-    } catch (err) {
-      setNote(`This voice could not be loaded (${err?.message || 'no internet for the first download?'}).`);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const keep = () => {
-    const next = { ...(v.localVoices || {}), [persona]: picked };
-    setVoiceChoices(next);
-    setSpeechSettings({ localVoices: next });
-    setNote(`${p.name} now uses this voice on this computer.`);
-  };
-  return (
-    <div className="mt-3 space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-      <p className="text-[11px] text-gray-700"><span className="font-semibold text-gray-800">{p.name}'s voice on this computer</span> (free, works offline). Used when the online voice is not available or the 5 minutes are used up.</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={picked} onChange={(e) => { setPicked(e.target.value); setNote(''); }} disabled={busy} className="border border-gray-300 rounded px-1 py-0.5 text-[11px]" aria-label="Voice on this computer">
-          {PIPER_CHOICES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-        </select>
-        <button type="button" onClick={preview} disabled={busy} className="px-3 py-1 rounded-lg border border-gray-300 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-40">{busy ? 'Loading…' : 'Preview'}</button>
-        <button type="button" onClick={keep} disabled={busy || picked === current} className="px-3 py-1 rounded-lg border border-emerald-600 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-40">Use this voice</button>
-      </div>
-      {note && <p className="text-[11px] text-gray-600" role="status">{note}</p>}
-    </div>
   );
 }
 

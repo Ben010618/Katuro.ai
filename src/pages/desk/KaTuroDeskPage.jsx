@@ -39,8 +39,7 @@ import TeachingAssistant from './teaching/TeachingAssistant';
 import MyClassesModal from './teaching/MyClassesModal';
 import { setTalkContext } from './talkController';
 import { startWakeController } from './wakeController';
-import { prepareVoice, setVoiceChoices } from '../../services/desk/voice/piperVoice';
-import { deskSpeaker } from '../../services/desk/voice/speech';
+import { prepareVoice } from '../../services/desk/voice/piperVoice';
 import { calendarPosition, manilaDate } from '../../services/desk/knowledge/schoolCalendar';
 import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
@@ -167,12 +166,7 @@ export default function KaTuroDeskPage() {
   // The persona's voice on this computer (Piper) is downloaded once and loaded ahead, only for
   // teachers who use voice: spoken replies, wake phrase, or spoken reminders.
   const usesVoice = useDeskStore((s) => Boolean(s.speechSettings?.replies || s.speechSettings?.wake || s.teachingSettings?.voice));
-  const localVoices = useDeskStore((s) => s.speechSettings?.localVoices);
-  useEffect(() => {
-    setVoiceChoices(localVoices);
-    deskSpeaker().forgetCache();
-    if (usesVoice) prepareVoice(persona);
-  }, [persona, usesVoice, localVoices]);
+  useEffect(() => { if (usesVoice) prepareVoice(persona); }, [persona, usesVoice]);
 
   // Messages ↔ classroom folder (desktop app with a real folder open): send files from
   // the folder; "Open" / "Save to my folder" put received files in "KaTuro Messages/".

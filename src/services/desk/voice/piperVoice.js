@@ -5,44 +5,34 @@
  * github.com/Mintplex-Labs/piper-tts-web) speaks with natural-sounding neural voices on the
  * laptop: no internet, no cost, no daily limit, and a sentence is ready in about a second.
  * Used when the online voice is not available (offline, its 5 minutes are used up, or no
- * service answers). Each chosen voice (about 60 MB) downloads once in the background and is
+ * service answers). Each persona's voice (about 60 MB) downloads once in the background and is
  * kept on this computer; until then the Windows voice speaks.
  * The engine files ship with the desktop app (dist/desk-voice, see vite.config.js).
  */
 
 /**
- * Voices a teacher can choose (Settings > Assistant > Voice). Only "medium" voices: the "high"
- * ones sound a little better but take twice as long as the speech itself on a normal laptop
- * (measured: 7.8 s for a 3.5 s sentence), so the persona would pause mid-reply.
+ * Each persona's voice on this computer is FIXED (it never changes, so the persona always
+ * sounds like itself). Chosen by measuring all medium English voices with the same sentence
+ * (2026-10-17): pitch, liveliness and speed.
+ *   Matt   Ryan    148 Hz, the brightest and fastest man's voice: jolly, energetic
+ *   Grey   Alan     93 Hz, the deepest, deliberate British voice: serious, smart
+ *   Luna   Hannah  220 Hz, the brightest and warmest woman's voice: sweet, polite
+ *   Carmen Kristin 159 Hz, the lowest and flattest woman's voice: strict, stern
+ * ("high" voices left out: measured twice as slow as the speech itself.)
  */
-export const PIPER_CHOICES = [
-  { id: 'en_US-hfc_female-medium', label: 'Hannah (woman, US)', gender: 'female' },
-  { id: 'en_US-lessac-medium', label: 'Lessac (woman, US)', gender: 'female' },
-  { id: 'en_US-amy-medium', label: 'Amy (woman, US)', gender: 'female' },
-  { id: 'en_US-kristin-medium', label: 'Kristin (woman, US)', gender: 'female' },
-  { id: 'en_US-ljspeech-medium', label: 'Linda (woman, US)', gender: 'female' },
-  { id: 'en_GB-cori-medium', label: 'Cori (woman, UK)', gender: 'female' },
-  { id: 'en_GB-jenny_dioco-medium', label: 'Jenny (woman, UK)', gender: 'female' },
-  { id: 'en_US-ryan-medium', label: 'Ryan (man, US)', gender: 'male' },
-  { id: 'en_US-joe-medium', label: 'Joe (man, US)', gender: 'male' },
-  { id: 'en_US-john-medium', label: 'John (man, US)', gender: 'male' },
-  { id: 'en_US-bryce-medium', label: 'Bryce (man, US)', gender: 'male' },
-  { id: 'en_US-norman-medium', label: 'Norman (man, US)', gender: 'male' },
-  { id: 'en_US-hfc_male-medium', label: 'Harry (man, US)', gender: 'male' },
-  { id: 'en_GB-alan-medium', label: 'Alan (man, UK)', gender: 'male' },
-];
-
 export const PIPER_VOICES = {
   matt: 'en_US-ryan-medium',
+  grey: 'en_GB-alan-medium',
   luna: 'en_US-hfc_female-medium',
-  grey: 'en_US-joe-medium',
   carmen: 'en_US-kristin-medium',
 };
+
+/** Played a little faster/higher (Matt: younger) or slower/lower (Lola Carmen: sterner). */
+export const PLAYBACK_RATE = { matt: 1.06, grey: 0.97, luna: 1.0, carmen: 0.94 };
 
 const isDesktop = () => typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.isElectron);
 const sessions = new Map(); // voiceId → Promise<TtsSession>
 const preparing = new Map(); // voiceId → Promise<boolean>
-let chosen = {}; // persona → voiceId (the teacher's choices)
 let lib = null;
 
 const load = () => {
@@ -50,13 +40,8 @@ const load = () => {
   return lib;
 };
 
-/** The teacher's voice choices (from Settings); unknown voices are ignored. */
-export function setVoiceChoices(map = {}) {
-  chosen = Object.fromEntries(Object.entries(map || {}).filter(([, id]) => PIPER_CHOICES.some((c) => c.id === id)));
-}
-
 /** The voice this persona uses on this computer. */
-export const voiceOf = (persona) => chosen[persona] || PIPER_VOICES[persona] || PIPER_VOICES.matt;
+export const voiceOf = (persona) => PIPER_VOICES[persona] || PIPER_VOICES.matt;
 
 function wasmPaths() {
   const base = new URL('./desk-voice/', document.baseURI).href;
@@ -115,7 +100,7 @@ export async function piperSpeak(text, persona) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-/** Settings "Preview": a voice says a sample (waits for its first download). → WAV bytes */
+/** A voice says a sample, waiting for its first download (QA and tests). → WAV bytes */
 export async function previewVoice(voiceId, text) {
   const s = await session(voiceId);
   const blob = await s.predict(String(text));

@@ -64,7 +64,7 @@ describe('deskSpeak: natural persona voices', () => {
     const tts = net.calls.find((c) => c.body);
     expect(tts.url).toContain('gemini-2.5-flash-preview-tts:generateContent?key=KEY');
     expect(tts.body.generationConfig).toEqual({ responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: PERSONA_VOICES.carmen.voice } } } });
-    expect(tts.body.contents[0].parts[0].text).toMatch(/grandmother[\s\S]*Good morning, Teacher Ana!/);
+    expect(tts.body.contents[0].parts[0].text).toMatch(/ruthlessly strict, stern retired college dean[\s\S]*Good morning, Teacher Ana!/);
     expect(tts.body.contents[0].parts[0].text).not.toContain('**');
     expect(usage().desk_speech_seconds).toBe(2);
     expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ seconds: 2, replies: 1 });

@@ -8,6 +8,7 @@
  */
 
 import { getPersona } from '../personas.js';
+import { scheduleQuestion } from './scheduleQuestion.js';
 
 const SHEET = /\.(xlsx|xlsm|xls|csv|tsv)$/i;
 const PDF = /\.pdf$/i;
@@ -63,6 +64,10 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
 
   if (GREETING.test(text)) return { reply: getPersona(persona).greeting(teacherName, now), tasks: [], local: true };
   if (THANKS.test(text) && text.length <= 40) return { reply: getPersona(persona).thanks(teacherName), tasks: [], local: true };
+
+  // "What's my schedule tomorrow?" is answered from the teacher's own data (no folder needed).
+  const sched = scheduleQuestion(text, now);
+  if (sched) return { reply: '', tasks: [{ id: 't1', tool: 'my_schedule', args: sched, label: 'My schedule', dependsOn: [] }] };
 
   const quick = QUICK_PROMPTS.find((q) => q.prompt === text);
   let route = quick?.route || null;

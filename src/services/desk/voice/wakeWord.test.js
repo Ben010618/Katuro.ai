@@ -47,8 +47,8 @@ describe('wake phrase', () => {
   });
 
   it("the persona's short answer uses the teacher's name", () => {
-    expect(ackFor('matt', 'Teacher Ana', 0)).toBe('Yes, Teacher Ana? What can I do for you?');
-    expect(ackFor('carmen', 'Sir Ben', 0)).toBe('Yes, anak? What do you need?');
-    expect(ackFor('nobody', '', 0.99)).toBe("Hi Teacher! I'm listening.");
+    expect(ackFor('matt', 'Teacher Ana', 0)).toBe('Yow Teacher Ana! What can I do for you?');
+    expect(ackFor('carmen', 'Sir Ben', 0)).toBe('What is it, Sir Ben? Make it quick.');
+    expect(ackFor('nobody', '', 0.99)).toBe("Hey Teacher! Matt here, I'm all ears!");
   });
 });

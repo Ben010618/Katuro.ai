@@ -24,11 +24,14 @@ const DEFAULT_PROVIDERS = ['google', 'azure', 'gemini'];
 const PROVIDER_NAMES = { google: 'Google Chirp 3 HD', azure: 'Microsoft Azure', gemini: 'Gemini' };
 
 // Voice and speaking style per persona, per service.
+// Fixed per persona (the persona always sounds like itself): voice, speed and pitch follow
+// the character. Matt jolly and funny, Grey serious and smart, Luna sweet and professional,
+// Lola Carmen brutally strict.
 const PERSONA_VOICES = {
-  matt: { voice: 'Puck', azure: 'en-US-AndrewMultilingualNeural', gender: 'male', rate: '+4%', style: 'Say this like a cheerful, energetic young Filipino teacher talking to a co-teacher friend, upbeat and natural' },
-  luna: { voice: 'Sulafat', azure: 'en-US-AvaMultilingualNeural', gender: 'female', rate: '-2%', style: 'Say this like a calm, warm and polite young Filipino woman, soft-spoken and kind' },
-  grey: { voice: 'Charon', azure: 'en-US-BrianMultilingualNeural', gender: 'male', rate: '-2%', style: 'Say this like a calm, precise and friendly young man who explains things clearly' },
-  carmen: { voice: 'Gacrux', azure: 'en-US-CoraMultilingualNeural', gender: 'female', rate: '-8%', style: 'Say this like a gentle, wise Filipino grandmother who was a college dean, slow, warm and caring' },
+  matt: { voice: 'Puck', azure: 'en-US-AndrewMultilingualNeural', gender: 'male', rate: '+8%', pitch: '+4%', speakingRate: 1.08, style: 'Say this like a jolly, funny, energetic young guy cracking a smile while talking to his co-teacher friend, upbeat, bright and playful' },
+  luna: { voice: 'Sulafat', azure: 'en-US-AvaMultilingualNeural', gender: 'female', rate: '0%', pitch: '+2%', speakingRate: 1.0, style: 'Say this like a sweet, warm, polite and professional young woman, gentle and courteous' },
+  grey: { voice: 'Charon', azure: 'en-US-BrianMultilingualNeural', gender: 'male', rate: '-3%', pitch: '-3%', speakingRate: 0.97, style: 'Say this like a serious, highly intelligent scientist: calm, precise, measured and matter-of-fact' },
+  carmen: { voice: 'Gacrux', azure: 'en-US-CoraMultilingualNeural', gender: 'female', rate: '-6%', pitch: '-6%', speakingRate: 0.94, style: 'Say this like a ruthlessly strict, stern retired college dean who has no patience for sloppy work: blunt, firm, clipped and commanding, never warm' },
 };
 // Filipino and Taglish replies: Filipino neural voices (Azure), Chirp 3 HD in fil-PH (Google).
 const AZURE_FILIPINO = { male: 'fil-PH-AngeloNeural', female: 'fil-PH-BlessicaNeural' };
@@ -154,7 +157,7 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, getGoogleToken = null, H
     const call = (locale) => fetchFn('https://texttospeech.googleapis.com/v1/text:synthesize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ input: { text }, voice: { languageCode: locale, name: `${locale}-Chirp3-HD-${p.voice}` }, audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: SAMPLE_RATE } }),
+      body: JSON.stringify({ input: { text }, voice: { languageCode: locale, name: `${locale}-Chirp3-HD-${p.voice}` }, audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: SAMPLE_RATE, speakingRate: p.speakingRate || 1 } }),
       signal: AbortSignal.timeout(30000),
     });
     let res = await call(lang === 'fil' ? 'fil-PH' : 'en-US');
@@ -170,7 +173,7 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, getGoogleToken = null, H
     const p = PERSONA_VOICES[persona] || PERSONA_VOICES.matt;
     const voice = lang === 'fil' ? AZURE_FILIPINO[p.gender] : p.azure;
     const locale = lang === 'fil' ? 'fil-PH' : 'en-US';
-    const ssml = `<speak version="1.0" xml:lang="${locale}"><voice name="${voice}"><prosody rate="${p.rate}">${escapeXml(text)}</prosody></voice></speak>`;
+    const ssml = `<speak version="1.0" xml:lang="${locale}"><voice name="${voice}"><prosody rate="${p.rate}" pitch="${p.pitch || '0%'}">${escapeXml(text)}</prosody></voice></speak>`;
     const res = await fetchFn(`https://${cfg.azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`, {
       method: 'POST',
       headers: { 'Ocp-Apim-Subscription-Key': cfg.azureKey, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'raw-24khz-16bit-mono-pcm', 'User-Agent': 'KaTuroDesk' },
