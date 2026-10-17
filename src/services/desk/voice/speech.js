@@ -120,7 +120,7 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, no
     else if (natural) {
       try {
         const res = await callTts({ text: chunk, persona });
-        if (res?.usedSeconds !== undefined) usage = { usedSeconds: res.usedSeconds, limitSeconds: res.limitSeconds };
+        if (res?.usedSeconds !== undefined) usage = { usedSeconds: res.usedSeconds, limitSeconds: res.limitSeconds, ...(res.provider ? { provider: res.provider } : {}) };
         if (res?.audio) {
           const out = { engine: 'natural', wav: pcmToWav(res.audio, res.sampleRate) };
           remember(key, out);
@@ -187,6 +187,8 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, no
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState: () => state,
     getUsage: () => usage,
+    /** After the teacher picks another voice: forget sentences made with the old one. */
+    forgetCache: () => cache.clear(),
   };
 }
 

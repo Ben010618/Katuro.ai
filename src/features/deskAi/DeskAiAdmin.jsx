@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Loader2, Plus, Save, Trash2, ThumbsUp, ThumbsDown, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import app, { db } from '../../firebase';
 import { loadRuleCards, saveRuleCards, cleanCard, CARD_LIMITS } from '../../services/desk/knowledge/ruleCards';
 import { summarizeFeedback } from '../../services/desk/feedback';
 
@@ -166,13 +167,14 @@ function VoiceUsage() {
       <p style={{ margin: '4px 0 12px', fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>Natural voice spoken by KaTuroDesk personas. Each teacher has 5 minutes a day; after that the persona uses the computer's own voice (free). Totals only, no names.</p>
       {days === null ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : error ? <Notice ok={false}>{error}</Notice> : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Day</th><th style={th}>Minutes spoken</th><th style={th}>Replies spoken</th><th style={th}>Reached the 5-minute limit</th><th style={th}>Voice service failed</th></tr></thead>
+          <thead><tr><th style={th}>Day</th><th style={th}>Minutes spoken</th><th style={th}>Replies spoken</th><th style={th}>Google / Azure / Gemini</th><th style={th}>Reached the 5-minute limit</th><th style={th}>No service answered</th></tr></thead>
           <tbody>
             {days.map((d) => (
               <tr key={d.id}>
                 <td style={td}>{d.id}</td>
                 <td style={td}>{((d.seconds || 0) / 60).toFixed(1)}</td>
                 <td style={td}>{d.replies || 0}</td>
+                <td style={td}>{d.by_google || 0} / {d.by_azure || 0} / {d.by_gemini || 0}</td>
                 <td style={td}>{d.limited || 0}</td>
                 <td style={td}>{d.failed || 0}</td>
               </tr>
@@ -184,11 +186,101 @@ function VoiceUsage() {
   );
 }
 
+const SERVICES = [
+  ['google', 'Google Chirp 3 HD', 'Uses this Google Cloud project (no key). The Cloud Text-to-Speech API must be turned on.'],
+  ['azure', 'Microsoft Azure AI Speech', 'Needs an Azure Speech key and its region.'],
+  ['gemini', 'Gemini voices', 'Uses the KaTuroDesk Gemini key (needs a paid plan for voices).'],
+];
+const AZURE_REGIONS = ['southeastasia', 'eastasia', 'japaneast', 'australiaeast', 'eastus', 'westus2', 'westeurope'];
+const ENABLE_GOOGLE_TTS = 'https://console.cloud.google.com/apis/library/texttospeech.googleapis.com?project=katuro-ai';
+
+/** Online persona voices: which services, the Azure key, and a test of each (adminConfig/deskVoice). */
+function OnlineVoices() {
+  const [cfg, setCfg] = useState(null);
+  const [keyInput, setKeyInput] = useState('');
+  const [msg, setMsg] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [results, setResults] = useState(null);
+  useEffect(() => {
+    getDoc(doc(db, 'adminConfig', 'deskVoice'))
+      .then((d) => setCfg({ providers: ['google', 'azure', 'gemini'], azureRegion: 'southeastasia', ...(d.exists() ? d.data() : {}) }))
+      .catch((e) => { setCfg({ providers: ['google', 'azure', 'gemini'], azureRegion: 'southeastasia' }); setMsg({ ok: false, text: e.message }); });
+  }, []);
+  if (!cfg) return <div style={card}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /></div>;
+
+  const toggle = (id) => setCfg((c) => {
+    const on = c.providers.includes(id);
+    const next = on ? c.providers.filter((p) => p !== id) : SERVICES.map(([s]) => s).filter((s) => s === id || c.providers.includes(s));
+    return { ...c, providers: next };
+  });
+  const save = async () => {
+    setMsg(null);
+    try {
+      const data = { providers: cfg.providers, azureRegion: cfg.azureRegion, updatedAt: new Date() };
+      if (keyInput.trim()) data.azureKey = keyInput.trim();
+      await setDoc(doc(db, 'adminConfig', 'deskVoice'), data, { merge: true });
+      if (keyInput.trim()) setCfg((c) => ({ ...c, azureKey: keyInput.trim() }));
+      setKeyInput('');
+      setMsg({ ok: true, text: 'Saved. Teachers get it within a minute.' });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    }
+  };
+  const test = async () => {
+    setTesting(true);
+    setResults(null);
+    try {
+      const res = await httpsCallable(getFunctions(app, 'us-central1'), 'adminTestDeskVoice', { timeout: 120000 })({});
+      setResults(res.data.results);
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+  const masked = cfg.azureKey ? `saved (ends in ${String(cfg.azureKey).slice(-4)})` : 'not saved';
+
+  return (
+    <div style={card}>
+      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Persona voice: online services</h2>
+      <p style={{ margin: '4px 0 12px', fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>The personas speak with the first service that answers, in this order, within each teacher's 5 minutes a day. Filipino or Taglish replies use a Filipino voice. When none answers, or the 5 minutes are used up, KaTuroDesk uses the free voice on the teacher's laptop.</p>
+      {SERVICES.map(([id, name, note]) => (
+        <label key={id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={cfg.providers.includes(id)} onChange={() => toggle(id)} style={{ marginTop: 3 }} />
+          <span style={{ fontSize: 13, color: 'var(--kt-text-primary)' }}><strong>{name}</strong><span style={{ display: 'block', fontSize: 12, color: 'var(--kt-text-secondary)' }}>{note}</span></span>
+        </label>
+      ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', margin: '10px 0' }}>
+        <label style={{ fontSize: 12, color: 'var(--kt-text-secondary)' }}>Azure Speech key ({masked})
+          <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder={cfg.azureKey ? 'Paste a new key to replace it' : 'Paste the key'} autoComplete="off" style={{ display: 'block', marginTop: 4, padding: '6px 8px', fontSize: 13, borderRadius: 8, border: '1px solid var(--kt-border)', minWidth: 260 }} />
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--kt-text-secondary)' }}>Azure region
+          <select value={cfg.azureRegion} onChange={(e) => setCfg((c) => ({ ...c, azureRegion: e.target.value }))} style={{ display: 'block', marginTop: 4, padding: '6px 8px', fontSize: 13, borderRadius: 8, border: '1px solid var(--kt-border)' }}>
+            {AZURE_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={save} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#2d6a4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}><Save size={13} /> Save</button>
+        <button type="button" onClick={test} disabled={testing} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--kt-surface)', color: 'var(--kt-text-primary)', border: '1px solid var(--kt-border)', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{testing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : null} Test each service</button>
+      </div>
+      {msg && <Notice ok={msg.ok}>{msg.text}</Notice>}
+      {results && results.map((r) => (
+        <div key={r.provider} style={{ fontSize: 13, margin: '6px 0', color: 'var(--kt-text-primary)' }}>
+          <strong>{r.name}:</strong> {r.ok ? <span style={{ color: '#2d6a4f' }}>works ({(r.ms / 1000).toFixed(1)} s)</span> : <span style={{ color: '#b42318' }}>{r.error}</span>}
+          {r.provider === 'google' && !r.ok && /has not been used|disabled|SERVICE_DISABLED|403/.test(r.error || '') && (
+            <span style={{ display: 'block', fontSize: 12 }}>Turn it on here (one time): <a href={ENABLE_GOOGLE_TTS} target="_blank" rel="noreferrer">Cloud Text-to-Speech API for katuro-ai</a>, wait 2 minutes, then test again.</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DeskAiAdmin({ adminUid }) {
   return (
     <div>
       <RuleCardsEditor adminUid={adminUid} />
       <FeedbackSummary />
+      <OnlineVoices />
       <VoiceUsage />
     </div>
   );

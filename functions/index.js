@@ -1943,11 +1943,24 @@ exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 },
 // Logic and tests: functions/emailCode.js, tests/emailCode.server.test.js.
 // ── KaTuroDesk personas speak with natural voices (5 minutes a day per teacher) ──
 // Logic and tests: functions/deskSpeech.js, tests/deskSpeech.server.test.js.
-const deskSpeech = createDeskSpeech({ db, admin, fetchFn: (...a) => fetch(...a), getKey: () => getGeminiKey(true), HttpsError, today: () => todayInManila() });
+const deskSpeech = createDeskSpeech({
+  db, admin, fetchFn: (...a) => fetch(...a), getKey: () => getGeminiKey(true), HttpsError, today: () => todayInManila(),
+  // Google Chirp 3 HD uses the function's own Google identity, like the Vertex backup.
+  getGoogleToken: () => vertexAccessToken(),
+});
 exports.deskSpeak = onCall(
   { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 120, memory: '512MiB', maxInstances: 20 },
   (req) => deskSpeech.speak(req),
 );
+
+// Admin > KaTuroDesk AI > Persona voice: "Test each service" (one short sentence each).
+exports.adminTestDeskVoice = onCall({ region: 'us-central1', timeoutSeconds: 120 }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+  if (!callerSnap.exists || !callerSnap.data()?.isAdmin) throw new HttpsError('permission-denied', 'Admin access required.');
+  deskSpeech.forget(); // read the newly saved settings
+  return { results: await deskSpeech.test() };
+});
 
 const emailCodes = createEmailCodes({ db, fetchFn: (...a) => fetch(...a), HttpsError });
 

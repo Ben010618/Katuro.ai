@@ -112,6 +112,91 @@ describe('deskSpeak: natural persona voices', () => {
     expect(calls.filter((u) => u.includes('gemini-3-flash-tts:generate'))).toHaveLength(1);
   });
 
+  describe('Google Chirp 3 HD and Microsoft Azure', () => {
+    // A WAV file (44-byte header) around `seconds` of PCM, as Google returns it.
+    const wav = (seconds) => {
+      const pcmBuf = Buffer.alloc(seconds * 48000, 1);
+      const h = Buffer.alloc(44);
+      h.write('RIFF', 0); h.writeUInt32LE(36 + pcmBuf.length, 4); h.write('WAVE', 8); h.write('fmt ', 12); h.writeUInt32LE(16, 16);
+      h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(24000, 24); h.writeUInt32LE(48000, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);
+      h.write('data', 36); h.writeUInt32LE(pcmBuf.length, 40);
+      return Buffer.concat([h, pcmBuf]).toString('base64');
+    };
+    const services = ({ google = 200, azure = 200 } = {}) => {
+      const calls = [];
+      const fn = async (url, opts = {}) => {
+        calls.push({ url, opts });
+        if (url.startsWith('https://texttospeech.googleapis.com')) {
+          return google === 200 ? { ok: true, status: 200, json: async () => ({ audioContent: wav(2) }) } : { ok: false, status: google, text: async () => 'Cloud Text-to-Speech API has not been used in project', json: async () => ({}) };
+        }
+        if (url.includes('tts.speech.microsoft.com')) {
+          return azure === 200 ? { ok: true, status: 200, arrayBuffer: async () => new Uint8Array(3 * 48000).buffer } : { ok: false, status: azure, text: async () => 'denied', json: async () => ({}) };
+        }
+        return fakeFetch().fn(url, opts);
+      };
+      return { fn, calls };
+    };
+    const withVoices = (fetchFn, cfg = { providers: ['google', 'azure', 'gemini'], azureKey: 'AZ', azureRegion: 'southeastasia' }) => {
+      f.docs.set('adminConfig/deskVoice', cfg);
+      return createDeskSpeech({ db: f.db, admin: f.admin, fetchFn, getKey: async () => 'KEY', getGoogleToken: async () => 'TOKEN', HttpsError, today: () => '2026-10-17' });
+    };
+
+    it("Google first: the persona's Chirp 3 HD voice, the WAV header removed, seconds counted", async () => {
+      const net = services();
+      const res = await withVoices(net.fn).speak({ auth: { uid: 'u1' }, data: { text: 'Good morning, Teacher!', persona: 'carmen' } });
+      expect(res).toMatchObject({ provider: 'google', seconds: 2, sampleRate: 24000 });
+      expect(Buffer.from(res.audio, 'base64').slice(0, 4).toString()).not.toBe('RIFF');
+      const body = JSON.parse(net.calls[0].opts.body);
+      expect(body.voice).toEqual({ languageCode: 'en-US', name: 'en-US-Chirp3-HD-Gacrux' });
+      expect(net.calls[0].opts.headers.Authorization).toBe('Bearer TOKEN');
+      expect(net.calls.some((c) => c.url.includes('microsoft'))).toBe(false);
+      expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ by_google: 1 });
+    });
+
+    it('Taglish text gets a Filipino voice (Google fil-PH; Azure Angelo or Blessica)', async () => {
+      const net = services();
+      await withVoices(net.fn).speak({ auth: { uid: 'u1' }, data: { text: 'Sige po, gagawin ko na ang quiz para sa Grade 7.', persona: 'matt' } });
+      expect(JSON.parse(net.calls[0].opts.body).voice.name).toBe('fil-PH-Chirp3-HD-Puck');
+      const az = services({ google: 403 });
+      await withVoices(az.fn).speak({ auth: { uid: 'u1' }, data: { text: 'Sige po, gagawin ko na ang quiz para sa Grade 7.', persona: 'luna' } });
+      const call = az.calls.find((c) => c.url.includes('microsoft'));
+      expect(call.url).toBe('https://southeastasia.tts.speech.microsoft.com/cognitiveservices/v1');
+      expect(call.opts.body).toContain('<voice name="fil-PH-BlessicaNeural">');
+      expect(call.opts.headers['X-Microsoft-OutputFormat']).toBe('raw-24khz-16bit-mono-pcm');
+    });
+
+    it('Google refuses (service off or billing): Azure answers, and Google is not asked again for a while', async () => {
+      const net = services({ google: 403 });
+      const s = withVoices(net.fn);
+      const res = await s.speak({ auth: { uid: 'u1' }, data: { text: 'Hello & welcome <class>.', persona: 'luna' } });
+      expect(res).toMatchObject({ provider: 'azure', seconds: 3 });
+      const azure = net.calls.find((c) => c.url.includes('microsoft'));
+      expect(azure.opts.body).toContain('<voice name="en-US-AvaMultilingualNeural">');
+      expect(azure.opts.body).toContain('Hello &amp; welcome &lt;class&gt;.');
+      expect(azure.opts.headers['Ocp-Apim-Subscription-Key']).toBe('AZ');
+      await s.speak({ auth: { uid: 'u1' }, data: { text: 'Again.', persona: 'luna' } });
+      expect(net.calls.filter((c) => c.url.startsWith('https://texttospeech'))).toHaveLength(1);
+    });
+
+    it('without an Azure key, Azure is skipped; the admin order is followed', async () => {
+      const net = services({ google: 403 });
+      const res = await withVoices(net.fn, { providers: ['google', 'azure', 'gemini'] }).speak({ auth: { uid: 'u1' }, data: { text: 'Hi.', persona: 'grey' } });
+      expect(res.provider).toBe('gemini');
+      expect(net.calls.some((c) => c.url.includes('microsoft'))).toBe(false);
+      const only = services();
+      const r2 = await withVoices(only.fn, { providers: ['azure'], azureKey: 'AZ', azureRegion: 'eastasia' }).speak({ auth: { uid: 'u2' }, data: { text: 'Hi.', persona: 'grey' } });
+      expect(r2.provider).toBe('azure');
+      expect(only.calls.some((c) => c.url.startsWith('https://texttospeech'))).toBe(false);
+    });
+
+    it('admin Test: one line per service, with the reason when one fails', async () => {
+      const out = await withVoices(services({ google: 403 }).fn, { providers: ['google', 'azure', 'gemini'] }).test();
+      expect(out.map((o) => [o.provider, o.ok])).toEqual([['google', false], ['azure', false], ['gemini', true]]);
+      expect(out[0].error).toMatch(/403 Cloud Text-to-Speech API has not been used/);
+      expect(out[1].error).toMatch(/No Azure key/);
+    });
+  });
+
   it('refuses no login, empty text and very long text', async () => {
     const s = make(fakeFetch().fn);
     await expect(s.speak({ data: { text: 'hi' } })).rejects.toMatchObject({ code: 'unauthenticated' });
