@@ -33,16 +33,12 @@ export default function DeskVoiceSettings() {
   return (
     <section className="border-t border-gray-100 pt-4 space-y-2">
       <h3 className="text-xs font-bold text-gray-800">Voice</h3>
-      <p className="text-[11px] text-gray-500">{p.name} can speak reminders, bubble answers and chat replies. The text is always shown too.</p>
+      <p className="text-[11px] text-gray-500">{p.name} speaks only when you call it by its wake phrase (below) or hold Talk, and keeps its answers short. Everything else is shown as text.</p>
       <label className="flex items-start gap-2 cursor-pointer">
         <input type="checkbox" checked={v.natural !== false} onChange={(e) => setSpeechSettings({ natural: e.target.checked })} className="mt-0.5 w-4 h-4 accent-emerald-600" />
         <span className="text-[11px] text-gray-700">
           <span className="font-semibold text-gray-800">Natural voice</span> (needs internet; up to 5 minutes a day). After that, or offline, {p.name} uses this computer's voice.
         </span>
-      </label>
-      <label className="flex items-start gap-2 cursor-pointer">
-        <input type="checkbox" checked={Boolean(v.replies)} onChange={(e) => setSpeechSettings({ replies: e.target.checked })} className="mt-0.5 w-4 h-4 accent-emerald-600" />
-        <span className="text-[11px] text-gray-700"><span className="font-semibold text-gray-800">Read chat replies aloud</span> (the first sentences of each reply).</span>
       </label>
       <label className="flex items-center gap-2 text-[11px] text-gray-700">
         Volume
@@ -54,7 +50,6 @@ export default function DeskVoiceSettings() {
         {speaking && <button type="button" onClick={() => deskSpeaker().stop()} className="px-3 py-1.5 rounded-lg border border-gray-300 text-[11px] text-gray-700 hover:bg-gray-50">Stop</button>}
       </div>
       {note && <p className="text-[11px] text-gray-600" role="status">{note}</p>}
-      <p className="text-[10.5px] text-gray-400">Bubble reminders are spoken only when "Say reminders out loud" is on in My classes &gt; Assistant.</p>
       {wakeSupported() && <WakeSettings />}
     </section>
   );

@@ -46,15 +46,35 @@ export function intentOf(text) {
 }
 
 // Hands-free listening (after the wake phrase). Levels are 0..1 from the recorder.
-export const AUTO = { speak: 0.12, quiet: 0.07, silenceMs: 1300, waitMs: 6000, maxMs: 20000 };
+export const AUTO = { speak: 0.12, quiet: 0.07, silenceMs: 900, waitMs: 6000, maxMs: 20000 };
 
+// Short on purpose: the persona speaks only when called, and says no more than needed.
 export const LINES = {
-  notHeard: "Sorry, I didn't catch that. Hold the button and try again.",
-  declined: "Okay, I won't do it. Tell me what to change.",
-  proceeding: 'Okay, going ahead.',
-  confirm: 'Shall I go ahead? Say yes or no.',
-  busy: "I'm still working on your last request. Give me a moment.",
+  notHeard: "Sorry, I didn't catch that.",
+  declined: "Okay, I won't.",
+  proceeding: 'Going ahead.',
+  confirm: 'Shall I go ahead?',
+  busy: 'Still working on your last request.',
 };
+
+/**
+ * The first complete sentence of a reply that is still coming in, or ''. A sentence counts as
+ * complete only when more text follows it (so "at 10." of "at 10.30" is never said early).
+ */
+export function firstSentence(text) {
+  const m = /^\s*([\s\S]+?[.!?])(?=\s)/.exec(String(text || ''));
+  const out = m ? m[1].replace(/\*\*/g, '').trim() : '';
+  return out.split(/\s+/).length >= 2 ? out : '';
+}
+
+/** What is left to say of `answer` after `said` was already spoken (never said twice). */
+export function restAfter(answer, said) {
+  const a = String(answer || '').replace(/\*\*/g, '').trim();
+  const s = String(said || '').trim();
+  if (!s) return a;
+  const at = a.indexOf(s);
+  return at === -1 ? a : `${a.slice(0, at)}${a.slice(at + s.length)}`.trim();
+}
 
 /**
  * deps:
@@ -64,7 +84,6 @@ export const LINES = {
  *   pending() → the plan waiting for Proceed, or null
  *   confirm(plan) → { content }   decline(plan)
  *   say(text)   stopSpeaking()
- *   thinking()   optional: a short spoken "one moment" right after the teacher stops talking
  *   onState({ phase: 'idle'|'listening'|'thinking', heard, answer, error })
  */
 export function createTalk(deps) {
@@ -103,7 +122,6 @@ export function createTalk(deps) {
     const r = rec;
     rec = null;
     set({ phase: 'thinking' });
-    deps.thinking?.();
     try {
       let wav;
       try {
@@ -134,10 +152,12 @@ export function createTalk(deps) {
         deps.stopSpeaking();
         return;
       }
+      // The first full sentence of the reply is said while the work runs; the rest comes after.
       let early = '';
       const out = await deps.ask(heard, {
         onReply: (words) => {
-          early = String(words || '').trim();
+          if (early) return;
+          early = firstSentence(words);
           if (early) deps.say(early);
         },
       });
@@ -156,10 +176,9 @@ export function createTalk(deps) {
     const waiting = Boolean(deps.pending());
     const answer = waiting ? `${content} ${LINES.confirm}`.trim() : content;
     set({ answer });
-    if (!answer) return;
-    // The agent's first words were already spoken while it worked: do not repeat them.
-    if (alreadySaid && content === alreadySaid && !waiting) return;
-    deps.say(answer);
+    // The agent's first sentence was already spoken while it worked: only the rest is said.
+    const rest = restAfter(answer, alreadySaid);
+    if (rest) deps.say(rest);
   }
 
   /**

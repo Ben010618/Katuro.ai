@@ -39,13 +39,6 @@ export function requestPrepare(jobs) {
 }
 export const isPreparing = () => prepRunning;
 
-/** The persona says it (natural voice, or this computer's voice); the text is always shown too. */
-function speak(text) {
-  const s = useDeskStore.getState();
-  const v = s.speechSettings || {};
-  deskSpeaker().say(text, { persona: s.persona, natural: v.natural !== false, volume: v.volume ?? 0.9 }).catch(() => {});
-}
-
 async function readParsed(path) {
   const ws = useDeskStore.getState().workspace;
   return folderIndex.ensure(path, findEntryByPath(ws?.files || [], path), ws?.handle, { full: false });
@@ -120,8 +113,7 @@ export function startTeachingAssistant(getContext) {
     presenting = Boolean(await desk?.isPresenting?.().catch(() => false));
     const inClass = s.myClasses.length ? inClassNow(Date.now(), engineState(s)) : null;
     if (!presenting && !inClass && !expanded) {
-      expanded = true;
-      if (settingsOf(s).voice) speak(current.text);
+      expanded = true; // shown only: the persona speaks only when called by its wake phrase or Talk
     }
     pushBubble();
   }
@@ -280,11 +272,9 @@ export function startTeachingAssistant(getContext) {
         if (s.isGenerating || !user) { reply = 'I\'m busy with another request. Please ask again in a moment.'; pushBubble(); break; }
         reply = 'Thinking…';
         pushBubble();
-        const out = await runChatTurn({ text, user, profile, speakReply: false });
+        const out = await runChatTurn({ text, user, profile });
         reply = bubbleReply(out.content);
         pushBubble();
-        const now = useDeskStore.getState();
-        if (settingsOf(now).voice || now.speechSettings?.replies) speak(reply);
         break;
       }
       case 'stopVoice':

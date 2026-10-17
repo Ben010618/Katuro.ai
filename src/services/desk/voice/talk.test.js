@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createTalk, intentOf, cleanTalk, TALK_PROMPT, LINES } from './talk';
+import { createTalk, intentOf, cleanTalk, TALK_PROMPT, LINES, firstSentence, restAfter } from './talk';
 
 function setup({ heard = 'What is my next class?', plan = null, answer = 'Your next class is Science 7 at 7:30.', early = '' } = {}) {
   let waiting = plan;
@@ -8,7 +8,8 @@ function setup({ heard = 'What is my next class?', plan = null, answer = 'Your n
   const deps = {
     record: vi.fn(async () => ({ stop: async () => new Uint8Array([1, 2, 3]), cancel: vi.fn() })),
     transcribe: vi.fn(async () => heard),
-    ask: vi.fn(async (text, { onReply }) => { if (early) onReply(early); return { content: answer }; }),
+    // The reply streams in: onReply hears it growing, word by word.
+    ask: vi.fn(async (text, { onReply }) => { if (early) { const w = early.split(' '); for (let i = 1; i <= w.length; i += 1) onReply(w.slice(0, i).join(' ')); } return { content: answer }; }),
     pending: () => waiting,
     confirm: vi.fn(async () => { waiting = null; return { content: 'Done. I made the quiz.' }; }),
     decline: vi.fn(() => { waiting = null; }),
@@ -44,15 +45,32 @@ describe('talking with the persona', () => {
     expect(states).toEqual(['listening', 'thinking', 'thinking', 'thinking', 'idle']);
   });
 
-  it("the agent's first words are spoken right away while it works, and not repeated", async () => {
-    const { talk, said } = setup({ early: 'Sure, making the quiz now.', answer: 'Sure, making the quiz now.' });
+  it("the reply's first full sentence is spoken while it works; the rest follows, nothing twice", async () => {
+    const { talk, said } = setup({ early: 'Sure, making the quiz now. It will have', answer: 'Sure, making the quiz now. It will have 20 items.' });
     await talk.begin();
     await talk.end();
-    expect(said).toEqual(['Sure, making the quiz now.']);
-    const two = setup({ early: 'Sure, one moment.', answer: 'Here is your quiz with 20 items.' });
-    await two.talk.begin();
-    await two.talk.end();
-    expect(two.said).toEqual(['Sure, one moment.', 'Here is your quiz with 20 items.']);
+    expect(said).toEqual(['Sure, making the quiz now.', 'It will have 20 items.']);
+    const one = setup({ early: 'Your next class is at 10', answer: 'Your next class is at 10.30.' });
+    await one.talk.begin();
+    await one.talk.end();
+    expect(one.said).toEqual(['Your next class is at 10.30.']); // "at 10." is never said early
+    const done = setup({ early: 'Okay, done. ', answer: '**Okay, done.**' });
+    await done.talk.begin();
+    await done.talk.end();
+    expect(done.said).toEqual(['Okay, done.']);
+  });
+
+  it('first sentence and the rest', () => {
+    expect(firstSentence('Sure. More')).toBe('');
+    expect(firstSentence('Sure thing, Sir. More')).toBe('Sure thing, Sir.');
+    expect(firstSentence('No end yet')).toBe('');
+    expect(restAfter('Hello there. Rest here.', 'Hello there.')).toBe('Rest here.');
+    expect(restAfter('Something else.', 'Hello there.')).toBe('Something else.');
+    expect(restAfter('Hello there.', 'Hello there.')).toBe('');
+  });
+
+  it('the fixed spoken lines are short', () => {
+    for (const line of Object.values(LINES)) expect(line.split(' ').length).toBeLessThanOrEqual(6);
   });
 
   it('a plan that changes files waits for a spoken yes or no', async () => {

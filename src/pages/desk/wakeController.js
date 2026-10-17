@@ -59,14 +59,18 @@ function conversationOver() {
   return new Promise((resolve) => {
     let offTalk = () => {};
     let offSpeech = () => {};
+    const quiet = () => deskTalk().getState().phase === 'idle' && !deskSpeaker().getState().speaking && !deskSpeaker().getState().queued;
+    let done = false;
     const check = () => {
-      if (deskTalk().getState().phase === 'idle' && !deskSpeaker().getState().speaking) {
-        setTimeout(() => {
-          offTalk();
-          offSpeech();
-          resolve();
-        }, 0);
-      }
+      if (done || !quiet()) return;
+      // Checked again a moment later: the next queued sentence may be about to start.
+      setTimeout(() => {
+        if (done || !quiet()) return;
+        done = true;
+        offTalk();
+        offSpeech();
+        resolve();
+      }, 250);
     };
     offTalk = subscribeTalk(check);
     offSpeech = deskSpeaker().subscribe(check);

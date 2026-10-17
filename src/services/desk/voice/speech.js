@@ -95,8 +95,10 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, lo
   const listeners = new Set();
   const cache = new Map(); // persona|text → { engine, wav } (repeated reminders cost nothing)
   let current = null; // { stop }
-  let token = 0;
-  let state = { speaking: false, engine: null };
+  let token = 0; // changes whenever the sentence being spoken is cut off
+  let gen = 0; // changes on Stop (and on a new say that is not queued): queued sayings are dropped
+  let tail = Promise.resolve(); // the last saying, so a queued one starts when it ends
+  let state = { speaking: false, engine: null, queued: 0 };
   let usage = null; // { usedSeconds, limitSeconds } from the last natural-voice answer
   let naturalOffUntil = 0;
 
@@ -105,11 +107,16 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, lo
     for (const l of listeners) l(state);
   };
 
-  function stop() {
+  function halt() {
     token += 1;
     current?.stop();
     current = null;
     if (state.speaking) emit({ speaking: false, engine: null });
+  }
+
+  function stop() {
+    gen += 1;
+    halt();
   }
 
   /** One chunk's audio: natural voice, then this computer's voice; null wav = Windows voice. */
@@ -156,13 +163,34 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, lo
   }
 
   /**
-   * Says `text`. options: { persona, natural (default true), volume (0..1) }
+   * Says `text`. options: { persona, natural (default true), volume (0..1), max (characters),
+   * queue (wait for what is being said to finish instead of cutting it off) }
    * The first sentence plays as soon as it is ready; the next is prepared while it plays.
    * → { engine: 'natural' | 'local' | 'system' | 'none', reason? }   (the first sentence's)
    */
-  async function say(text, { persona = 'matt', natural = true, volume = 0.9 } = {}) {
-    const words = speechText(text);
-    stop();
+  function say(text, options = {}) {
+    if (!options.queue) {
+      gen += 1;
+      const p = speakNow(text, options);
+      tail = p.catch(() => {});
+      return p;
+    }
+    const g = gen;
+    emit({ queued: state.queued + 1 });
+    const p = tail.then(async () => {
+      try {
+        return g === gen ? await speakNow(text, options) : { engine: 'none', reason: 'stopped' };
+      } finally {
+        emit({ queued: Math.max(0, state.queued - 1) });
+      }
+    });
+    tail = p.catch(() => {});
+    return p;
+  }
+
+  async function speakNow(text, { persona = 'matt', natural = true, volume = 0.9, max } = {}) {
+    const words = speechText(text, max || MAX_SPOKEN);
+    halt();
     const chunks = speechChunks(words);
     if (!chunks.length) return { engine: 'none' };
     const mine = ++token;
@@ -242,7 +270,7 @@ async function serverTts(payload) {
 }
 
 // Same as PLAYBACK_RATE in piperVoice.js (kept here so the speaker loads without Piper).
-const LOCAL_RATE = { matt: 1.06, grey: 0.97, luna: 1.0, carmen: 0.94 };
+const LOCAL_RATE = { matt: 1, grey: 1, luna: 1, carmen: 1 };
 
 let appSpeaker = null;
 export function deskSpeaker() {

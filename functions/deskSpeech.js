@@ -28,10 +28,10 @@ const PROVIDER_NAMES = { google: 'Google Chirp 3 HD', azure: 'Microsoft Azure', 
 // the character. Matt jolly and funny, Grey serious and smart, Luna sweet and professional,
 // Lola Carmen brutally strict.
 const PERSONA_VOICES = {
-  matt: { voice: 'Puck', azure: 'en-US-AndrewMultilingualNeural', gender: 'male', rate: '+8%', pitch: '+4%', speakingRate: 1.08, style: 'Say this in English like a jolly, funny, energetic young guy cheering his co-teacher friend: loud, upbeat, bright and playful, stretching a long "Yooooow" and shouting "Amazing dayyyy" with excitement' },
-  luna: { voice: 'Sulafat', azure: 'en-US-AvaMultilingualNeural', gender: 'female', rate: '0%', pitch: '+2%', speakingRate: 1.0, style: 'Say this like a sweet, warm, polite and professional young woman, gentle and courteous' },
-  grey: { voice: 'Charon', azure: 'en-US-BrianMultilingualNeural', gender: 'male', rate: '-3%', pitch: '-3%', speakingRate: 0.97, style: 'Say this like a serious, highly intelligent scientist: calm, precise, measured and matter-of-fact' },
-  carmen: { voice: 'Gacrux', azure: 'en-US-CoraMultilingualNeural', gender: 'female', rate: '-6%', pitch: '-6%', speakingRate: 0.94, style: 'Say this like a ruthlessly strict, stern retired college dean who has no patience for sloppy work: blunt, firm, clipped and commanding, never warm' },
+  matt: { voice: 'Puck', azure: 'en-US-AndrewMultilingualNeural', gender: 'male', rate: '+3%', pitch: '0%', speakingRate: 1.03, style: 'Say this in English like a happy, friendly young teacher talking with a colleague: warm, cheerful, natural and relaxed' },
+  luna: { voice: 'Sulafat', azure: 'en-US-AvaMultilingualNeural', gender: 'female', rate: '0%', pitch: '0%', speakingRate: 1.0, style: 'Say this like a sweet, warm, polite and professional young woman, gentle and courteous' },
+  grey: { voice: 'Charon', azure: 'en-US-BrianMultilingualNeural', gender: 'male', rate: '-2%', pitch: '0%', speakingRate: 0.98, style: 'Say this like a serious, highly intelligent scientist: calm, precise, measured and matter-of-fact' },
+  carmen: { voice: 'Gacrux', azure: 'en-US-CoraMultilingualNeural', gender: 'female', rate: '-4%', pitch: '0%', speakingRate: 0.96, style: 'Say this like a ruthlessly strict, stern retired college dean who has no patience for sloppy work: blunt, firm, clipped and commanding, never warm' },
 };
 // Filipino and Taglish replies: Filipino neural voices (Azure), Chirp 3 HD in fil-PH (Google).
 const AZURE_FILIPINO = { male: 'fil-PH-AngeloNeural', female: 'fil-PH-BlessicaNeural' };

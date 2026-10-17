@@ -17,9 +17,10 @@ import { isCorrection, sendFeedback, toolsOf } from '../../services/desk/feedbac
  * @param {object} [o.scheduled]     { id, name } when a scheduled task started this turn
  * @param {Function} [o.onOpenCanvas]
  * @param {object} [o.confirmedPlan] a plan the teacher approved with "Proceed" (runs with no new AI call)
+ * @param {boolean} [o.voice]        the teacher is talking (wake phrase or Talk): short spoken answers
  * @returns {Promise<{ status: 'done'|'needs_info'|'error', content: string, files: string[] }>}
  */
-export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null, speakReply = true, onReply = null }) {
+export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null, voice = false, onReply = null }) {
   const store = useDeskStore.getState();
   const { messages, persona, privacyMode, workspace, activeFile, activeArtifact } = store;
   const salutation = getTeacherSalutationName(profile, user);
@@ -39,7 +40,6 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
   store.addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
   store.setIsGenerating(true);
 
-  let repliedEarly = false;
   try {
     const result = await runDeskAgentTurn({
       prompt: text,
@@ -55,14 +55,12 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       eSignature: useDeskStore.getState().eSignature,
       fileIndex: folderIndex,
       confirmedPlan,
+      voice,
       autoApprove: Boolean(scheduled),
       onUpdate: ({ steps, reply }) => {
         useDeskStore.getState().updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
-        // Talking: the persona says its first words while the work runs.
-        if (reply && onReply && !repliedEarly) {
-          repliedEarly = true;
-          onReply(reply);
-        }
+        // Talking: the reply so far (talk.js speaks its first full sentence while the work runs).
+        if (reply && onReply) onReply(reply);
       },
     });
 
@@ -80,11 +78,6 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       onOpenCanvas?.();
     }
     if (result.createdFiles.length) await s.refreshFiles();
-    // Settings > Assistant: the persona reads its reply aloud (never for scheduled tasks).
-    const voice = useDeskStore.getState().speechSettings;
-    if (speakReply && !scheduled && voice?.replies && result.content) {
-      import('../../services/desk/voice/speech').then(({ deskSpeaker }) => deskSpeaker().say(result.content, { persona, natural: voice.natural !== false, volume: voice.volume ?? 0.9 })).catch(() => {});
-    }
 
     const failed = result.steps?.some((st) => st.status === 'error');
     const status = result.pendingPlan || result.asked || /\*\*Needs your input\*\*/.test(result.content) ? 'needs_info' : failed && !result.createdFiles.length ? 'error' : 'done';

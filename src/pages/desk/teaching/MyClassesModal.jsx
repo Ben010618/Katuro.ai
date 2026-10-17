@@ -10,7 +10,6 @@ import { lessonFiles, lessonStatus } from '../../../services/desk/teaching/assis
 import { mondayOf } from '../../../services/desk/teaching/prepareLesson';
 import { getPersona } from '../../../services/desk/personas';
 import { requestPrepare } from './assistantEngine';
-import { deskSpeaker } from '../../../services/desk/voice/speech';
 
 const DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat']];
 const GRADES = ['Kindergarten', ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`)];
@@ -389,18 +388,13 @@ function AssistantTab() {
   const persona = getPersona(s.persona);
   const desktop = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.setBubble);
   const toggleRemind = (m) => set({ remind: st.remind.includes(m) ? st.remind.filter((x) => x !== m) : [...st.remind, m].sort((a, b) => b - a) });
-  const testVoice = () => {
-    const v = s.speechSettings || {};
-    deskSpeaker().say(`Hello! This is ${persona.name}. Your next class is in 10 minutes.`, { persona: persona.id, natural: v.natural !== false, volume: v.volume ?? 0.9 }).catch(() => {});
-  };
   return (
     <div className="space-y-4">
       <section className="space-y-2">
         <h3 className="text-xs font-bold text-gray-800">{persona.name} as your teaching assistant</h3>
         <p className="text-[11px] text-gray-500">Change the persona in Settings &gt; Assistant. Reminders come while KaTuroDesk runs, including in the tray (Settings &gt; Notifications).</p>
         <SettingCheck checked={st.bubble} onChange={(v) => set({ bubble: v })} title="Show the floating bubble" detail={desktop ? `${persona.name}'s head floats on your screen with reminders and quick questions. It stays quiet during your classes and slideshows.` : 'Available in the KaTuroDesk desktop app.'} />
-        <SettingCheck checked={st.voice} onChange={(v) => set({ voice: v })} title="Say reminders out loud" detail={`${persona.name}'s natural voice (up to 5 minutes a day), then this computer's voice. More voice settings in Settings > Assistant. The text is always shown too.`} />
-        {st.voice && <button type="button" className={btn} onClick={testVoice}>Test the voice</button>}
+        <p className="text-[11px] text-gray-500">Reminders are shown, not spoken. {persona.name} speaks only when you call it by its wake phrase or hold Talk (Settings &gt; Assistant &gt; Voice).</p>
       </section>
       <section className="space-y-2 border-t border-gray-100 pt-3">
         <h3 className="text-xs font-bold text-gray-800">Reminders</h3>

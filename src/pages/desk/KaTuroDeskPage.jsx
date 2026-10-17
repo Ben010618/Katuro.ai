@@ -164,8 +164,8 @@ export default function KaTuroDeskPage() {
   // "Hello Matt": listens for the wake phrase when the teacher turned it on (desktop app only).
   useEffect(() => startWakeController(), []);
   // The persona's voice on this computer (Piper) is downloaded once and loaded ahead, only for
-  // teachers who use voice: spoken replies, wake phrase, or spoken reminders.
-  const usesVoice = useDeskStore((s) => Boolean(s.speechSettings?.replies || s.speechSettings?.wake || s.teachingSettings?.voice));
+  // teachers who turned on the wake phrase (the only time the persona speaks by itself).
+  const usesVoice = useDeskStore((s) => Boolean(s.speechSettings?.wake));
   useEffect(() => { if (usesVoice) prepareVoice(persona); }, [persona, usesVoice]);
 
   // Messages ↔ classroom folder (desktop app with a real folder open): send files from

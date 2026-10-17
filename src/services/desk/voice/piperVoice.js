@@ -27,8 +27,8 @@ export const PIPER_VOICES = {
   carmen: 'en_US-kristin-medium',
 };
 
-/** Played a little faster/higher (Matt: younger) or slower/lower (Lola Carmen: sterner). */
-export const PLAYBACK_RATE = { matt: 1.06, grey: 0.97, luna: 1.0, carmen: 0.94 };
+// Played at the voice's own speed: changing it also shifts the pitch and sounds less natural.
+export const PLAYBACK_RATE = { matt: 1, grey: 1, luna: 1, carmen: 1 };
 
 const isDesktop = () => typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.isElectron);
 const sessions = new Map(); // voiceId → Promise<TtsSession>

@@ -75,20 +75,43 @@ describe('the persona speaks', () => {
     expect((await notReady.say('Hi.', { persona: 'grey' })).engine).toBe('system');
   });
 
-  it("each persona's voice is fixed, and the laptop voice plays at the persona's pace", async () => {
+  it("each persona's voice is fixed, and the laptop voice plays at its natural speed", async () => {
     const { PIPER_VOICES, PLAYBACK_RATE, voiceOf } = await import('./piperVoice');
     expect(PIPER_VOICES).toEqual({ matt: 'en_US-ryan-medium', grey: 'en_GB-alan-medium', luna: 'en_US-hfc_female-medium', carmen: 'en_US-kristin-medium' });
     expect(voiceOf('carmen')).toBe('en_US-kristin-medium');
     expect(voiceOf('nobody')).toBe('en_US-ryan-medium');
-    expect(PLAYBACK_RATE.matt).toBeGreaterThan(1);
-    expect(PLAYBACK_RATE.carmen).toBeLessThan(1);
+    expect(Object.values(PLAYBACK_RATE)).toEqual([1, 1, 1, 1]); // natural speed: no pitch shift
     const playWav = vi.fn(() => { const e = ended(); setTimeout(e.finish, 1); return e; });
     const sp = createSpeaker({ callTts: async () => ({ fallback: 'unavailable' }), localTts: async () => new Uint8Array([1]), playWav, systemSay: vi.fn(), localRate: (p) => PLAYBACK_RATE[p] });
     await sp.say('Again. Properly this time.', { persona: 'carmen' });
-    expect(playWav.mock.calls[0][2]).toBe(0.94);
+    expect(playWav.mock.calls[0][2]).toBe(1);
     const natural = createSpeaker({ callTts: async () => ({ audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }), playWav, systemSay: vi.fn(), localRate: () => 2 });
     await natural.say('Hello.', { persona: 'matt' });
     expect(playWav.mock.calls.at(-1)[2]).toBe(1); // online voices keep their own pace
+  });
+
+  it('queued sayings wait for the one being spoken (never cut off); Stop drops the queue; spoken answers can be kept short', async () => {
+    const order = [];
+    const playWav = vi.fn(() => { const e = ended(); order.push('play'); setTimeout(() => { order.push('end'); e.finish(); }, 10); return e; });
+    const callTts = vi.fn(async ({ text }) => ({ audio: Buffer.from(text).toString('base64'), sampleRate: 24000 }));
+    const sp = createSpeaker({ callTts, playWav, systemSay: vi.fn() });
+    const states = [];
+    sp.subscribe((s) => states.push(s.queued));
+    const a = sp.say('First one.', { queue: true });
+    const b = sp.say('Second one.', { queue: true });
+    expect(sp.getState().queued).toBe(2);
+    await Promise.all([a, b]);
+    expect(order).toEqual(['play', 'end', 'play', 'end']);
+    expect(sp.getState().queued).toBe(0);
+    const c = sp.say('Third one.', { queue: true });
+    const d = sp.say('Fourth one.', { queue: true });
+    sp.stop();
+    expect(await d).toEqual({ engine: 'none', reason: 'stopped' });
+    await c;
+    expect(sp.getState().queued).toBe(0);
+    callTts.mockClear();
+    await sp.say('One short sentence here. Another long sentence that should not be spoken at all.', { max: 30 });
+    expect(callTts.mock.calls.map((x) => x[0].text)).toEqual(['One short sentence here.']);
   });
 
   it('the wake answer can be made ready in advance: it then plays at once, with no new request', async () => {

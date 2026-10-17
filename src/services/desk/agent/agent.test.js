@@ -60,7 +60,7 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
       profile: { firstName: 'Ben', gender: 'male' },
       persona: 'matt',
     });
-    expect(res.content).toMatch(/^Yooooooow, Sir Ben! Amazing dayyyy, Sir Ben!/);
+    expect(res.content).toMatch(/^Yow, Sir Ben! /);
     expect(res.fastPath).toBe('local');
     expect(callGeminiProxy).not.toHaveBeenCalled();
   });
@@ -93,6 +93,16 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
     });
     expect(again.fastPath).toBe('memory');
     expect(callGeminiProxy).toHaveBeenCalledTimes(1);
+  });
+
+  it('talking by voice: the planner is told to answer in at most 2 short sentences (and it is remembered apart from chat)', async () => {
+    callGeminiProxy.mockImplementation(async () => ({ text: JSON.stringify({ reply: 'Use exit tickets.', tasks: [] }) }));
+    const ask = (voice) => runDeskAgentTurn({ prompt: 'Any quick tip for Grade 4?', workspace: createVirtualWorkspace('X'), user: { uid: 'u1' }, profile: { firstName: 'Ben', gender: 'male' }, voice });
+    await ask(true);
+    expect(sentText(0)).toContain('your \\"reply\\" will be spoken aloud: answer in at most 2 short, plain sentences');
+    await ask(false);
+    expect(callGeminiProxy).toHaveBeenCalledTimes(2); // the chat question is not answered from the voice memory
+    expect(sentText(1)).not.toContain('will be spoken aloud');
   });
 
   it('a long multi-line answer still reaches the teacher when the plan JSON is broken', async () => {
@@ -282,7 +292,8 @@ describe('personas (Matt / Luna / Grey)', () => {
 
   it('builds distinct chat voices and a neutral document voice', () => {
     expect(personaFor(teacher, 'matt')).toMatch(/Matt/);
-    expect(personaFor(teacher, 'matt')).toMatch(/Yooooooow, Sir Ben! Amazing dayyyy/);
+    expect(personaFor(teacher, 'matt')).toMatch(/at most once or twice in a whole conversation/);
+    expect(personaFor(teacher, 'matt')).not.toMatch(/Yooo|dayyy|Let's gooo|Boom, done/);
     expect(personaFor(teacher, 'matt')).toMatch(/ALWAYS reply in English only/);
     const m = PERSONAS.matt;
     for (const line of [m.sample, m.welcome('Sir Ben'), m.greeting('Sir Ben'), m.thanks('Sir Ben'), m.ack('Sir Ben', 'the item analysis'), m.limitReached('Sir Ben')]) {
@@ -296,7 +307,7 @@ describe('personas (Matt / Luna / Grey)', () => {
   });
 
   it('greets in each persona and exposes avatars metadata', () => {
-    expect(PERSONAS.matt.welcome('Sir Ben')).toMatch(/^Yooooooow, Sir Ben! Amazing dayyyy, Sir Ben!/);
+    expect(PERSONAS.matt.welcome('Sir Ben')).toMatch(/^Yow, Sir Ben! /);
     expect(PERSONAS.luna.welcome("Ma'am April")).toMatch(/^A pleasant day, Ma'am April\./);
     expect(getPersona('luna').gender).toBe('girl');
     expect(timeOfDay(new Date(2026, 0, 1, 8))).toBe('morning');

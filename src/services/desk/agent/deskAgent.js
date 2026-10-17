@@ -88,7 +88,7 @@ export function teacherFromProfile(profile = {}, user = {}) {
   };
 }
 
-const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${teacher.salutation}, a DepEd (Philippines) teacher. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Be straight to the point and genuinely helpful.`;
+const baseRole = (teacher) => `You are a KaTuroDesk co-teacher assistant for ${teacher.salutation}, a DepEd (Philippines) teacher. You support Kindergarten to Grade 12 in all learning areas, following the MATATAG curriculum, PPST, and DepEd orders. Be straight to the point and genuinely helpful: give the answer first, keep replies short, and ask only one short question when you need something.`;
 
 // Chat replies are shown formatted (DeskFormattedText); documents stay plain.
 const CHAT_FORMAT = `Formatting of chat replies: short paragraphs separated by a blank line. For a list, write a short label line ending with ":" and then put EACH item on its own line starting with "- " (or "1. ", "2. " for steps); never put several items on one line. Emphasize sparingly: **bold** for the key facts the teacher must notice (results, totals, scores, file names, deadlines), *italics* for titles and terms, and <u>underline</u> only for a warning or an action the teacher must take. A few words at a time, never whole sentences. No # headings, no tables, no backticks.`;
@@ -136,6 +136,9 @@ export function readPlanCheck(plan, unmask = (x) => x) {
     choices: list(plan?.choices, 4).map((c) => c.slice(0, 60)),
   };
 }
+
+/** Added to the planner when the teacher is talking: the reply is read aloud, so it must be short. */
+export const VOICE_RULE = 'The teacher is TALKING to you right now and your "reply" will be spoken aloud: answer in at most 2 short, plain sentences (about 30 words), the answer first, with no lists, headings, file paths or filler. If you need something, ask ONE short question. Do not greet again or repeat the teacher\'s words.';
 
 /** Always asked first (unless already approved, e.g. a scheduled task): signing a document. */
 const ALWAYS_CONFIRM = new Set(['place_signature']);
@@ -190,7 +193,7 @@ function hashString(str) {
   return (h >>> 0).toString(36);
 }
 
-function answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePath, history }) {
+function answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePath, history, voice = false }) {
   const stamp = (p) => {
     const e = findEntryByPath(tree, p);
     return `${p}@${e?.lastModified || ''}:${e?.size || ''}`;
@@ -204,6 +207,7 @@ function answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePa
     [...attachedPaths].sort().map(stamp),
     activePath ? stamp(activePath) : '',
     hashString(lastAssistant),
+    voice ? 'voice' : '',
   ]));
 }
 
@@ -242,6 +246,7 @@ export async function runDeskAgentTurn({
   autoApprove = false, // scheduled tasks: approved when scheduled, so no "Proceed?" step
   ruleCards, // the admin's rule cards (loaded from Firestore when not given)
   eSignature = null, // the teacher's saved e-signature (PNG data URL, kept on this computer)
+  voice = false, // the teacher is talking (wake phrase or Talk): the reply is spoken, so it stays short
 }) {
   const teacher = teacherFromProfile(profile, user);
   const persona = personaFor(teacher, personaId);
@@ -374,7 +379,7 @@ export async function runDeskAgentTurn({
   }
 
   // 1b. Same question, same unchanged files → remembered answer.
-  const memoKey = answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePath, history });
+  const memoKey = answerKey({ prompt, personaId, workspace, tree, attachedPaths, activePath, history, voice });
   const remembered = answerMemory.get(memoKey);
   if (!fast && !confirmedPlan && remembered && Date.now() - remembered.at < ANSWER_TTL_MS) {
     return { content: remembered.content, steps: [], artifacts: [], createdFiles: [], aiOffline: null, fastPath: 'memory' };
@@ -393,7 +398,7 @@ export async function runDeskAgentTurn({
     const cards = ruleCards ?? await loadRuleCards();
     const plan = await callDeskLLM({
       kind: 'plan',
-      system: `${buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() })}\n\n${teacher.facts}`,
+      system: `${buildPlannerSystem({ persona, teacherName: teacher.salutation, today: today.toDateString() })}${voice ? `\n\n${VOICE_RULE}` : ''}\n\n${teacher.facts}`,
       history: history.slice(-8).map((m) => ({ role: m.role, content: masker.mask(m.content) })),
       prompt: buildPlannerPrompt({
         prompt: masker.mask(prompt),

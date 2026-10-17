@@ -20,7 +20,8 @@ export const getTalkContext = () => context;
 const listeners = new Set();
 let talk = null;
 
-const ONE_MOMENT = { matt: 'Okay, one sec! Hehe.', luna: 'One moment, please.', grey: 'Processing.', carmen: 'Wait. I am checking.' };
+// Spoken answers stay short (the full answer is always in the chat).
+export const SPOKEN_MAX = 260;
 
 /** The plan waiting for Proceed: only in the newest reply (an older plan is never run by voice). */
 function pendingPlan() {
@@ -29,30 +30,34 @@ function pendingPlan() {
   return last?.pendingPlan && !last.planDecision ? last : null;
 }
 
+/** Said after whatever the persona is still saying (never cut off, never talking over itself). */
 function speak(text) {
   const s = useDeskStore.getState();
   const v = s.speechSettings || {};
-  deskSpeaker().say(text, { persona: s.persona, natural: v.natural !== false, volume: v.volume ?? 0.9 }).catch(() => {});
+  deskSpeaker().say(text, { persona: s.persona, natural: v.natural !== false, volume: v.volume ?? 0.9, max: SPOKEN_MAX, queue: true }).catch(() => {});
 }
 
 export function deskTalk() {
   if (talk) return talk;
   talk = createTalk({
-    record: (opts) => startRecording(opts || {}),
+    record: (opts) => {
+      prepareVoice(useDeskStore.getState().persona); // the laptop voice is ready by the time it answers
+      return startRecording(opts || {});
+    },
     transcribe: (wav) => transcribeAudio(wav, { prompt: TALK_PROMPT, clean: cleanTalk, tier: 'fast' }),
     async ask(text, { onReply }) {
       const s = useDeskStore.getState();
       if (!context.user) throw new Error('Please sign in to your KaTuro account first.');
       if (s.isGenerating) throw new Error(LINES.busy);
       const attachments = [...s.attachedPaths];
-      const out = await runChatTurn({ text, attachments, user: context.user, profile: context.profile, onOpenCanvas: context.onOpenCanvas, speakReply: false, onReply });
+      const out = await runChatTurn({ text, attachments, user: context.user, profile: context.profile, onOpenCanvas: context.onOpenCanvas, voice: true, onReply });
       if (out.status === 'done' || out.files.length) useDeskStore.getState().clearAttachments();
       return out;
     },
     pending: pendingPlan,
     async confirm(msg) {
       useDeskStore.getState().updateMessage(msg.id, { planDecision: 'proceed' });
-      const out = await runChatTurn({ text: 'Proceed', attachments: msg.pendingAttachments || [], user: context.user, profile: context.profile, onOpenCanvas: context.onOpenCanvas, confirmedPlan: msg.pendingPlan, speakReply: false });
+      const out = await runChatTurn({ text: 'Proceed', attachments: msg.pendingAttachments || [], user: context.user, profile: context.profile, onOpenCanvas: context.onOpenCanvas, confirmedPlan: msg.pendingPlan, voice: true });
       if (out.status === 'done' || out.files.length) useDeskStore.getState().clearAttachments();
       return out;
     },
@@ -60,12 +65,6 @@ export function deskTalk() {
       useDeskStore.getState().updateMessage(msg.id, { planDecision: 'change' });
     },
     say: speak,
-    // Said at once with the voice on this computer (no waiting for the internet).
-    thinking: () => {
-      const s = useDeskStore.getState();
-      prepareVoice(s.persona);
-      deskSpeaker().say(ONE_MOMENT[s.persona] || ONE_MOMENT.matt, { persona: s.persona, natural: false, volume: s.speechSettings?.volume ?? 0.9 }).catch(() => {});
-    },
     stopSpeaking: () => deskSpeaker().stop(),
     onState: (st) => listeners.forEach((fn) => fn(st)),
   });

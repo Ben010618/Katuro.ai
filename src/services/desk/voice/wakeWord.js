@@ -85,12 +85,12 @@ export function stableWake(s, phrases, now) {
   return phrases.find((p) => tail === p || tail.endsWith(` ${p}`)) || null;
 }
 
-// How each persona answers its name (short, so the teacher can talk right after).
+// How each persona answers its name: very short, so the teacher can talk right away.
 const ACKS = {
-  matt: ['Yooooooow, {t}! What can I do for you?', "Yooooooow, {t}! Amazing dayyyy! Matt here, I'm all ears!"],
-  luna: ['Yes, {t}? How may I help you?', "I'm here, {t}. Please go ahead."],
-  grey: ['Listening, {t}.', 'Yes, {t}. State your request.'],
-  carmen: ['What is it, {t}? Make it quick.', 'Yes? Speak clearly, {t}. I am listening.'],
+  matt: ['Yow, {t}! What can I do for you?', "Yes, {t}? I'm listening."],
+  luna: ['Yes, {t}?', 'How may I help, {t}?'],
+  grey: ['Yes, {t}?', 'Listening, {t}.'],
+  carmen: ['What is it, {t}?', 'Yes, {t}? Speak.'],
 };
 
 /** The acknowledgement after the wake phrase. pick: 0..1 (random by default). */
