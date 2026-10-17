@@ -816,7 +816,7 @@ const WAKE_MODEL = {
   file: 'vosk-model-small-en-us-0.15.tar.gz',
   sha256: 'f0b24bb92a48ca575b6a96500d6b543f0f079c573dfe85bbe16001fc0404e1d8',
   urls: [
-    'https://github.com/Ben010618/Katuro.ai/releases/download/voice-model-1/vosk-model-small-en-us-0.15.tar.gz',
+    'https://github.com/Ben010618/Katuro.ai/releases/download/v1.15.0/vosk-model-small-en-us-0.15.tar.gz',
     'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
   ],
 };
