@@ -18,6 +18,7 @@
     "test:e2e:email": "firebase emulators:exec --only auth,firestore,functions --project demo-katuro \"vitest run tests/emailCode.e2e.test.js\""
   },
   "dependencies": {
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "browser-image-compression": "^2.0.2",
     "docx": "^9.6.1",
     "docxtemplater": "^3.71.0",
@@ -31,6 +32,7 @@
     "jszip": "^3.10.2",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.13.0",
+    "onnxruntime-web": "^1.30.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.3.289",
     "pizzip": "^3.3.0",
@@ -46,6 +48,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@diffusionstudio/piper-wasm": "^1.0.0",
     "@eslint/js": "^10.0.1",
     "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.0",

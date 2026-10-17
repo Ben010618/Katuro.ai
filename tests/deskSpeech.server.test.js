@@ -39,12 +39,12 @@ function fakeDb() {
 // 2 seconds of 24 kHz 16-bit audio, as base64.
 const pcm = (seconds) => Buffer.alloc(seconds * 24000 * 2, 1).toString('base64');
 
-function fakeFetch({ list = ['gemini-2.5-flash-preview-tts'], fail = false, seconds = 2 } = {}) {
+function fakeFetch({ list = ['gemini-2.5-flash-preview-tts'], fail = false, status = 503, seconds = 2 } = {}) {
   const calls = [];
   const fn = async (url, opts = {}) => {
     calls.push({ url, body: opts.body ? JSON.parse(opts.body) : null });
     if (url.includes('/models?')) return { ok: true, status: 200, json: async () => ({ models: list.map((id) => ({ name: `models/${id}`, supportedGenerationMethods: ['generateContent'] })) }) };
-    if (fail) return { ok: false, status: 503, json: async () => ({}) };
+    if (fail) return { ok: false, status: typeof fail === 'function' ? fail(url) : status, json: async () => ({}), text: async () => 'Prepayment credits are depleted.' };
     return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm(seconds) } }] } }] }) };
   };
   return { fn, calls };
@@ -85,6 +85,31 @@ describe('deskSpeak: natural persona voices', () => {
     expect(res.fallback).toBe('unavailable');
     expect(usage().desk_speech_seconds).toBe(0);
     expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ failed: 1 });
+  });
+
+  it('a billing refusal (402) pauses the natural voice for a while: later calls answer at once, without asking Google', async () => {
+    const net = fakeFetch({ fail: true, status: 402 });
+    const s = make(net.fn);
+    expect((await s.speak({ auth: { uid: 'u1' }, data: { text: 'Hello.', persona: 'matt' } })).fallback).toBe('unavailable');
+    const asked = net.calls.filter((c) => c.body).length;
+    expect(asked).toBe(1); // the other models are not tried after a billing refusal
+    expect((await s.speak({ auth: { uid: 'u1' }, data: { text: 'Hello again.', persona: 'matt' } })).fallback).toBe('unavailable');
+    expect(net.calls.filter((c) => c.body).length).toBe(asked);
+    expect(usage().desk_speech_seconds).toBe(0);
+  });
+
+  it('a model that does not exist for this key (404) is skipped next time', async () => {
+    const good = fakeFetch({ list: ['gemini-3-flash-tts', 'gemini-2.5-flash-preview-tts'] });
+    const calls = [];
+    const fetchFn = async (url, opts) => {
+      calls.push(url);
+      if (url.includes('gemini-3-flash-tts:generate')) return { ok: false, status: 404, text: async () => 'not found', json: async () => ({}) };
+      return good.fn(url, opts);
+    };
+    const s = make(fetchFn);
+    expect((await s.speak({ auth: { uid: 'u1' }, data: { text: 'One.', persona: 'luna' } })).audio).toBeTruthy();
+    expect((await s.speak({ auth: { uid: 'u1' }, data: { text: 'Two.', persona: 'luna' } })).audio).toBeTruthy();
+    expect(calls.filter((u) => u.includes('gemini-3-flash-tts:generate'))).toHaveLength(1);
   });
 
   it('refuses no login, empty text and very long text', async () => {

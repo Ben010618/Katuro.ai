@@ -8,6 +8,7 @@ import { startRecording, transcribeAudio } from '../../services/desk/voice/voice
 import { createTalk, TALK_PROMPT, cleanTalk, LINES } from '../../services/desk/voice/talk';
 import { deskSpeaker } from '../../services/desk/voice/speech';
 import { runChatTurn } from './runChatTurn';
+import { prepareVoice } from '../../services/desk/voice/piperVoice';
 
 let context = { user: null, profile: null, onOpenCanvas: null };
 /** KaTuroDeskPage keeps this current (who is signed in, how to open the Canvas). */
@@ -18,6 +19,8 @@ export const getTalkContext = () => context;
 
 const listeners = new Set();
 let talk = null;
+
+const ONE_MOMENT = { matt: 'Okay, one sec!', luna: 'One moment, please.', grey: 'Working on it.', carmen: 'Sige, anak. Sandali lang.' };
 
 /** The plan waiting for Proceed: only in the newest reply (an older plan is never run by voice). */
 function pendingPlan() {
@@ -36,7 +39,7 @@ export function deskTalk() {
   if (talk) return talk;
   talk = createTalk({
     record: (opts) => startRecording(opts || {}),
-    transcribe: (wav) => transcribeAudio(wav, { prompt: TALK_PROMPT, clean: cleanTalk }),
+    transcribe: (wav) => transcribeAudio(wav, { prompt: TALK_PROMPT, clean: cleanTalk, tier: 'fast' }),
     async ask(text, { onReply }) {
       const s = useDeskStore.getState();
       if (!context.user) throw new Error('Please sign in to your KaTuro account first.');
@@ -57,6 +60,12 @@ export function deskTalk() {
       useDeskStore.getState().updateMessage(msg.id, { planDecision: 'change' });
     },
     say: speak,
+    // Said at once with the voice on this computer (no waiting for the internet).
+    thinking: () => {
+      const s = useDeskStore.getState();
+      prepareVoice(s.persona);
+      deskSpeaker().say(ONE_MOMENT[s.persona] || ONE_MOMENT.matt, { persona: s.persona, natural: false, volume: s.speechSettings?.volume ?? 0.9 }).catch(() => {});
+    },
     stopSpeaking: () => deskSpeaker().stop(),
     onState: (st) => listeners.forEach((fn) => fn(st)),
   });

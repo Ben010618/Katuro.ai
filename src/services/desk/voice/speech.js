@@ -3,7 +3,8 @@
  * reminders, bubble answers and (when the teacher turns it on) chat replies.
  *
  *   natural voice: the server's deskSpeak (Gemini voices, one per persona), 5 minutes a day
- *   then, or offline: this computer's voice (Windows), tuned per persona, so it never goes silent
+ *   then, or offline: the persona's voice on this computer (Piper, open source, desktop app)
+ *   last resort: Windows' own voice, tuned per persona, so it never goes silent
  *
  * A new sentence replaces the one being spoken. Listeners hear { speaking, engine } for the
  * talking animation and the Stop buttons.
@@ -57,18 +58,45 @@ export function pcmToWav(base64, sampleRate = 24000) {
 }
 
 /**
- * The speaker. deps (all replaceable in tests):
- *   callTts({ text, persona }) → server answer, or throws (offline)
- *   playWav(bytes, volume) → { done: Promise, stop() }
- *   systemSay(text, tuning, volume) → { done: Promise, stop() }
+ * Sentences grouped for speaking: the first chunk is the first sentence alone (so the voice
+ * starts as soon as possible), the rest are grouped up to `size` characters.
  */
-export function createSpeaker({ callTts, playWav, systemSay }) {
+export function speechChunks(words, size = 170) {
+  const sentences = String(words || '').split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (!sentences.length) return [];
+  const chunks = [sentences[0]];
+  let cur = '';
+  for (const s of sentences.slice(1)) {
+    if (cur && cur.length + s.length + 1 > size) {
+      chunks.push(cur);
+      cur = s;
+    } else cur = cur ? `${cur} ${s}` : s;
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
+}
+
+// After the natural voice fails or its daily minutes are used up, it is not asked again for a
+// while: asking costs time on every reply (that made answers slow).
+export const NATURAL_COOLDOWN_MS = 10 * 60 * 1000;
+export const OFFLINE_COOLDOWN_MS = 2 * 60 * 1000;
+
+/**
+ * The speaker. deps (all replaceable in tests):
+ *   callTts({ text, persona }) → server answer, or throws (offline)      natural voice
+ *   localTts(text, persona) → WAV bytes, or null when not ready          voice on this computer (Piper)
+ *   playWav(bytes, volume) → { done: Promise, stop() }
+ *   systemSay(text, tuning, volume) → { done: Promise, stop() }           last resort (Windows)
+ *   now() → ms
+ */
+export function createSpeaker({ callTts, localTts = null, playWav, systemSay, now = Date.now }) {
   const listeners = new Set();
-  const cache = new Map(); // persona|text → wav bytes (repeated reminders cost nothing)
+  const cache = new Map(); // persona|text → { engine, wav } (repeated reminders cost nothing)
   let current = null; // { stop }
   let token = 0;
   let state = { speaking: false, engine: null };
   let usage = null; // { usedSeconds, limitSeconds } from the last natural-voice answer
+  let naturalOffUntil = 0;
 
   const emit = (patch) => {
     state = { ...state, ...patch };
@@ -82,48 +110,75 @@ export function createSpeaker({ callTts, playWav, systemSay }) {
     if (state.speaking) emit({ speaking: false, engine: null });
   }
 
+  /** One chunk's audio: natural voice, then this computer's voice; null wav = Windows voice. */
+  async function synth(chunk, persona, natural) {
+    const key = `${persona}|${chunk}`;
+    const hit = cache.get(key);
+    if (hit && (hit.engine === 'natural' || !natural || now() < naturalOffUntil)) return { ...hit, reason: '' };
+    let reason = natural ? '' : 'off';
+    if (natural && now() < naturalOffUntil) reason = 'resting';
+    else if (natural) {
+      try {
+        const res = await callTts({ text: chunk, persona });
+        if (res?.usedSeconds !== undefined) usage = { usedSeconds: res.usedSeconds, limitSeconds: res.limitSeconds };
+        if (res?.audio) {
+          const out = { engine: 'natural', wav: pcmToWav(res.audio, res.sampleRate) };
+          remember(key, out);
+          return { ...out, reason: '' };
+        }
+        reason = res?.fallback || 'unavailable';
+        naturalOffUntil = now() + NATURAL_COOLDOWN_MS;
+      } catch {
+        reason = 'offline';
+        naturalOffUntil = now() + OFFLINE_COOLDOWN_MS;
+      }
+    }
+    if (localTts) {
+      try {
+        const wav = await localTts(chunk, persona);
+        if (wav) {
+          const out = { engine: 'local', wav };
+          remember(key, out);
+          return { ...out, reason };
+        }
+      } catch {
+        // the voice on this computer is not ready: the Windows voice speaks this time
+      }
+    }
+    return { engine: 'system', wav: null, reason };
+  }
+
+  function remember(key, out) {
+    cache.set(key, out);
+    if (cache.size > 40) cache.delete(cache.keys().next().value);
+  }
+
   /**
    * Says `text`. options: { persona, natural (default true), volume (0..1) }
-   * → { engine: 'natural' | 'system' | 'none', reason? }
+   * The first sentence plays as soon as it is ready; the next is prepared while it plays.
+   * → { engine: 'natural' | 'local' | 'system' | 'none', reason? }   (the first sentence's)
    */
   async function say(text, { persona = 'matt', natural = true, volume = 0.9 } = {}) {
     const words = speechText(text);
     stop();
-    if (!words) return { engine: 'none' };
+    const chunks = speechChunks(words);
+    if (!chunks.length) return { engine: 'none' };
     const mine = ++token;
     const vol = Math.max(0, Math.min(1, Number(volume) || 0));
-    let reason = natural ? '' : 'off';
-    if (natural) {
-      const key = `${persona}|${words}`;
-      try {
-        let wav = cache.get(key);
-        if (!wav) {
-          const res = await callTts({ text: words, persona });
-          if (mine !== token) return { engine: 'none', reason: 'replaced' };
-          if (res?.usedSeconds !== undefined) usage = { usedSeconds: res.usedSeconds, limitSeconds: res.limitSeconds };
-          if (res?.audio) {
-            wav = pcmToWav(res.audio, res.sampleRate);
-            cache.set(key, wav);
-            if (cache.size > 24) cache.delete(cache.keys().next().value);
-          } else reason = res?.fallback || 'unavailable';
-        }
-        if (wav) {
-          current = playWav(wav, vol);
-          emit({ speaking: true, engine: 'natural' });
-          await current.done.catch(() => {});
-          if (mine === token) emit({ speaking: false, engine: null });
-          return { engine: 'natural' };
-        }
-      } catch {
-        if (mine !== token) return { engine: 'none', reason: 'replaced' };
-        reason = 'offline';
-      }
+    let first = null;
+    let next = synth(chunks[0], persona, natural);
+    for (let i = 0; i < chunks.length; i += 1) {
+      const res = await next;
+      if (mine !== token) return { engine: 'none', reason: 'replaced' };
+      if (i + 1 < chunks.length) next = synth(chunks[i + 1], persona, natural);
+      first = first || res;
+      current = res.wav ? playWav(res.wav, vol) : systemSay(chunks[i], SYSTEM_TUNING[persona] || SYSTEM_TUNING.matt, vol);
+      emit({ speaking: true, engine: res.engine });
+      await current.done.catch(() => {});
+      if (mine !== token) return { engine: first.engine, reason: first.reason || undefined };
     }
-    current = systemSay(words, SYSTEM_TUNING[persona] || SYSTEM_TUNING.matt, vol);
-    emit({ speaking: true, engine: 'system' });
-    await current.done.catch(() => {});
-    if (mine === token) emit({ speaking: false, engine: null });
-    return { engine: 'system', reason };
+    emit({ speaking: false, engine: null });
+    return first.reason ? { engine: first.engine, reason: first.reason } : { engine: first.engine };
   }
 
   return {
@@ -172,6 +227,17 @@ async function serverTts(payload) {
 
 let appSpeaker = null;
 export function deskSpeaker() {
-  if (!appSpeaker) appSpeaker = createSpeaker({ callTts: serverTts, playWav: browserPlayWav, systemSay: browserSystemSay });
+  if (!appSpeaker) {
+    appSpeaker = createSpeaker({
+      callTts: serverTts,
+      // The voice on this computer (Piper, desktop app): never waits for a first download.
+      localTts: async (text, persona) => {
+        const { piperSpeak } = await import('./piperVoice.js');
+        return piperSpeak(text, persona);
+      },
+      playWav: browserPlayWav,
+      systemSay: browserSystemSay,
+    });
+  }
   return appSpeaker;
 }

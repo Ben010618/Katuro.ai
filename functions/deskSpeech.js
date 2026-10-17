@@ -56,6 +56,11 @@ function speakable(raw) {
 
 function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
   let modelCache = { list: null, at: 0 };
+  // Skipped without asking (asking costs time on every reply): models that do not exist for
+  // this key, and the whole service for a while after it refuses (402 billing, 403, 429).
+  const badModels = new Map(); // model → until (ms)
+  let pausedUntil = 0;
+  const now = () => Date.now();
 
   async function models(key) {
     if (modelCache.list && Date.now() - modelCache.at < MODEL_CACHE_MS) return modelCache.list;
@@ -105,18 +110,32 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
     });
     let lastErr = null;
     for (const model of await models(key)) {
+      if ((badModels.get(model) || 0) > now()) continue;
       try {
         const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(45000),
         });
-        if (res.status === 404 || res.status === 400) { lastErr = new Error(`${model}: ${res.status}`); continue; }
-        if (!res.ok) throw new Error(`${model}: ${res.status}`);
+        if (!res.ok) {
+          const why = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+          if (res.status === 402 || res.status === 403 || res.status === 429) {
+            const err = new Error(`${model}: ${res.status} ${why}`);
+            err.pauseMs = res.status === 429 ? 2 * 60 * 1000 : 10 * 60 * 1000;
+            throw err;
+          }
+          if (res.status === 404 || res.status === 400) {
+            badModels.set(model, now() + 6 * 60 * 60 * 1000);
+            lastErr = new Error(`${model}: ${res.status} ${why}`);
+            continue;
+          }
+          throw new Error(`${model}: ${res.status} ${why}`);
+        }
         const data = await res.json();
         const part = (data.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData?.data);
         if (!part) { lastErr = new Error(`${model}: no audio`); continue; }
         const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType || '')?.[1]) || SAMPLE_RATE;
         return { audio: part.inlineData.data, sampleRate: rate, model };
       } catch (err) {
+        if (err.pauseMs) throw err;
         lastErr = err;
       }
     }
@@ -131,6 +150,11 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
     if (!text) throw new HttpsError('invalid-argument', 'Nothing to say.');
     if (text.length > MAX_CHARS) throw new HttpsError('invalid-argument', `Too long to speak (up to ${MAX_CHARS} characters).`);
     const ref = db.doc(`teachers/${req.auth.uid}/usage/${today()}`);
+    if (pausedUntil > now()) {
+      // The voice service refused a moment ago: answer at once (the app uses the laptop's voice).
+      const used = (await ref.get()).data()?.desk_speech_seconds ?? 0;
+      return { fallback: 'unavailable', usedSeconds: Math.round(used), limitSeconds: DAILY_SECONDS };
+    }
     const estimate = estimateSeconds(text);
     const reserved = await reserve(ref, estimate);
     if (reserved === null) {
@@ -149,6 +173,7 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
     } catch (err) {
       await adjust(ref, -estimate); // nothing was spoken: give the time back
       await stat({ failed: 1 });
+      if (err?.pauseMs) pausedUntil = now() + err.pauseMs;
       console.warn('[deskSpeak] natural voice unavailable:', err?.message || err);
       return { fallback: 'unavailable', usedSeconds: reserved - estimate, limitSeconds: DAILY_SECONDS };
     }

@@ -195,7 +195,7 @@ export function cleanTranscript(text) {
  * Sends one WAV clip to the gateway and returns the transcript ('' when nothing was said).
  * prompt/clean: a different transcription format (e.g. spoken scores) and its reply check.
  */
-export async function transcribeAudio(wavBytes, { prompt = TRANSCRIBE_PROMPT, clean = cleanTranscript } = {}) {
+export async function transcribeAudio(wavBytes, { prompt = TRANSCRIBE_PROMPT, clean = cleanTranscript, tier } = {}) {
   try {
     const res = await callGeminiProxy({
       action: 'desk_voice',
@@ -203,6 +203,7 @@ export async function transcribeAudio(wavBytes, { prompt = TRANSCRIBE_PROMPT, cl
       temperature: 0,
       maxTokens: 2048,
       region: DESK_REGION,
+      ...(tier ? { tier } : {}),
     });
     return clean(typeof res === 'string' ? res : res?.text);
   } catch (err) {

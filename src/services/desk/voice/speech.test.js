@@ -54,6 +54,36 @@ describe('the persona speaks', () => {
     expect(callTts).not.toHaveBeenCalled();
   });
 
+  it("the laptop's own voice (Piper) speaks before the Windows voice; a failed natural voice is not asked again for 10 minutes", async () => {
+    let t = 0;
+    const callTts = vi.fn(async () => ({ fallback: 'unavailable' }));
+    const localTts = vi.fn(async () => new Uint8Array([1, 2]));
+    const systemSay = vi.fn(() => { const e = ended(); setTimeout(e.finish, 1); return e; });
+    const playWav = vi.fn(() => { const e = ended(); setTimeout(e.finish, 1); return e; });
+    const sp = createSpeaker({ callTts, localTts, playWav, systemSay, now: () => t });
+    expect(await sp.say('Hello.', { persona: 'luna' })).toEqual({ engine: 'local', reason: 'unavailable' });
+    expect(systemSay).not.toHaveBeenCalled();
+    t = 5 * 60 * 1000;
+    expect(await sp.say('Next one.', { persona: 'luna' })).toEqual({ engine: 'local', reason: 'resting' });
+    expect(callTts).toHaveBeenCalledTimes(1);
+    t = 11 * 60 * 1000;
+    await sp.say('Third one.', { persona: 'luna' });
+    expect(callTts).toHaveBeenCalledTimes(2);
+    // Not ready on this computer yet (first download): the Windows voice speaks this time.
+    const notReady = createSpeaker({ callTts: async () => ({ fallback: 'limit' }), localTts: async () => null, playWav, systemSay });
+    expect((await notReady.say('Hi.', { persona: 'grey' })).engine).toBe('system');
+  });
+
+  it('a long answer: the first sentence plays while the next one is being prepared', async () => {
+    const order = [];
+    const callTts = vi.fn(async ({ text }) => { order.push(`make:${text.slice(0, 6)}`); return { audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }; });
+    const playWav = vi.fn(() => { order.push('play'); const e = ended(); setTimeout(() => { order.push('end'); e.finish(); }, 10); return e; });
+    const sp = createSpeaker({ callTts, playWav, systemSay: vi.fn() });
+    await sp.say('First sentence here. Second sentence is here. Third one too.');
+    expect(callTts.mock.calls.map((c) => c[0].text)).toEqual(['First sentence here.', 'Second sentence is here. Third one too.']);
+    expect(order).toEqual(['make:First ', 'make:Second', 'play', 'end', 'play', 'end']); // prepared while the first plays
+  });
+
   it('Stop ends the voice at once; a new sentence replaces the one being spoken', async () => {
     const first = ended();
     const second = ended();

@@ -64,6 +64,7 @@ export const LINES = {
  *   pending() → the plan waiting for Proceed, or null
  *   confirm(plan) → { content }   decline(plan)
  *   say(text)   stopSpeaking()
+ *   thinking()   optional: a short spoken "one moment" right after the teacher stops talking
  *   onState({ phase: 'idle'|'listening'|'thinking', heard, answer, error })
  */
 export function createTalk(deps) {
@@ -102,6 +103,7 @@ export function createTalk(deps) {
     const r = rec;
     rec = null;
     set({ phase: 'thinking' });
+    deps.thinking?.();
     try {
       let wav;
       try {
