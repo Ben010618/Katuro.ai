@@ -16,6 +16,7 @@ import { messageFor, bubbleMood, bubbleReply } from '../../../services/desk/teac
 import { getTeacherSalutationName } from '../../../services/teacherProfileUtils';
 import { getPersona } from '../../../services/desk/personas';
 import { runChatTurn } from '../runChatTurn';
+import { deskSpeaker } from '../../../services/desk/voice/speech';
 import mattAvatar from '../../../assets/avatars/matt.webp';
 import lunaAvatar from '../../../assets/avatars/luna.webp';
 import greyAvatar from '../../../assets/avatars/grey.webp';
@@ -37,17 +38,11 @@ export function requestPrepare(jobs) {
 }
 export const isPreparing = () => prepRunning;
 
+/** The persona says it (natural voice, or this computer's voice); the text is always shown too. */
 function speak(text) {
-  try {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const voice = window.speechSynthesis.getVoices().find((v) => /^en(-|_)/i.test(v.lang));
-    if (voice) u.voice = voice;
-    window.speechSynthesis.speak(u);
-  } catch {
-    // speaking is optional; the text is always shown
-  }
+  const s = useDeskStore.getState();
+  const v = s.speechSettings || {};
+  deskSpeaker().say(text, { persona: s.persona, natural: v.natural !== false, volume: v.volume ?? 0.9 }).catch(() => {});
 }
 
 async function readParsed(path) {
@@ -106,6 +101,7 @@ export function startTeachingAssistant(getContext) {
       pending: queue.length > 1 || (queue.length && !show) ? queue.length : 0,
       message: current ? { title: current.title, text: current.text, actions: current.actions } : null,
       reply,
+      speaking: deskSpeaker().getState().speaking,
     };
     const key = JSON.stringify(state);
     if (key === lastBubble) return;
@@ -281,17 +277,23 @@ export function startTeachingAssistant(getContext) {
         if (s.isGenerating || !user) { reply = 'I\'m busy with another request. Please ask again in a moment.'; pushBubble(); break; }
         reply = 'Thinking…';
         pushBubble();
-        const out = await runChatTurn({ text, user, profile });
+        const out = await runChatTurn({ text, user, profile, speakReply: false });
         reply = bubbleReply(out.content);
         pushBubble();
+        const now = useDeskStore.getState();
+        if (settingsOf(now).voice || now.speechSettings?.replies) speak(reply);
         break;
       }
+      case 'stopVoice':
+        deskSpeaker().stop();
+        break;
       default:
         break;
     }
   }
 
   const offAction = desk?.onBubbleAction ? desk.onBubbleAction(onAction) : () => {};
+  const offSpeech = deskSpeaker().subscribe(() => pushBubble());
   const unsub = useDeskStore.subscribe(schedulePush);
   const interval = setInterval(tick, TICK_MS);
   const onVisible = () => tick();
@@ -308,6 +310,7 @@ export function startTeachingAssistant(getContext) {
     document.removeEventListener('visibilitychange', onVisible);
     unsub();
     offAction();
+    offSpeech();
     desk?.setBubble?.({ visible: false })?.catch?.(() => {});
   };
 }

@@ -7,7 +7,8 @@
 
   function render(s) {
     state = s || {};
-    document.body.className = [state.theme === 'dark' ? 'dark' : '', state.mood || 'resting'].filter(Boolean).join(' ');
+    document.body.className = [state.theme === 'dark' ? 'dark' : '', state.mood || 'resting', state.speaking ? 'speaking' : ''].filter(Boolean).join(' ');
+    $('stopVoice').hidden = !state.speaking;
     if (state.avatarUrl && $('avatar').getAttribute('src') !== state.avatarUrl) $('avatar').setAttribute('src', state.avatarUrl);
     $('avatar').alt = state.name || 'KaTuro assistant';
     face.setAttribute('aria-label', `${state.name || 'KaTuro assistant'}: ${state.expanded ? 'make small' : 'open'}`);
@@ -72,6 +73,7 @@
   face.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.ktBubble.action('toggle'); } });
 
   $('close').addEventListener('click', () => window.ktBubble.action('toggle'));
+  $('stopVoice').addEventListener('click', () => window.ktBubble.action('stopVoice'));
   $('ask').addEventListener('submit', (e) => {
     e.preventDefault();
     const text = $('askText').value.trim();

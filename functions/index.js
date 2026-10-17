@@ -16,6 +16,7 @@ const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 const { createEmailCodes, codeEmail } = require('./emailCode');
 const { purgeAccounts, findLeftoverUids } = require('./accountPurge');
+const { createDeskSpeech } = require('./deskSpeech');
 const { createGeminiSseParser } = require('./lib/sse');
 
 admin.initializeApp();
@@ -1940,6 +1941,14 @@ exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 },
 
 // ── Email codes (website sign-up, and website sign-in every 30 days) ─────────
 // Logic and tests: functions/emailCode.js, tests/emailCode.server.test.js.
+// ── KaTuroDesk personas speak with natural voices (5 minutes a day per teacher) ──
+// Logic and tests: functions/deskSpeech.js, tests/deskSpeech.server.test.js.
+const deskSpeech = createDeskSpeech({ db, admin, fetchFn: (...a) => fetch(...a), getKey: () => getGeminiKey(true), HttpsError, today: () => todayInManila() });
+exports.deskSpeak = onCall(
+  { region: ['us-central1', 'asia-southeast1'], timeoutSeconds: 120, memory: '512MiB', maxInstances: 20 },
+  (req) => deskSpeech.speak(req),
+);
+
 const emailCodes = createEmailCodes({ db, fetchFn: (...a) => fetch(...a), HttpsError });
 
 async function emailHasAccount(email) {

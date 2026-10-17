@@ -9,6 +9,7 @@ import TeacherExamPanel from './TeacherExamPanel';
 import DeskNotificationSettings from './DeskNotificationSettings';
 import DeskSignatureSettings from './DeskSignatureSettings';
 import { PAPER_SIZES } from '../../services/desk/docSpec';
+import DeskVoiceSettings from './DeskVoiceSettings';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
@@ -125,6 +126,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
               })}
             </div>
           </section>
+
+          <DeskVoiceSettings />
 
           <section className="border-t border-gray-100 pt-4">
             <h3 className="text-xs font-bold text-gray-800 mb-0.5">Appearance</h3>

@@ -19,7 +19,7 @@ import { isCorrection, sendFeedback, toolsOf } from '../../services/desk/feedbac
  * @param {object} [o.confirmedPlan] a plan the teacher approved with "Proceed" (runs with no new AI call)
  * @returns {Promise<{ status: 'done'|'needs_info'|'error', content: string, files: string[] }>}
  */
-export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null }) {
+export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null, speakReply = true }) {
   const store = useDeskStore.getState();
   const { messages, persona, privacyMode, workspace, activeFile, activeArtifact } = store;
   const salutation = getTeacherSalutationName(profile, user);
@@ -74,6 +74,11 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       onOpenCanvas?.();
     }
     if (result.createdFiles.length) await s.refreshFiles();
+    // Settings > Assistant: the persona reads its reply aloud (never for scheduled tasks).
+    const voice = useDeskStore.getState().speechSettings;
+    if (speakReply && !scheduled && voice?.replies && result.content) {
+      import('../../services/desk/voice/speech').then(({ deskSpeaker }) => deskSpeaker().say(result.content, { persona, natural: voice.natural !== false, volume: voice.volume ?? 0.9 })).catch(() => {});
+    }
 
     const failed = result.steps?.some((st) => st.status === 'error');
     const status = result.pendingPlan || result.asked || /\*\*Needs your input\*\*/.test(result.content) ? 'needs_info' : failed && !result.createdFiles.length ? 'error' : 'done';

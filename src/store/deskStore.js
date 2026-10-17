@@ -71,6 +71,9 @@ export const useDeskStore = create(
       deskTheme: 'light',
       // Paper for new documents when the request does not name one (Settings > Documents).
       defaultPaper: 'long',
+      // The persona's voice: natural voice (5 minutes a day, then this computer's voice),
+      // chat replies read aloud, volume. Bubble reminders have their own switch (My classes).
+      speechSettings: { natural: true, replies: false, volume: 0.9 },
 
       // Messages: Windows notifications and the unread number on the taskbar button.
       notifyMessages: true,
@@ -192,6 +195,7 @@ export const useDeskStore = create(
       setPersona: (persona) => set({ persona }),
 
       setDeskTheme: (deskTheme) => set({ deskTheme: deskTheme === 'dark' ? 'dark' : 'light' }),
+      setSpeechSettings: (patch) => set((state) => ({ speechSettings: { ...state.speechSettings, ...patch } })),
       setDefaultPaper: (paper) => {
         if (!PAPER_SIZES[paper]) return;
         applyDefaultPaper(paper);
@@ -443,6 +447,7 @@ export const useDeskStore = create(
         teachingSettings: { ...DEFAULT_TEACHING_SETTINGS, ...(persisted?.teachingSettings || {}) },
         teachingLog: { noClass: [], noClassFor: {}, repeat: {}, ...(persisted?.teachingLog || {}) },
         defaultPaper: applyPersistedPaper(persisted?.defaultPaper),
+        speechSettings: { natural: true, replies: false, volume: 0.9, ...(persisted?.speechSettings || {}) },
       }),
       partialize: (state) => ({
         activeAgentId: state.activeAgentId,
@@ -450,6 +455,7 @@ export const useDeskStore = create(
         persona: state.persona,
         deskTheme: state.deskTheme,
         defaultPaper: state.defaultPaper,
+        speechSettings: state.speechSettings,
         notifyMessages: state.notifyMessages,
         taskbarBadge: state.taskbarBadge,
         messageSound: state.messageSound,
