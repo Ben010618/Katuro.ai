@@ -183,8 +183,16 @@ export function createSpeaker({ callTts, localTts = null, playWav, systemSay, lo
     return first.reason ? { engine: first.engine, reason: first.reason } : { engine: first.engine };
   }
 
+  /** Makes `text` ready ahead of time (same voice and cache as say) without playing it. */
+  async function prepare(text, { persona = 'matt', natural = true } = {}) {
+    for (const chunk of speechChunks(speechText(text))) {
+      await synth(chunk, persona, natural).catch(() => {});
+    }
+  }
+
   return {
     say,
+    prepare,
     stop,
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState: () => state,

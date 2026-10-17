@@ -91,6 +91,19 @@ describe('the persona speaks', () => {
     expect(playWav.mock.calls.at(-1)[2]).toBe(1); // online voices keep their own pace
   });
 
+  it('the wake answer can be made ready in advance: it then plays at once, with no new request', async () => {
+    const callTts = vi.fn(async () => ({ audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }));
+    const playWav = vi.fn(() => { const e = ended(); setTimeout(e.finish, 1); return e; });
+    const sp = createSpeaker({ callTts, playWav, systemSay: vi.fn() });
+    await sp.prepare('Yooooooow, Sir Ben! What can I do for you?', { persona: 'matt' });
+    const made = callTts.mock.calls.length;
+    expect(made).toBeGreaterThan(0);
+    expect(playWav).not.toHaveBeenCalled(); // nothing is played while preparing
+    expect(await sp.say('Yooooooow, Sir Ben! What can I do for you?', { persona: 'matt' })).toEqual({ engine: 'natural' });
+    expect(callTts).toHaveBeenCalledTimes(made); // every sentence came from the prepared audio
+    expect(playWav).toHaveBeenCalledTimes(made);
+  });
+
   it('a long answer: the first sentence plays while the next one is being prepared', async () => {
     const order = [];
     const callTts = vi.fn(async ({ text }) => { order.push(`make:${text.slice(0, 6)}`); return { audio: Buffer.from('ab').toString('base64'), sampleRate: 24000 }; });

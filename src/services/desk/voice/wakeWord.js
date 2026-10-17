@@ -12,7 +12,7 @@
 // the recognizer so it can tell them apart ("hello ma'am" was heard as "hello matt" without them).
 export const LOOKALIKES = ['hello mam', 'hello madam', 'hello sir', 'hello class', 'hello everyone', 'hello mama', 'hello po', 'good morning mam', 'hey man', 'hello there'];
 
-export const MAX_PHRASES = 6;
+export const MAX_PHRASES = 12;
 
 /** A phrase as the recognizer wants it: lower case, letters and spaces, 2 to 4 words. */
 export function normalizePhrase(raw) {
@@ -21,13 +21,17 @@ export function normalizePhrase(raw) {
   return n >= 2 && n <= 4 ? p : '';
 }
 
-/** The persona's own wake phrases: "hello matt", "hey matt" (Lola Carmen: "hello carmen", "hello lola carmen"). */
+/**
+ * The persona's own wake phrases, the ways teachers naturally call it: "hello matt", "hey matt",
+ * "hi matt", "okay matt". Lola Carmen answers to "carmen" ("lola" is not a word the small speech
+ * model knows; "hello lola carmen" still wakes her because unknown words in between are skipped).
+ */
+export const GREET_WORDS = ['hello', 'hey', 'hi', 'okay'];
 export function defaultPhrases(personaName) {
   const words = normalizePhrase(`x ${personaName}`).split(' ').slice(1);
   const last = words[words.length - 1];
   if (!last) return [];
-  const out = [`hello ${last}`, `hey ${last}`];
-  if (words.length > 1) out.push(`hello ${words.join(' ')}`);
+  const out = GREET_WORDS.map((g) => `${g} ${last}`);
   return [...new Set(out.map(normalizePhrase).filter(Boolean))];
 }
 
@@ -44,11 +48,12 @@ export const grammarFor = (phrases) => JSON.stringify([...phrases, ...LOOKALIKES
  * Which wake phrase the recognized text holds (as whole words, in order), or null.
  * minConf: every word of the phrase must be at least this sure (Vosk word confidences).
  */
-export function matchWake(result, phrases, minConf = 0.6) {
-  const words = Array.isArray(result?.result) ? result.result : null;
+export function matchWake(result, phrases, minConf = 0.5) {
+  // Unknown words ("[unk]", e.g. "lola" in "hello lola carmen") are skipped, not counted as a gap.
+  const words = Array.isArray(result?.result) ? result.result.filter((w) => w?.word !== '[unk]') : null;
   const text = String(result?.text ?? result?.partial ?? '').trim();
   if (!text) return null;
-  const said = text.split(/\s+/);
+  const said = text.split(/\s+/).filter((w) => w !== '[unk]');
   for (const phrase of phrases) {
     const want = phrase.split(' ');
     for (let i = 0; i + want.length <= said.length; i += 1) {
@@ -67,10 +72,13 @@ export function matchWake(result, phrases, minConf = 0.6) {
  * "hello ma..." has had time to become "hello mam").
  *   s: { partial, changedAt, quietSince } (ms)   → the wake phrase, or null
  */
-export const STABLE_MS = 450;
+export const STABLE_MS = 350;
+// A noisy classroom may never go quiet: then a guess that stays on the phrase this long is enough.
+export const NOISY_STABLE_MS = 900;
 export function stableWake(s, phrases, now) {
-  if (!s?.partial || !s.quietSince) return null;
-  if (now - s.changedAt < STABLE_MS || now - s.quietSince < STABLE_MS) return null;
+  if (!s?.partial) return null;
+  const settled = now - s.changedAt >= STABLE_MS && s.quietSince && now - s.quietSince >= STABLE_MS;
+  if (!settled && now - s.changedAt < NOISY_STABLE_MS) return null;
   const words = s.partial.split(/\s+/).filter((w) => w !== '[unk]');
   // The phrase must be the last thing said (not something said before other words).
   const tail = words.join(' ');

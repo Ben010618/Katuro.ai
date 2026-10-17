@@ -73,18 +73,32 @@ function conversationOver() {
   });
 }
 
-async function onWake() {
+// The answer to the next wake, made ready in advance in the persona's voice so it plays at once.
+let nextAck = null; // { persona, name, natural, text }
+const ackSpec = () => {
   const s = useDeskStore.getState();
+  const { user, profile } = getTalkContext();
+  return { persona: s.persona, name: getTeacherSalutationName(profile, user), natural: settings().natural !== false };
+};
+function readyNextAck() {
+  const spec = ackSpec();
+  nextAck = { ...spec, text: ackFor(spec.persona, spec.name) };
+  deskSpeaker().prepare?.(nextAck.text, { persona: spec.persona, natural: spec.natural }).catch(() => {});
+}
+
+async function onWake() {
   if (deskTalk().getState().phase !== 'idle' || deskSpeaker().getState().speaking) {
     listener?.resume();
     return;
   }
-  const { user, profile } = getTalkContext();
-  const v = settings();
+  const spec = ackSpec();
+  const ready = nextAck && nextAck.persona === spec.persona && nextAck.name === spec.name && nextAck.natural === spec.natural;
+  const line = ready ? nextAck.text : ackFor(spec.persona, spec.name);
   // The persona answers its name, then listens without a button.
-  await deskSpeaker().say(ackFor(s.persona, getTeacherSalutationName(profile, user)), { persona: s.persona, natural: v.natural !== false, volume: v.volume ?? 0.9 });
+  await deskSpeaker().say(line, { persona: spec.persona, natural: spec.natural, volume: settings().volume ?? 0.9 });
   await deskTalk().begin({ auto: true });
   await conversationOver();
+  readyNextAck();
   listener?.resume();
 }
 
@@ -114,6 +128,7 @@ export async function syncWake() {
       listener = await startWakeListener({ loadModel, phrases, onWake, onError: (err) => emit({ error: err?.message || String(err) }) });
       listeningFor = key;
       emit({ status: 'listening', phrases, error: '' });
+      readyNextAck();
     } catch (err) {
       listener = null;
       const msg = /Permission|NotAllowed|NotFound|device/i.test(`${err?.name} ${err?.message}`)
