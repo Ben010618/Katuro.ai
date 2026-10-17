@@ -259,6 +259,13 @@ export function withAccuracyRules(action, contents) {
 
 export async function callGeminiProxy({ action, contents: rawContents, temperature, maxTokens, responseMimeType, isRetry, unitCount, timeoutMs, tier, stream = false, onChunk, region }) {
   const contents = withAccuracyRules(action, rawContents);
+  // KaTuroDesk with the teacher's own AI key: that key answers first (no daily limit);
+  // any problem with it falls through to the KaTuro AI below.
+  if (typeof window !== 'undefined' && window.katuroDeskApi?.brain) {
+    const { tryOwnBrain } = await import('./desk/brain/ownBrain.js');
+    const own = await tryOwnBrain({ contents, temperature, maxTokens, responseMimeType, onChunk: stream === true ? onChunk : undefined });
+    if (own) return own;
+  }
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   // BUG-FIX: the client used to give up after 50s on every non-COT action.
   // That is SHORTER than the time the server legitimately needs to write a

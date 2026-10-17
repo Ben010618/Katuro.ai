@@ -789,6 +789,13 @@ ipcMain.handle('print:document', async (event, html, opts = {}) => {
   }
 });
 
+// ── The teacher's own AI key (hidden Settings tab). Encrypted here; never sent to the page. ──
+require('./customBrain.cjs').registerBrainIpc({
+  ipcMain,
+  file: () => path.join(app.getPath('userData'), 'own-ai.json'),
+  isAllowed: (e) => Boolean(mainWindow && !mainWindow.isDestroyed() && e.sender === mainWindow.webContents),
+});
+
 // ── Phone photos for bubble-sheet quizzes (same Wi-Fi or the phone's hotspot) ──
 const phoneCapture = require('./phoneCapture.cjs');
 const sendToWindow = (channel, payload) => {

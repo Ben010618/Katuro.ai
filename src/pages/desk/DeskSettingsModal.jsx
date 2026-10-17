@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Check, ShieldCheck, Settings } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import { PERSONAS } from '../../services/desk/personas';
@@ -10,6 +10,7 @@ import DeskNotificationSettings from './DeskNotificationSettings';
 import DeskSignatureSettings from './DeskSignatureSettings';
 import { PAPER_SIZES } from '../../services/desk/docSpec';
 import DeskVoiceSettings from './DeskVoiceSettings';
+import DeskOwnKeySettings from './DeskOwnKeySettings';
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
@@ -17,6 +18,30 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
   const [tab, setTab] = useState(initialTab);
   const { status: update, appVersion, check, install } = useDeskUpdate();
   const busy = update.state === 'checking' || update.state === 'downloading';
+  // Hidden tab: 4 quick clicks on the gear in the title. Nothing visible happens before that,
+  // and the tab hides itself again whenever Settings closes (the saved key keeps working).
+  const [ownKeyTab, setOwnKeyTab] = useState(false);
+  const gearClicks = useRef({ n: 0, at: 0 });
+  const onGear = () => {
+    const now = Date.now();
+    const g = gearClicks.current;
+    g.n = now - g.at < 1500 ? g.n + 1 : 1;
+    g.at = now;
+    if (g.n >= 4) {
+      g.n = 0;
+      setOwnKeyTab(true);
+      setTab('ownkey');
+    }
+  };
+
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) {
+      setOwnKeyTab(false);
+      if (tab === 'ownkey') setTab(initialTab);
+    }
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -38,7 +63,7 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
       >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-[#f6f8f7]">
           <h2 id="desk-settings-title" className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <Settings size={15} className="text-emerald-700" /> KaTuroDesk Settings
+            <span onClick={onGear} className="inline-flex" aria-hidden="true"><Settings size={15} className="text-emerald-700" /></span> KaTuroDesk Settings
           </h2>
           <button onClick={onClose} title="Close" className="p-1 rounded hover:bg-gray-200 text-gray-500">
             <X size={16} />
@@ -46,7 +71,7 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         </div>
 
         <div className="px-5 pt-3 flex gap-1 border-b border-gray-200" role="tablist">
-          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : [])].map(([id, label]) => (
+          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : []), ...(ownKeyTab ? [['ownkey', 'AI key']] : [])].map(([id, label]) => (
             <button
               key={id}
               role="tab"
@@ -59,7 +84,9 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
           ))}
         </div>
 
-        {tab === 'exam' && profile?.isAdmin ? (
+        {tab === 'ownkey' && ownKeyTab ? (
+          <div className="p-5 overflow-y-auto"><DeskOwnKeySettings /></div>
+        ) : tab === 'exam' && profile?.isAdmin ? (
           <TeacherExamPanel />
         ) : tab === 'notifications' ? (
           <DeskNotificationSettings />

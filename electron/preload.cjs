@@ -61,6 +61,16 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   },
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
+  // The teacher's own AI key: the key goes in once and never comes back out.
+  brain: {
+    status: () => ipcRenderer.invoke('brain:status'),
+    detect: (key) => ipcRenderer.invoke('brain:detect', { key }),
+    save: (input) => ipcRenderer.invoke('brain:save', input),
+    remove: () => ipcRenderer.invoke('brain:remove'),
+    models: (input) => ipcRenderer.invoke('brain:models', input),
+    test: () => ipcRenderer.invoke('brain:test'),
+    call: (req) => ipcRenderer.invoke('brain:call', req),
+  },
   getUpdateStatus: () => ipcRenderer.invoke('update:getStatus'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
