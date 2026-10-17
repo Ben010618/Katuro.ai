@@ -180,6 +180,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // KaTuroDesk natural-voice daily totals (no names); written by the deskSpeak function only.
+    match /deskVoiceStats/{day} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
     // ── kaTuro Protect — child protection decision-support module ───────────
     // BrainBank access model calls for role/schoolId scoping (school_head,
     // cpc_member, guidance, lfo) — that role system doesn't exist in this app

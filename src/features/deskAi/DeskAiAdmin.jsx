@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Loader2, Plus, Save, Trash2, ThumbsUp, ThumbsDown, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { loadRuleCards, saveRuleCards, cleanCard, CARD_LIMITS } from '../../services/desk/knowledge/ruleCards';
 import { summarizeFeedback } from '../../services/desk/feedback';
@@ -146,11 +146,50 @@ function FeedbackSummary() {
   );
 }
 
+const manilaDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+/** Natural voice use by day (the deskSpeak function keeps the totals; no names). */
+function VoiceUsage() {
+  const [days, setDays] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const ids = Array.from({ length: 7 }, (_, i) => manilaDay(Date.now() - i * 86400000));
+    Promise.all(ids.map((id) => getDoc(doc(db, 'deskVoiceStats', id)).then((d) => ({ id, ...(d.exists() ? d.data() : {}) }))))
+      .then(setDays)
+      .catch((e) => { setError(e.message); setDays([]); });
+  }, []);
+  const th = { textAlign: 'left', padding: '6px 8px', fontSize: 11, color: 'var(--kt-text-secondary)', borderBottom: '1px solid var(--kt-border)' };
+  const td = { padding: '6px 8px', fontSize: 13, color: 'var(--kt-text-primary)', borderBottom: '1px solid var(--kt-border)' };
+  return (
+    <div style={card}>
+      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--kt-text-primary)' }}>Persona voice (last 7 days)</h2>
+      <p style={{ margin: '4px 0 12px', fontSize: 12.5, color: 'var(--kt-text-secondary)' }}>Natural voice spoken by KaTuroDesk personas. Each teacher has 5 minutes a day; after that the persona uses the computer's own voice (free). Totals only, no names.</p>
+      {days === null ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : error ? <Notice ok={false}>{error}</Notice> : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr><th style={th}>Day</th><th style={th}>Minutes spoken</th><th style={th}>Replies spoken</th><th style={th}>Reached the 5-minute limit</th><th style={th}>Voice service failed</th></tr></thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.id}>
+                <td style={td}>{d.id}</td>
+                <td style={td}>{((d.seconds || 0) / 60).toFixed(1)}</td>
+                <td style={td}>{d.replies || 0}</td>
+                <td style={td}>{d.limited || 0}</td>
+                <td style={td}>{d.failed || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export default function DeskAiAdmin({ adminUid }) {
   return (
     <div>
       <RuleCardsEditor adminUid={adminUid} />
       <FeedbackSummary />
+      <VoiceUsage />
     </div>
   );
 }

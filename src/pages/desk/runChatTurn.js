@@ -19,7 +19,7 @@ import { isCorrection, sendFeedback, toolsOf } from '../../services/desk/feedbac
  * @param {object} [o.confirmedPlan] a plan the teacher approved with "Proceed" (runs with no new AI call)
  * @returns {Promise<{ status: 'done'|'needs_info'|'error', content: string, files: string[] }>}
  */
-export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null, speakReply = true }) {
+export async function runChatTurn({ text, attachments = [], user, profile, scheduled = null, onOpenCanvas, confirmedPlan = null, speakReply = true, onReply = null }) {
   const store = useDeskStore.getState();
   const { messages, persona, privacyMode, workspace, activeFile, activeArtifact } = store;
   const salutation = getTeacherSalutationName(profile, user);
@@ -39,6 +39,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
   store.addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
   store.setIsGenerating(true);
 
+  let repliedEarly = false;
   try {
     const result = await runDeskAgentTurn({
       prompt: text,
@@ -57,6 +58,11 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       autoApprove: Boolean(scheduled),
       onUpdate: ({ steps, reply }) => {
         useDeskStore.getState().updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
+        // Talking: the persona says its first words while the work runs.
+        if (reply && onReply && !repliedEarly) {
+          repliedEarly = true;
+          onReply(reply);
+        }
       },
     });
 

@@ -21,7 +21,9 @@
     $('card').hidden = !state.expanded;
     if (!state.expanded) return;
     $('who').textContent = state.name || 'KaTuro';
-    $('mood').textContent = MOOD_TEXT[state.mood] || '';
+    $('mood').textContent = state.talk === 'listening' ? 'Listening… let go to send' : state.talk === 'thinking' ? 'Thinking…' : MOOD_TEXT[state.mood] || '';
+    $('talk').classList.toggle('on', state.talk === 'listening');
+    $('talk').textContent = state.talk === 'listening' ? 'Listening' : 'Talk';
     const msg = state.message || {};
     $('title').textContent = msg.title || '';
     $('title').hidden = !msg.title;
@@ -74,6 +76,23 @@
 
   $('close').addEventListener('click', () => window.ktBubble.action('toggle'));
   $('stopVoice').addEventListener('click', () => window.ktBubble.action('stopVoice'));
+  // Hold to talk: press, speak, let go. Letting go outside the button sends nothing.
+  const talkBtn = $('talk');
+  let talking = false;
+  talkBtn.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    talkBtn.setPointerCapture(e.pointerId);
+    talking = true;
+    window.ktBubble.action('talkStart');
+  });
+  talkBtn.addEventListener('pointerup', (e) => {
+    if (!talking) return;
+    talking = false;
+    const r = talkBtn.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    window.ktBubble.action(inside ? 'talkEnd' : 'talkCancel');
+  });
+  talkBtn.addEventListener('pointercancel', () => { if (talking) { talking = false; window.ktBubble.action('talkCancel'); } });
   $('ask').addEventListener('submit', (e) => {
     e.preventDefault();
     const text = $('askText').value.trim();

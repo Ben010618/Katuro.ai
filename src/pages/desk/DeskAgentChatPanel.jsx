@@ -30,6 +30,7 @@ import { getPersona } from '../../services/desk/personas';
 import { QUICK_PROMPTS } from '../../services/desk/agent/fastRoute';
 import { useVoiceInput } from './useVoiceInput';
 import { VoiceButton, VoiceStatus } from './VoiceControls';
+import { TalkButton, TalkStatus } from './TalkButton';
 import AnswerFeedback from './AnswerFeedback';
 
 function StepIcon({ status }) {
@@ -391,6 +392,7 @@ export default function DeskAgentChatPanel({
       {/* Bottom Prompt Input */}
       <div className="p-3 bg-white border-t border-gray-200 shadow-md">
         <div className="max-w-4xl mx-auto w-full">
+          <TalkStatus personaName={personaInfo.name} />
           <VoiceStatus voice={voice} />
           {(attachedPaths.length > 0 || importError) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -416,6 +418,7 @@ export default function DeskAgentChatPanel({
               <Paperclip size={15} />
             </button>
             <VoiceButton voice={voice} disabled={isGenerating} />
+            <TalkButton personaName={personaInfo.name} disabled={isGenerating || voice.status !== 'idle'} />
             <input
               ref={fileInputRef}
               type="file"

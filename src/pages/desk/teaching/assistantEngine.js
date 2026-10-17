@@ -17,6 +17,7 @@ import { getTeacherSalutationName } from '../../../services/teacherProfileUtils'
 import { getPersona } from '../../../services/desk/personas';
 import { runChatTurn } from '../runChatTurn';
 import { deskSpeaker } from '../../../services/desk/voice/speech';
+import { deskTalk, subscribeTalk } from '../talkController';
 import mattAvatar from '../../../assets/avatars/matt.webp';
 import lunaAvatar from '../../../assets/avatars/luna.webp';
 import greyAvatar from '../../../assets/avatars/grey.webp';
@@ -70,6 +71,7 @@ export function startTeachingAssistant(getContext) {
   let reply = '';
   let presenting = false;
   let userOpened = false; // the teacher opened it: quiet times do not close it
+  let talkPhase = 'idle'; // talking with the persona: idle | listening | thinking
   let lastBubble = '';
   let pushTimer = null;
   let stopped = false;
@@ -102,6 +104,7 @@ export function startTeachingAssistant(getContext) {
       message: current ? { title: current.title, text: current.text, actions: current.actions } : null,
       reply,
       speaking: deskSpeaker().getState().speaking,
+      talk: talkPhase,
     };
     const key = JSON.stringify(state);
     if (key === lastBubble) return;
@@ -287,6 +290,18 @@ export function startTeachingAssistant(getContext) {
       case 'stopVoice':
         deskSpeaker().stop();
         break;
+      case 'talkStart':
+        userOpened = true;
+        expanded = true;
+        reply = '';
+        deskTalk().begin();
+        break;
+      case 'talkEnd':
+        deskTalk().end();
+        break;
+      case 'talkCancel':
+        deskTalk().cancel();
+        break;
       default:
         break;
     }
@@ -294,6 +309,13 @@ export function startTeachingAssistant(getContext) {
 
   const offAction = desk?.onBubbleAction ? desk.onBubbleAction(onAction) : () => {};
   const offSpeech = deskSpeaker().subscribe(() => pushBubble());
+  // Talking (from the bubble, the chat or Ctrl+Space): the bubble shows it too.
+  const offTalk = subscribeTalk((t) => {
+    talkPhase = t.phase;
+    if (t.phase === 'thinking' && t.heard) reply = `You said: "${t.heard}"`;
+    if (t.phase === 'idle' && (t.answer || t.error)) reply = bubbleReply(t.answer || t.error);
+    pushBubble();
+  });
   const unsub = useDeskStore.subscribe(schedulePush);
   const interval = setInterval(tick, TICK_MS);
   const onVisible = () => tick();
@@ -311,6 +333,7 @@ export function startTeachingAssistant(getContext) {
     unsub();
     offAction();
     offSpeech();
+    offTalk();
     desk?.setBubble?.({ visible: false })?.catch?.(() => {});
   };
 }

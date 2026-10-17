@@ -89,6 +89,12 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
     return total;
   }
 
+  // Daily totals for the admin (no names): seconds spoken, replies, limit reached, failures.
+  const stat = (fields) => {
+    const inc = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, admin.firestore.FieldValue.increment(v)]));
+    return db.doc(`deskVoiceStats/${today()}`).set({ ...inc, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
+  };
+
   const adjust = (ref, delta) => (delta ? ref.set({ desk_speech_seconds: admin.firestore.FieldValue.increment(delta) }, { merge: true }).catch(() => {}) : Promise.resolve());
 
   async function tts(key, text, persona) {
@@ -129,6 +135,7 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
     const reserved = await reserve(ref, estimate);
     if (reserved === null) {
       const used = (await ref.get()).data()?.desk_speech_seconds ?? 0;
+      await stat({ limited: 1 });
       return { fallback: 'limit', usedSeconds: Math.round(used), limitSeconds: DAILY_SECONDS };
     }
     try {
@@ -137,9 +144,11 @@ function createDeskSpeech({ db, admin, fetchFn, getKey, HttpsError, today }) {
       const bytes = Math.floor((out.audio.length * 3) / 4);
       const seconds = Math.max(1, Math.round(bytes / (out.sampleRate * 2)));
       await adjust(ref, seconds - estimate); // charge what was really spoken
+      await stat({ seconds, replies: 1 });
       return { audio: out.audio, sampleRate: out.sampleRate, seconds, usedSeconds: reserved - estimate + seconds, limitSeconds: DAILY_SECONDS };
     } catch (err) {
       await adjust(ref, -estimate); // nothing was spoken: give the time back
+      await stat({ failed: 1 });
       console.warn('[deskSpeak] natural voice unavailable:', err?.message || err);
       return { fallback: 'unavailable', usedSeconds: reserved - estimate, limitSeconds: DAILY_SECONDS };
     }

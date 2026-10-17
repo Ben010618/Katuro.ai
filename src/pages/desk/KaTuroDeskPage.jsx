@@ -37,6 +37,7 @@ import DeskCalendarPanel from './calendar/DeskCalendarPanel';
 import CalendarAlarms from './calendar/CalendarAlarms';
 import TeachingAssistant from './teaching/TeachingAssistant';
 import MyClassesModal from './teaching/MyClassesModal';
+import { setTalkContext } from './talkController';
 import { calendarPosition, manilaDate } from '../../services/desk/knowledge/schoolCalendar';
 import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
@@ -156,6 +157,8 @@ export default function KaTuroDeskPage() {
   };
 
   useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
+  // Talking with the persona (chat, bubble, Ctrl+Space) answers as the signed-in teacher.
+  useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: () => setShowRightPanel(true) }); }, [user, profile]);
 
   // Messages ↔ classroom folder (desktop app with a real folder open): send files from
   // the folder; "Open" / "Save to my folder" put received files in "KaTuro Messages/".

@@ -67,6 +67,7 @@ describe('deskSpeak: natural persona voices', () => {
     expect(tts.body.contents[0].parts[0].text).toMatch(/grandmother[\s\S]*Good morning, Teacher Ana!/);
     expect(tts.body.contents[0].parts[0].text).not.toContain('**');
     expect(usage().desk_speech_seconds).toBe(2);
+    expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ seconds: 2, replies: 1 });
   });
 
   it('after 5 minutes a day it answers "limit" (the app then uses the computer voice); nothing is charged', async () => {
@@ -76,12 +77,14 @@ describe('deskSpeak: natural persona voices', () => {
     expect(res).toEqual({ fallback: 'limit', usedSeconds: DAILY_SECONDS - 2, limitSeconds: DAILY_SECONDS });
     expect(net.calls.filter((c) => c.body)).toHaveLength(0);
     expect(usage().desk_speech_seconds).toBe(DAILY_SECONDS - 2);
+    expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ limited: 1 });
   });
 
   it('voice service down: answers "unavailable" and gives the reserved time back', async () => {
     const res = await make(fakeFetch({ fail: true }).fn).speak({ auth: { uid: 'u1' }, data: { text: 'Hello there.', persona: 'grey' } });
     expect(res.fallback).toBe('unavailable');
     expect(usage().desk_speech_seconds).toBe(0);
+    expect(f.docs.get('deskVoiceStats/2026-10-17')).toMatchObject({ failed: 1 });
   });
 
   it('refuses no login, empty text and very long text', async () => {
