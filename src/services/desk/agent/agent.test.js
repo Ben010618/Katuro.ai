@@ -60,7 +60,7 @@ describe('runDeskAgentTurn (plan → parallel tools → real files)', () => {
       profile: { firstName: 'Ben', gender: 'male' },
       persona: 'matt',
     });
-    expect(res.content).toMatch(/^Yow Sir Ben!/);
+    expect(res.content).toMatch(/^Yooooooow, Sir Ben! Amazing dayyyy, Sir Ben!/);
     expect(res.fastPath).toBe('local');
     expect(callGeminiProxy).not.toHaveBeenCalled();
   });
@@ -282,7 +282,12 @@ describe('personas (Matt / Luna / Grey)', () => {
 
   it('builds distinct chat voices and a neutral document voice', () => {
     expect(personaFor(teacher, 'matt')).toMatch(/Matt/);
-    expect(personaFor(teacher, 'matt')).toMatch(/Yow Sir/);
+    expect(personaFor(teacher, 'matt')).toMatch(/Yooooooow, Sir Ben! Amazing dayyyy/);
+    expect(personaFor(teacher, 'matt')).toMatch(/ALWAYS reply in English only/);
+    const m = PERSONAS.matt;
+    for (const line of [m.sample, m.welcome('Sir Ben'), m.greeting('Sir Ben'), m.thanks('Sir Ben'), m.ack('Sir Ben', 'the item analysis'), m.limitReached('Sir Ben')]) {
+      expect(line).not.toMatch(/\b(na|ang|natin|sige|ako|po|para|mo|walang|ay)\b/i); // all English
+    }
     expect(personaFor(teacher, 'luna')).toMatch(/Luna/);
     expect(personaFor(teacher, 'luna')).toMatch(/pleasant morning/i);
     expect(personaFor(teacher, 'nobody')).toMatch(/Matt/); // unknown id → default
@@ -291,7 +296,7 @@ describe('personas (Matt / Luna / Grey)', () => {
   });
 
   it('greets in each persona and exposes avatars metadata', () => {
-    expect(PERSONAS.matt.welcome('Sir Ben')).toMatch(/^Yow Sir Ben!/);
+    expect(PERSONAS.matt.welcome('Sir Ben')).toMatch(/^Yooooooow, Sir Ben! Amazing dayyyy, Sir Ben!/);
     expect(PERSONAS.luna.welcome("Ma'am April")).toMatch(/^A pleasant day, Ma'am April\./);
     expect(getPersona('luna').gender).toBe('girl');
     expect(timeOfDay(new Date(2026, 0, 1, 8))).toBe('morning');

@@ -9,8 +9,8 @@ const list = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', 
 /** facts: { name, cls, time, minutes, topic, status: 'ready'|'preparing'|'missing'|'failed', count, classes, special } */
 const LINES = {
   matt: {
-    brief: (f) => `Yow ${f.name}! ${f.count} class${f.count > 1 ? 'es' : ''} today: ${list(f.classes)}. ${f.readyText}`,
-    remind: (f) => `${f.name}, ${f.cls} in ${f.minutes} minutes! ${f.statusText} Kaya natin 'to!`,
+    brief: (f) => `Yooooooow, ${f.name}! Amazing dayyyy! ${f.count} class${f.count > 1 ? 'es' : ''} today: ${list(f.classes)}. ${f.readyText}`,
+    remind: (f) => `${f.name}, ${f.cls} in ${f.minutes} minutes! ${f.statusText} We got this!`,
     special: (f) => `Heads up ${f.name}: ${f.cls} at ${f.time}. ${f.special}. No new lesson today.`,
     after: (f) => `Done with ${f.cls}, ${f.name}? Did you finish "${f.topic}"? If you don't answer, I'll count it as done.`,
     noSequence: (f) => `${f.name}, ${f.cls} at ${f.time}, but I don't know which lesson is next. Set the lessons in My classes!`,

@@ -7,7 +7,7 @@ const route = (prompt, attachedPaths = [], extra = {}) => fastRoute({ prompt, at
 describe('fastRoute', () => {
   it('answers greetings and thanks locally in each persona', () => {
     expect(route('hello')).toMatchObject({ local: true, tasks: [] });
-    expect(route('Good morning po!').reply).toMatch(/^Yow Sir Ben!/);
+    expect(route('Good morning po!').reply).toMatch(/^Yooooooow, Sir Ben! Amazing dayyyy, Sir Ben!/);
     expect(route('Magandang umaga, Luna', [], { persona: 'luna', now: new Date(2026, 9, 3, 8) }).reply).toBe('A pleasant morning, Sir Ben. How may I help you with your classes today?');
     expect(route('salamat!').local).toBe(true);
     expect(route('hello, can you make me a DLL for Science 7?')).toBeNull();

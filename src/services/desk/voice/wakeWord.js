@@ -79,7 +79,7 @@ export function stableWake(s, phrases, now) {
 
 // How each persona answers its name (short, so the teacher can talk right after).
 const ACKS = {
-  matt: ['Yow {t}! What can I do for you?', "Hey {t}! Matt here, I'm all ears!"],
+  matt: ['Yooooooow, {t}! What can I do for you?', "Yooooooow, {t}! Amazing dayyyy! Matt here, I'm all ears!"],
   luna: ['Yes, {t}? How may I help you?', "I'm here, {t}. Please go ahead."],
   grey: ['Listening, {t}.', 'Yes, {t}. State your request.'],
   carmen: ['What is it, {t}? Make it quick.', 'Yes? Speak clearly, {t}. I am listening.'],

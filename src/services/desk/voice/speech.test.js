@@ -17,6 +17,7 @@ describe('the persona speaks', () => {
     expect(out.length).toBeLessThanOrEqual(420);
     expect(out.endsWith('.')).toBe(true);
     expect(speechText('   ')).toBe('');
+    expect(speechText('Yooooooooooowwww, Sir Ben! Amazing dayyyy!')).toBe('Yoooowwww, Sir Ben! Amazing dayyyy!');
   });
 
   it('PCM becomes a playable WAV (24 kHz, 16-bit, mono)', () => {

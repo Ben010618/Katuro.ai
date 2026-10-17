@@ -29,6 +29,7 @@ export function speechText(raw, max = MAX_SPOKEN) {
     .replace(/https?:\/\/\S+/g, 'the link')
     .replace(/\*\*|__|`|#+\s/g, '')
     .replace(/^\s*(?:[-•*]|\d+[.)])\s+/gm, '')
+    .replace(/([a-z])\1{4,}/gi, '$1$1$1$1') // a stretched "Yooooooow" is said long, not spelled out
     .replace(/\s+/g, ' ')
     .trim();
   if (!flat) return '';
