@@ -18,6 +18,7 @@ const { createEmailCodes, codeEmail } = require('./emailCode');
 const { purgeAccounts, findLeftoverUids } = require('./accountPurge');
 const { createDeskSpeech } = require('./deskSpeech');
 const { createGeminiSseParser } = require('./lib/sse');
+const { createUniversalAI } = require('./universalAI');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -322,6 +323,11 @@ console.info('[kaTuro] AI model: resolved per-request from ListModels (admin pin
 const GEMINI_CONFIG_TTL_MS = 60 * 1000;
 let _geminiConfigCache = null; // { data, at }
 
+// The Admin's universal AI key (any service: Gemini, OpenAI, Claude, OpenAI-compatible).
+// When it is on it answers first; the Gemini chain below is the automatic backup.
+// Logic and tests: functions/universalAI.js, tests/universalAI.server.test.js.
+const universalAI = createUniversalAI({ db, fetchFn: (...a) => fetch(...a) });
+
 async function getGeminiKey(isDesk = false) {
   let data = _geminiConfigCache && Date.now() - _geminiConfigCache.at < GEMINI_CONFIG_TTL_MS ? _geminiConfigCache.data : undefined;
   if (data === undefined) {
@@ -492,6 +498,13 @@ function geminiUrl(key, model) {
 }
 
 async function callGemini(key, prompt, { temperature = 0.5, maxTokens = 2048, model, _attempt = 0, _tried = [] } = {}) {
+  // First try (not a retry): the Admin's universal AI key answers first when it is on.
+  if (_attempt === 0 && !_tried.length && !model) {
+    const viaUniversal = await universalAI.textIfActive(prompt, { temperature, maxTokens });
+    if (viaUniversal !== null) return viaUniversal;
+  }
+  // Callers may skip reading the Gemini key (it is only needed when Gemini answers).
+  if (!key) key = await getGeminiKey();
   const activeModel = model || await resolveGeminiModel(key, _tried);
   // PREVENTIVE: Only add thinkingConfig for models that support it — sending it
   // to a model that doesn't causes a 400 that breaks the whole generation.
@@ -978,19 +991,21 @@ Return ONLY this JSON:
     // Gemini remains the fallback, so a bad NVIDIA day degrades to the previous
     // behaviour rather than failing.
     let outlineEngine = 'gemini';
-    try {
+    const outlineViaUniversal = await universalAI.textIfActive(prompt, { temperature: 0.3, maxTokens: 2500 });
+    if (outlineViaUniversal !== null) {
+      text = outlineViaUniversal;
+      outlineEngine = 'universal';
+    } else try {
       if (nvidiaConfig?.apiKey) {
         outlineEngine = 'nvidia';
         text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.3, maxTokens: 2500 });
       } else {
-        const key_ = await getGeminiKey();
-        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+        text = await callGemini(null, prompt, { temperature: 0.3, maxTokens: 2048 });
       }
     } catch (primaryErr) {
       if (outlineEngine === 'nvidia') {
         console.warn('[generateOutline] NVIDIA failed, falling back to Gemini:', primaryErr.message);
-        const key_ = await getGeminiKey();
-        text = await callGemini(key_, prompt, { temperature: 0.3, maxTokens: 2048 });
+        text = await callGemini(null, prompt, { temperature: 0.3, maxTokens: 2048 });
         outlineEngine = 'gemini';
       } else {
         throw primaryErr;
@@ -1043,9 +1058,7 @@ exports.expandSlides = onCall(
     const lang         = langLabel(subject);
     const nvidiaConfig = await getNvidiaConfigServer();
     let geminiKey      = null;
-    if (!nvidiaConfig) {
-      geminiKey = await getGeminiKey();
-    }
+    // Read only when Gemini answers (callGemini reads it then); the universal key may answer first.
     const styleGuide = {
       Academic:  'formal, define terms precisely, include DepEd module examples',
       Modern:    'clear direct sentences, bold key terms, professional and readable',
@@ -1101,13 +1114,14 @@ Return ONLY this JSON (no markdown, no explanation):
   "suggestedVisual": ""
 }`;
 
-      let text;
-      if (nvidiaConfig) {
+      let text = await universalAI.textIfActive(prompt, { temperature: 0.5, maxTokens: 1200 });
+      if (text !== null) {
+        // answered by the Admin's universal AI key
+      } else if (nvidiaConfig) {
         try {
           text = await callNvidiaServer(nvidiaConfig, prompt, { temperature: 0.5, maxTokens: 1200 });
         } catch (err) {
           console.warn('NVIDIA NIM slide expansion failed on server, falling back to Gemini:', err);
-          if (!geminiKey) geminiKey = await getGeminiKey();
           text = await callGemini(geminiKey, prompt, { temperature: 0.6, maxTokens: 1024 });
         }
       } else {
@@ -1835,6 +1849,15 @@ exports.generateAI = onCall(
     }
 
     async function runGeneration() {
+    // The Admin's universal AI key answers first when it is on; any problem with it (or a
+    // voice clip it cannot hear) → the usual Gemini chain below, inside the same budget.
+    const viaUniversal = await universalAI.callIfActive({ contents, temperature: temperature ?? 0.5, maxTokens: clampedMaxTokens, responseMimeType });
+    if (viaUniversal) {
+      if (wantsStream) {
+        try { res.sendChunk({ text: viaUniversal.text }); } catch { /* the full reply is still returned below */ }
+      }
+      return viaUniversal;
+    }
     const isDesk = action === 'desk_agent_run' || action === 'desk_agent_task' || action === 'desk_voice';
     let key = null;
     try {
@@ -1936,6 +1959,27 @@ exports.adminTestVertex = onCall({ region: 'us-central1', timeoutSeconds: 120 },
     return { ok: true, model: r.model, ms: Date.now() - t0, reply: String(r.text).trim().slice(0, 40), enabled: cfg.enabled !== false, dailyLimit: vertexDailyLimit(cfg) };
   } catch (err) {
     return { ok: false, error: String(err?.message || err), ms: Date.now() - t0 };
+  }
+});
+
+// Admin Dashboard → Universal AI key: list a key's models, test the saved settings, or read
+// the key's health. The key itself is saved by the admin in adminConfig/aiProvider.
+exports.adminUniversalAi = onCall({ region: 'us-central1', timeoutSeconds: 90 }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const callerSnap = await db.doc(`teachers/${req.auth.uid}`).get();
+  if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+    throw new HttpsError('permission-denied', 'Admin access required.');
+  }
+  const { op, provider, baseUrl, apiKey } = req.data || {};
+  try {
+    if (op === 'models') return { ok: true, ...(await universalAI.models({ provider, baseUrl, apiKey })) };
+    if (op === 'test') return await universalAI.test();
+    if (op === 'saved') { universalAI.forget(); return { ok: true, ...(await universalAI.health()) }; }
+    if (op === 'health') return { ok: true, ...(await universalAI.health()) };
+    throw new HttpsError('invalid-argument', 'Unknown operation.');
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    return { ok: false, error: String(err?.message || err).slice(0, 300) };
   }
 });
 
@@ -2608,7 +2652,7 @@ exports.collabAIReply = onCall(
     const { channelId, dmId, messageText } = req.data || {};
     if (!messageText) return { ok: true };
 
-    const key = await getGeminiKey();
+    const key = null; // read by callGemini only when Gemini answers (the universal key may answer first)
 
     // Get caller's display name for personalised response
     let callerName = 'Teacher';
@@ -2671,7 +2715,7 @@ exports.validateMelcCode = onCall(
     const { subject, gradeLevel, quarter, melcCodes } = req.data || {};
     if (!melcCodes?.length || !subject) return { results: [] };
 
-    const key = await getGeminiKey();
+    const key = null; // read by callGemini only when Gemini answers (the universal key may answer first)
     const codeList = melcCodes.map((c, i) => `${i + 1}. ${c}`).join('\n');
 
     const prompt = `You are a DepEd Philippines curriculum expert with knowledge of the official Most Essential Learning Competencies (MELC) document released in 2020.

@@ -21,6 +21,7 @@ import InactiveUsersSection from '../features/inactivity/InactiveUsersSection';
 import { userStats, recordBreakdown } from '../features/admin/userStats';
 import TotalUsersBreakdown from '../features/admin/TotalUsersBreakdown';
 import EmailCodeAdminCard from '../features/emailCode/EmailCodeAdminCard';
+import UniversalAiKeyCard from '../features/universalAi/UniversalAiKeyCard';
 import DeskAiAdmin from '../features/deskAi/DeskAiAdmin';
 import { db } from '../firebase';
 import {
@@ -1667,7 +1668,7 @@ function AnalyticsSection({ teachers = [] }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 // ── AI Engine & API Keys Management Center ───────────────────────────────────
 function ApiKeySection({ adminUid }) {
-  const [activeEngineTab, setActiveEngineTab] = useState('nvidia'); // 'gemini' | 'nvidia'
+  const [activeEngineTab, setActiveEngineTab] = useState('nvidia'); // 'gemini' | 'nvidia' | 'universal'
 
   // Gemini State
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
@@ -1935,6 +1936,19 @@ function ApiKeySection({ adminUid }) {
           >
             <Key size={13} /> Gemini API (Core Generator)
             {geminiStatus?.hasKey && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveEngineTab('universal')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8,
+              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: activeEngineTab === 'universal' ? '#2d6a4f' : 'transparent',
+              color: activeEngineTab === 'universal' ? '#fff' : 'var(--kt-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Key size={13} /> Universal AI key (any service)
           </button>
         </div>
       </div>
@@ -2489,7 +2503,10 @@ function ApiKeySection({ adminUid }) {
         </div>
       )}
 
-      {/* Email codes (both engine tabs) */}
+      {/* ── Tab 3: Universal AI key (any service; Gemini chain stays as backup) ── */}
+      {activeEngineTab === 'universal' && <UniversalAiKeyCard adminUid={adminUid} />}
+
+      {/* Email codes (every engine tab) */}
       <EmailCodeAdminCard adminUid={adminUid} />
     </div>
   );
