@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { placeInstaller } from '../../scripts/installers.mjs';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT = path.resolve(APP, '..');
@@ -56,6 +57,8 @@ if (!fs.existsSync(built)) throw new Error('The signed APK was not made (app-rel
 const apkName = `KaTuro-App-${version}.apk`;
 const apk = path.join(outDir, apkName);
 fs.copyFileSync(built, apk);
+// The copy to hand out by USB, in its own clean folder (scripts/installers.mjs).
+const forUsb = placeInstaller(apk, 'phone');
 const bytes = fs.readFileSync(apk);
 
 // The notes of this version: its section of CHANGELOG.md (## v1.2.3 …).
@@ -76,7 +79,7 @@ fs.writeFileSync(feed, `${JSON.stringify(update, null, 2)}\n`);
 console.log(`\nMade:\n  ${apk}\n  ${feed}\n  SHA-256 ${update.sha256}`);
 
 if (!publish) {
-  console.log('\nFor USB: copy the APK to the phone or tablet and open it.\nTo send this update to installed apps: node scripts/release.mjs --publish');
+  console.log(`\nFor USB: ${forUsb}\nCopy it to the phone or tablet and open it.\nTo send this update to installed apps: node scripts/release.mjs --publish`);
 } else {
   try {
     execFileSync('gh', ['release', 'view', TAG, '--repo', REPO].map(q), { stdio: 'ignore', shell: process.platform === 'win32' });
