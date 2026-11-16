@@ -310,22 +310,21 @@ export default function PhoneApp() {
   const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
   const pinScreen = showUnlock || showSetPin;
 
-  // Android back button / gesture: go up a folder instead of closing the app (not while the
-  // PIN screen shows: the app underneath stays as it was).
+  // Android back button / gesture: go up a folder instead of closing the app. Also while the
+  // PIN screen shows (it covers everything): the back step is used up either way, so the screen
+  // must follow it or an open file could no longer be closed after unlocking.
   useEffect(() => {
     const onPop = () => {
-      if (pinScreen) return;
       if (file) setFile(null);
       else if (tab === 'files' && path) setPath(path.split('/').slice(0, -1).join('/'));
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [file, path, tab, pinScreen]);
+  }, [file, path, tab]);
   const go = (next) => {
     window.history.pushState({ kt: true }, '');
     next();
   };
-
 
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
