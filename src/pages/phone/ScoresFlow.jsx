@@ -71,29 +71,29 @@ function ClassList({ client, online, onPick }) {
   }, [client, tick, online]);
 
   return (
-    <div className="p-3 space-y-2">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Record scores · choose a class</p>
-        <button type="button" onClick={() => { setState((s) => ({ ...s, loading: true })); setTick((t) => t + 1); }} className="p-2 text-gray-500" aria-label="Refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button>
+    <div className="space-y-4 px-5 py-3">
+      <div className="flex items-center justify-between">
+        <p className="nm-muted text-sm font-medium">Classes</p>
+        <button type="button" onClick={() => { setState((s) => ({ ...s, loading: true })); setTick((t) => t + 1); }} className="nm-sm nm-press nm-muted grid h-10 w-10 place-items-center rounded-full" aria-label="Refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button>
       </div>
-      {state.fromPhone && !state.loading && <p className="px-1 text-xs text-amber-800">Showing the classes saved on this phone. Scores you record now are sent when KaTuroDesk is reachable.</p>}
+      {state.fromPhone && !state.loading && <p className="text-xs text-amber-800">Saved on this phone · scores send when KaTuroDesk is back</p>}
       {state.error && <Card><p className="text-sm text-red-700">{state.error}</p></Card>}
       {!state.loading && !state.list.length && (
-        <Card>
-          <p className="text-sm font-semibold text-gray-900">No class records yet</p>
-          <p className="text-sm text-gray-600 mt-1">On KaTuroDesk, ask: &ldquo;Set up my Grade 7 Rizal Science class record&rdquo; and attach your class list. It appears here once it is in your Records folder.</p>
-        </Card>
+        <div className="py-10 text-center">
+          <p className="text-sm font-medium">No class records yet</p>
+          <p className="nm-muted mt-1 text-xs">Set one up on KaTuroDesk</p>
+        </div>
       )}
-      <ul className="space-y-2">
+      <ul className="space-y-4">
         {state.list.map((c) => (
           <li key={c.path}>
-            <button type="button" disabled={!c.ready} onClick={() => onPick(c)} className="w-full flex items-center gap-3 rounded-xl bg-white px-4 py-3.5 text-left shadow-sm active:bg-gray-50 disabled:opacity-90">
-              <ClipboardList size={24} className={c.ready ? 'text-emerald-700' : 'text-gray-400'} />
+            <button type="button" disabled={!c.ready} onClick={() => onPick(c)} className="nm nm-press flex w-full items-center gap-4 rounded-3xl px-5 py-4 text-left disabled:opacity-90">
+              <ClipboardList size={24} className={c.ready ? 'nm-green' : 'nm-muted'} />
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-gray-900 truncate">{c.name}</span>
+                <span className="block truncate text-sm font-semibold">{c.name}</span>
                 {c.ready
-                  ? <span className="block text-xs text-gray-500">{c.learnerCount} learners</span>
-                  : <span className="block text-xs text-amber-800">Set up this class on KaTuroDesk first: {c.problems?.[0]}</span>}
+                  ? <span className="nm-muted block text-xs">{c.learnerCount} learners</span>
+                  : <span className="block text-xs text-amber-800">Not ready: {c.problems?.[0]}</span>}
               </span>
               {c.ready && <ChevronRight size={18} className="text-gray-400" />}
             </button>
@@ -192,7 +192,7 @@ function Entry({ cls, column, initial, onReview, onBubble, onSnap }) {
           </ul>
         </section>
       ))}
-      <div className="fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={() => onReview({ hps, values })} disabled={!typed} className="w-full rounded-xl bg-emerald-700 py-3.5 text-white font-bold disabled:opacity-50">Review {typed} score{typed === 1 ? '' : 's'}</button>
       </div>
     </div>

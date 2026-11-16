@@ -6,6 +6,7 @@ import { Loader2, Eye, EyeOff, Gift, BookOpen, CheckCircle2, ShieldCheck, FileSp
 import ktLogo from '../assets/KT-Favicon.webp';
 import { selfSignUp } from '../services/db';
 import { sendSignupCode, cleanCode, SIGNUP_URL } from '../services/emailCode';
+import { authErrorText } from '../utils/authError';
 
 import bg1 from '../assets/1.webp';
 import bg2 from '../assets/2.webp';
@@ -482,8 +483,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      setError((err?.message ?? 'Sign-in failed. Please try again.')
-        .replace('Firebase: ', '').replace(/ \(auth\/[\w-]+\)\.?/g, '').trim());
+      setError(authErrorText(err, 'Sign-in failed. Please try again.'));
       triggerShake();
     } finally {
       setLoading(false);
@@ -513,8 +513,7 @@ export default function LoginPage() {
       const { pendingApproval } = await selfSignUp({ email, password, surname, givenName, mi, school, code: codeStep ? code : undefined });
       setSignedUp(pendingApproval ? 'pending' : 'active');
     } catch (err) {
-      setError((err?.message ?? 'Registration failed. Please try again.')
-        .replace('Firebase: ', '').replace(/ \(auth\/[\w-]+\)\.?/g, '').trim());
+      setError(authErrorText(err, 'Registration failed. Please try again.'));
       triggerShake();
     } finally {
       setLoading(false);

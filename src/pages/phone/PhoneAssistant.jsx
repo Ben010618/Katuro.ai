@@ -106,15 +106,14 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
         {chat.length > 0 && <button type="button" onClick={() => { if (window.confirm('Clear this conversation on the phone?')) setChat([]); }} aria-label="Clear the conversation" className="p-2 text-gray-400"><Trash2 size={18} /></button>}
       </div>
 
-      <div className="flex-1 space-y-3 p-3 pb-36">
+      <div className="flex-1 space-y-3 p-3 pb-52">
         {!chat.length && (
-          <div className="rounded-xl bg-white p-4 shadow-sm space-y-2">
-            <div className="flex items-center gap-2"><KaTuroAIAvatar persona={prefs.persona} size={36} /><p className="text-sm font-bold">{persona.name}</p></div>
-            <p className="text-sm text-gray-700">{persona.greeting(salutation)}</p>
-            <p className="text-xs text-gray-500">I work on KaTuroDesk for you: your schedule, your Records and Lessons, and new lesson plans, quizzes and worksheets (saved in Lessons). Tip: tap the microphone on your keyboard to talk instead of typing.</p>
-            <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className="space-y-5 px-2 pt-6 text-center">
+            <div className="flex justify-center"><KaTuroAIAvatar persona={prefs.persona} size={64} /></div>
+            <p className="text-base">{persona.greeting(salutation)}</p>
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
               {IDEAS.map((idea) => (
-                <button key={idea} type="button" onClick={() => { if (idea.endsWith(' ')) { setText(idea); inputRef.current?.focus(); } else send(idea); }} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">{idea.trim()}{idea.endsWith(' ') ? '…' : ''}</button>
+                <button key={idea} type="button" onClick={() => { if (idea.endsWith(' ')) { setText(idea); inputRef.current?.focus(); } else send(idea); }} className="nm-sm nm-press nm-green rounded-full px-4 py-2 text-xs font-medium">{idea.trim()}{idea.endsWith(' ') ? '…' : ''}</button>
               ))}
             </div>
           </div>
@@ -150,7 +149,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
         <div ref={endRef} />
       </div>
 
-      <div className="fixed inset-x-0 bottom-[60px] z-20 border-t border-gray-200 bg-white p-2" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="nm fixed inset-x-3 bottom-[108px] z-20 rounded-3xl p-2" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}

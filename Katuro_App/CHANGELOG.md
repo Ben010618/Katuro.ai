@@ -4,6 +4,12 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.1.0
+A new, quieter look.
+- Soft, clean screens with less text.
+- The KaTuro logo in the middle of the bottom bar opens the Assistant.
+- A simpler sign-in and PIN screen.
+
 ## v1.0.0
 The first KaTuro App, linked to KaTuroDesk on your computer.
 - Today: your classes, your calendar and the DepEd school calendar; reminders ring on the phone.

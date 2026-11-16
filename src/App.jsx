@@ -60,6 +60,7 @@ const KaTuroDeskPage          = lazy(() => import('./pages/desk/KaTuroDeskPage')
 const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
 const MessagesPage            = lazy(() => import('./pages/MessagesPage'));
 const PhoneApp                = lazy(() => import('./pages/phone/PhoneApp'));
+const PhoneSignIn             = lazy(() => import('./pages/phone/PhoneSignIn'));
 
 function LoadingScreen() {
   return (
@@ -198,7 +199,7 @@ function RootRoute() {
  * KaTuroDesk (Electron) and the KaTuro App (phone): the same KaTuro account sign-in as the
  * website (LoginPage), then the app's own home. `where` names the app in error logs.
  */
-function SignedInShell({ where, children }) {
+function SignedInShell({ where, signIn = <LoginPage />, children }) {
   const { user, loading, disabled, pendingApproval } = useAuth();
 
   useEffect(() => {
@@ -216,7 +217,7 @@ function SignedInShell({ where, children }) {
 
   if (loading) return <LoadingScreen />;
   if (disabled && !pendingApproval && user) return null;
-  if (!user) return <LoginPage />;
+  if (!user) return signIn;
   if (pendingApproval) return <PendingApprovalScreen />;
   return children;
 }
@@ -230,7 +231,7 @@ export default function App() {
         <ToastProvider>
           <HashRouter>
             <Suspense fallback={<LoadingScreen />}>
-              <SignedInShell where="the phone app"><PhoneApp /></SignedInShell>
+              <SignedInShell where="the phone app" signIn={<PhoneSignIn />}><PhoneApp /></SignedInShell>
             </Suspense>
           </HashRouter>
         </ToastProvider>

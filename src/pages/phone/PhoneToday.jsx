@@ -100,32 +100,32 @@ export default function PhoneToday({ client, online }) {
     .map((d) => ({ ...d, items: d.items.filter((it) => it.kind !== 'school' || (!seenSchool.has(it.title) && seenSchool.add(it.title))) }))
     .filter((d) => d.items.length);
   return (
-    <div className="p-3 space-y-3">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">My schedule · next 2 weeks</p>
-        <button type="button" onClick={refresh} aria-label="Refresh" className="p-2 text-gray-500"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button>
+    <div className="space-y-5 px-5 py-3">
+      <div className="flex items-center justify-between">
+        <p className="nm-muted text-sm font-medium">Schedule</p>
+        <button type="button" onClick={refresh} aria-label="Refresh" className="nm-sm nm-press nm-muted grid h-10 w-10 place-items-center rounded-full"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button>
       </div>
-      {data && online === false && <p className="px-1 text-xs text-amber-800">From the phone&apos;s copy ({new Date(data.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}). Changes need KaTuroDesk.</p>}
+      {data && online === false && <p className="text-xs text-amber-800">Saved copy · {new Date(data.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}
       {error && <Card><p className="text-sm text-red-700">{error}</p></Card>}
       {canNotify() && rang?.scheduled > 0 && (
         <div className="px-1 text-xs text-emerald-800">
-          <p className="flex items-center gap-1"><BellRing size={13} /> {rang.scheduled} reminder{rang.scheduled > 1 ? 's' : ''} will ring on this phone{rang.exact ? '' : ' (within a few minutes of the time)'}.</p>
+          <p className="flex items-center gap-1"><BellRing size={13} /> {rang.scheduled} reminder{rang.scheduled > 1 ? 's' : ''} on</p>
           {!rang.exact && <button type="button" onClick={async () => { await allowExactReminders(); refresh(); }} className="mt-1 font-semibold underline">Ring exactly on time</button>}
         </div>
       )}
-      {!data && loading && <p className="flex items-center gap-2 px-1 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Getting your schedule from KaTuroDesk…</p>}
-      {data && !days.length && <Card><p className="text-sm text-gray-700">Nothing scheduled in the next two weeks. Add your classes in KaTuroDesk (My classes), or add an entry with +.</p></Card>}
+      {!data && loading && <p className="flex items-center gap-2 px-1 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Loading…</p>}
+      {data && !days.length && <p className="nm-muted py-10 text-center text-sm">Nothing in the next two weeks</p>}
       {days.map((d) => (
         <section key={d.date}>
-          <p className={`px-1 pb-1 text-xs font-semibold uppercase tracking-wide ${d.date === data.today ? 'text-emerald-800' : 'text-gray-500'}`}>{d.label}</p>
-          <ul className="rounded-xl bg-white shadow-sm divide-y divide-gray-100">
+          <p className={`px-1 pb-2 text-xs font-medium ${d.date === data.today ? 'nm-green' : 'nm-muted'}`}>{d.label}</p>
+          <ul className="nm divide-y divide-gray-100 rounded-3xl px-1">
             {d.items.map((it, i) => {
               const Icon = ICON[it.kind] || CalendarDays;
               return (
-                <li key={`${it.kind}-${it.id || i}`} className={`flex items-start gap-3 px-3 py-2.5 ${it.done ? 'opacity-50' : ''}`}>
+                <li key={`${it.kind}-${it.id || i}`} className={`flex items-start gap-3 px-4 py-3.5 ${it.done ? 'opacity-50' : ''}`}>
                   <Icon size={18} className={`mt-0.5 flex-shrink-0 ${it.kind === 'class' ? 'text-emerald-700' : it.kind === 'school' ? 'text-amber-600' : 'text-sky-700'}`} />
                   <span className="min-w-0 flex-1">
-                    <span className={`block text-sm font-semibold text-gray-900 ${it.done ? 'line-through' : ''}`}>{it.time ? `${clock(it.time)} · ` : ''}{it.title}</span>
+                    <span className={`block text-sm font-medium ${it.done ? 'line-through' : ''}`}>{it.time ? `${clock(it.time)} · ` : ''}{it.title}</span>
                     {it.detail && <span className="block text-xs text-gray-500">{it.detail}</span>}
                     {it.kind === 'event' && it.remindMinutes !== null && !it.done && <span className="block text-[11px] text-gray-400">{REMIND_OPTIONS.find((o) => o.value === it.remindMinutes)?.label}</span>}
                   </span>
@@ -141,7 +141,7 @@ export default function PhoneToday({ client, online }) {
           </ul>
         </section>
       ))}
-      <button type="button" onClick={() => setAdding(true)} aria-label="Add to my calendar" className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-lg" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+      <button type="button" onClick={() => setAdding(true)} aria-label="Add to my calendar" className="nm-accent nm-press fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
         <Plus size={28} />
       </button>
       {adding && <AddEntry client={client} onClose={() => setAdding(false)} onAdded={refresh} />}

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { Bot, CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, Menu, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
+import { CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, Menu, RefreshCw, ShieldCheck } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
@@ -21,11 +21,14 @@ import { LockScreen, PhoneMenu, UpdateSheet } from './PhoneSecurity';
 import { hasPin, shouldLock } from '../../services/link/appLock';
 import { canUpdate, checkForUpdate, checkQuietly, installUpdate, installedVersion } from '../../services/link/appUpdate';
 import { publishedDesk, withPublishedAddresses } from '../../services/link/findDesk';
+import { KT_LOGO } from './phoneLogo';
+import './phone.css';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
 
 const MAIN = ['Records', 'Lessons'];
-const HINT = { Records: 'Class records', Lessons: 'Learning materials' };
+// The bottom bar; the Assistant is the KaTuro logo in the middle.
+const TABS = [['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'KaTuro Assistant', null], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]];
 
 const day = (ms) => (ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
@@ -55,22 +58,15 @@ function LinkScreen({ teacherName, uid, onLinked }) {
   }, [teacherName, uid, onLinked]);
 
   return (
-    <div className="p-5 space-y-5">
-      <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3">
-        <Laptop size={32} className="text-emerald-700" />
-        <h2 className="text-lg font-bold text-gray-900">Link to your KaTuroDesk</h2>
-        <p className="text-sm text-gray-600">See your Records and Lessons from your computer on this phone.</p>
-        <ol className="list-decimal pl-5 text-sm text-gray-700 space-y-1">
-          <li>On your computer, open <b>KaTuroDesk → Settings → Phones</b> and click <b>Link a phone</b>.</li>
-          <li>Keep this phone on the same Wi-Fi as the computer, or turn on this phone&apos;s hotspot and connect the computer to it.</li>
-          <li>Tap the button below and point the camera at the code.</li>
-        </ol>
-        <button type="button" onClick={() => { setError(''); setScanning(true); }} disabled={busy} className="w-full rounded-xl bg-emerald-700 py-3.5 text-white font-bold disabled:opacity-60">
-          {busy ? 'Linking…' : 'Scan the code'}
-        </button>
-        {error && <p className="text-sm text-red-700">{error}</p>}
-      </div>
-      <p className="flex items-start gap-2 text-xs text-gray-500"><ShieldCheck size={16} className="text-emerald-700 flex-shrink-0" /> Your files stay on your computer. They travel only between your computer and this phone, encrypted, and never through the internet.</p>
+    <div className="flex flex-col items-center px-8 pt-[8vh] text-center">
+      <div className="nm grid h-28 w-28 place-items-center rounded-full"><Laptop size={44} className="nm-green" /></div>
+      <h2 className="mt-8 text-xl font-semibold">Link your computer</h2>
+      <p className="nm-muted mt-2 text-sm">KaTuroDesk → Settings → Phones → Link a phone</p>
+      <button type="button" onClick={() => { setError(''); setScanning(true); }} disabled={busy} className="nm-accent nm-press mt-10 w-full max-w-sm rounded-2xl py-4 font-semibold disabled:opacity-60">
+        {busy ? 'Linking…' : 'Scan the code'}
+      </button>
+      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      <p className="nm-muted mt-8 flex items-center gap-1.5 text-xs"><ShieldCheck size={14} className="nm-green" /> Same Wi-Fi or hotspot · never the internet</p>
       {scanning && <QrScanner onResult={onCode} onClose={() => setScanning(false)} />}
     </div>
   );
@@ -101,27 +97,27 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
     : state.items;
 
   return (
-    <div className="p-3 space-y-2">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{atTop ? 'Your KaTuro folder' : path.split('/').pop()}</p>
-        <button type="button" onClick={() => { setState((s) => ({ ...s, loading: true, error: '' })); setTick((t) => t + 1); }} aria-label="Refresh" className="p-2 text-gray-500"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button>
+    <div className="space-y-4 px-5 py-3">
+      <div className="flex items-center justify-between">
+        <p className="nm-muted text-sm font-medium">{atTop ? 'Files' : ''}</p>
+        <button type="button" onClick={() => { setState((s) => ({ ...s, loading: true, error: '' })); setTick((t) => t + 1); }} aria-label="Refresh" className="nm-sm nm-press nm-muted grid h-10 w-10 place-items-center rounded-full"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button>
       </div>
-      {state.error && <p className="rounded-xl bg-white p-4 text-sm text-red-700">{state.error}</p>}
-      {!state.loading && !state.error && !items.length && <p className="rounded-xl bg-white p-4 text-sm text-gray-500">This folder is empty.</p>}
-      <ul className="space-y-2">
+      {state.error && <p className="nm-in rounded-2xl p-4 text-sm text-red-700">{state.error}</p>}
+      {!state.loading && !state.error && !items.length && <p className="nm-muted py-10 text-center text-sm">Empty</p>}
+      <ul className="space-y-4">
         {items.map((i) => {
           const main = atTop && MAIN.includes(i.name);
           return (
             <li key={i.path}>
-              <button type="button" onClick={() => onOpen(i)} className={`w-full flex items-center gap-3 rounded-xl bg-white px-4 text-left shadow-sm active:bg-gray-50 ${main ? 'py-4' : 'py-3'}`}>
+              <button type="button" onClick={() => onOpen(i)} className={`nm nm-press flex w-full items-center gap-4 rounded-3xl px-5 text-left ${main ? 'py-5' : 'py-4'}`}>
                 {i.kind === 'directory'
-                  ? (main ? <FolderOpen size={26} className="text-emerald-700 flex-shrink-0" /> : <Folder size={22} className="text-amber-600 flex-shrink-0" />)
-                  : <FileText size={22} className="text-gray-500 flex-shrink-0" />}
+                  ? (main ? <FolderOpen size={26} className="nm-green flex-shrink-0" /> : <Folder size={22} className="text-amber-600 flex-shrink-0" />)
+                  : <FileText size={22} className="nm-muted flex-shrink-0" />}
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate ${main ? 'text-base font-bold' : 'text-sm font-semibold'} text-gray-900`}>{i.name}</span>
-                  <span className="block text-xs text-gray-500">{main ? HINT[i.name] : i.kind === 'file' ? `${formatBytes(i.size)} · ${day(i.lastModified)}` : (atTop ? 'View only on the phone' : '')}</span>
+                  <span className={`block truncate ${main ? 'text-base font-semibold' : 'text-sm font-medium'}`}>{i.name}</span>
+                  {i.kind === 'file' && <span className="nm-muted block text-xs">{formatBytes(i.size)} · {day(i.lastModified)}</span>}
                 </span>
-                <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />
+                <ChevronRight size={18} className="nm-muted flex-shrink-0" />
               </button>
             </li>
           );
@@ -310,11 +306,16 @@ export default function PhoneApp() {
   const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
   const pinScreen = showUnlock || showSetPin;
 
+  // A folder-path tap: step back through history (one entry per folder opened), so the Android
+  // back button stays in step with the screen. jumpTo makes that one popstate land on the level.
+  const jumpTo = useRef(null);
+
   // Android back button / gesture: go up a folder instead of closing the app. Also while the
   // PIN screen shows (it covers everything): the back step is used up either way, so the screen
   // must follow it or an open file could no longer be closed after unlocking.
   useEffect(() => {
     const onPop = () => {
+      if (jumpTo.current !== null) { setPath(jumpTo.current); jumpTo.current = null; return; }
       if (file) setFile(null);
       else if (tab === 'files' && path) setPath(path.split('/').slice(0, -1).join('/'));
     };
@@ -325,9 +326,17 @@ export default function PhoneApp() {
     window.history.pushState({ kt: true }, '');
     next();
   };
+  // A folder-path tap (see jumpTo above).
+  const upTo = (depth) => {
+    const parts = path.split('/');
+    const steps = parts.length - depth;
+    if (steps <= 0) return;
+    jumpTo.current = parts.slice(0, depth).join('/');
+    window.history.go(-steps);
+  };
 
   return (
-    <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="kt-phone" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* A linked phone needs a PIN first (class lists live on it), then asks for it when opened.
           While a PIN screen shows, the app underneath is hidden (not shown, not read aloud, not
           tappable) but stays mounted, so typed scores, an open file and a running Assistant turn
@@ -345,7 +354,7 @@ export default function PhoneApp() {
           onSignOut={() => { setMenuOpen(false); signOutHere(); }}
         />
       )}
-      {menuOpen && menuNote && !pinScreen && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
+      {menuOpen && menuNote && !pinScreen && <p className="fixed inset-x-6 bottom-6 z-[55] rounded-2xl bg-gray-900/90 px-4 py-3 text-center text-sm text-white" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>{menuNote}</p>}
       {update && !pinScreen && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
       <div hidden={pinScreen} inert={pinScreen}>
           {file && client && (
@@ -353,42 +362,38 @@ export default function PhoneApp() {
               <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
             </div>
           )}
-          <header className="flex items-center justify-between px-4 py-3 bg-[#1f3a2c] text-white">
-            <div className="min-w-0">
-              <p className="text-base font-bold">KaTuro</p>
-              <p className="text-xs text-emerald-100 truncate">{firstName ? `Hi, ${firstName}` : user?.email}</p>
+          <header className="flex items-center justify-between px-5 pb-2 pt-5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <p className="truncate text-xl font-semibold">{firstName ? `Hi, ${firstName}` : 'KaTuro'}</p>
+              {link && (
+                <span
+                  role="img"
+                  aria-label={online === false ? `${link.deskName} not reachable` : online ? `Connected to ${link.deskName}` : 'Connecting'}
+                  className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${online === false ? 'bg-amber-500' : online ? 'bg-emerald-500' : 'animate-pulse bg-gray-300'}`}
+                />
+              )}
             </div>
-            <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="p-2 -mr-2"><Menu size={22} /></button>
+            <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="nm-sm nm-press grid h-11 w-11 place-items-center rounded-full"><Menu size={20} /></button>
           </header>
 
           {!link ? (
             <LinkScreen teacherName={firstName} uid={user?.uid} onLinked={(l) => { setOnline(null); setLink(l); setPath(''); }} />
           ) : (
             <>
-              <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200">
-                <Laptop size={16} className="text-gray-500" />
-                <p className="text-xs text-gray-700 flex-1 truncate">
-                  {link.deskName} ·{' '}
-                  {online === null ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> checking</span>
-                    : online ? <span className="text-emerald-700 font-semibold">connected</span>
-                      : <span className="text-amber-700 font-semibold">not reachable</span>}
-                </p>
-                <button type="button" onClick={unlink} aria-label="Unlink this phone" className="p-1.5 text-gray-400"><Unlink size={15} /></button>
-              </div>
               {tab === 'files' && path && (
-                <nav className="flex items-center gap-1 px-4 pt-3 text-xs text-emerald-800 overflow-x-auto whitespace-nowrap">
-                  <button type="button" onClick={() => setPath('')} className="font-semibold">KaTuro</button>
+                <nav className="nm-green flex items-center gap-1 overflow-x-auto whitespace-nowrap px-5 pt-2 text-xs">
+                  <button type="button" onClick={() => upTo(0)} className="font-semibold">KaTuro</button>
                   {path.split('/').map((part, i, all) => (
                     <span key={all.slice(0, i + 1).join('/')} className="flex items-center gap-1">
                       <ChevronRight size={12} />
-                      <button type="button" onClick={() => setPath(all.slice(0, i + 1).join('/'))} className={i === all.length - 1 ? 'font-bold text-gray-900' : 'font-semibold'}>{part}</button>
+                      <button type="button" onClick={() => upTo(i + 1)} className={i === all.length - 1 ? 'nm-ink font-semibold' : 'font-semibold'}>{part}</button>
                     </span>
                   ))}
                 </nav>
               )}
               {online === false && (
-                <p className="mx-3 mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
-                  {deskNote || <>Can&apos;t reach {link.deskName}. Check that KaTuroDesk is open on your computer and that this phone is on the same Wi-Fi or hotspot.</>}
+                <p className="nm-in mx-5 mt-2 rounded-2xl px-4 py-3 text-xs text-amber-800">
+                  {deskNote || <>Can&apos;t reach {link.deskName}. Is KaTuroDesk open, on the same Wi-Fi?</>}
                 </p>
               )}
               {client && visited.has('today') && <div hidden={tab !== 'today'}><PhoneToday client={client} online={online} /></div>}
@@ -397,11 +402,11 @@ export default function PhoneApp() {
               {visited.has('messages') && (
                 <div hidden={tab !== 'messages'}>
                   <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
-                    <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 170px)" /></div>
+                    <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 190px)" /></div>
                   </Suspense>
                 </div>
               )}
-              {sharedNote && <p className="mx-3 mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{sharedNote}</p>}
+              {sharedNote && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">{sharedNote}</p>}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
               {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go(() => setFile(i))} />}
               {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
@@ -419,14 +424,22 @@ export default function PhoneApp() {
                   }}
                 />
               )}
-              <div className="h-20" />
-              <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-gray-200 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {[['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'Assistant', Bot], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]].map(([id, label, Icon]) => (
-                  <button key={id} type="button" onClick={() => openTab(id)} aria-pressed={tab === id} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
-                    <Icon size={22} /> {label}
-                    {id === 'messages' && chatState.badgeCount > 0 && <span className="absolute right-2 top-1 min-w-[18px] rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
+              <div className="h-28" />
+              <nav className="kt-nav fixed inset-x-0 bottom-0 z-20" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                <div className="relative grid h-16 grid-cols-5 items-center">
+                  {TABS.map(([id, label, Icon]) => (Icon ? (
+                    <button key={id} type="button" onClick={() => openTab(id)} aria-pressed={tab === id} aria-label={label} className="relative grid place-items-center justify-self-center">
+                      <span className={`grid h-11 w-11 place-items-center rounded-2xl ${tab === id ? 'nm-in nm-green' : 'nm-muted'}`}><Icon size={22} strokeWidth={tab === id ? 2.2 : 1.8} /></span>
+                      {id === 'messages' && chatState.badgeCount > 0 && <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
+                    </button>
+                  ) : (
+                    <span key={id} aria-hidden="true" />
+                  )))}
+                  {/* The KaTuro logo, big and in the middle: opens the Assistant. */}
+                  <button type="button" onClick={() => openTab('assistant')} aria-pressed={tab === 'assistant'} aria-label="KaTuro Assistant" className="kt-logo-btn absolute -top-12 left-1/2 -translate-x-1/2">
+                    <img src={KT_LOGO} alt="" className="kt-logo h-[104px] w-[104px]" />
                   </button>
-                ))}
+                </div>
               </nav>
             </>
           )}
