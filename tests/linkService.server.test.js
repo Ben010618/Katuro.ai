@@ -7,10 +7,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
+import { execSync } from 'child_process';
 import { parseLinkQr, pairWithDesk, createLinkClient } from '../src/services/link/linkClient.js';
 
 const require = createRequire(import.meta.url);
-const { createLinkService, insideHome } = require('../electron/linkService.cjs');
+const { createLinkService } = require('../electron/linkService.cjs');
+const { resolvePhonePath } = require('../electron/phoneAccess.cjs');
 
 // Stand-in for Windows DPAPI: reversible, and the saved file never holds the raw key.
 const protect = { encrypt: (b) => `x${Buffer.from(b).toString('hex')}`, decrypt: (s) => Buffer.from(String(s).slice(1), 'hex') };
@@ -87,7 +89,7 @@ describe('phone link', () => {
     await expect(client.read('../secret.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(client.read('Records/../../secret.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(client.list('..')).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    expect(insideHome('/home/KaTuro', 'C:/Windows')).toBeNull();
+    expect(resolvePhonePath('C:/Windows', { home: path.join(tmp, 'KaTuro') })).toBeNull();
   });
 
   it('a pairing QR code works for one phone only', async () => {
@@ -355,6 +357,96 @@ describe('what phones can see (Settings → Phones)', () => {
     // The KaTuro folders themselves and KaTuro Backups stay as they are.
     await expect(client.request('rename', { path: 'Lessons', name: 'X' })).rejects.toBeTruthy();
     expect(() => service.setAccess(id, 'home:katuro backups', 'full')).toThrow(/up to "view"/);
+  });
+});
+
+describe('a phone holding a valid key cannot get around the levels', () => {
+  const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const b64 = (t) => Buffer.from(t).toString('base64');
+  // The 8.3 short name Windows gives a folder (null where short names are switched off).
+  const shortName = (p) => {
+    if (process.platform !== 'win32') return null;
+    try {
+      const out = execSync(`cmd /c for %I in ("${p}") do @echo %~sI`, { encoding: 'utf8' }).trim();
+      const name = path.basename(out);
+      return name.includes('~') ? name : null;
+    } catch { return null; }
+  };
+
+  it('another spelling of a hidden folder (NTFS stream, short name, case) is still hidden', async () => {
+    const { home } = await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    service.setAccess(service.status().devices[0].id, 'home:records', 'hidden');
+    for (const p of ['Records::$INDEX_ALLOCATION', 'Records::$INDEX_ALLOCATION/Grade 7 - Rizal - Science.xlsx', 'RECORDS/Grade 7 - Rizal - Science.xlsx', 'Records./Grade 7 - Rizal - Science.xlsx', 'Records /x', 'CON', 'Lessons/NUL.pdf']) {
+      await expect(client.read(p)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
+    const short = shortName(path.join(home, 'Records'));
+    if (short && short.toLowerCase() !== 'records') await expect(client.list(short)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('a full phone cannot change KaTuro Backups in an outside folder, not even by its short name', async () => {
+    await setup();
+    const sci = path.join(tmp, 'Sci');
+    fs.mkdirSync(path.join(sci, 'KaTuro Backups'), { recursive: true });
+    fs.writeFileSync(path.join(sci, 'KaTuro Backups', 'old.docx'), 'backup');
+    const client = createLinkClient((await pairPhone()).link);
+    const st = service.addShared(sci);
+    service.setAccess(st.devices[0].id, st.folders.find((f) => f.kind === 'outside').key, 'full');
+    const names = ['KaTuro Backups', 'katuro backups', 'KaTuro Backups::$INDEX_ALLOCATION'];
+    const short = shortName(path.join(sci, 'KaTuro Backups'));
+    if (short) names.push(short);
+    for (const n of names) {
+      await expect(client.request('replace', { path: `:Sci/${n}/old.docx`, data: b64('EVIL') })).rejects.toBeTruthy();
+      await expect(client.upload(`:Sci/${n}`, 'x.pdf', photo)).rejects.toBeTruthy();
+    }
+    expect(fs.readFileSync(path.join(sci, 'KaTuro Backups', 'old.docx'), 'utf8')).toBe('backup');
+    expect(fs.readdirSync(path.join(sci, 'KaTuro Backups'))).toEqual(['old.docx']);
+  });
+
+  it('a new folder below a shortcut that leads outside is refused, and nothing is made outside', async () => {
+    await setup();
+    const sci = path.join(tmp, 'Sci');
+    const outside = path.join(tmp, 'outside');
+    fs.mkdirSync(sci);
+    fs.mkdirSync(outside);
+    fs.symlinkSync(outside, path.join(sci, 'junc'), 'junction');
+    const client = createLinkClient((await pairPhone()).link);
+    const st = service.addShared(sci);
+    service.setAccess(st.devices[0].id, st.folders.find((f) => f.kind === 'outside').key, 'full');
+    await expect(client.upload(':Sci/junc/new', 'x.pdf', photo)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.upload(':Sci/junc', 'x.pdf', photo)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(fs.readdirSync(outside)).toEqual([]);
+  });
+
+  it('programs and macro files cannot be replaced, renamed or moved; device names are refused', async () => {
+    const { home } = await setup();
+    fs.writeFileSync(path.join(home, 'Lessons', 'run.bat'), 'echo hi');
+    fs.writeFileSync(path.join(home, 'Lessons', 'marks.xlsm'), 'macro');
+    const client = createLinkClient((await pairPhone()).link);
+    service.setAccess(service.status().devices[0].id, 'home:lessons', 'full');
+    for (const f of ['run.bat', 'marks.xlsm']) {
+      await expect(client.request('replace', { path: `Lessons/${f}`, data: b64('calc') })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+      await expect(client.request('rename', { path: `Lessons/${f}`, name: `x${path.extname(f)}` })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    }
+    expect(fs.readFileSync(path.join(home, 'Lessons', 'run.bat'), 'utf8')).toBe('echo hi');
+    await expect(client.upload('Lessons', 'CON.pdf', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    await expect(client.request('rename', { path: 'Lessons/Week 1/Cells.pdf', name: 'nul.pdf' })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+  });
+
+  it('two replaces in the same second each keep their own backup', async () => {
+    const { home } = await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    service.setAccess(service.status().devices[0].id, 'home:lessons', 'full');
+    const a = await client.request('replace', { path: 'Lessons/Week 1/Cells.pdf', data: b64('%PDF one') });
+    const b = await client.request('replace', { path: 'Lessons/Week 1/Cells.pdf', data: b64('%PDF two') });
+    expect(a.backup).not.toBe(b.backup);
+    expect(fs.readFileSync(path.join(home, ...b.backup.split('/')), 'utf8')).toBe('%PDF one');
+  });
+
+  it('a hidden folder such as .ssh cannot be added for phones', async () => {
+    await setup();
+    fs.mkdirSync(path.join(tmp, '.ssh'));
+    expect(() => service.addShared(path.join(tmp, '.ssh'))).toThrow(/Hidden folders/);
   });
 });
 

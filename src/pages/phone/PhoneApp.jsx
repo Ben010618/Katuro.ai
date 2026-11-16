@@ -94,7 +94,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
 
   const atTop = !path;
   const items = atTop
-    ? [...state.items.filter((i) => MAIN.includes(i.name)).sort((a, b) => MAIN.indexOf(a.name) - MAIN.indexOf(b.name)), ...state.items.filter((i) => !MAIN.includes(i.name))]
+    ? [...state.items.filter((i) => MAIN.includes(i.path)).sort((a, b) => MAIN.indexOf(a.path) - MAIN.indexOf(b.path)), ...state.items.filter((i) => !MAIN.includes(i.path))]
     : state.items;
 
   return (
@@ -107,7 +107,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
       {!state.loading && !state.error && !items.length && <p className="nm-muted py-10 text-center text-sm">Empty</p>}
       <ul className="space-y-4">
         {items.map((i) => {
-          const main = atTop && MAIN.includes(i.name);
+          const main = atTop && MAIN.includes(i.path);
           return (
             <li key={i.path}>
               <button type="button" onClick={() => onOpen(i)} className={`nm nm-press flex w-full items-center gap-4 rounded-3xl px-5 text-left ${main ? 'py-5' : 'py-4'}`}>
@@ -136,6 +136,8 @@ export default function PhoneApp() {
   const [link, setLink] = useState(() => loadLink());
   const [path, setPath] = useState('');
   const [file, setFile] = useState(null);
+  // The folder now listed, with what KaTuroDesk lets this phone do there (its "access").
+  const [listing, setListing] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
   const [deskNote, setDeskNote] = useState(''); // why KaTuroDesk refused (e.g. another account signed in there)
   const [update, setUpdate] = useState(null); // a newer KaTuro App (appUpdate.js)
@@ -251,6 +253,7 @@ export default function PhoneApp() {
     setLink(null);
     setPath('');
     setFile(null);
+    setListing(null);
     await new Promise((r) => setTimeout(r, 0));
     await forgetPhoneData();
   }, []);
@@ -288,8 +291,6 @@ export default function PhoneApp() {
     if (err.code === 'NOT_LINKED') wipe();
   }, [wipe]);
 
-  // The folder now listed, with what KaTuroDesk lets this phone do there (its "access").
-  const [listing, setListing] = useState(null);
   const onListLoaded = useCallback((r) => { setOnline(true); setListing(r); }, []);
   // Where the "+" sends files: this folder when KaTuroDesk allows adding here; from the top,
   // Lessons (also while KaTuroDesk can't be reached: the files wait on the phone and it checks then).
@@ -428,6 +429,7 @@ export default function PhoneApp() {
                 </div>
               )}
               {sharedNote && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">{sharedNote}</p>}
+              {tab === 'files' && listing && listing.access === undefined && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">Update KaTuroDesk on your computer to 1.18.0 to send and change files from this phone.</p>}
               {tab === 'files' && filesNote && <p className="nm-green mx-5 mt-3 text-xs font-medium">{filesNote}</p>}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
               {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go({ file: i })} />}

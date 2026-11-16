@@ -107,8 +107,9 @@ function FileActions({ entry, client, file, kept, onClose, onDone }) {
   // A kept copy follows the file to its new name or place.
   const follow = async (newPath, newName, bytes = file?.bytes) => {
     if (!kept || !bytes) return;
-    await keepFile(newPath, { name: newName, size: bytes.byteLength, bytes }).catch(() => {});
-    if (newPath !== entry.path) await forgetKept(entry.path).catch(() => {});
+    // The old copy goes only once the new one is saved (a full phone keeps the old one).
+    const saved = await keepFile(newPath, { name: newName, size: bytes.byteLength, bytes }).then(() => true, () => false);
+    if (saved && newPath !== entry.path) await forgetKept(entry.path).catch(() => {});
   };
   const run = async (fn) => {
     setBusy(true);

@@ -62,7 +62,7 @@ export function OutboxBanner({ client, onSent, version }) {
       <ul className="mt-1 text-xs text-amber-900 space-y-1">
         {items.map((i) => (
           <li key={i.id} className="flex items-start gap-2">
-            <span className="flex-1 min-w-0"><span className="block truncate">{i.name} → {i.folder}</span>{i.error && <span className="block text-red-700">{i.error}</span>}</span>
+            <span className="flex-1 min-w-0"><span className="block truncate">{i.name} → {folderLabel(i.folder)}</span>{i.error && <span className="block text-red-700">{i.error}</span>}</span>
             <button type="button" aria-label={`Do not send ${i.name}`} onClick={async () => { await dropFromOutbox(i.id); after(null); }} className="p-1 text-amber-700"><X size={14} /></button>
           </li>
         ))}
@@ -175,7 +175,7 @@ function ScanToPdf({ client, folder, onClose, onSent }) {
         <Card className="text-center space-y-2">
           {done.queued ? <CloudOff size={40} className="mx-auto text-amber-600" /> : <CheckCircle2 size={40} className="mx-auto text-emerald-600" />}
           <p className="text-lg font-bold">{done.queued ? 'Saved on this phone' : 'Sent'}</p>
-          <p className="text-sm text-gray-600">{done.queued ? `${done.name} will be sent to ${folder} when KaTuroDesk is reachable.` : `${done.name} is in ${folder} on KaTuroDesk.`}</p>
+          <p className="text-sm text-gray-600">{done.queued ? `${done.name} will be sent to ${folderLabel(folder)} when KaTuroDesk is reachable.` : `${done.name} is in ${folderLabel(folder)} on KaTuroDesk.`}</p>
         </Card>
         <button type="button" onClick={onClose} className="w-full rounded-xl bg-emerald-700 py-3 font-bold text-white">Done</button>
       </div>
@@ -186,7 +186,7 @@ function ScanToPdf({ client, folder, onClose, onSent }) {
       <Card className="space-y-2">
         <label className="block text-xs font-semibold text-gray-600" htmlFor="kt-scan-name">PDF name</label>
         <input id="kt-scan-name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-        <p className="text-[11px] text-gray-500">Goes to <b>{folder}</b>. Take one photo per page, flat and in good light.</p>
+        <p className="text-[11px] text-gray-500">Goes to <b>{folderLabel(folder)}</b>. Take one photo per page, flat and in good light.</p>
       </Card>
       <div className="grid grid-cols-3 gap-2">
         {pages.map((p, i) => (
@@ -283,8 +283,12 @@ export function AddToFolder({ client, folder, onSent }) {
  * Files shared to KaTuro from another app (Android Share → KaTuro): choose a folder this phone
  * may add to (Lessons first, then the others KaTuroDesk allows, and their folders), then send.
  */
+const OLD_DESK = 'Update KaTuroDesk on your computer to 1.18.0 to send files from this phone.';
+
 export function SharedFilesSheet({ client, files, onClose, onSent }) {
   const [folder, setFolder] = useState('');
+  const [note, setNote] = useState(''); // when this phone may not add anywhere (or KaTuroDesk is older)
+  const [loaded, setLoaded] = useState(false);
   const [folders, setFolders] = useState([]);
   const [busy, setBusy] = useState('');
   const [results, setResults] = useState(null);
@@ -292,8 +296,9 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
     let alive = true;
     client.list('')
       .then((r) => {
+        if (r.access === undefined) throw Object.assign(new Error(OLD_DESK), { oldDesk: true });
         const tops = r.items.filter((i) => i.kind === 'directory' && canAdd(i.access))
-          .sort((a, b) => (a.name === 'Lessons' ? -1 : b.name === 'Lessons' ? 1 : 0));
+          .sort((a, b) => (a.path === 'Lessons' ? -1 : b.path === 'Lessons' ? 1 : 0));
         return Promise.all(tops.map((t) => client.list(t.path)
           .then((sub) => [t.path, ...sub.items.filter((i) => i.kind === 'directory' && canAdd(i.access)).map((i) => i.path)])
           .catch(() => [t.path])));
@@ -303,10 +308,14 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
         const all = lists.flat();
         setFolders(all);
         setFolder((f) => f || all[0] || '');
+        setLoaded(true);
+        if (!all.length) setNote('This phone may not add files to any folder. Change it in KaTuroDesk Settings → Phones.');
       })
       // KaTuroDesk not reachable now: Lessons, kept in the outbox until it is (it checks again then).
-      .catch(() => {
+      .catch((err) => {
         if (!alive) return;
+        setLoaded(true);
+        if (err.oldDesk) { setNote(err.message); return; }
         setFolders(['Lessons']);
         setFolder((f) => f || 'Lessons');
       });
@@ -333,7 +342,8 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
             <select id="kt-share-folder" value={folder} onChange={(e) => setFolder(e.target.value)} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm">
               {(folders.length ? folders : ['Lessons']).map((p) => <option key={p} value={p}>{folderLabel(p)}</option>)}
             </select>
-            {folders.length === 0 && <p className="text-[11px] text-gray-500">Checking which folders KaTuroDesk lets this phone add to…</p>}
+            {!loaded && <p className="text-[11px] text-gray-500">Checking which folders KaTuroDesk lets this phone add to…</p>}
+            {note && <p className="text-xs text-amber-800">{note}</p>}
             <button type="button" disabled={Boolean(busy) || !folder} onClick={send} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-60">{busy || `Send ${files.length} file${files.length > 1 ? 's' : ''}`}</button>
           </>
         )}

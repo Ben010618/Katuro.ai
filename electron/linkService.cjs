@@ -28,7 +28,6 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { isInsideFolder } = require('./defaultFolders.cjs');
 const access = require('./phoneAccess.cjs');
 
 const VERSION = 1;
@@ -68,14 +67,6 @@ function open(key, { iv, ct }, additional) {
   d.setAAD(additional);
   d.setAuthTag(all.subarray(all.length - 16));
   return JSON.parse(Buffer.concat([d.update(all.subarray(0, all.length - 16)), d.final()]).toString('utf8'));
-}
-
-/** `rel` (forward slashes, relative to the KaTuro folder) → an absolute path inside it, or null. */
-function insideHome(home, rel) {
-  const clean = String(rel || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  if (clean.split('/').some((p) => p === '..' || HIDDEN.test(p))) return null;
-  const abs = path.resolve(home, clean);
-  return isInsideFolder(abs, home) ? abs : null;
 }
 
 function plainJson(res, code, body) {
@@ -246,6 +237,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (!p.key) throw refused('Open a folder first, for example Lessons, then send the file there.');
     const file = cleanName(name);
     if (!file || !UPLOAD_TYPES.test(file)) throw refused('KaTuro takes documents, pictures, sound and video files only.');
+    if (access.badPart(file)) throw refused('Choose another name for this file.');
     const bytes = fileBytes(data);
     fs.mkdirSync(p.abs, { recursive: true });
     const ext = path.extname(file);
@@ -270,6 +262,8 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     const p = place(rel, device, 'full');
     if (!p.key || !p.rel) throw refused('KaTuro folders themselves cannot be changed from the phone.');
     if (!fs.existsSync(p.abs) || !fs.statSync(p.abs).isFile()) throw notFound('That file is not on this computer for your phone.');
+    // Only the kinds of files a phone may send (never programs or macro files) can be changed.
+    if (!UPLOAD_TYPES.test(path.basename(p.abs))) throw refused('Only documents, pictures, sound and video files can be changed from the phone.');
     return p;
   }
 
@@ -278,6 +272,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     const file = cleanName(name);
     const ext = path.extname(p.abs);
     if (!file) throw refused('Type a name.');
+    if (access.badPart(file)) throw refused('Choose another name.');
     if (path.extname(file).toLowerCase() !== ext.toLowerCase()) throw refused(`Keep the ${ext} ending.`);
     const target = path.join(path.dirname(p.abs), file);
     if (target === p.abs) return { path: access.phonePathOf(p, p.abs), name: file };
@@ -311,11 +306,22 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     const pad = (n) => String(n).padStart(2, '0');
     const relDir = path.relative(p.root, path.dirname(p.abs));
     const base = path.basename(p.abs, ext);
-    const backup = path.join(p.root, 'KaTuro Backups', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, relDir, `${base} (backup ${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())})${ext}`);
+    const dir = path.join(p.root, 'KaTuro Backups', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, relDir);
+    const stamp = `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
     const temp = `${p.abs}.katuro-new`;
+    let backup = '';
     try {
-      fs.mkdirSync(path.dirname(backup), { recursive: true });
-      fs.copyFileSync(p.abs, backup, fs.constants.COPYFILE_EXCL);
+      fs.mkdirSync(dir, { recursive: true });
+      // A second replace in the same second gets its own backup (… (backup 143205 2).pdf).
+      for (let i = 1; !backup; i += 1) {
+        const candidate = path.join(dir, `${base} (backup ${stamp}${i > 1 ? ` ${i}` : ''})${ext}`);
+        try {
+          fs.copyFileSync(p.abs, candidate, fs.constants.COPYFILE_EXCL);
+          backup = candidate;
+        } catch (err) {
+          if (err.code !== 'EEXIST' || i > 50) throw err;
+        }
+      }
       fs.writeFileSync(temp, bytes);
       fs.renameSync(temp, p.abs);
     } catch (err) {
@@ -522,4 +528,4 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
   };
 }
 
-module.exports = { createLinkService, insideHome };
+module.exports = { createLinkService };

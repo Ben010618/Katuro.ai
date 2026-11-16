@@ -14,7 +14,11 @@ const READ_MS = 60000;
 // Addresses kept per KaTuroDesk: each unreachable one costs a wait, so the list stays short.
 export const MAX_HOSTS = 6;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
-const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
+const SLOW_OPS = new Set(['read', 'upload', 'rename', 'move', 'replace', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
+// File changes on KaTuroDesk: one that runs out of time may still have been done there, so it is
+// never sent again to another address of the computer, nor kept to send later (TIMEOUT, not
+// UNREACHABLE). The teacher looks first.
+const FILE_CHANGES = new Set(['upload', 'rename', 'move', 'replace']);
 // An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
 const ASK_MS = 5 * 60000 + 15000;
 
@@ -88,6 +92,7 @@ async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs })
   try {
     res = await fetchImpl(`http://${host}:${port}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: t.signal });
   } catch {
+    if (t.signal.aborted && FILE_CHANGES.has(op)) throw new LinkError('KaTuroDesk took too long to answer. Look in the folder whether it was done before trying again.', 'TIMEOUT');
     throw new LinkError(UNREACHABLE, 'UNREACHABLE');
   } finally {
     t.done();
@@ -189,9 +194,9 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
     },
     /** One folder of the KaTuro folder ('' = the top). → { path, items: [{ name, path, kind, size?, lastModified? }] } */
     list: (path = '') => call('list', { path }),
-    /** Any other request KaTuroDesk answers (classes, class, record, quizzes, quiz). */
-    request: (op, args) => call(op, args),
-    /** Sends a file into Records or Lessons (or a folder in them). → { path, name, size } */
+    /** Any other request KaTuroDesk answers (classes, class, record, rename, move, replace, …). options: { timeoutMs } */
+    request: (op, args, options) => call(op, args, options),
+    /** Sends a file into a folder KaTuroDesk lets this phone add to. → { path, name, size } */
     upload: (folder, name, bytes) => call('upload', { folder, name, data: bytesToBase64(bytes) }),
     /** One file. → { name, size, bytes: Uint8Array } */
     async read(path) {
