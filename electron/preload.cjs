@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   linkPhone: () => ipcRenderer.invoke('link:pair'),
   cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
   removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
+  setLinkAccount: (uid) => ipcRenderer.invoke('link:account', uid),
   // KaTuroDesk answers the phone's class-record requests (src/pages/desk/usePhoneRequests.js).
   phoneHomeRoot: () => ipcRenderer.invoke('workspace:homeRoot'),
   onLinkRequest: (callback) => {

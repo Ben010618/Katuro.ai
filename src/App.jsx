@@ -168,7 +168,7 @@ function ProtectedRoute({ children }) {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (pendingApproval) return <PendingApprovalScreen />;
-  // Website only (KaTuroDesk uses DesktopAppShell): email code every 30 days when switched on.
+  // Website only (KaTuroDesk and the phone app use SignedInShell): email code every 30 days when switched on.
   return <EmailCodeGate uid={user.uid} fallback={<LoadingScreen />}>{children}</EmailCodeGate>;
 }
 
@@ -194,15 +194,19 @@ function RootRoute() {
   return <LandingPage />;
 }
 
-function DesktopAppShell() {
+/**
+ * KaTuroDesk (Electron) and the KaTuro App (phone): the same KaTuro account sign-in as the
+ * website (LoginPage), then the app's own home. `where` names the app in error logs.
+ */
+function SignedInShell({ where, children }) {
   const { user, loading, disabled, pendingApproval } = useAuth();
 
   useEffect(() => {
     if (!user) return;
     ensureTeacherProfile(user.uid, user.email).catch((err) => {
-      console.error('[kaTuro] Teacher profile check in desktop:', err);
+      console.error(`[kaTuro] Teacher profile check in ${where}:`, err);
     });
-  }, [user]);
+  }, [user, where]);
 
   useEffect(() => {
     if (disabled && !pendingApproval && user) {
@@ -214,29 +218,7 @@ function DesktopAppShell() {
   if (disabled && !pendingApproval && user) return null;
   if (!user) return <LoginPage />;
   if (pendingApproval) return <PendingApprovalScreen />;
-  return <KaTuroDeskPage />;
-}
-
-// The KaTuro App on the phone (Katuro_App/, Capacitor): sign in, then the phone home.
-function MobileAppShell() {
-  const { user, loading, disabled, pendingApproval } = useAuth();
-
-  useEffect(() => {
-    if (!user) return;
-    ensureTeacherProfile(user.uid, user.email).catch((err) => {
-      console.error('[kaTuro] Teacher profile check in the phone app:', err);
-    });
-  }, [user]);
-
-  useEffect(() => {
-    if (disabled && !pendingApproval && user) signOut(auth);
-  }, [disabled, pendingApproval, user]);
-
-  if (loading) return <LoadingScreen />;
-  if (disabled && !pendingApproval && user) return null;
-  if (!user) return <LoginPage />;
-  if (pendingApproval) return <PendingApprovalScreen />;
-  return <PhoneApp />;
+  return children;
 }
 
 export default function App() {
@@ -248,7 +230,7 @@ export default function App() {
         <ToastProvider>
           <HashRouter>
             <Suspense fallback={<LoadingScreen />}>
-              <MobileAppShell />
+              <SignedInShell where="the phone app"><PhoneApp /></SignedInShell>
             </Suspense>
           </HashRouter>
         </ToastProvider>
@@ -262,7 +244,7 @@ export default function App() {
         <ToastProvider>
           <HashRouter>
             <Suspense fallback={<LoadingScreen />}>
-              <DesktopAppShell />
+              <SignedInShell where="desktop"><KaTuroDeskPage /></SignedInShell>
             </Suspense>
           </HashRouter>
         </ToastProvider>

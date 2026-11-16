@@ -35,8 +35,9 @@ const MAX_REQUEST_BYTES = 40 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 // Folders a phone may add files to (and their subfolders). The others are view only.
 const WRITABLE_TOP = ['records', 'lessons'];
-// What a phone may send: documents, pictures, sound and video for lessons. Never programs.
-const UPLOAD_TYPES = /\.(pdf|docx?|xlsx?|xlsm|pptx?|csv|txt|rtf|odt|ods|odp|jpe?g|png|webp|heic|heif|gif|bmp|mp3|m4a|wav|ogg|mp4|mov|3gp|webm)$/i;
+// What a phone may send: documents, pictures, sound and video for lessons. Never programs,
+// and no formats that can carry macros (.docm/.xlsm/.pptm, old .doc/.xls/.ppt).
+const UPLOAD_TYPES = /\.(pdf|docx|xlsx|pptx|csv|txt|rtf|odt|ods|odp|jpe?g|png|webp|heic|heif|gif|bmp|mp3|m4a|wav|ogg|mp4|mov|3gp|webm)$/i;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_DEVICES = 10;
 const MAX_LIST = 2000;
@@ -101,12 +102,24 @@ const CORS = {
  * askDesk(op, args, device) → Promise of the answer from the KaTuroDesk window (optional)
  * onFileAdded({ path, name, size, phone }) → after a phone sent a file into Records / Lessons
  */
-function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, onFileAdded = () => {}, now = () => Date.now() }) {
+function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, onFileAdded = () => {}, account: startAccount = '', now = () => Date.now() }) {
   let server = null;
+  // The KaTuro account signed in on KaTuroDesk ('' = signed out): phones are linked to it.
+  let account = String(startAccount || '');
   let port = null;
   let pairing = null; // { id, key, expiresAt }
-  const seen = new Map(); // nonce → expiry
   const sockets = new Set();
+
+  // Nonces already used, with their expiry. Kept in a file next to the phones list, so a
+  // message captured on the Wi-Fi cannot be replayed after KaTuroDesk restarts either.
+  const seenFile = path.join(path.dirname(storeFile), 'linked-phones-seen.json');
+  const seen = new Map(); // nonce → expiry
+  try {
+    for (const [n, exp] of JSON.parse(fs.readFileSync(seenFile, 'utf8'))) if (exp > now()) seen.set(n, exp);
+  } catch { /* first run, or unreadable: start empty */ }
+  const saveSeen = () => {
+    try { fs.writeFileSync(seenFile, JSON.stringify([...seen])); } catch { /* not critical: the clock window still applies */ }
+  };
 
   // ── saved phones ──
   function load() {
@@ -223,6 +236,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (!Number.isFinite(ts) || Math.abs(t - ts) > CLOCK_SKEW_MS) return false;
     if (seen.has(nonce)) return false;
     seen.set(nonce, t + 2 * CLOCK_SKEW_MS);
+    saveSeen();
     return true;
   }
 
@@ -235,14 +249,24 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       let req;
       try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This QR code is not valid.' } }; }
       if (req.op !== 'pair' || !freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: 'Bad pairing request.' } };
-      if (store.devices.length >= MAX_DEVICES) {
-        return { code: 200, sealed: seal(key, { error: `Up to ${MAX_DEVICES} phones can be linked. Remove one in KaTuroDesk first.` }, aad(id, 'res', req.nonce)) };
-      }
+      const refuse = (error, code) => ({ code: 200, sealed: seal(key, { error, code }, aad(id, 'res', req.nonce)) });
+      if (store.devices.length >= MAX_DEVICES) return refuse(`Up to ${MAX_DEVICES} phones can be linked. Remove one in KaTuroDesk first.`, 'TOO_MANY');
+      // One KaTuro account on both sides: the phone must be signed in as the teacher on KaTuroDesk.
+      const phoneUid = String(req.args?.uid || '');
+      if (!account) return refuse('Sign in to KaTuroDesk on the computer first, then show a new code.', 'DESK_SIGNED_OUT');
+      if (phoneUid !== account) return refuse('This phone is signed in to a different KaTuro account than KaTuroDesk. Sign in with the same account on both, then link again.', 'WRONG_ACCOUNT');
       const deviceId = b64u(crypto.randomBytes(12));
       const deviceKey = crypto.randomBytes(32);
       const name = String(req.args?.deviceName || 'Phone').replace(/[\u0000-\u001f]/g, '').slice(0, 60) || 'Phone';
-      store.devices.push({ id: deviceId, name, key: protect.encrypt(deviceKey), pairedAt: new Date(now()).toISOString(), lastSeen: new Date(now()).toISOString() });
-      save();
+      const device = { id: deviceId, name, uid: account, key: protect.encrypt(deviceKey), pairedAt: new Date(now()).toISOString(), lastSeen: new Date(now()).toISOString() };
+      // Saved first: a phone that could not be saved is not linked (and leaves nothing behind).
+      store = { ...store, devices: [...store.devices, device] };
+      try {
+        save();
+      } catch {
+        store = { ...store, devices: store.devices.filter((d) => d.id !== deviceId) };
+        return { code: 200, sealed: seal(key, { error: 'KaTuroDesk could not save this phone. Try again.' }, aad(id, 'res', req.nonce)) };
+      }
       pairing = null; // one phone per QR code
       onChange(status());
       return { code: 200, sealed: seal(key, { ok: true, deviceId, key: b64u(deviceKey), deskId: store.deskId, deskName }, aad(id, 'res', req.nonce)) };
@@ -254,6 +278,10 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     let req;
     try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk.', code: 'NOT_LINKED' } }; }
     if (!freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: "The phone's clock or message is off. Check the phone's date and time.", code: 'STALE' } };
+    // KaTuroDesk is now signed in to another account (or signed out): that teacher's phone is not served.
+    if (!account || (device.uid && device.uid !== account)) {
+      return { code: 200, sealed: seal(key, { error: 'KaTuroDesk is not signed in to your KaTuro account right now. Sign in on the computer with the same account as this phone.', code: 'OTHER_ACCOUNT' }, aad(id, 'res', req.nonce)) };
+    }
     let body;
     try {
       body = { ok: true, result: await handle(req.op, req.args || {}, device) };
@@ -336,6 +364,12 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       pairing = null;
       onChange(status());
     },
+    /** The KaTuro account signed in on KaTuroDesk now ('' when signed out). */
+    setAccount(uid) {
+      account = String(uid || '');
+      if (pairing && !account) pairing = null;
+      onChange(status());
+    },
     removeDevice(id) {
       const before = store.devices.length;
       store.devices = store.devices.filter((d) => d.id !== id);
@@ -345,4 +379,4 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
   };
 }
 
-module.exports = { createLinkService, QR_PREFIX, VERSION, PREFERRED_PORT, MAX_FILE_BYTES, insideHome };
+module.exports = { createLinkService, insideHome };

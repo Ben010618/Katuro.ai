@@ -5,12 +5,14 @@
  * Plain WebCrypto (AES-256-GCM) and fetch, so it runs in the phone app and in tests.
  */
 
+import { bytesToBase64 } from '../../utils/bytes.js';
+
 export const QR_PREFIX = 'KTLINK1:';
 export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
-const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'quizzes', 'quiz', 'schedule', 'addEvent']);
+const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
 // An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
 const ASK_MS = 5 * 60000 + 15000;
 
@@ -18,25 +20,16 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 export function b64uEncode(bytes) {
-  let s = '';
-  const u = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return bytesToBase64(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function b64uDecode(str) {
+function b64uDecode(str) {
   const s = String(str || '').replace(/-/g, '+').replace(/_/g, '/');
   const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-
-/** Bytes → plain base64 (not url-safe); files are sent to the Desk this way. */
-export const bytesToBase64 = (bytes) => {
-  const s = b64uEncode(bytes).replace(/-/g, '+').replace(/_/g, '/');
-  return s + '='.repeat((4 - (s.length % 4)) % 4);
-};
 
 /** Plain base64 (not url-safe) → bytes; the Desk sends file contents this way. */
 export const base64ToBytes = (s) => b64uDecode(String(s || '').replace(/\+/g, '-').replace(/\//g, '_'));
@@ -71,7 +64,7 @@ export function parseLinkQr(text) {
   }
 }
 
-export class LinkError extends Error {
+class LinkError extends Error {
   constructor(message, code = 'ERROR', details = null) {
     super(message);
     this.code = code;
@@ -138,9 +131,13 @@ async function tryHosts(hosts, run) {
  * Pairs with the KaTuroDesk whose QR code was scanned.
  * → the saved link: { deskId, deskName, deviceId, key, hosts, port, pairedAt }
  */
-export async function pairWithDesk(qr, { deviceName = 'Phone', fetchImpl = fetch } = {}) {
+/**
+ * uid = the KaTuro account signed in on the phone: KaTuroDesk links only a phone signed in to
+ * the same account as KaTuroDesk itself.
+ */
+export async function pairWithDesk(qr, { deviceName = 'Phone', uid = '', fetchImpl = fetch } = {}) {
   const key = await importKey(b64uDecode(qr.key));
-  const { host, out } = await tryHosts(qr.hosts, (h) => exchange({ host: h, port: qr.port, id: qr.id, key, op: 'pair', args: { deviceName }, fetchImpl, timeoutMs: TRY_MS }));
+  const { host, out } = await tryHosts(qr.hosts, (h) => exchange({ host: h, port: qr.port, id: qr.id, key, op: 'pair', args: { deviceName, uid }, fetchImpl, timeoutMs: TRY_MS }));
   return {
     deskId: out.deskId,
     deskName: out.deskName || qr.deskName,

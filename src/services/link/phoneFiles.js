@@ -51,11 +51,15 @@ export async function keptFiles() {
   const all = (await run(KEPT, 'readonly', (s) => s.getAll())) || [];
   return all.map(({ path, name, size, keptAt }) => ({ path, name, size, keptAt })).sort((a, b) => a.name.localeCompare(b.name));
 }
-export const forgetAllKept = () => run(KEPT, 'readwrite', (s) => s.clear());
+/** Removes every kept file and every file waiting to be sent (unlink / sign-out). */
+export async function forgetPhoneFiles() {
+  await run(KEPT, 'readwrite', (s) => s.clear());
+  await run(OUTBOX, 'readwrite', (s) => s.clear());
+}
 
 // ── Outbox ──
 /** Adds a file to send; → its id. */
-export async function addToOutbox({ folder, name, bytes }) {
+async function addToOutbox({ folder, name, bytes }) {
   const id = newId();
   await run(OUTBOX, 'readwrite', (s) => s.put({ id, folder, name, bytes, size: bytes.byteLength, addedAt: new Date().toISOString(), error: null }));
   return id;
@@ -70,7 +74,12 @@ const removeFromOutbox = (id) => run(OUTBOX, 'readwrite', (s) => s.delete(id));
  * Sends what is waiting, oldest first; stops at the first "can't reach".
  * A file KaTuroDesk refused stays with its reason. → { sent: [result], failed, unreachable }
  */
-export async function sendOutbox(client) {
+let sendingOutbox = null; // one send at a time: a second caller waits for the same run
+export function sendOutbox(client) {
+  if (!sendingOutbox) sendingOutbox = sendOutboxOnce(client).finally(() => { sendingOutbox = null; });
+  return sendingOutbox;
+}
+async function sendOutboxOnce(client) {
   const sent = [];
   const failed = [];
   for (const item of await outbox()) {

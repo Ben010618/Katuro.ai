@@ -12,6 +12,8 @@
  * open it on every schedule call): reminders ring within a few minutes (inexact) until the
  * teacher taps "Ring exactly on time" on the Today tab (allowExactReminders).
  */
+import { clock } from '../../utils/dates.js';
+
 const STORE = 'katuro-phone-reminders-v1';
 const REMIND_PREFIX = 'r'; // notification id space for reminders (messages use others)
 
@@ -31,10 +33,6 @@ export function idFor(text) {
   return (h >>> 1) || 1;
 }
 
-const fmt = (hhmm) => {
-  const [h, m] = String(hhmm).split(':').map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-};
 const before = (min) => (min === 0 ? 'now' : min === 1440 ? 'tomorrow' : min >= 60 && min % 60 === 0 ? `in ${min / 60} hour${min === 60 ? '' : 's'}` : `in ${min} minutes`);
 
 /**
@@ -50,7 +48,7 @@ export function reminderNotifications(reminders = [], now = Date.now()) {
       return {
         id: idFor(`${REMIND_PREFIX}|${r.id}|${r.date}|${r.time}|${r.remindMinutes}`),
         title: r.title,
-        body: `${r.remindMinutes ? `${before(r.remindMinutes)}, ` : ''}at ${fmt(r.time)}${r.note ? ` · ${r.note}` : ''}`,
+        body: `${r.remindMinutes ? `${before(r.remindMinutes)}, ` : ''}at ${clock(r.time)}${r.note ? ` · ${r.note}` : ''}`,
         at: new Date(at),
       };
     })
@@ -65,7 +63,7 @@ const saveIds = (ids) => { try { localStorage.setItem(STORE, JSON.stringify(ids)
 export const canNotify = () => Boolean(bridge());
 
 /** True when Android lets KaTuro ring reminders on the minute ("Alarms & reminders"). */
-export async function exactReminders() {
+async function exactReminders() {
   if (!bridge()) return false;
   try {
     return (await call('checkExactNotificationSetting'))?.exact_alarm === 'granted';
@@ -85,7 +83,7 @@ export async function allowExactReminders() {
 }
 
 /** Asks Android once for permission to show notifications. → true when allowed. */
-export async function allowNotifications() {
+async function allowNotifications() {
   if (!bridge()) return false;
   try {
     const st = await call('checkPermissions');

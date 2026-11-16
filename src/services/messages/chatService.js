@@ -64,11 +64,7 @@ export function fileProblem(name, size) {
   return '';
 }
 
-export function formatBytes(n) {
-  if (!n) return '0 KB';
-  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
+export { formatBytes } from '../../utils/bytes.js';
 
 let functionsBase = USE_EMULATORS
   ? 'http://127.0.0.1:5001/demo-katuro/us-central1'

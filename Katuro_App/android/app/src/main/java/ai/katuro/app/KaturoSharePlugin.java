@@ -26,10 +26,15 @@ import java.util.List;
  * take() (on start, and when the "shared" event says new files arrived). Files are read
  * from the sharing app's content URI (Android grants this app temporary read access),
  * up to 25 MB each, and given to the page as base64. Nothing is stored here.
+ *
+ * Memory: one take() returns at most MAX_BATCH bytes of files (base64 and the bridge copy
+ * multiply it several times); the rest stay waiting and the result says "more", so the page
+ * asks again. A file is taken off the waiting list only once it has been read.
  */
 @CapacitorPlugin(name = "KaturoShare")
 public class KaturoSharePlugin extends Plugin {
     private static final long MAX_BYTES = 25L * 1024 * 1024;
+    private static final long MAX_BATCH = 30L * 1024 * 1024;
     private static final List<Uri> pending = new ArrayList<>();
     private static KaturoSharePlugin instance;
 
@@ -61,19 +66,26 @@ public class KaturoSharePlugin extends Plugin {
         if (instance != null) instance.notifyListeners("shared", new JSObject(), true);
     }
 
-    /** → { files: [{ name, mimeType, size, data (base64) }], skipped: [{ name, reason }] } */
+    /** → { files: [{ name, mimeType, size, data (base64) }], skipped: [{ name, reason }], more: boolean } */
     @PluginMethod
     public void take(PluginCall call) {
-        List<Uri> uris;
-        synchronized (pending) {
-            uris = new ArrayList<>(pending);
-            pending.clear();
-        }
         ContentResolver resolver = getContext().getContentResolver();
         JSArray files = new JSArray();
         JSArray skipped = new JSArray();
+        long batch = 0;
         int n = 0;
-        for (Uri uri : uris) {
+        while (true) {
+            Uri uri;
+            synchronized (pending) {
+                if (pending.isEmpty()) break;
+                uri = pending.get(0);
+            }
+            long size = sizeOf(resolver, uri);
+            // This file would make the batch too big: leave it for the next call (unless it is the first).
+            if (batch > 0 && size > 0 && batch + Math.min(size, MAX_BYTES) > MAX_BATCH) break;
+            synchronized (pending) {
+                pending.remove(0);
+            }
             n += 1;
             String name = displayName(resolver, uri, n);
             try (InputStream in = resolver.openInputStream(uri)) {
@@ -92,6 +104,7 @@ public class KaturoSharePlugin extends Plugin {
                     skipped.put(new JSObject().put("name", name).put("reason", "too big to send (up to 25 MB)"));
                     continue;
                 }
+                batch += total;
                 JSObject f = new JSObject();
                 f.put("name", name);
                 f.put("mimeType", resolver.getType(uri));
@@ -105,7 +118,20 @@ public class KaturoSharePlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("files", files);
         result.put("skipped", skipped);
+        synchronized (pending) {
+            result.put("more", !pending.isEmpty());
+        }
         call.resolve(result);
+    }
+
+    /** The file's size when the sharing app tells it, else -1. */
+    private static long sizeOf(ContentResolver resolver, Uri uri) {
+        try (Cursor c = resolver.query(uri, new String[] { OpenableColumns.SIZE }, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        } catch (Exception ignored) {
+            // unknown size: read it and see
+        }
+        return -1;
     }
 
     private static String displayName(ContentResolver resolver, Uri uri, int n) {

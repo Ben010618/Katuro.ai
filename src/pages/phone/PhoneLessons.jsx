@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Camera, CheckCircle2, CloudOff, FileUp, FolderOpen, HardDriveDownload, Loader2, Plus, ScanText, Trash2, X } from 'lucide-react';
 import { canSendTo, keptFiles, outbox, sendOutbox, dropFromOutbox, sendOrKeep, shrinkPhoto, pagesToPdf, stampName } from '../../services/link/phoneFiles';
+import { formatBytes } from '../../utils/bytes';
 
-const size = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
 const MAX_SEND = 25 * 1024 * 1024;
 
@@ -23,7 +23,7 @@ export function KeptList({ onOpen, version }) {
           <li key={f.path}>
             <button type="button" onClick={() => onOpen({ name: f.name, path: f.path, kind: 'file', size: f.size })} className="w-full px-4 py-2.5 text-left">
               <span className="block text-sm font-semibold text-gray-900 truncate">{f.name}</span>
-              <span className="block text-[11px] text-gray-500 truncate">{f.path.split('/').slice(0, -1).join(' › ')} · {size(f.size)}</span>
+              <span className="block text-[11px] text-gray-500 truncate">{f.path.split('/').slice(0, -1).join(' › ')} · {formatBytes(f.size)}</span>
             </button>
           </li>
         ))}
@@ -311,7 +311,7 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
           <p className="text-base font-bold text-gray-900">Send to KaTuroDesk</p>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1"><X size={20} /></button>
         </div>
-        <ul className="text-sm text-gray-800 space-y-0.5">{files.map((f) => <li key={f.name} className="truncate">• {f.name} <span className="text-gray-500">({size(f.bytes.byteLength)})</span></li>)}</ul>
+        <ul className="text-sm text-gray-800 space-y-0.5">{files.map((f) => <li key={f.name} className="truncate">• {f.name} <span className="text-gray-500">({formatBytes(f.bytes.byteLength)})</span></li>)}</ul>
         {!results && (
           <>
             <label className="block text-xs font-semibold text-gray-600" htmlFor="kt-share-folder">Folder</label>

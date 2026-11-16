@@ -2,27 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Camera, Check, CheckCircle2, CloudOff, History, Loader2, RotateCcw, SkipForward } from 'lucide-react';
 import { cropAround, readHandwrittenScore } from '../../services/link/scoreReading';
 import { newId, queueRecording, classOrder } from '../../services/link/scoreEntry';
+import { isoDay } from '../../utils/dates';
 
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
-const pad = (n) => String(n).padStart(2, '0');
-const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const when = (ms) => new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 
 /**
  * Snap the checked papers: one photo per paper, in class-record order. The teacher taps the
- * score on the photo; only that small square is read (scoreReading.js). The teacher confirms
- * or corrects each one. → onDone({ [lrn]: '18' })
+ * score on the photo, sees the small square that would be read, and only then sends it
+ * (scoreReading.js; the square must hold the number only, never the name). The teacher
+ * confirms or corrects each reading. → onDone({ [lrn]: '18' })
  */
 export function SnapScores({ cls, hps, existing = {}, onDone }) {
   const order = useMemo(() => classOrder(cls.learners), [cls]);
   const [i, setI] = useState(() => Math.max(0, order.findIndex((l) => existing[l.lrn] === undefined)));
   const [photo, setPhoto] = useState(null); // { file, url }
-  const [crop, setCrop] = useState(null); // { url, reading?, error? }
+  const [crop, setCrop] = useState(null); // { url, bytes, reading?, error? }
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [got, setGot] = useState({}); // lrn → text
   const urls = useRef([]);
+  const token = useRef(0); // changes with every learner / photo: a late reading for an older one is ignored
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
   const learner = order[i];
   const done = i >= order.length;
@@ -32,38 +33,49 @@ export function SnapScores({ cls, hps, existing = {}, onDone }) {
     urls.current.push(url);
     return url;
   };
+  const reset = () => {
+    token.current += 1;
+    setPhoto(null);
+    setCrop(null);
+    setValue('');
+    setBusy(false);
+  };
   const take = (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    reset();
     setPhoto({ file, url: keep(file) });
-    setCrop(null);
-    setValue('');
   };
   const tap = async (e) => {
     if (!photo || busy) return;
     const box = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - box.left) / box.width;
-    const y = (e.clientY - box.top) / box.height;
+    try {
+      const bytes = await cropAround(photo.file, (e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
+      setCrop({ url: keep(bytes), bytes });
+    } catch (err) {
+      setCrop({ error: err.message });
+    }
+  };
+  const read = async () => {
+    if (!crop?.bytes || busy) return;
+    const mine = token.current;
     setBusy(true);
     try {
-      const bytes = await cropAround(photo.file, x, y);
-      const url = keep(bytes);
-      setCrop({ url });
-      const reading = await readHandwrittenScore(bytes, hps);
-      setCrop({ url, reading });
+      const reading = await readHandwrittenScore(crop.bytes, hps);
+      if (mine !== token.current) return;
+      setCrop((c) => ({ ...c, reading }));
       setValue(reading.sure ? String(reading.score) : '');
     } catch (err) {
-      setCrop((c) => ({ ...(c || {}), error: err.message }));
+      if (mine === token.current) setCrop((c) => ({ ...c, error: err.message }));
+    } finally {
+      if (mine === token.current) setBusy(false);
     }
-    setBusy(false);
   };
-  const next = (text) => {
+  const goTo = (index, text) => {
     if (learner && text !== undefined) setGot((g) => ({ ...g, [learner.lrn]: text }));
-    setPhoto(null);
-    setCrop(null);
-    setValue('');
-    setI((x) => x + 1);
+    reset();
+    setI(index);
   };
 
   if (done) {
@@ -83,7 +95,7 @@ export function SnapScores({ cls, hps, existing = {}, onDone }) {
       <Card className="space-y-1">
         <p className="text-xs text-gray-500">Paper {i + 1} of {order.length} · out of {hps}</p>
         <p className="text-lg font-bold text-gray-900">{learner.name}</p>
-        <select aria-label="A different learner" value={learner.lrn} onChange={(e) => { setI(order.findIndex((l) => l.lrn === e.target.value)); setPhoto(null); setCrop(null); }} className="w-full rounded-lg border border-gray-200 p-2 text-sm text-gray-700">
+        <select aria-label="A different learner" value={learner.lrn} disabled={busy} onChange={(e) => goTo(order.findIndex((l) => l.lrn === e.target.value))} className="w-full rounded-lg border border-gray-200 p-2 text-sm text-gray-700">
           {order.map((l) => <option key={l.lrn} value={l.lrn}>{got[l.lrn] !== undefined ? '✓ ' : ''}{l.name}</option>)}
         </select>
       </Card>
@@ -94,26 +106,27 @@ export function SnapScores({ cls, hps, existing = {}, onDone }) {
         </label>
       ) : (
         <Card className="space-y-2">
-          <p className="text-sm font-semibold text-gray-800">{crop ? 'Check the score' : 'Tap the score on the photo'}</p>
+          <p className="text-sm font-semibold text-gray-800">{crop ? 'Only this square is read' : 'Tap the score on the photo'}</p>
           {!crop && <img src={photo.url} alt={`Paper of ${learner.name}`} onClick={tap} className="w-full rounded-lg cursor-crosshair" />}
           {crop && (
             <div className="flex items-center gap-3">
-              <img src={crop.url} alt="The score" className="h-28 w-28 rounded-lg border border-gray-200 object-cover" />
+              {crop.url && <img src={crop.url} alt="The score" className="h-28 w-28 rounded-lg border border-gray-200 object-cover" />}
               <div className="flex-1 space-y-1">
-                {busy && <p className="flex items-center gap-2 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Reading…</p>}
+                {!crop.reading && !crop.error && <button type="button" disabled={busy} onClick={read} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? <span className="flex items-center gap-1"><Loader2 size={14} className="animate-spin" /> Reading…</span> : 'Read this score'}</button>}
+                {!crop.reading && !crop.error && <p className="text-[11px] text-gray-500">Make sure the square shows the score only, not the name.</p>}
                 {crop.reading && !crop.reading.sure && <p className="text-xs text-amber-800 flex items-center gap-1"><AlertTriangle size={13} /> Not clear{crop.reading.score !== null ? ` (maybe ${crop.reading.score})` : ''}. Type it.</p>}
                 {crop.error && <p className="text-xs text-red-700">{crop.error} Type it instead.</p>}
                 <input aria-label={`Score of ${learner.name}`} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-right text-xl font-bold" />
               </div>
             </div>
           )}
-          {crop && <button type="button" onClick={() => setCrop(null)} className="text-xs font-semibold text-emerald-800 underline">Tap another spot</button>}
+          {crop && !busy && <button type="button" onClick={() => { token.current += 1; setCrop(null); setValue(''); }} className="text-xs font-semibold text-emerald-800 underline">Tap another spot</button>}
         </Card>
       )}
       <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-2 border-t border-gray-200 bg-white p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-        <button type="button" onClick={() => next(undefined)} className="flex items-center justify-center gap-1 rounded-xl border border-gray-300 py-3 text-sm font-semibold"><SkipForward size={16} /> No paper</button>
-        <button type="button" onClick={() => onDone(got)} className="rounded-xl border border-gray-300 py-3 text-sm font-semibold">Finish</button>
-        <button type="button" disabled={!value.trim() || busy} onClick={() => next(value.trim())} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white disabled:opacity-40"><Check size={16} /> Next</button>
+        <button type="button" disabled={busy} onClick={() => goTo(i + 1)} className="flex items-center justify-center gap-1 rounded-xl border border-gray-300 py-3 text-sm font-semibold disabled:opacity-40"><SkipForward size={16} /> No paper</button>
+        <button type="button" disabled={busy} onClick={() => onDone(got)} className="rounded-xl border border-gray-300 py-3 text-sm font-semibold disabled:opacity-40">Finish</button>
+        <button type="button" disabled={!value.trim() || busy} onClick={() => goTo(i + 1, value.trim())} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white disabled:opacity-40"><Check size={16} /> Next</button>
       </div>
     </div>
   );
@@ -124,7 +137,7 @@ const MARK_LABEL = { P: 'Present', L: 'Late', A: 'Absent', E: 'Excused' };
 
 /** Attendance by tap for one class and day, saved by KaTuroDesk in Records/Attendance. */
 export function AttendanceScreen({ client, cls, onClose }) {
-  const [date, setDate] = useState(localToday);
+  const [date, setDate] = useState(() => isoDay());
   const [marks, setMarks] = useState({});
   const [state, setState] = useState({ loading: true });
   const [saved, setSaved] = useState(null);

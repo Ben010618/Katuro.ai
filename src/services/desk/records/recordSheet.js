@@ -23,6 +23,15 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** A score cell → a number, the text in it ("Absent", "INC"), or undefined when blank. */
+function cellValue(v) {
+  if (v === null || v === undefined) return undefined;
+  const t = String(v).trim();
+  if (!t) return undefined;
+  const n = num(t);
+  return n === null ? t : n;
+}
+
 function findLrnColumn(rows, table) {
   const last = Math.min(rows.length, Math.max(HEADER_SCAN_ROWS, (table.headerRowIndex ?? 0) + 3));
   for (let r = 0; r < last; r++) {
@@ -61,10 +70,12 @@ export function readClassRecord(parsed) {
       comp.cols.forEach((col, i) => {
         const key = `${k}${i + 1}`;
         const letter = indexToCol(col);
+        // What is in each learner's cell, as typed: a number, or text such as "Absent" or
+        // "INC". Text counts as occupied, so it is never overwritten without the teacher's yes.
         const values = {};
-        table.componentScores.forEach((s, li) => {
-          const v = s[k][i];
-          if (v !== null && v !== undefined && learners[li].lrn) values[learners[li].lrn] = v;
+        table.learners.forEach((l, li) => {
+          const v = cellValue(rows[l.row]?.[col]);
+          if (v !== undefined && learners[li].lrn) values[learners[li].lrn] = v;
         });
         scores[key] = values;
         columns.push({

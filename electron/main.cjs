@@ -177,6 +177,8 @@ async function openFolder(selectedPath) {
     canceled: false,
     path: resolved,
     name: path.basename(resolved),
+    // The KaTuro folder: class records in its Records are edited in place (localFileSystem.editsInPlace).
+    isHome: defaultFolders.isHomeFolder(resolved, app.getPath('documents')),
     files: await readDirectoryRecursive(resolved),
   };
 }
@@ -337,8 +339,16 @@ function createWindow() {
     }
   });
 
-  // A reload drops the page's phone-request listener until it registers again.
-  mainWindow.webContents.on('did-start-loading', () => { deskAnswering = false; });
+  // A reload drops the page's phone-request listener until it registers again; requests it was
+  // working on will never be answered, so the phone hears it now instead of after a timeout.
+  mainWindow.webContents.on('did-start-loading', () => {
+    deskAnswering = false;
+    for (const [id, ask] of deskAsks) {
+      clearTimeout(ask.timer);
+      ask.reject(Object.assign(new Error('KaTuroDesk restarted its window. Try again in a moment.'), { code: 'DESK_STARTING' }));
+      deskAsks.delete(id);
+    }
+  });
 
   // Links in AI answers open in the real browser, never inside the app window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -892,6 +902,7 @@ function startLinkService() {
     onChange: (st) => sendToWindow('link:changed', st),
     askDesk,
     onFileAdded: (info) => sendToWindow('link:fileAdded', info),
+    account: linkAccount,
   });
   linkService.start().catch((err) => console.error('Phone link could not start:', err));
 }
@@ -903,6 +914,13 @@ ipcMain.handle('link:status', async () => (linkService ? linkService.status() : 
 ipcMain.handle('link:pair', async () => linkReady().beginPairing());
 ipcMain.handle('link:cancel', async () => linkReady().cancelPairing());
 ipcMain.handle('link:remove', async (_, id) => linkReady().removeDevice(String(id || '')));
+// The KaTuro account signed in on KaTuroDesk: phones link only to the same account.
+let linkAccount = '';
+ipcMain.handle('link:account', (e, uid) => {
+  if (!fromMainWindow(e)) return;
+  linkAccount = String(uid || '');
+  linkService?.setAccount(linkAccount);
+});
 
 // ── Wake phrase ("Hello Matt"): the offline speech model (Vosk small English, Apache-2.0) ──
 // Downloaded once when the teacher turns the wake phrase on (not in the installer), checked

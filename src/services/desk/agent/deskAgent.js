@@ -28,6 +28,7 @@ import {
   convertHeicToJpeg,
   readerNameFor,
   saveWorkingCopy,
+  sha256Hex,
 } from '../../localFileSystem.js';
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
@@ -268,9 +269,14 @@ export async function runDeskAgentTurn({
   let steps = [];
   const emit = (extra = {}) => onUpdate?.({ steps, ...extra });
 
+  // The fingerprint of each file as this turn first read it: saving an edited class record
+  // is refused if it changed meanwhile (e.g. scores sent from the phone), see saveWorkingCopy.
+  const firstRead = new Map();
   const readBytes = async (path) => {
     const entry = findEntryByPath(tree, path);
-    return readFileBytes(handle, entry || path);
+    const bytes = await readFileBytes(handle, entry || path);
+    if (!firstRead.has(path)) firstRead.set(path, sha256Hex(bytes).catch(() => null));
+    return bytes;
   };
 
   const ctx = {
@@ -329,7 +335,8 @@ export async function runDeskAgentTurn({
     async saveWorkingCopy(originalPath, bytes, format) {
       if (!handle) throw new Error('Open a classroom folder first so I can save files.');
       const ext = originalPath.split('.').pop().toLowerCase();
-      const res = await saveWorkingCopy(handle, originalPath, bytes, MIME_BY_EXT[ext] || 'application/octet-stream');
+      const baseHash = firstRead.has(originalPath) ? await firstRead.get(originalPath) : null;
+      const res = await saveWorkingCopy(handle, originalPath, bytes, MIME_BY_EXT[ext] || 'application/octet-stream', new Date(), { baseHash });
       const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? 0, backups: res.backups, originalPath };
       createdFiles.push(file);
       return file;

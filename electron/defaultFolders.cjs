@@ -36,4 +36,4 @@ function isHomeFolder(dir, documentsDir) {
   return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
-module.exports = { HOME_NAME, MAIN_FOLDERS, homeFolderIn, ensureHomeFolder, isHomeFolder };
+module.exports = { MAIN_FOLDERS, ensureHomeFolder, isHomeFolder };

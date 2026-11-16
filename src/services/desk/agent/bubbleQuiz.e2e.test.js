@@ -109,9 +109,10 @@ describe('bubble quiz tools', () => {
     const changes = { ...scoreChangesArtifact(result.plan, { targetPath: art.data.targetPath, kind: art.data.kind, columnLabel: 'WW1' }), id: 'c1' };
     useDeskStore.setState({ workspace, artifacts: [changes], activeArtifact: null });
     const saved = await useDeskStore.getState().applyPendingChanges('c1');
-    // A class record in Records is edited in place, after a backup of it as it was.
-    expect(saved).toMatchObject({ path: 'Records/G7 Class Record.xlsx', inPlace: true });
-    expect(Array.from(await readFileBytes(workspace.handle, saved.backups[0]))).toEqual(Array.from(record));
+    // Not a KaTuro class record ("Grade - Section - Subject.xlsx" in the KaTuro folder), so the
+    // original stays untouched and the changes go into the working copy.
+    expect(saved).toMatchObject({ path: 'Records/G7 Class Record (KaTuro edit).xlsx', inPlace: false });
+    expect(Array.from(await readFileBytes(workspace.handle, 'Records/G7 Class Record.xlsx'))).toEqual(Array.from(record));
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await readFileBytes(workspace.handle, saved.path));
     const ws = wb.getWorksheet('Sheet1');

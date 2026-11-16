@@ -83,6 +83,7 @@ describe('planRecord', () => {
 
 async function home() {
   const ws = createVirtualWorkspace('KaTuro');
+  ws.handle.katuroHome = true; // the KaTuro folder: class records are edited in place
   ws.handle.saveVirtualFile(RECORD, await ecr());
   ws.handle.saveVirtualFile('Lessons/Week 1.docx', new Uint8Array([1]));
   return ws;

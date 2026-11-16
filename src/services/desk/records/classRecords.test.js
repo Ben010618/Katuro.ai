@@ -8,10 +8,10 @@ import ExcelJS from 'exceljs';
 import { callGeminiProxy } from '../../geminiConfig';
 import { runDeskAgentTurn, clearAnswerMemory } from '../agent/deskAgent';
 import { resetTaskActionSupport } from '../agent/llm';
-import { createVirtualWorkspace, readFileBytes } from '../../localFileSystem';
+import { createVirtualWorkspace, readFileBytes, editsInPlace } from '../../localFileSystem';
 import { buildClassRecordWorkbook } from '../generators/xlsxWriters.js';
 import {
-  classRecordFileName, parseClassRecordFileName, gradeLabel, isInRecords, isKaturoHome, isMainFolder,
+  classRecordFileName, parseClassRecordFileName, gradeLabel, isInRecords, isKaturoHome,
   unclearNameReason, checkClassList, readinessText, defaultOutputFolder,
 } from './classRecords.js';
 
@@ -38,6 +38,21 @@ describe('class record file names', () => {
     expect(() => classRecordFileName({ gradeLevel: '7', section: '', subject: 'Math' })).toThrow(/section/);
   });
 
+  it('only KaTuro class records in the KaTuro folder are edited in place; everything else gets a copy', () => {
+    const home = { katuroHome: true };
+    expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', home)).toBe(true);
+    expect(editsInPlace('Records/SY 2025-2026/Grade 7 - Rizal - Science.xlsx', home)).toBe(true);
+    // Another folder the teacher opened (e.g. D:\School\Records\…): never in place.
+    expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', { katuroHome: false })).toBe(false);
+    expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', undefined)).toBe(false);
+    // Not a class record, macros, attendance, a working copy, outside Records.
+    expect(editsInPlace('Records/SF2 October.xlsx', home)).toBe(false);
+    expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsm', home)).toBe(false);
+    expect(editsInPlace('Records/Attendance/Grade 7 - Rizal - Science.xlsx', home)).toBe(false);
+    expect(editsInPlace('Records/Grade 7 - Rizal - Science (KaTuro edit).xlsx', home)).toBe(false);
+    expect(editsInPlace('Lessons/Grade 7 - Rizal - Science.xlsx', home)).toBe(false);
+  });
+
   it('reads a class back from its file name', () => {
     expect(parseClassRecordFileName('Records/Grade 7 - Rizal - Science.xlsx')).toEqual({ gradeLevel: 'Grade 7', section: 'Rizal', subject: 'Science' });
     expect(parseClassRecordFileName('Records/my grades.xlsx')).toBeNull();
@@ -47,9 +62,6 @@ describe('class record file names', () => {
     expect(isInRecords('Records/Grade 7 - Rizal - Science.xlsx')).toBe(true);
     expect(isInRecords('records/Old/x.xlsx')).toBe(true);
     expect(isInRecords('Lessons/Records/x.xlsx')).toBe(false);
-    expect(isMainFolder('Records')).toBe(true);
-    expect(isMainFolder('/Lessons/')).toBe(true);
-    expect(isMainFolder('Records/Grade 7')).toBe(false);
     const dir = (name) => ({ name, path: name, kind: 'directory', children: [] });
     expect(isKaturoHome([dir('Records'), dir('Lessons'), dir('Seminars')])).toBe(true);
     expect(isKaturoHome([dir('Records')])).toBe(false);

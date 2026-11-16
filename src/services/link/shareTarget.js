@@ -10,18 +10,22 @@ const bridge = () => {
   return cap?.isNativePlatform?.() && typeof cap.nativePromise === 'function' ? cap : null;
 };
 
-/** The files waiting since the last call. → { files: [{ name, mimeType, bytes }], skipped: [{ name, reason }] } */
+/**
+ * The next batch of shared files (the native side gives at most ~30 MB per call, so the phone
+ * never runs out of memory). → { files: [{ name, mimeType, bytes }], skipped: [{ name, reason }], more }
+ */
 export async function takeSharedFiles() {
   const cap = bridge();
-  if (!cap) return { files: [], skipped: [] };
+  if (!cap) return { files: [], skipped: [], more: false };
   try {
     const r = await cap.nativePromise('KaturoShare', 'take', {});
     return {
       files: (r?.files || []).map((f) => ({ name: f.name, mimeType: f.mimeType || '', bytes: base64ToBytes(f.data) })),
       skipped: r?.skipped || [],
+      more: Boolean(r?.more),
     };
   } catch {
-    return { files: [], skipped: [] };
+    return { files: [], skipped: [], more: false };
   }
 }
 

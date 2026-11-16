@@ -9,6 +9,7 @@
  */
 import { holidayOn, activitiesOn } from '../knowledge/depedActivities.js';
 import { calendarPosition } from '../knowledge/schoolCalendar.js';
+import { isoDay, toMin, addDays, clock } from '../../../utils/dates.js';
 
 export const DEFAULT_SETTINGS = {
   remind: [30, 10], // minutes before each class
@@ -24,17 +25,11 @@ export const DEFAULT_SETTINGS = {
   voice: false,
 };
 
-const pad = (n) => String(n).padStart(2, '0');
-/** Local date YYYY-MM-DD of a time. */
-export const isoDay = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
-/** "07:30" → 450 */
-export const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+// Local days and clock times are shared with the KaTuro App (src/utils/dates.js).
+export { isoDay, toMin, addDays, clock };
 /** The time of a day's minute, as epoch ms (local time). */
 export const at = (iso, min) => { const [y, mo, d] = iso.split('-').map(Number); return new Date(y, mo - 1, d, Math.floor(min / 60), min % 60).getTime(); };
-export const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return isoDay(new Date(y, m - 1, d + n, 12).getTime()); };
 export const weekday = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d, 12).getDay(); };
-/** "13:05" → "1:05 PM" */
-export const clock = (hhmm) => { const m = toMin(hhmm); if (m === null) return ''; const h = Math.floor(m / 60); return `${((h + 11) % 12) + 1}:${pad(m % 60)} ${h < 12 ? 'AM' : 'PM'}`; };
 /** "Science 7 – Rizal" */
 export const className = (c) => `${c.subject} ${String(c.grade || '').replace(/^Grade\s*/i, '')}${c.section ? ` – ${c.section}` : ''}`.replace(/\s+/g, ' ').trim();
 

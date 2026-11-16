@@ -15,6 +15,7 @@ const { createLinkService, insideHome } = require('../electron/linkService.cjs')
 // Stand-in for Windows DPAPI: reversible, and the saved file never holds the raw key.
 const protect = { encrypt: (b) => `x${Buffer.from(b).toString('hex')}`, decrypt: (s) => Buffer.from(String(s).slice(1), 'hex') };
 
+const TEACHER = 'uid-teacher-ana';
 let tmp;
 let service;
 afterEach(() => {
@@ -34,6 +35,7 @@ async function setup({ now, askDesk } = {}) {
   fs.writeFileSync(path.join(tmp, 'secret.txt'), 'outside the KaTuro folder');
   const storeFile = path.join(tmp, 'appdata', 'linked-phones.json');
   service = createLinkService({
+    account: TEACHER,
     home: () => home, storeFile, protect, deskName: "Teacher's laptop",
     addresses: () => [{ address: '127.0.0.1', name: 'test' }],
     ...(now ? { now } : {}),
@@ -46,7 +48,7 @@ async function setup({ now, askDesk } = {}) {
 async function pairPhone() {
   const { qrText } = service.beginPairing();
   const qr = parseLinkQr(qrText);
-  const link = await pairWithDesk(qr, { deviceName: "Ma'am Ana's phone" });
+  const link = await pairWithDesk(qr, { deviceName: "Ma'am Ana's phone", uid: TEACHER });
   return { qr, qrText, link };
 }
 
@@ -169,6 +171,58 @@ describe('phone link', () => {
     await expect(client.upload('Seminars', 'a.pdf', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
     await expect(client.upload('Lessons/../..', 'a.pdf', photo)).rejects.toThrow();
     await expect(client.upload('Lessons', 'setup.exe', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    // No formats that can carry macros.
+    for (const name of ['grades.xlsm', 'old.doc', 'old.xls', 'old.ppt']) {
+      await expect(client.upload('Lessons', name, photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    }
     expect(fs.existsSync(path.join(tmp, 'a.pdf'))).toBe(false);
+  });
+
+  it('a message captured on the Wi-Fi cannot be replayed after KaTuroDesk restarts', async () => {
+    const { home, storeFile } = await setup();
+    const { link } = await pairPhone();
+    let captured = null;
+    const spy = async (url, init) => { captured = init.body; return fetch(url, init); };
+    await createLinkClient(link, { fetchImpl: spy }).list('Records');
+    service.stop();
+    // KaTuroDesk opens again (same app data), then the captured message is sent again.
+    service = createLinkService({ home: () => home, storeFile, protect, addresses: () => [{ address: '127.0.0.1', name: 'test' }], account: TEACHER });
+    await service.start(0);
+    const res = await fetch(`http://127.0.0.1:${service.status().port}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: captured }).then((r) => r.json());
+    expect(res).toMatchObject({ code: 'STALE' });
+    // The phone itself still works after the restart.
+    expect(await createLinkClient({ ...link, port: service.status().port }).hello()).toMatchObject({ phone: "Ma'am Ana's phone" });
+  });
+
+  it('a phone that could not be saved is not linked, and leaves nothing behind', async () => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-link-'));
+    const home = path.join(tmp, 'KaTuro');
+    fs.mkdirSync(home);
+    fs.writeFileSync(path.join(tmp, 'not-a-folder'), 'x');
+    // The phones list would go inside a file, so saving always fails.
+    service = createLinkService({ home: () => home, storeFile: path.join(tmp, 'not-a-folder', 'linked-phones.json'), protect, addresses: () => [{ address: '127.0.0.1', name: 'test' }], account: TEACHER });
+    await service.start(0);
+    await expect(pairPhone()).rejects.toThrow(/could not save this phone/);
+    expect(service.status().devices).toEqual([]);
+  });
+
+  it('links only a phone signed in to the same KaTuro account as KaTuroDesk', async () => {
+    await setup();
+    const qr = parseLinkQr(service.beginPairing().qrText);
+    await expect(pairWithDesk(qr, { deviceName: 'Other teacher', uid: 'uid-someone-else' })).rejects.toMatchObject({ code: 'WRONG_ACCOUNT' });
+    await expect(pairWithDesk(qr, { deviceName: 'No account' })).rejects.toMatchObject({ code: 'WRONG_ACCOUNT' });
+    expect(service.status().devices).toEqual([]);
+    service.setAccount('');
+    await expect(pairWithDesk(parseLinkQr(service.beginPairing().qrText), { uid: TEACHER })).rejects.toMatchObject({ code: 'DESK_SIGNED_OUT' });
+  });
+
+  it('when KaTuroDesk signs in to another account, phones of the first one are not served', async () => {
+    await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    await client.hello();
+    service.setAccount('uid-another-teacher');
+    await expect(client.list('Records')).rejects.toMatchObject({ code: 'OTHER_ACCOUNT' });
+    service.setAccount(TEACHER);
+    expect((await client.list('Records')).items.length).toBeGreaterThan(0);
   });
 });

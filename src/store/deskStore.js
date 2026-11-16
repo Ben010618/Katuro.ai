@@ -10,6 +10,7 @@ import {
   readFileBytes,
   findEntryByPath,
   saveWorkingCopy,
+  sha256Hex,
 } from '../services/localFileSystem';
 
 import { createFileIndex } from '../services/desk/index/fileIndex';
@@ -376,8 +377,9 @@ export const useDeskStore = create(
         const { applyEdits } = await import('../services/desk/docmap/index.js');
         const entry = findEntryByPath(workspace.files || [], targetPath);
         const original = await readFileBytes(workspace.handle, entry || targetPath);
+        const baseHash = await sha256Hex(original);
         const result = await applyEdits(original, targetPath.split('/').pop(), chosen);
-        const saved = await saveWorkingCopy(workspace.handle, targetPath, result.bytes);
+        const saved = await saveWorkingCopy(workspace.handle, targetPath, result.bytes, undefined, new Date(), { baseHash });
         const ext = targetPath.split('.').pop().toLowerCase();
         updateArtifact(id, {
           files: [{ path: saved.path, name: saved.name, format: ext, size: result.bytes.byteLength }],

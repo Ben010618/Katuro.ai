@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Images, Loader2, Trash2 } from 'lucide-react';
 import { CHOICE_SETS } from '../../services/desk/bubble/layout';
 import { layoutOf, readKey, sheetFromRead, reviewSheets, finalScores } from '../../services/desk/bubble/quiz';
@@ -20,7 +20,7 @@ export default function BubbleScan({ client, cls, onScores }) {
   const [sheets, setSheets] = useState({});
   const [decisions, setDecisions] = useState({});
   const [reading, setReading] = useState('');
-  const [count, setCount] = useState(0);
+  const count = useRef(0); // photos read so far: every photo gets its own number, batch after batch
 
   useEffect(() => {
     let alive = true;
@@ -52,12 +52,12 @@ export default function BubbleScan({ client, cls, onScores }) {
     ]);
     const layout = layoutOf(quiz);
     const accept = (code) => parseSheetCode(code)?.setId === quiz.setId;
-    let n = count;
+    if (reading) return;
     for (let i = 0; i < files.length; i++) {
       setReading(`Reading photo ${i + 1} of ${files.length}…`);
       await new Promise((r) => setTimeout(r, 0));
-      n += 1;
-      const id = `Photo ${String(n).padStart(3, '0')}`;
+      count.current += 1;
+      const id = `Photo ${String(count.current).padStart(3, '0')}`;
       let found;
       try {
         const image = await photoToGray(new Uint8Array(await files[i].arrayBuffer()), files[i].name);
@@ -67,7 +67,6 @@ export default function BubbleScan({ client, cls, onScores }) {
       }
       setSheets((s) => ({ ...s, [id]: found }));
     }
-    setCount(n);
     setReading('');
   };
 
@@ -126,11 +125,11 @@ export default function BubbleScan({ client, cls, onScores }) {
         <div className="grid grid-cols-2 gap-2">
           <label className="flex items-center justify-center gap-2 rounded-lg bg-emerald-700 py-3 text-sm font-semibold text-white">
             <Camera size={18} /> Take a photo
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={addPhotos} />
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={Boolean(reading)} onChange={addPhotos} />
           </label>
           <label className="flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 py-3 text-sm font-semibold text-emerald-800">
             <Images size={18} /> From gallery
-            <input type="file" accept="image/*" multiple className="hidden" onChange={addPhotos} />
+            <input type="file" accept="image/*" multiple className="hidden" disabled={Boolean(reading)} onChange={addPhotos} />
           </label>
         </div>
         <p className="text-[11px] text-gray-500">One sheet per photo, the whole sheet with its four black corner squares in view, on a plain light surface.</p>

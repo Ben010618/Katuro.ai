@@ -5,27 +5,27 @@ import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
 import { parseLinkQr, pairWithDesk, createLinkClient } from '../../services/link/linkClient';
-import { loadLink, saveLink, forgetLink } from '../../services/link/linkStore';
+import { loadLink, saveLink } from '../../services/link/linkStore';
+import { forgetPhoneData, unsentOnPhone } from '../../services/link/phoneData';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
 import ScoresFlow from './ScoresFlow';
 import { KeptList, OutboxBanner, AddToFolder, SharedFilesSheet } from './PhoneLessons';
 import { takeSharedFiles, onFilesShared } from '../../services/link/shareTarget';
-import { forgetCachedClasses } from '../../services/link/scoreEntry';
 import PhoneToday from './PhoneToday';
 import PhoneAssistant from './PhoneAssistant';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 import { notifyNow } from '../../services/link/phoneReminders';
+import { formatBytes } from '../../utils/bytes';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
 
 const MAIN = ['Records', 'Lessons'];
 const HINT = { Records: 'Class records', Lessons: 'Learning materials' };
 
-const size = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
 const day = (ms) => (ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
-function LinkScreen({ teacherName, onLinked }) {
+function LinkScreen({ teacherName, uid, onLinked }) {
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +40,7 @@ function LinkScreen({ teacherName, onLinked }) {
     setBusy(true);
     setError('');
     try {
-      const link = await pairWithDesk(qr, { deviceName: teacherName ? `${teacherName}'s phone` : 'My phone' });
+      const link = await pairWithDesk(qr, { deviceName: teacherName ? `${teacherName}'s phone` : 'My phone', uid });
       saveLink(link);
       onLinked(link);
     } catch (err) {
@@ -48,7 +48,7 @@ function LinkScreen({ teacherName, onLinked }) {
     } finally {
       setBusy(false);
     }
-  }, [teacherName, onLinked]);
+  }, [teacherName, uid, onLinked]);
 
   return (
     <div className="p-5 space-y-5">
@@ -115,7 +115,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
                   : <FileText size={22} className="text-gray-500 flex-shrink-0" />}
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate ${main ? 'text-base font-bold' : 'text-sm font-semibold'} text-gray-900`}>{i.name}</span>
-                  <span className="block text-xs text-gray-500">{main ? HINT[i.name] : i.kind === 'file' ? `${size(i.size)} · ${day(i.lastModified)}` : (atTop ? 'View only on the phone' : '')}</span>
+                  <span className="block text-xs text-gray-500">{main ? HINT[i.name] : i.kind === 'file' ? `${formatBytes(i.size)} · ${day(i.lastModified)}` : (atTop ? 'View only on the phone' : '')}</span>
                 </span>
                 <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />
               </button>
@@ -136,17 +136,27 @@ export default function PhoneApp() {
   const [path, setPath] = useState('');
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
+  const [deskNote, setDeskNote] = useState(''); // why KaTuroDesk refused (e.g. another account signed in there)
   const [tab, setTab] = useState('today'); // today | scores | assistant | messages | files
   const [version, setVersion] = useState(0); // bumped after files are sent or kept
   const [shared, setShared] = useState(null); // files shared from another app
+  const [sharedNote, setSharedNote] = useState('');
+  const [visited, setVisited] = useState(() => new Set(['today'])); // tabs stay mounted once opened (typed scores, a running Assistant turn)
   const bump = useCallback(() => setVersion((v) => v + 1), []);
 
   // Share → KaTuro from another app: on start, and while the app is open.
   useEffect(() => {
     let alive = true;
-    const take = () => takeSharedFiles().then(({ files }) => {
-      if (alive && files.length) { setShared(files); setTab('files'); }
-    });
+    // Files come in batches (the native side caps memory per batch); every batch is added.
+    const take = async () => {
+      for (let more = true; more && alive;) {
+        const r = await takeSharedFiles();
+        more = r.more;
+        if (!alive) return;
+        if (r.files.length) { setShared((prev) => [...(prev || []), ...r.files]); setTab('files'); }
+        if (r.skipped.length) setSharedNote(`Not sent: ${r.skipped.map((x) => `${x.name} (${x.reason})`).join('; ')}.`);
+      }
+    };
     take();
     const stop = onFilesShared(take);
     return () => { alive = false; stop(); };
@@ -173,28 +183,37 @@ export default function PhoneApp() {
   useEffect(() => {
     if (!client) return;
     let alive = true;
-    client.hello().then(() => alive && setOnline(true)).catch((err) => {
+    client.hello().then(() => { if (alive) { setOnline(true); setDeskNote(''); } }).catch((err) => {
       if (!alive) return;
       setOnline(false);
-      if (err.code === 'NOT_LINKED') { forgetLink(); setLink(null); }
+      setDeskNote(err.code === 'OTHER_ACCOUNT' ? err.message : '');
+      // KaTuroDesk removed this phone: nothing of that teacher's classes stays on it.
+      if (err.code === 'NOT_LINKED') forgetPhoneData().finally(() => setLink(null));
     });
     return () => { alive = false; };
   }, [client]);
 
   const onListError = useCallback((err) => {
-    if (err.code === 'UNREACHABLE') setOnline(false);
-    if (err.code === 'NOT_LINKED') { forgetLink(); setLink(null); }
+    if (err.code === 'UNREACHABLE' || err.code === 'OTHER_ACCOUNT') setOnline(false);
+    setDeskNote(err.code === 'OTHER_ACCOUNT' ? err.message : '');
+    if (err.code === 'NOT_LINKED') forgetPhoneData().finally(() => setLink(null));
   }, []);
 
   const onListLoaded = useCallback(() => setOnline(true), []);
 
-  const unlink = () => {
-    if (!window.confirm('Unlink this phone from KaTuroDesk? You can link it again any time.')) return;
-    forgetLink();
-    forgetCachedClasses();
+  /** Unlink or sign out: everything of the teacher's on this phone is cleared (after a warning about unsent work). */
+  const clearPhone = async (what) => {
+    const { recordings, files } = await unsentOnPhone();
+    const unsent = recordings || files ? ` ${[recordings && `${recordings} recording(s)`, files && `${files} file(s)`].filter(Boolean).join(' and ')} not sent to KaTuroDesk yet will be deleted.` : '';
+    if (!window.confirm(`${what} Your class lists, kept files and schedule are removed from this phone.${unsent}`)) return false;
+    await forgetPhoneData();
     setLink(null);
     setPath('');
+    return true;
   };
+  const unlink = () => clearPhone('Unlink this phone from KaTuroDesk? You can link it again any time.');
+  const signOutHere = async () => { if (await clearPhone('Sign out of KaTuro on this phone?')) signOut(auth); };
+  const openTab = (id) => { setTab(id); setVisited((v) => (v.has(id) ? v : new Set([...v, id]))); };
 
   // Android back button / gesture: go up a folder instead of closing the app.
   useEffect(() => {
@@ -212,20 +231,23 @@ export default function PhoneApp() {
 
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {file && client ? (
-        <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
-      ) : (
+      {file && client && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
+        </div>
+      )}
+      {(
         <>
           <header className="flex items-center justify-between px-4 py-3 bg-[#1f3a2c] text-white">
             <div className="min-w-0">
               <p className="text-base font-bold">KaTuro</p>
               <p className="text-xs text-emerald-100 truncate">{firstName ? `Hi, ${firstName}` : user?.email}</p>
             </div>
-            <button type="button" onClick={() => signOut(auth)} aria-label="Sign out" className="p-2 -mr-2"><LogOut size={20} /></button>
+            <button type="button" onClick={signOutHere} aria-label="Sign out" className="p-2 -mr-2"><LogOut size={20} /></button>
           </header>
 
           {!link ? (
-            <LinkScreen teacherName={firstName} onLinked={(l) => { setOnline(null); setLink(l); setPath(''); }} />
+            <LinkScreen teacherName={firstName} uid={user?.uid} onLinked={(l) => { setOnline(null); setLink(l); setPath(''); }} />
           ) : (
             <>
               <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200">
@@ -251,21 +273,24 @@ export default function PhoneApp() {
               )}
               {online === false && (
                 <p className="mx-3 mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
-                  Can&apos;t reach {link.deskName}. Check that KaTuroDesk is open on your computer and that this phone is on the same Wi-Fi or hotspot.
+                  {deskNote || <>Can&apos;t reach {link.deskName}. Check that KaTuroDesk is open on your computer and that this phone is on the same Wi-Fi or hotspot.</>}
                 </p>
               )}
-              {client && tab === 'today' && <PhoneToday client={client} online={online} />}
-              {client && tab === 'scores' && <ScoresFlow client={client} online={online} />}
-              {client && tab === 'assistant' && <PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go(() => setFile(i))} />}
-              {tab === 'messages' && (
-                <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
-                  <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 170px)" /></div>
-                </Suspense>
+              {client && visited.has('today') && <div hidden={tab !== 'today'}><PhoneToday client={client} online={online} /></div>}
+              {client && visited.has('scores') && <div hidden={tab !== 'scores'}><ScoresFlow client={client} online={online} /></div>}
+              {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go(() => setFile(i))} /></div>}
+              {visited.has('messages') && (
+                <div hidden={tab !== 'messages'}>
+                  <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
+                    <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 170px)" /></div>
+                  </Suspense>
+                </div>
               )}
+              {sharedNote && <p className="mx-3 mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{sharedNote}</p>}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
               {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go(() => setFile(i))} />}
               {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
-              {client && shared && <SharedFilesSheet client={client} files={shared} onClose={() => setShared(null)} onSent={bump} />}
+              {client && shared && <SharedFilesSheet client={client} files={shared} onClose={() => { setShared(null); setSharedNote(''); }} onSent={bump} />}
               {client && tab === 'files' && (
                 <FolderList
                   key={`${path}|${version}`}
@@ -282,7 +307,7 @@ export default function PhoneApp() {
               <div className="h-20" />
               <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-gray-200 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {[['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'Assistant', Bot], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]].map(([id, label, Icon]) => (
-                  <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
+                  <button key={id} type="button" onClick={() => openTab(id)} aria-pressed={tab === id} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
                     <Icon size={22} /> {label}
                     {id === 'messages' && chatState.badgeCount > 0 && <span className="absolute right-2 top-1 min-w-[18px] rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
                   </button>

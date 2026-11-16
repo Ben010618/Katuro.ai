@@ -2,24 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { BellRing, BookOpen, CalendarDays, Check, Flag, Loader2, Plus, RefreshCw, Timer, Trash2, X } from 'lucide-react';
 import { REMIND_OPTIONS } from '../desk/calendar/reminders';
 import { syncReminders, canNotify, allowExactReminders } from '../../services/link/phoneReminders';
+import { isoDay, addDays, clock } from '../../utils/dates';
 
 const CACHE = 'katuro-phone-schedule-v1';
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
 const ICON = { class: BookOpen, event: CalendarDays, task: Timer, school: Flag };
-const pad = (n) => String(n).padStart(2, '0');
-// Local dates (the teacher's day), never UTC.
-const isoIn = (days = 0) => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
-const todayIso = () => isoIn(0);
-const fmt = (hhmm) => {
-  if (!hhmm) return '';
-  const [h, m] = hhmm.split(':').map(Number);
-  return `${((h + 11) % 12) + 1}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`;
-};
 const loadCache = () => { try { return JSON.parse(localStorage.getItem(CACHE) || 'null'); } catch { return null; } };
 const saveCache = (v) => { try { localStorage.setItem(CACHE, JSON.stringify(v)); } catch { /* full */ } };
 
 function AddEntry({ client, onClose, onAdded }) {
-  const [form, setForm] = useState({ title: '', date: todayIso(), time: '', remindMinutes: '' });
+  const [form, setForm] = useState({ title: '', date: isoDay(), time: '', remindMinutes: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -73,8 +65,8 @@ export default function PhoneToday({ client, online }) {
     let alive = true;
     (async () => {
       try {
-        const from = todayIso();
-        const r = await client.request('schedule', { from, to: isoIn(13) });
+        const from = isoDay();
+        const r = await client.request('schedule', { from, to: addDays(isoDay(), 13) });
         if (!alive) return;
         const v = { ...r, at: new Date().toISOString() };
         saveCache(v);
@@ -132,7 +124,7 @@ export default function PhoneToday({ client, online }) {
                 <li key={`${it.kind}-${it.id || i}`} className={`flex items-start gap-3 px-3 py-2.5 ${it.done ? 'opacity-50' : ''}`}>
                   <Icon size={18} className={`mt-0.5 flex-shrink-0 ${it.kind === 'class' ? 'text-emerald-700' : it.kind === 'school' ? 'text-amber-600' : 'text-sky-700'}`} />
                   <span className="min-w-0 flex-1">
-                    <span className={`block text-sm font-semibold text-gray-900 ${it.done ? 'line-through' : ''}`}>{it.time ? `${fmt(it.time)} · ` : ''}{it.title}</span>
+                    <span className={`block text-sm font-semibold text-gray-900 ${it.done ? 'line-through' : ''}`}>{it.time ? `${clock(it.time)} · ` : ''}{it.title}</span>
                     {it.detail && <span className="block text-xs text-gray-500">{it.detail}</span>}
                     {it.kind === 'event' && it.remindMinutes !== null && !it.done && <span className="block text-[11px] text-gray-400">{REMIND_OPTIONS.find((o) => o.value === it.remindMinutes)?.label}</span>}
                   </span>

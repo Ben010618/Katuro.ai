@@ -12,10 +12,12 @@ function PdfPages({ bytes }) {
   const [error, setError] = useState('');
   useEffect(() => {
     let cancelled = false;
+    let doc = null;
     (async () => {
       try {
         const pdfjs = await loadPdfjs();
-        const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+        doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+        if (cancelled) { doc.destroy(); return; }
         const width = Math.max(320, box.current?.clientWidth || 360);
         for (let i = 1; i <= Math.min(doc.numPages, MAX_PDF_PAGES) && !cancelled; i++) {
           const page = await doc.getPage(i);
@@ -34,7 +36,8 @@ function PdfPages({ bytes }) {
         if (!cancelled) setError('This PDF could not be shown on the phone. Open it on KaTuroDesk.');
       }
     })();
-    return () => { cancelled = true; };
+    // Frees the pdf.js document (worker, data, page caches) when the viewer closes.
+    return () => { cancelled = true; doc?.destroy(); };
   }, [bytes]);
   return (
     <div>

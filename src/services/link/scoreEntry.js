@@ -79,7 +79,7 @@ export function queueRecording(item) {
   const list = queuedRecordings().filter((x) => x.id !== item.id);
   return write(QUEUE_KEY, [...list, { ...item, queuedAt: new Date().toISOString(), error: null }]);
 }
-export function removeQueued(id) {
+function removeQueued(id) {
   write(QUEUE_KEY, queuedRecordings().filter((x) => x.id !== id));
 }
 function markQueued(id, error) {
@@ -91,7 +91,12 @@ function markQueued(id, error) {
  * → { sent: [{ item, result }], failed: [{ item, error }], unreachable }
  * A recording KaTuroDesk refused (e.g. a score is already there) stays, with its error, for the teacher.
  */
-export async function sendQueued(client) {
+let sendingQueue = null; // one send at a time: a second caller waits for the same run
+export function sendQueued(client) {
+  if (!sendingQueue) sendingQueue = sendQueuedOnce(client).finally(() => { sendingQueue = null; });
+  return sendingQueue;
+}
+async function sendQueuedOnce(client) {
   const sent = [];
   const failed = [];
   for (const item of queuedRecordings()) {
@@ -103,7 +108,7 @@ export async function sendQueued(client) {
       removeQueued(item.id);
       sent.push({ item, result });
     } catch (err) {
-      if (err.code === 'UNREACHABLE') return { sent, failed, unreachable: true };
+      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') return { sent, failed, unreachable: true };
       markQueued(item.id, err.message);
       failed.push({ item, error: err.message });
     }

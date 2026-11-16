@@ -18,9 +18,9 @@
 import { readDocument } from '../desk/readers/index.js';
 import { applyEdits } from '../desk/docmap/index.js';
 import { readClassRecord, planRecord } from '../desk/records/recordSheet.js';
-import { RECORDS_DIR, parseClassRecordFileName } from '../desk/records/classRecords.js';
+import { isInRecords, parseClassRecordFileName } from '../desk/records/classRecords.js';
 import { QUIZ_FILE, CHECK_FILE, parseQuiz } from '../desk/bubble/quiz.js';
-import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError, writeFileToDirectory, fileExists } from '../localFileSystem.js';
+import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError, writeFileToDirectory, fileExists, backupFile, editsInPlace, sha256Hex } from '../localFileSystem.js';
 import { attendancePathFor, isAttendanceFile, newAttendanceWorkbook, readAttendance, writeAttendance, MARKS } from '../desk/records/attendance.js';
 
 const RECORD_FILE = /\.(xlsx|xlsm)$/i;
@@ -37,7 +37,7 @@ export class RequestError extends Error {
 }
 
 /** Remembers recordings already written (by the phone's id), so a resend is not written twice. */
-export function memoryAppliedStore() {
+function memoryAppliedStore() {
   const m = new Map();
   return { get: (id) => m.get(id), set: (id, v) => { m.set(id, v); if (m.size > KEEP_APPLIED) m.delete(m.keys().next().value); } };
 }
@@ -58,7 +58,7 @@ export function localAppliedStore(key = 'katuro-phone-applied-v1') {
  * hps: { before, after } | null, undoneAt }.
  */
 const KEEP_HISTORY = 300;
-export function memoryHistoryStore() {
+function memoryHistoryStore() {
   let list = [];
   return { all: () => list, add: (e) => { list = [...list, e].slice(-KEEP_HISTORY); }, update: (id, patch) => { list = list.map((e) => (e.id === id ? { ...e, ...patch } : e)); } };
 }
@@ -69,7 +69,6 @@ export function localHistoryStore(key = 'katuro-phone-history-v1') {
 }
 
 const isWorkingCopy = (p) => workingCopyPath(p) === p;
-const inRecords = (p) => p.toLowerCase().startsWith(`${RECORDS_DIR.toLowerCase()}/`);
 
 /**
  * handle   — the KaTuro folder (localFileSystem handle: 'electron' in the app, virtual in tests)
@@ -84,9 +83,16 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
 
   async function recordFiles() {
     const files = await allFiles();
+    const paths = new Set(files.map((f) => f.path));
     return files
-      .filter((f) => inRecords(f.path) && RECORD_FILE.test(f.path) && !isWorkingCopy(f.path) && !isAttendanceFile(f.path) && !f.name.startsWith('~$'))
-      .map((f) => ({ path: f.path, name: f.name, source: f.path }))
+      .filter((f) => isInRecords(f.path) && RECORD_FILE.test(f.path) && !isWorkingCopy(f.path) && !isAttendanceFile(f.path) && !f.name.startsWith('~$'))
+      .map((f) => {
+        // KaTuro class records are edited in place; any other workbook gets the "(KaTuro edit)"
+        // copy, and later readings continue in that copy.
+        const copy = workingCopyPath(f.path);
+        const source = !editsInPlace(f.path, handle) && paths.has(copy) ? copy : f.path;
+        return { path: f.path, name: f.name, source };
+      })
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }
 
@@ -138,9 +144,11 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     if (skipped.length === edits.length) throw new RequestError('None of the scores could be written: those cells hold formulas or are protected. Check the class record on KaTuroDesk.', 'NOT_WRITTEN');
     let saved;
     try {
-      saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME);
+      // Refused if the record changed after it was read (e.g. a KaTuroDesk task saved it).
+      saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME, new Date(now()), { baseHash: await sha256Hex(bytes) });
     } catch (err) {
       if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${file.name} is open in Excel on the computer. Close it there, then send again.`, 'FILE_OPEN');
+      if (err.code === 'FILE_CHANGED') throw new RequestError(`${file.name} changed on KaTuroDesk just now. Send again.`, 'FILE_CHANGED');
       throw err;
     }
     onWrote(saved.path);
@@ -252,8 +260,9 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     const start = exists ? await readFileBytes(handle, attPath) : await newAttendanceWorkbook({ title: file.name.replace(RECORD_FILE, ''), learners });
     const out = await writeAttendance(start, { date, marks: clean, learners });
     try {
-      if (exists) await saveWorkingCopy(handle, attPath, out.bytes, XLSX_MIME);
-      else await writeFileToDirectory(handle, attPath, out.bytes, XLSX_MIME, { overwrite: false });
+      // KaTuro's own attendance file: backed up, then updated in place (never a copy).
+      if (exists) await backupFile(handle, attPath, new Date(now()));
+      await writeFileToDirectory(handle, attPath, out.bytes, XLSX_MIME, { overwrite: exists });
     } catch (err) {
       if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${attPath.split('/').pop()} is open in Excel on the computer. Close it there, then send again.`, 'FILE_OPEN');
       throw err;

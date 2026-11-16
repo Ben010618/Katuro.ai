@@ -253,15 +253,9 @@ export async function callDeskLLM({
   throw lastErr || new Error('AI call failed.');
 }
 
-/** Base64-encodes bytes in chunks (safe for multi-MB files). */
-export function bytesToBase64(bytes) {
-  let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  }
-  return typeof btoa === 'function' ? btoa(binary) : globalThis.Buffer.from(bytes).toString('base64');
-}
+import { bytesToBase64 } from '../../../utils/bytes.js';
+
+export { bytesToBase64 };
 
 /**
  * Shrinks large photos before sending them to the vision model (phone photos are

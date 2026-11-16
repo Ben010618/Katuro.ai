@@ -8,28 +8,34 @@
  * Absences and Lates are live COUNTIF formulas, so the teacher's own edits in Excel count too.
  * The learners come from the ready class record (LRN is the key; new learners are added).
  */
+import { indexToCol } from '../docmap/addr.js';
+import { interop, toUint8 as toU8 } from '../generators/shared.js';
+
 const SHEET = 'Attendance';
 const HEADER_ROW = 3;
 const FIRST_ROW = 4;
 const FIRST_DAY_COL = 6; // F
 export const MARKS = ['P', 'A', 'L', 'E'];
-export const ATTENDANCE_DIR = 'Records/Attendance';
+const ATTENDANCE_DIR = 'Records/Attendance';
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
-const interop = (m) => (m && m.default ? m.default : m);
 async function excel() {
   return interop(await import('exceljs'));
 }
-const toU8 = (buf) => (buf instanceof Uint8Array ? buf : new Uint8Array(buf));
 
-const colLetter = (n) => {
-  let s = '';
-  for (let x = n; x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
-  return s;
-};
+const colLetter = (n) => indexToCol(n - 1); // 1-based column number → "F"
 
-/** "Records/Grade 7 - Rizal - Science.xlsx" → "Records/Attendance/Grade 7 - Rizal - Science.xlsx" */
-export const attendancePathFor = (recordPath) => `${ATTENDANCE_DIR}/${String(recordPath).split('/').pop().replace(/\.(xlsm)$/i, '.xlsx')}`;
+/**
+ * The attendance file of a class record, mirroring its folder under Records/Attendance, so two
+ * classes never share one file:
+ *   "Records/Grade 7 - Rizal - Science.xlsx"            → "Records/Attendance/Grade 7 - Rizal - Science.xlsx"
+ *   "Records/SY 2025-2026/Grade 7 - Rizal - Science.xlsx" → "Records/Attendance/SY 2025-2026/Grade 7 - Rizal - Science.xlsx"
+ *   "Records/Grade 7 - Rizal - Science.xlsm"            → "Records/Attendance/Grade 7 - Rizal - Science (xlsm).xlsx"
+ */
+export function attendancePathFor(recordPath) {
+  const inside = String(recordPath).replace(/\\/g, '/').replace(/^records\//i, '');
+  return `${ATTENDANCE_DIR}/${inside.replace(/\.xlsm$/i, ' (xlsm).xlsx')}`;
+}
 
 /** True for files in Records/Attendance (they are not class records). */
 export const isAttendanceFile = (path) => /^records\/attendance\//i.test(String(path || ''));
@@ -124,18 +130,25 @@ export async function writeAttendance(bytes, { date, marks = {}, learners = [] }
   await wb.xlsx.load(bytes);
   const ws = wb.getWorksheet(SHEET);
   if (!ws) throw new Error('This attendance file has no Attendance sheet.');
-  const found = layout(ws);
-  const { rows, days, lastCol } = found;
-  let { last } = found;
+  const { rows, days, last, lastCol } = layout(ws);
+  // The teacher may have typed in the sheet (a Remarks column, a footer row): a new learner goes
+  // into the first fully empty row after the learners, a new day into the first empty column
+  // after the days. Nothing the teacher wrote is ever overwritten.
+  const blankRow = (r) => !ws.getRow(r).values.some((v) => cellText(v).trim());
+  let free = last + 1;
   for (const l of learners) {
     if (rows.has(l.lrn)) continue;
-    last += 1;
-    writeLearnerRow(ws, last, last - FIRST_ROW + 1, l);
-    rows.set(l.lrn, last);
+    while (!blankRow(free)) free += 1;
+    writeLearnerRow(ws, free, rows.size + 1, l);
+    rows.set(l.lrn, free);
+    free += 1;
   }
+  const blankColumn = (c) => !cellText(ws.getRow(HEADER_ROW).getCell(c).value).trim()
+    && [...rows.values()].every((r) => !cellText(ws.getRow(r).getCell(c).value).trim());
   let col = days.get(date);
   if (!col) {
     col = lastCol + 1;
+    while (!blankColumn(col)) col += 1;
     const h = ws.getRow(HEADER_ROW).getCell(col);
     h.value = date;
     h.font = { bold: true };

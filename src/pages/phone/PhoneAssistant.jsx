@@ -22,14 +22,16 @@ const IDEAS = [
 /**
  * Without KaTuroDesk (computer off or not on the same Wi-Fi): the persona still answers
  * through the KaTuro AI service, but without the teacher's files, schedule or tools.
+ * Privacy: only the question itself is sent. The conversation so far is NOT sent: KaTuroDesk's
+ * replies on the phone carry real learner names (masked only on the way to the AI there).
  */
-async function askCloud({ prompt, history, persona, user, profile }) {
+async function askCloud({ prompt, persona, user, profile }) {
   const [{ callDeskLLM }, { personaFor, teacherFromProfile }] = await Promise.all([
     import('../../services/desk/agent/llm.js'),
     import('../../services/desk/agent/deskAgent.js'),
   ]);
   const system = `${personaFor(teacherFromProfile(profile || {}, user || {}), persona)}\n\nRight now you are on the teacher's phone and KaTuroDesk (their computer) cannot be reached, so you cannot see their files, class records or calendar, and you cannot make or save files. Answer from general knowledge in a short chat reply. If the teacher asks for a document, a schedule or anything from their files, say kindly that it needs KaTuroDesk to be open on the same Wi-Fi, and offer what you can do now (an outline, ideas).`;
-  return callDeskLLM({ system, history, prompt, maxTokens: 1500, temperature: 0.5 });
+  return callDeskLLM({ system, prompt, maxTokens: 1500, temperature: 0.5 });
 }
 
 /** Phase 4: the teacher talks with Matt / Luna / Grey / Lola Carmen; the work runs on KaTuroDesk. */
@@ -74,7 +76,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
     } catch (err) {
       if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') {
         try {
-          const content = await askCloud({ prompt: q, history: past, persona: prefs.persona, user, profile });
+          const content = await askCloud({ prompt: q, persona: prefs.persona, user, profile });
           reply = { role: 'assistant', persona: prefs.persona, content, cloud: true, at: stamp() };
         } catch (cloudErr) {
           reply = { role: 'assistant', persona: prefs.persona, error: true, content: `I can't reach KaTuroDesk or the KaTuro AI right now (${cloudErr.message}). Check your Wi-Fi or data, then try again.`, at: stamp() };

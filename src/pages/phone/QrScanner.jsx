@@ -23,6 +23,9 @@ export default function QrScanner({ onResult, onClose }) {
   const canvasRef = useRef(null);
   const [cameraError, setCameraError] = useState('');
   const doneRef = useRef(false);
+  // The latest callback, so a parent re-render never restarts the camera.
+  const resultRef = useRef(onResult);
+  useEffect(() => { resultRef.current = onResult; }, [onResult]);
 
   useEffect(() => {
     let stream = null;
@@ -35,7 +38,7 @@ export default function QrScanner({ onResult, onClose }) {
         const text = readQr(v, v.videoWidth, v.videoHeight, canvasRef.current);
         if (text) {
           doneRef.current = true;
-          onResult(text);
+          resultRef.current(text);
           return;
         }
       }
@@ -45,7 +48,11 @@ export default function QrScanner({ onResult, onClose }) {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('no camera');
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-        if (!alive) return;
+        if (!alive) {
+          // The scanner closed while the camera was starting: turn the camera off again.
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         const v = videoRef.current;
         v.srcObject = stream;
         await v.play();
@@ -59,7 +66,7 @@ export default function QrScanner({ onResult, onClose }) {
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onResult]);
+  }, []);
 
   const fromPhoto = (e) => {
     const file = e.target.files?.[0];

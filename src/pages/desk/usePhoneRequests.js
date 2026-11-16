@@ -14,6 +14,10 @@ import { useDeskStore } from '../../store/deskStore';
 export function usePhoneRequests({ user, profile } = {}) {
   const account = useRef({ user, profile });
   useEffect(() => { account.current = { user, profile }; }, [user, profile]);
+  // Phones link only to the KaTuro account signed in here (and stop when it changes).
+  useEffect(() => {
+    window.katuroDeskApi?.setLinkAccount?.(user?.uid || '')?.catch?.(() => {});
+  }, [user?.uid]);
   useEffect(() => {
     const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
     if (!api?.onLinkRequest || !api?.phoneHomeRoot) return undefined;
@@ -30,13 +34,14 @@ export function usePhoneRequests({ user, profile } = {}) {
           if (workspace?.rootPath && workspace.rootPath.toLowerCase() === String(rootPath).toLowerCase()) refreshFiles();
         }, 800);
       };
+      // The KaTuro folder itself: its class records are edited in place (localFileSystem.editsInPlace).
+      const handle = { kind: 'electron', isElectron: true, rootPath, katuroHome: true };
       handler = createDeskRequestHandler({
-        handle: { kind: 'electron', isElectron: true, rootPath },
+        handle,
         applied: localAppliedStore(),
         history: localHistoryStore(),
         onWrote: refreshIfHome,
       });
-      const handle = { kind: 'electron', isElectron: true, rootPath };
       const assistant = createAssistantHandler({
         getState: () => useDeskStore.getState(),
         calendar: {

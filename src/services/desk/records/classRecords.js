@@ -14,8 +14,8 @@
 import { normalizeLearnerName } from '../generators/fillTemplates.js';
 
 export const RECORDS_DIR = 'Records';
-export const LESSONS_DIR = 'Lessons';
-export const MAIN_DIRS = Object.freeze([RECORDS_DIR, LESSONS_DIR]);
+const LESSONS_DIR = 'Lessons';
+const MAIN_DIRS = Object.freeze([RECORDS_DIR, LESSONS_DIR]);
 
 const BAD_FILE_CHARS = /[\\/:*?"<>|]+/g;
 const tidy = (s) => String(s ?? '').replace(BAD_FILE_CHARS, ' ').replace(/\s+/g, ' ').trim();
@@ -50,11 +50,8 @@ export function isKaturoHome(tree = []) {
   return MAIN_DIRS.every((d) => dirs.has(d.toLowerCase()));
 }
 
-/** True when `path` IS Records or Lessons itself (not a file inside them). */
-export const isMainFolder = (path) => MAIN_DIRS.some((d) => d.toLowerCase() === String(path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase());
-
 /** Tools whose new files are about learners' records (grades, scores, attendance). */
-export const RECORD_TOOLS = new Set([
+const RECORD_TOOLS = new Set([
   'make_class_record', 'build_report_cards', 'analyze_scores', 'check_attendance',
   'check_grade_sheets', 'check_answer_sheets', 'consolidate_files', 'record_quiz_scores',
 ]);

@@ -1,16 +1,17 @@
 /**
  * scoreReading.js — reads the score a teacher wrote on a checked paper (KaTuro App, Phase 5).
  *
- * Privacy: the teacher taps the score on the photo and ONLY a small square around that spot
- * (the handwritten number) is sent to the KaTuro AI service. The learner is known from the
- * class list on the phone, so no name, LRN or other part of the paper leaves the phone.
+ * Privacy: the teacher taps the score on the photo; a small square around that spot (about
+ * 1 inch on a paper photo: the handwritten number) is shown, and only after the teacher sends
+ * it is it read by the KaTuro AI service. The learner is known from the class list on the
+ * phone, so no LRN leaves it, and the teacher checks that the square holds no name.
  *
  * Every reading is shown next to its picture for the teacher to confirm or correct; an
  * unsure reading is never filled in by itself.
  */
 
-/** Crops a square around the tapped spot (x, y as 0–1 of the photo) → JPEG bytes (≤ 640 px). */
-export async function cropAround(file, x, y, { fraction = 0.28, size = 640 } = {}) {
+/** Crops a small square around the tapped spot (x, y as 0–1 of the photo) → JPEG bytes (≤ 480 px). */
+export async function cropAround(file, x, y, { fraction = 0.12, size = 480 } = {}) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   try {
     const side = Math.round(Math.min(bitmap.width, bitmap.height) * fraction);

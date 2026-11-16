@@ -8,6 +8,8 @@
  *
  * All paths passed in are workspace-relative and use forward slashes.
  */
+import { parseClassRecordFileName } from './desk/records/classRecords.js';
+import { isAttendanceFile } from './desk/records/attendance.js';
 
 export const isFileSystemAccessSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
@@ -42,7 +44,8 @@ async function contentToBytes(content) {
 
 function electronWorkspace(res) {
   return {
-    handle: { kind: 'electron', isElectron: true, rootPath: res.path },
+    // katuroHome: the KaTuro folder (Documents\KaTuro), where class records are edited in place.
+    handle: { kind: 'electron', isElectron: true, rootPath: res.path, katuroHome: Boolean(res.isHome) },
     name: res.name,
     rootPath: res.path,
     isVirtual: false,
@@ -296,27 +299,49 @@ export async function backupFile(dirHandle, relPath, now = new Date()) {
 }
 
 /**
- * Class records in the KaTuro folder's Records folder are edited IN PLACE (one file per class
- * and subject, decided with the teacher 2026-11-16), with a backup in KaTuro Backups first,
- * every time. Everything else gets the "(KaTuro edit)" working copy.
+ * KaTuro class records are edited IN PLACE (one file per class and subject, decided with the
+ * teacher 2026-11-16), with a backup in KaTuro Backups first, every time. Only when:
+ *   - the open folder is the KaTuro folder (handle.katuroHome), and
+ *   - the file is a class record in Records named "Grade 7 - Rizal - Science.xlsx"
+ *     (.xlsx only: an .xlsm's macros would not survive every writer), not an attendance file.
+ * Everything else (the teacher's own folders and files) gets the "(KaTuro edit)" working copy.
  */
-export const editsInPlace = (relPath) => {
+export const editsInPlace = (relPath, dirHandle) => {
   const p = cleanRelPath(relPath);
-  return /^records\//i.test(p) && /\.(xlsx|xlsm)$/i.test(p) && workingCopyPath(p) !== p;
+  return Boolean(dirHandle?.katuroHome)
+    && /^records\//i.test(p)
+    && /\.xlsx$/i.test(p)
+    && workingCopyPath(p) !== p
+    && !isAttendanceFile(p)
+    && Boolean(parseClassRecordFileName(p));
 };
 
 /** Windows refuses to write a file that is open in Excel (EBUSY / EPERM). */
 export const isFileOpenError = (err) => /EBUSY|EPERM|resource busy|locked|being used by another process/i.test(String(err?.message || err || ''));
 
+/** SHA-256 of bytes, as hex (to tell whether a file changed since it was read). */
+export async function sha256Hex(bytes) {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', toUint8(bytes));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /**
  * Saves edited bytes for `originalPath` following the safe-edit SOP.
+ *   baseHash: sha256Hex of the bytes the edit started from. For a record edited in place, the
+ *   save is refused (code FILE_CHANGED) when the file changed since then, e.g. scores sent from
+ *   the phone while a KaTuroDesk task was working on the same record: nothing is lost.
  * Returns { path: the working clone (or the record itself), backups: [backup paths made this time], inPlace }.
  */
-export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType = 'application/octet-stream', now = new Date()) {
+export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType = 'application/octet-stream', now = new Date(), { baseHash = null } = {}) {
   const backups = [];
   const original = cleanRelPath(originalPath);
-  if (editsInPlace(original)) {
-    if (await fileExists(dirHandle, original)) backups.push(await backupFile(dirHandle, original, now));
+  if (editsInPlace(original, dirHandle)) {
+    const exists = await fileExists(dirHandle, original);
+    if (exists && baseHash && (await sha256Hex(await readFileBytes(dirHandle, original))) !== baseHash) {
+      const name = original.split('/').pop();
+      throw Object.assign(new Error(`${name} changed while I was working (for example scores sent from your phone). Ask me again.`), { code: 'FILE_CHANGED' });
+    }
+    if (exists) backups.push(await backupFile(dirHandle, original, now));
     try {
       const res = await writeFileToDirectory(dirHandle, original, bytes, mimeType, { overwrite: true });
       return { path: res.path, name: res.name, backups, inPlace: true };
