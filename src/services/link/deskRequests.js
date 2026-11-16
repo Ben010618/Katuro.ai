@@ -9,8 +9,9 @@
  *   quizzes                 → bubble quizzes in the KaTuro folder
  *   quiz    { path }        → one quiz and its answer key (the phone checks the sheets itself)
  *
- * Writing follows the safe-edit SOP (backup in KaTuro Backups, edits in the
- * "<name> (KaTuro edit).xlsx" working copy, which later recordings continue in), and the
+ * Writing: a backup in KaTuro Backups first, every time, then the scores go straight into the
+ * class record (one file per class; localFileSystem.saveWorkingCopy edits Records in place).
+ * If the file is open in Excel, nothing is changed and the teacher is told to close it. The
  * records rule: LRN matching only, ready class records only, no silent overwrite.
  * A recording sent twice (the phone's answer got lost on the Wi-Fi) is written once.
  */
@@ -19,7 +20,7 @@ import { applyEdits } from '../desk/docmap/index.js';
 import { readClassRecord, planRecord } from '../desk/records/recordSheet.js';
 import { RECORDS_DIR, parseClassRecordFileName } from '../desk/records/classRecords.js';
 import { QUIZ_FILE, CHECK_FILE, parseQuiz } from '../desk/bubble/quiz.js';
-import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath } from '../localFileSystem.js';
+import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError } from '../localFileSystem.js';
 
 const RECORD_FILE = /\.(xlsx|xlsm)$/i;
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -65,13 +66,9 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
 
   async function recordFiles() {
     const files = await allFiles();
-    const paths = new Set(files.map((f) => f.path));
     return files
       .filter((f) => inRecords(f.path) && RECORD_FILE.test(f.path) && !isWorkingCopy(f.path) && !f.name.startsWith('~$'))
-      .map((f) => {
-        const copy = workingCopyPath(f.path);
-        return { path: f.path, name: f.name, source: paths.has(copy) ? copy : f.path };
-      })
+      .map((f) => ({ path: f.path, name: f.name, source: f.path }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }
 
@@ -94,7 +91,6 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
       ready: record.ready,
       problems: record.problems.slice(0, 5).map((p) => p.detail),
       learnerCount: record.learners.length,
-      editing: f.source !== f.path ? f.source : null,
     };
   };
 
@@ -129,7 +125,12 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
       const out = await applyEdits(bytes, file.source.split('/').pop(), plan.edits);
       skipped = out.skipped || [];
       if (skipped.length === plan.edits.length) throw new RequestError('None of the scores could be written: those cells hold formulas or are protected. Check the class record on KaTuroDesk.', 'NOT_WRITTEN');
-      saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME);
+      try {
+        saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME);
+      } catch (err) {
+        if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${file.name} is open in Excel on the computer. Close it there, then send the scores again.`, 'FILE_OPEN');
+        throw err;
+      }
       onWrote(saved.path);
     }
     const result = {

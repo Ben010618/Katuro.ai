@@ -102,15 +102,16 @@ describe('bubble quiz tools', () => {
     expect(res.content).toMatch(/1 need your choice/);
     expect(res.content).toMatch(/1 learner\(s\) without a sheet are left blank/);
 
-    // Teacher picks WW1 and applies: only WW1 cells change, in a working copy.
+    // Teacher picks WW1 and applies: only WW1 cells change.
     const session = { ...art.data.session, issues: [] }; // the teacher dismisses the question
     const result = buildScorePlan({ learners: art.data.learners, column: art.data.columns.find((c) => c.key === 'ww1'), kind: art.data.kind, session, maxScore: 5 });
     expect(result.ok).toBe(true);
     const changes = { ...scoreChangesArtifact(result.plan, { targetPath: art.data.targetPath, kind: art.data.kind, columnLabel: 'WW1' }), id: 'c1' };
     useDeskStore.setState({ workspace, artifacts: [changes], activeArtifact: null });
     const saved = await useDeskStore.getState().applyPendingChanges('c1');
-    expect(saved.path).toBe('Records/G7 Class Record (KaTuro edit).xlsx');
-    expect(Array.from(await readFileBytes(workspace.handle, 'Records/G7 Class Record.xlsx'))).toEqual(Array.from(record));
+    // A class record in Records is edited in place, after a backup of it as it was.
+    expect(saved).toMatchObject({ path: 'Records/G7 Class Record.xlsx', inPlace: true });
+    expect(Array.from(await readFileBytes(workspace.handle, saved.backups[0]))).toEqual(Array.from(record));
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await readFileBytes(workspace.handle, saved.path));
     const ws = wb.getWorksheet('Sheet1');

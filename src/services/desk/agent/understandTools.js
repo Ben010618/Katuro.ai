@@ -8,7 +8,8 @@
  *
  * Edits are never written directly: tools return a pending "changes" artifact.
  * The teacher reviews it in the Canvas; applying follows the safe-edit SOP
- * (original backed up, working copy "<name> (KaTuro edit)" edited).
+ * (original backed up, working copy "<name> (KaTuro edit)" edited; class records in Records are
+ * edited in place after the backup, see localFileSystem.saveWorkingCopy).
  */
 
 import { recognizeMap, harvestNames } from '../understand/recognize.js';

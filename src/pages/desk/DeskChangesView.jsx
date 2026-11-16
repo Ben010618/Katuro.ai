@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, X, Loader2, AlertTriangle, ShieldCheck, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
+import { editsInPlace } from '../../services/localFileSystem';
 
 const MAX_ROWS = 600;
 
@@ -175,7 +176,10 @@ export default function DeskChangesView({ art }) {
       )}
       {pending && (
         <p className="text-[10px] text-gray-500 flex items-center gap-1">
-          <ShieldCheck size={11} className="text-emerald-700" /> Your original file stays untouched: it is backed up, and the changes go into “{d.targetPath?.split('/').pop().replace(/(\.[^.]+)$/, ' (KaTuro edit)$1')}”.
+          <ShieldCheck size={11} className="text-emerald-700" />{' '}
+          {editsInPlace(d.targetPath || '')
+            ? <>A backup of your class record is saved in KaTuro Backups first; then the changes go straight into “{d.targetPath.split('/').pop()}”.</>
+            : <>Your original file stays untouched: it is backed up, and the changes go into “{d.targetPath?.split('/').pop().replace(/(\.[^.]+)$/, ' (KaTuro edit)$1')}”.</>}
         </p>
       )}
     </div>

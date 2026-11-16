@@ -1015,7 +1015,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         title: `Encoding check — ${file.name}`,
         sheets: [{ name: 'Encoded', columns: [{ header: 'Learner (source)' }, { header: 'Matched name in your file' }, { header: 'Row' }, { header: 'Score' }], rows: result.written.map((w) => [w.name, w.matchedName, w.row, w.score]) }],
       });
-      return { summary: `${parts.join('; ')}. Your original is untouched (backup in ${file.backups[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); edited copy: ${file.name}`, artifacts: [{ type: 'sheet', title: spec.title, subtitle: parts.join(' · '), spec, files: [file], editable: false }] };
+      return { summary: `${parts.join('; ')}. ${file.inPlace ? `A backup is in ${file.backups[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}; the scores are in ${file.name}.` : `Your original is untouched (backup in ${file.backups[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); edited copy: ${file.name}`}`, artifacts: [{ type: 'sheet', title: spec.title, subtitle: parts.join(' · '), spec, files: [file], editable: false }] };
     },
   },
 
@@ -2033,7 +2033,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         }],
       });
       return {
-        summary: `Filled your ${fileName(targetPath)} from ${columns.length} file(s). ${parts.join('; ')}.${notes.length ? ` Notes: ${notes.join('; ')}.` : ''} Your original is untouched (backup in ${file.backups?.[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); the filled copy is ${file.name}. Done by code; no names or grades were sent to the AI.`,
+        summary: `Filled your ${fileName(targetPath)} from ${columns.length} file(s). ${parts.join('; ')}.${notes.length ? ` Notes: ${notes.join('; ')}.` : ''} ${file.inPlace ? `A backup is in ${file.backups?.[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}; ${file.name} is filled.` : `Your original is untouched (backup in ${file.backups?.[0] ? file.backups[0].split('/').slice(0, 2).join('/') : 'KaTuro Backups'}); the filled copy is ${file.name}.`} Done by code; no names or grades were sent to the AI.`,
         artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${columns.length} column(s) filled`, spec, files: [file], editable: false }],
       };
     },

@@ -256,7 +256,7 @@ function Review({ cls, column, entry, client, onBack, onDone }) {
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />} Record in KaTuroDesk
         </button>
       </div>
-      <p className="text-[11px] text-gray-500">KaTuroDesk keeps a backup of the class record before writing, and saves the scores in &ldquo;{cls.name} (KaTuro edit)&rdquo; in your Records folder.</p>
+      <p className="text-[11px] text-gray-500">KaTuroDesk saves a backup of {cls.name} in KaTuro Backups first, then writes the scores into it.</p>
     </div>
   );
 }

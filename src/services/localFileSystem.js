@@ -296,12 +296,38 @@ export async function backupFile(dirHandle, relPath, now = new Date()) {
 }
 
 /**
+ * Class records in the KaTuro folder's Records folder are edited IN PLACE (one file per class
+ * and subject, decided with the teacher 2026-11-16), with a backup in KaTuro Backups first,
+ * every time. Everything else gets the "(KaTuro edit)" working copy.
+ */
+export const editsInPlace = (relPath) => {
+  const p = cleanRelPath(relPath);
+  return /^records\//i.test(p) && /\.(xlsx|xlsm)$/i.test(p) && workingCopyPath(p) !== p;
+};
+
+/** Windows refuses to write a file that is open in Excel (EBUSY / EPERM). */
+export const isFileOpenError = (err) => /EBUSY|EPERM|resource busy|locked|being used by another process/i.test(String(err?.message || err || ''));
+
+/**
  * Saves edited bytes for `originalPath` following the safe-edit SOP.
- * Returns { path: the working clone, backups: [backup paths made this time] }.
+ * Returns { path: the working clone (or the record itself), backups: [backup paths made this time], inPlace }.
  */
 export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType = 'application/octet-stream', now = new Date()) {
   const backups = [];
   const original = cleanRelPath(originalPath);
+  if (editsInPlace(original)) {
+    if (await fileExists(dirHandle, original)) backups.push(await backupFile(dirHandle, original, now));
+    try {
+      const res = await writeFileToDirectory(dirHandle, original, bytes, mimeType, { overwrite: true });
+      return { path: res.path, name: res.name, backups, inPlace: true };
+    } catch (err) {
+      if (isFileOpenError(err)) {
+        const name = original.split('/').pop();
+        throw Object.assign(new Error(`${name} is open in Excel. Close it on the computer, then try again. (A backup was already made; nothing was changed.)`), { code: 'FILE_OPEN' });
+      }
+      throw err;
+    }
+  }
   const clone = workingCopyPath(original);
   if (clone !== original && (await fileExists(dirHandle, original))) {
     backups.push(await backupFile(dirHandle, original, now));
@@ -310,7 +336,7 @@ export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType =
     backups.push(await backupFile(dirHandle, clone, now));
   }
   const res = await writeFileToDirectory(dirHandle, clone, bytes, mimeType, { overwrite: true });
-  return { path: res.path, name: res.name, backups };
+  return { path: res.path, name: res.name, backups, inPlace: false };
 }
 
 /**

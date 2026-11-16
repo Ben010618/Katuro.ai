@@ -89,7 +89,7 @@ async function home() {
 }
 
 describe('KaTuroDesk answering the phone', () => {
-  it('lists the classes, records scores into the working copy (original backed up), and reports missing papers', async () => {
+  it('lists the classes, records scores straight into the class record (backup first), and reports missing papers', async () => {
     const ws = await home();
     const wrote = [];
     const ask = createDeskRequestHandler({ handle: ws.handle, onWrote: (p) => wrote.push(p) });
@@ -101,27 +101,29 @@ describe('KaTuroDesk answering the phone', () => {
     expect(cls.learners).toHaveLength(3);
 
     const res = await ask('record', { id: 'r1', path: RECORD, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }, { lrn: '136512340003', score: 20 }] });
-    expect(res).toMatchObject({ ok: true, written: 2, hps: 20, savedTo: 'Records/Grade 7 - Rizal - Science (KaTuro edit).xlsx' });
+    expect(res).toMatchObject({ ok: true, written: 2, hps: 20, savedTo: RECORD });
     expect(res.missing.map((m) => m.name)).toEqual(['Reyes, Pedro A.']);
     expect(res.backup).toMatch(/^KaTuro Backups\//);
-    expect(wrote).toEqual(['Records/Grade 7 - Rizal - Science (KaTuro edit).xlsx']);
+    expect(wrote).toEqual([RECORD]);
 
-    // The original is untouched; the working copy has the scores and the HPS.
-    const original = await readFileBytes(ws.handle, RECORD);
-    expect(await cellValue(original, 'D9')).toBeNull();
-    const copy = await readFileBytes(ws.handle, res.savedTo);
+    // The backup holds the record as it was; the record has the scores and the HPS.
+    const backup = await readFileBytes(ws.handle, res.backup);
+    expect(await cellValue(backup, 'D9')).toBeNull();
+    const copy = await readFileBytes(ws.handle, RECORD);
     expect(await cellValue(copy, 'D9')).toBe(20);
     const juanRow = cls.learners.find((l) => l.lrn === '136512340001').row;
     expect(await cellValue(copy, `D${juanRow}`)).toBe(18);
 
-    // The next recording continues in the working copy and keeps WW1.
+    // The next recording keeps WW1, and there is still one file for the class (no copy).
     const res2 = await ask('record', { id: 'r2', path: RECORD, column: 'ww2', hps: 10, scores: [{ lrn: '136512340002', score: 7 }] });
     expect(res2.written).toBe(1);
     const copy2 = await readFileBytes(ws.handle, res2.savedTo);
     expect(await cellValue(copy2, `D${juanRow}`)).toBe(18);
     expect((await ask('class', { path: RECORD })).columns.find((c) => c.key === 'ww1').filled).toBe(2);
-    // The list shows one class (the working copy is not a second class).
     expect((await ask('classes')).classes).toHaveLength(1);
+    expect(flattenFileTree(ws.handle.getFiles()).filter((f) => f.path.startsWith('Records/')).map((f) => f.path)).toEqual([RECORD]);
+    // Every recording made its own backup.
+    expect(flattenFileTree(ws.handle.getFiles()).filter((f) => f.path.startsWith('KaTuro Backups/'))).toHaveLength(2);
   });
 
   it('the same recording sent twice is written once', async () => {
@@ -153,5 +155,20 @@ describe('KaTuroDesk answering the phone', () => {
     expect(c.ready).toBe(false);
     expect(c.problems[0]).toMatch(/Reyes, Pedro A\. has no LRN/);
     await expect(ask('record', { id: 'x', path: RECORD, column: 'ww1', hps: 10, scores: [{ lrn: '136512340001', score: 5 }] })).rejects.toMatchObject({ code: 'NOT_READY' });
+  });
+
+  it('a class record open in Excel is not changed; the teacher is told to close it', async () => {
+    const ws = await home();
+    const ask = createDeskRequestHandler({ handle: ws.handle });
+    const save = ws.handle.saveVirtualFile.bind(ws.handle);
+    ws.handle.saveVirtualFile = (path, ...rest) => {
+      if (path === RECORD) throw new Error("EBUSY: resource busy or locked, open 'C:\\Users\\T\\Documents\\KaTuro\\Records\\Grade 7 - Rizal - Science.xlsx'");
+      return save(path, ...rest);
+    };
+    await expect(ask('record', { id: 'busy', path: RECORD, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] }))
+      .rejects.toMatchObject({ code: 'FILE_OPEN', message: expect.stringMatching(/open in Excel/) });
+    ws.handle.saveVirtualFile = save;
+    // Nothing was written, so the same recording can be sent again once Excel is closed.
+    expect((await ask('record', { id: 'busy', path: RECORD, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] })).written).toBe(1);
   });
 });
