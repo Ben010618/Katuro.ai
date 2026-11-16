@@ -906,6 +906,12 @@ function startLinkService() {
     askDesk,
     onFileAdded: (info) => sendToWindow('link:fileAdded', info),
     account: linkAccount,
+    // Folders added for phones must not be Windows, programs, KaTuroDesk's own files or the whole user folder.
+    guard: {
+      profile: app.getPath('home'),
+      protectedPaths: [app.getPath('userData'), app.getPath('appData')],
+      systemPaths: [process.env.WINDIR, process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.ProgramData, process.env.LOCALAPPDATA, app.getPath('appData')],
+    },
   });
   linkService.start().catch((err) => console.error('Phone link could not start:', err));
 }
@@ -917,6 +923,21 @@ ipcMain.handle('link:status', async () => (linkService ? linkService.status() : 
 ipcMain.handle('link:pair', async () => linkReady().beginPairing());
 ipcMain.handle('link:cancel', async () => linkReady().cancelPairing());
 ipcMain.handle('link:remove', async (_, id) => linkReady().removeDevice(String(id || '')));
+// What phones can see: a level per folder and per phone, and folders outside KaTuro added for phones.
+ipcMain.handle('link:access', async (e, deviceId, key, level) => {
+  if (!fromMainWindow(e)) return null;
+  return linkReady().setAccess(String(deviceId || ''), String(key || ''), String(level || ''));
+});
+ipcMain.handle('link:addFolder', async (e) => {
+  if (!fromMainWindow(e)) return { canceled: true };
+  const pick = await dialog.showOpenDialog(mainWindow, { title: 'Choose a folder your phone may see', properties: ['openDirectory'] });
+  if (pick.canceled || !pick.filePaths.length) return { canceled: true };
+  return { status: linkReady().addShared(pick.filePaths[0]) };
+});
+ipcMain.handle('link:removeFolder', async (e, id) => {
+  if (!fromMainWindow(e)) return null;
+  return linkReady().removeShared(String(id || ''));
+});
 // The KaTuro account signed in on KaTuroDesk: phones link only to the same account.
 let linkAccount = '';
 ipcMain.handle('link:account', (e, uid) => {

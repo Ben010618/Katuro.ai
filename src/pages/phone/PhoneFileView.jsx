@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, HardDriveDownload, Loader2 } from 'lucide-react';
-import { keepFile, keptFile, forgetKept } from '../../services/link/phoneFiles';
+import { ArrowLeft, FileUp, FolderInput, HardDriveDownload, Loader2, MoreHorizontal, Pencil, X } from 'lucide-react';
+import { keepFile, keptFile, forgetKept, folderLabel } from '../../services/link/phoneFiles';
+import { bytesToBase64 } from '../../utils/bytes';
 import { readDocument, loadPdfjs } from '../../services/desk/readers/index.js';
 
 const IMAGE = /\.(png|jpe?g|webp|gif|bmp)$/i;
@@ -77,10 +78,126 @@ function SheetView({ sheets }) {
 }
 
 /**
- * Opens one file from the KaTuro folder on the phone (read only). "Keep on phone" saves a
- * copy that opens without KaTuroDesk; when KaTuroDesk can't be reached the kept copy is used.
+ * Rename, move or replace a file, in a folder where KaTuroDesk gives this phone "Full" access
+ * (it checks again, and saves a replaced file in KaTuro Backups first). → onDone(note)
  */
-export default function PhoneFileView({ entry, client, onBack, onKeptChange }) {
+function FileActions({ entry, client, file, kept, onClose, onDone }) {
+  const [mode, setMode] = useState('menu'); // menu | rename | move
+  const ext = (entry.name.match(/\.[^.]+$/) || [''])[0];
+  const [name, setName] = useState(entry.name.slice(0, entry.name.length - ext.length));
+  const [folders, setFolders] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const here = entry.path.split('/').slice(0, -1).join('/');
+
+  useEffect(() => {
+    if (mode !== 'move') return undefined;
+    let alive = true;
+    const top = entry.path.split('/')[0];
+    const dirs = (r) => r.items.filter((i) => i.kind === 'directory' && i.access === 'full').map((i) => i.path);
+    client.list(top)
+      .then(async (r) => {
+        const below = await Promise.all(dirs(r).map((p) => client.list(p).then((s) => [p, ...dirs(s)]).catch(() => [p])));
+        if (alive) setFolders([top, ...below.flat()].filter((p) => p !== here));
+      })
+      .catch((err) => alive && setError(err.message));
+    return () => { alive = false; };
+  }, [mode, client, entry.path, here]);
+
+  // A kept copy follows the file to its new name or place.
+  const follow = async (newPath, newName, bytes = file?.bytes) => {
+    if (!kept || !bytes) return;
+    await keepFile(newPath, { name: newName, size: bytes.byteLength, bytes }).catch(() => {});
+    if (newPath !== entry.path) await forgetKept(entry.path).catch(() => {});
+  };
+  const run = async (fn) => {
+    setBusy(true);
+    setError('');
+    try {
+      onDone(await fn());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const rename = () => run(async () => {
+    const res = await client.request('rename', { path: entry.path, name: `${name.trim()}${ext}` });
+    await follow(res.path, res.name);
+    return `Renamed to ${res.name}.`;
+  });
+  const moveTo = (to) => run(async () => {
+    const res = await client.request('move', { path: entry.path, to });
+    await follow(res.path, entry.name);
+    return `Moved to ${folderLabel(to)}.`;
+  });
+  const replace = (e) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    run(async () => {
+      const bytes = new Uint8Array(await picked.arrayBuffer());
+      const res = await client.request('replace', { path: entry.path, name: picked.name, data: bytesToBase64(bytes) });
+      await follow(entry.path, entry.name, bytes);
+      return `Replaced. The old one is in ${folderLabel(res.backup.split('/').slice(0, 2).join('/'))}.`;
+    });
+  };
+
+  const row = 'nm-press flex w-full items-center gap-4 rounded-2xl px-4 py-4 text-left text-[15px] font-medium disabled:opacity-50';
+  return (
+    <div className="fixed inset-0 z-[55] flex items-end bg-black/30" onClick={busy ? undefined : onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full rounded-t-2xl bg-white px-4 pt-3 space-y-1" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+        <div className="flex items-center justify-between pb-1">
+          <p className="truncate text-sm font-semibold">{entry.name}</p>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="p-1"><X size={20} /></button>
+        </div>
+        {mode === 'menu' && (
+          <>
+            <button type="button" onClick={() => setMode('rename')} disabled={busy} className={row}><Pencil size={20} className="nm-green" /> Rename</button>
+            <button type="button" onClick={() => setMode('move')} disabled={busy} className={row}><FolderInput size={20} className="nm-green" /> Move</button>
+            <label className={row}>
+              <FileUp size={20} className="nm-green" /> Replace with a file from this phone
+              <input type="file" accept={ext} className="hidden" disabled={busy} onChange={replace} />
+            </label>
+            <p className="nm-muted px-4 pt-1 text-[11px]">A replaced file is saved in KaTuro Backups first.</p>
+          </>
+        )}
+        {mode === 'rename' && (
+          <div className="space-y-3 pt-1">
+            <label className="block text-xs font-medium" htmlFor="kt-rename">New name</label>
+            <div className="flex items-center gap-2">
+              <input id="kt-rename" value={name} onChange={(e) => setName(e.target.value)} className="flex-1 rounded-2xl px-4 py-3 text-base" />
+              <span className="nm-muted text-sm">{ext}</span>
+            </div>
+            <button type="button" onClick={rename} disabled={busy || !name.trim()} className="w-full rounded-2xl bg-emerald-700 py-3.5 font-semibold text-white disabled:opacity-50">{busy ? 'Renaming…' : 'Rename'}</button>
+          </div>
+        )}
+        {mode === 'move' && (
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-medium">Move to</p>
+            {!folders && !error && <p className="nm-muted flex items-center gap-2 text-sm"><Loader2 size={16} className="animate-spin" /> Finding folders…</p>}
+            {folders && !folders.length && <p className="nm-muted text-sm">No other folder here that this phone may change.</p>}
+            <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
+              {folders?.map((p) => (
+                <li key={p}><button type="button" disabled={busy} onClick={() => moveTo(p)} className="w-full rounded-xl bg-white px-4 py-3 text-left text-sm shadow-sm disabled:opacity-50">{folderLabel(p)}</button></li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {busy && mode === 'menu' && <p className="nm-muted flex items-center gap-2 px-4 text-sm"><Loader2 size={16} className="animate-spin" /> Working on KaTuroDesk…</p>}
+        {error && <p className="px-1 text-sm text-red-700">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Opens one file from KaTuroDesk on the phone. "Keep on phone" saves a copy that opens
+ * without KaTuroDesk; when KaTuroDesk can't be reached the kept copy is used. In a folder with
+ * "Full" access, ⋯ renames, moves or replaces the file. → onChanged(note) after one of those.
+ */
+export default function PhoneFileView({ entry, client, onBack, onKeptChange, onChanged }) {
+  const [actions, setActions] = useState(false);
   const [state, setState] = useState({ loading: true });
   const [file, setFile] = useState(null); // { bytes, size, fromPhone }
   const [kept, setKept] = useState(false);
@@ -131,6 +248,9 @@ export default function PhoneFileView({ entry, client, onBack, onKeptChange }) {
       <div className="sticky top-0 z-10 flex items-center gap-2 bg-[#eef2ef] px-3 py-2 border-b border-gray-200">
         <button type="button" onClick={onBack} aria-label="Back" className="p-2 -ml-2"><ArrowLeft size={20} /></button>
         <p className="text-sm font-semibold text-gray-900 truncate flex-1">{entry.name}</p>
+        {entry.access === 'full' && file && !file.fromPhone && (
+          <button type="button" onClick={() => setActions(true)} aria-label="Rename, move or replace" className="p-2"><MoreHorizontal size={20} /></button>
+        )}
         {file && (
           <button
             type="button"
@@ -147,6 +267,16 @@ export default function PhoneFileView({ entry, client, onBack, onKeptChange }) {
           </button>
         )}
       </div>
+      {actions && (
+        <FileActions
+          entry={entry}
+          client={client}
+          file={file}
+          kept={kept}
+          onClose={() => setActions(false)}
+          onDone={(note) => { setActions(false); onChanged?.(note); }}
+        />
+      )}
       <div className="p-3">
         {keepNote && <p className="mb-2 text-xs text-emerald-800">{keepNote}</p>}
         {file?.fromPhone && <p className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900">KaTuroDesk can't be reached, so this is the copy kept on this phone.</p>}

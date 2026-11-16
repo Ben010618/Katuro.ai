@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Camera, CheckCircle2, CloudOff, FileUp, FolderOpen, HardDriveDownload, Loader2, Plus, ScanText, Trash2, X } from 'lucide-react';
-import { canSendTo, keptFiles, outbox, sendOutbox, dropFromOutbox, sendOrKeep, shrinkPhoto, pagesToPdf, stampName } from '../../services/link/phoneFiles';
+import { canAdd, folderLabel, keptFiles, outbox, sendOutbox, dropFromOutbox, sendOrKeep, shrinkPhoto, pagesToPdf, stampName } from '../../services/link/phoneFiles';
 import { formatBytes } from '../../utils/bytes';
 
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
@@ -217,11 +217,10 @@ function ScanToPdf({ client, folder, onClose, onSent }) {
 }
 
 /**
- * The "+" on the Files tab: Snap & Send, Scan to PDF, Choose files. Files go to the folder
- * being viewed when it is in Records or Lessons; otherwise to Lessons.
+ * The "+" on the Files tab: Snap & Send, Scan to PDF, Choose files, into `folder` (the folder
+ * being viewed, or Lessons from the top; PhoneApp shows it only where KaTuroDesk allows adding).
  */
-export function AddToFolder({ client, path, onSent }) {
-  const folder = canSendTo(path) ? path : 'Lessons';
+export function AddToFolder({ client, folder, onSent }) {
   const [open, setOpen] = useState(false);
   const [scan, setScan] = useState(false);
   const [busy, setBusy] = useState('');
@@ -255,13 +254,13 @@ export function AddToFolder({ client, path, onSent }) {
           <Results results={results} />
         </div>
       )}
-      <button type="button" onClick={() => { setResults(null); setOpen(true); }} aria-label={`Add to ${folder}`} className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-lg" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+      <button type="button" onClick={() => { setResults(null); setOpen(true); }} aria-label={`Add to ${folderLabel(folder)}`} className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-lg" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
         <Plus size={28} />
       </button>
       {open && (
         <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full rounded-t-2xl bg-white p-4 space-y-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-            <p className="text-sm font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={16} className="text-emerald-700" /> Add to {folder}</p>
+            <p className="text-sm font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={16} className="text-emerald-700" /> Add to {folderLabel(folder)}</p>
             <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3.5 text-sm font-semibold text-gray-900">
               <Camera size={22} className="text-emerald-700" /> Take a photo
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { setOpen(false); pick(e); }} />
@@ -273,7 +272,6 @@ export function AddToFolder({ client, path, onSent }) {
               <FileUp size={22} className="text-emerald-700" /> Choose photos or files from this phone
               <input type="file" multiple className="hidden" onChange={(e) => { setOpen(false); pick(e); }} />
             </label>
-            {!canSendTo(path) && <p className="text-[11px] text-gray-500">Open a folder in Records or Lessons first to send there; otherwise files go to Lessons.</p>}
           </div>
         </div>
       )}
@@ -282,19 +280,36 @@ export function AddToFolder({ client, path, onSent }) {
 }
 
 /**
- * Files shared to KaTuro from another app (Android Share → KaTuro): choose Lessons or Records
- * (or a folder in them), then send.
+ * Files shared to KaTuro from another app (Android Share → KaTuro): choose a folder this phone
+ * may add to (Lessons first, then the others KaTuroDesk allows, and their folders), then send.
  */
 export function SharedFilesSheet({ client, files, onClose, onSent }) {
-  const [folder, setFolder] = useState('Lessons');
+  const [folder, setFolder] = useState('');
   const [folders, setFolders] = useState([]);
   const [busy, setBusy] = useState('');
   const [results, setResults] = useState(null);
   useEffect(() => {
     let alive = true;
-    Promise.all(['Lessons', 'Records'].map((top) => client.list(top).then((r) => [top, ...r.items.filter((i) => i.kind === 'directory').map((i) => i.path)]).catch(() => [top])))
-      .then((lists) => alive && setFolders(lists.flat()))
-      .catch(() => {});
+    client.list('')
+      .then((r) => {
+        const tops = r.items.filter((i) => i.kind === 'directory' && canAdd(i.access))
+          .sort((a, b) => (a.name === 'Lessons' ? -1 : b.name === 'Lessons' ? 1 : 0));
+        return Promise.all(tops.map((t) => client.list(t.path)
+          .then((sub) => [t.path, ...sub.items.filter((i) => i.kind === 'directory' && canAdd(i.access)).map((i) => i.path)])
+          .catch(() => [t.path])));
+      })
+      .then((lists) => {
+        if (!alive) return;
+        const all = lists.flat();
+        setFolders(all);
+        setFolder((f) => f || all[0] || '');
+      })
+      // KaTuroDesk not reachable now: Lessons, kept in the outbox until it is (it checks again then).
+      .catch(() => {
+        if (!alive) return;
+        setFolders(['Lessons']);
+        setFolder((f) => f || 'Lessons');
+      });
     return () => { alive = false; };
   }, [client]);
 
@@ -316,9 +331,10 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
           <>
             <label className="block text-xs font-semibold text-gray-600" htmlFor="kt-share-folder">Folder</label>
             <select id="kt-share-folder" value={folder} onChange={(e) => setFolder(e.target.value)} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm">
-              {(folders.length ? folders : ['Lessons', 'Records']).map((p) => <option key={p} value={p}>{p.split('/').join(' › ')}</option>)}
+              {(folders.length ? folders : ['Lessons']).map((p) => <option key={p} value={p}>{folderLabel(p)}</option>)}
             </select>
-            <button type="button" disabled={Boolean(busy)} onClick={send} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-60">{busy || `Send ${files.length} file${files.length > 1 ? 's' : ''}`}</button>
+            {folders.length === 0 && <p className="text-[11px] text-gray-500">Checking which folders KaTuroDesk lets this phone add to…</p>}
+            <button type="button" disabled={Boolean(busy) || !folder} onClick={send} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-60">{busy || `Send ${files.length} file${files.length > 1 ? 's' : ''}`}</button>
           </>
         )}
         <Results results={results} />

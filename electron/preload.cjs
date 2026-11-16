@@ -65,6 +65,9 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   linkPhone: () => ipcRenderer.invoke('link:pair'),
   cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
   removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
+  setPhoneAccess: (deviceId, key, level) => ipcRenderer.invoke('link:access', deviceId, key, level),
+  addPhoneFolder: () => ipcRenderer.invoke('link:addFolder'),
+  removePhoneFolder: (id) => ipcRenderer.invoke('link:removeFolder', id),
   setLinkAccount: (uid) => ipcRenderer.invoke('link:account', uid),
   // Backup of the KaTuro folder to a USB drive or folder (Settings → Backup).
   lastBackup: () => ipcRenderer.invoke('backup:last'),

@@ -141,5 +141,10 @@ export async function pagesToPdf(pages, { paper = 'a4' } = {}) {
   return imagesToPdf(pages.map((bytes) => ({ bytes, mimeType: 'image/jpeg' })), { paper, margin: 18 });
 }
 
-/** Where a file may go from the phone: Records or Lessons, or a folder inside them. */
-export const canSendTo = (folder) => /^(records|lessons)(\/|$)/i.test(String(folder || ''));
+/**
+ * What KaTuroDesk lets this phone do in a folder (its "access", Settings → Phones on the
+ * computer): 'view', 'add' or 'full'. KaTuroDesk checks it again on every request.
+ */
+export const canAdd = (access) => access === 'add' || access === 'full';
+/** A phone path for showing: an outside folder's ":" mark left out, parts joined with ›. */
+export const folderLabel = (p) => String(p || '').replace(/^:/, '').split('/').join(' › ');

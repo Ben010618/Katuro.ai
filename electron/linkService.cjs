@@ -14,10 +14,12 @@
  *   - the answer is bound to that nonce, so it can't be swapped for another answer
  *   Anyone on the same Wi-Fi sees only scrambled bytes.
  *
- * What a paired phone can do: see the KaTuro folder (Records, Lessons and any other folder)
- * and open its files (answered here, paths always kept inside the KaTuro folder); the other
- * requests (class records, recording scores, bubble quizzes) go to the KaTuroDesk window
- * through askDesk(op, args, device), see src/services/link/deskRequests.js.
+ * What a paired phone can do with files is set per folder and per phone in KaTuroDesk
+ * (phoneAccess.cjs: hidden / view / add / full) and checked here on every request: list, read,
+ * upload, and for "full" folders rename, move and replace (a backup first). Paths always stay
+ * inside the KaTuro folder or a folder the teacher added for phones. The other requests (class
+ * records, recording scores, bubble quizzes, the Assistant) go to the KaTuroDesk window through
+ * askDesk(op, args, device), see src/services/link/deskRequests.js.
  *
  * Phone keys are saved encrypted (Windows DPAPI through Electron's safeStorage) in
  * linked-phones.json in KaTuroDesk's app data. The teacher can remove a phone at any time.
@@ -27,6 +29,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { isInsideFolder } = require('./defaultFolders.cjs');
+const access = require('./phoneAccess.cjs');
 
 const VERSION = 1;
 const PAIR_MS = 10 * 60 * 1000;
@@ -34,8 +37,6 @@ const CLOCK_SKEW_MS = 5 * 60 * 1000;
 // A file sent from the phone (up to 25 MB) arrives base64-encoded inside the encrypted message.
 const MAX_REQUEST_BYTES = 40 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-// Folders a phone may add files to (and their subfolders). The others are view only.
-const WRITABLE_TOP = ['records', 'lessons'];
 // What a phone may send: documents, pictures, sound and video for lessons. Never programs,
 // and no formats that can carry macros (.docm/.xlsm/.pptm, old .doc/.xls/.ppt).
 const UPLOAD_TYPES = /\.(pdf|docx|xlsx|pptx|csv|txt|rtf|odt|ods|odp|jpe?g|png|webp|heic|heif|gif|bmp|mp3|m4a|wav|ogg|mp4|mov|3gp|webm)$/i;
@@ -44,7 +45,7 @@ const MAX_DEVICES = 10;
 const MAX_LIST = 2000;
 const PREFERRED_PORT = 47821;
 const QR_PREFIX = 'KTLINK1:';
-const HIDDEN = /^(\.|~\$|desktop\.ini$|thumbs\.db$|\$recycle\.bin$|system volume information$)/i;
+const { HIDDEN } = access;
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 const unb64u = (s) => Buffer.from(String(s || ''), 'base64url');
@@ -100,9 +101,10 @@ const CORS = {
  * addresses()   → [{ address, name }] this computer's LAN addresses (phoneCapture.lanAddresses)
  * onChange(st)  → after pairing / removing / a phone being seen
  * askDesk(op, args, device) → Promise of the answer from the KaTuroDesk window (optional)
- * onFileAdded({ path, name, size, phone }) → after a phone sent a file into Records / Lessons
+ * onFileAdded({ path, name, size, phone }) → after a phone sent, renamed, moved or replaced a file
+ * guard         → { profile, protectedPaths, systemPaths } for folders added for phones (phoneAccess.checkSharedFolder)
  */
-function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, onFileAdded = () => {}, account: startAccount = '', now = () => Date.now() }) {
+function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, onFileAdded = () => {}, account: startAccount = '', guard = {}, now = () => Date.now() }) {
   let server = null;
   // The KaTuro account signed in on KaTuroDesk ('' = signed out): phones are linked to it.
   let account = String(startAccount || '');
@@ -129,9 +131,9 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
   function load() {
     try {
       const raw = JSON.parse(fs.readFileSync(storeFile, 'utf8'));
-      return { deskId: raw.deskId || b64u(crypto.randomBytes(9)), devices: Array.isArray(raw.devices) ? raw.devices : [] };
+      return { deskId: raw.deskId || b64u(crypto.randomBytes(9)), devices: Array.isArray(raw.devices) ? raw.devices : [], shared: Array.isArray(raw.shared) ? raw.shared : [] };
     } catch {
-      return { deskId: b64u(crypto.randomBytes(9)), devices: [] };
+      return { deskId: b64u(crypto.randomBytes(9)), devices: [], shared: [] };
     }
   }
   let store = load();
@@ -145,43 +147,81 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
   const keyOf = (device) => {
     try { return protect.decrypt(device.key); } catch { return null; }
   };
-  const publicDevice = ({ id, name, pairedAt, lastSeen }) => ({ id, name, pairedAt, lastSeen: lastSeen || null });
-  const status = () => ({
-    running: Boolean(server),
-    port,
-    addresses: addresses().map((a) => a.address),
-    deskId: store.deskId,
-    deskName,
-    devices: store.devices.map(publicDevice),
-    pairing: pairing && pairing.expiresAt > now() ? { expiresAt: pairing.expiresAt } : null,
+  // The folders a teacher can set levels for: the KaTuro folder's top folders, then the outside
+  // folders added for phones.
+  const folders = () => [
+    ...access.homeFolders(home()).map((name) => ({ key: access.homeKey(name), name, kind: 'home', max: access.maxLevel(access.homeKey(name)) })),
+    ...store.shared.map((s) => ({ key: access.outKey(s.id), id: s.id, name: s.name, kind: 'outside', path: s.path, max: 'full' })),
+  ];
+  const publicDevice = (d, list) => ({
+    id: d.id, name: d.name, pairedAt: d.pairedAt, lastSeen: d.lastSeen || null,
+    levels: Object.fromEntries(list.map((f) => [f.key, access.levelFor(d, f.key)])),
   });
+  const status = () => {
+    const list = folders();
+    return {
+      running: Boolean(server),
+      port,
+      addresses: addresses().map((a) => a.address),
+      deskId: store.deskId,
+      deskName,
+      devices: store.devices.map((d) => publicDevice(d, list)),
+      folders: list,
+      pairing: pairing && pairing.expiresAt > now() ? { expiresAt: pairing.expiresAt } : null,
+    };
+  };
 
-  // ── what a phone may ask ──
-  function list(rel) {
-    const root = home();
-    const abs = insideHome(root, rel);
-    if (!abs || !fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) throw Object.assign(new Error('That folder is not in your KaTuro folder.'), { code: 'NOT_FOUND' });
-    const items = fs.readdirSync(abs, { withFileTypes: true })
+  // ── what a phone may ask (every file request checks the phone's level for that folder) ──
+  const notFound = (msg = 'That folder or file is not on this computer for your phone.') => Object.assign(new Error(msg), { code: 'NOT_FOUND' });
+  const refused = (msg) => Object.assign(new Error(msg), { code: 'NOT_ALLOWED' });
+  /** A phone path → a place the phone may use at `min` level, or throws. */
+  function place(phonePath, device, min = 'view') {
+    const p = access.resolvePhonePath(phonePath, { home: home(), shared: store.shared });
+    if (!p) throw notFound();
+    const level = access.levelAt(device, p);
+    if (!access.atLeast(level, 'view')) throw notFound();
+    if (!access.atLeast(level, min)) {
+      throw refused(min === 'add'
+        ? 'Your phone can only view this folder. To send files here, change it in KaTuroDesk Settings → Phones.'
+        : 'Renaming, moving and replacing files here is not allowed for this phone. Change it in KaTuroDesk Settings → Phones.');
+    }
+    return { ...p, level };
+  }
+  const entry = (p, device, full, name, isDir) => {
+    const phonePath = access.phonePathOf(p, full);
+    const sub = access.resolvePhonePath(phonePath, { home: home(), shared: store.shared });
+    const level = sub ? access.levelAt(device, sub) : 'hidden';
+    if (!access.atLeast(level, 'view')) return null;
+    if (isDir) return { name, path: phonePath, kind: 'directory', access: level };
+    const st = fs.statSync(full);
+    return { name, path: phonePath, kind: 'file', size: st.size, lastModified: st.mtimeMs, access: level };
+  };
+
+  function list(rel, device) {
+    const p = place(rel, device);
+    if (!fs.existsSync(p.abs) || !fs.statSync(p.abs).isDirectory()) throw notFound();
+    const items = fs.readdirSync(p.abs, { withFileTypes: true })
       .filter((e) => !HIDDEN.test(e.name) && (e.isDirectory() || e.isFile()))
       .slice(0, MAX_LIST)
-      .map((e) => {
-        const full = path.join(abs, e.name);
-        const st = fs.statSync(full);
-        const relPath = path.relative(root, full).split(path.sep).join('/');
-        return e.isDirectory()
-          ? { name: e.name, path: relPath, kind: 'directory' }
-          : { name: e.name, path: relPath, kind: 'file', size: st.size, lastModified: st.mtimeMs };
-      })
-      .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
-    return { path: path.relative(root, abs).split(path.sep).join('/'), items };
+      .map((e) => entry(p, device, path.join(p.abs, e.name), e.name, e.isDirectory()))
+      .filter(Boolean);
+    // The top of the KaTuro folder also shows the outside folders added for this phone.
+    if (!p.key) {
+      for (const s of store.shared) {
+        const level = access.levelFor(device, access.outKey(s.id));
+        if (access.atLeast(level, 'view') && fs.existsSync(s.path)) items.push({ name: s.name, path: `${access.OUTSIDE}${s.name}`, kind: 'directory', access: level, outside: true });
+      }
+    }
+    items.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
+    return { path: p.phonePath, access: p.level, items };
   }
 
-  function read(rel) {
-    const abs = insideHome(home(), rel);
-    if (!abs || !fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw Object.assign(new Error('That file is not in your KaTuro folder.'), { code: 'NOT_FOUND' });
-    const size = fs.statSync(abs).size;
+  function read(rel, device) {
+    const p = place(rel, device);
+    if (!fs.existsSync(p.abs) || !fs.statSync(p.abs).isFile()) throw notFound('That file is not on this computer for your phone.');
+    const size = fs.statSync(p.abs).size;
     if (size > MAX_FILE_BYTES) throw Object.assign(new Error(`This file is too big to open on the phone (${Math.round(size / 1048576)} MB; up to 25 MB). Open it on KaTuroDesk.`), { code: 'TOO_BIG' });
-    return { name: path.basename(abs), size, data: fs.readFileSync(abs).toString('base64') };
+    return { name: path.basename(p.abs), size, data: fs.readFileSync(p.abs).toString('base64') };
   }
 
   const cleanName = (name) => String(name || '')
@@ -189,46 +229,114 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     .replace(/\s+/g, ' ')
     .replace(/^[\s.]+|[\s.]+$/g, '')
     .slice(0, 120);
-
-  /** Saves a file from the phone into Records or Lessons (or a folder inside them), never over an existing file. */
-  function upload({ folder, name, data } = {}, device) {
-    const root = home();
-    const rel = String(folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    if (!WRITABLE_TOP.includes(rel.split('/')[0].toLowerCase())) throw Object.assign(new Error('Files from the phone can go into Records or Lessons only.'), { code: 'NOT_ALLOWED' });
-    const dir = insideHome(root, rel);
-    if (!dir) throw Object.assign(new Error('That folder is not in your KaTuro folder.'), { code: 'NOT_FOUND' });
-    const file = cleanName(name);
-    if (!file || !UPLOAD_TYPES.test(file)) throw Object.assign(new Error('KaTuro takes documents, pictures, sound and video files only.'), { code: 'NOT_ALLOWED' });
+  const fileBytes = (data) => {
     const bytes = Buffer.from(String(data || ''), 'base64');
     if (!bytes.length) throw Object.assign(new Error('The file is empty.'), { code: 'EMPTY' });
     if (bytes.length > MAX_UPLOAD_BYTES) throw Object.assign(new Error('This file is too big to send (up to 25 MB).'), { code: 'TOO_BIG' });
-    fs.mkdirSync(dir, { recursive: true });
+    return bytes;
+  };
+  const locked = (err) => (/EBUSY|EPERM|EACCES/.test(String(err?.code))
+    ? Object.assign(new Error('That file is open on the computer (for example in Excel or Word). Close it there, then try again.'), { code: 'FILE_OPEN' })
+    : err);
+  const told = (p, abs, size, device) => onFileAdded({ path: access.phonePathOf(p, abs), name: path.basename(abs), size, phone: device?.name || 'Phone' });
+
+  /** Saves a file from the phone into a folder the phone may add to, never over an existing file. */
+  function upload({ folder, name, data } = {}, device) {
+    const p = place(folder, device, 'add');
+    if (!p.key) throw refused('Open a folder first, for example Lessons, then send the file there.');
+    const file = cleanName(name);
+    if (!file || !UPLOAD_TYPES.test(file)) throw refused('KaTuro takes documents, pictures, sound and video files only.');
+    const bytes = fileBytes(data);
+    fs.mkdirSync(p.abs, { recursive: true });
     const ext = path.extname(file);
     const base = file.slice(0, file.length - ext.length);
     for (let i = 1; i < 1000; i += 1) {
       const candidate = i === 1 ? file : `${base} (${i})${ext}`;
-      const full = path.join(dir, candidate);
+      const full = path.join(p.abs, candidate);
       try {
         fs.writeFileSync(full, bytes, { flag: 'wx' });
       } catch (err) {
         if (err.code === 'EEXIST') continue;
         throw err;
       }
-      const savedPath = path.relative(root, full).split(path.sep).join('/');
-      onFileAdded({ path: savedPath, name: candidate, size: bytes.length, phone: device?.name || 'Phone' });
-      return { path: savedPath, name: candidate, size: bytes.length };
+      told(p, full, bytes.length, device);
+      return { path: access.phonePathOf(p, full), name: candidate, size: bytes.length };
     }
     throw new Error('Too many files with this name in that folder.');
   }
 
-  const LOCAL_OPS = new Set(['hello', 'list', 'read', 'upload']);
+  /** A file (not a folder) the phone may change: inside a "full" folder, never a top folder itself. */
+  function changeable(rel, device) {
+    const p = place(rel, device, 'full');
+    if (!p.key || !p.rel) throw refused('KaTuro folders themselves cannot be changed from the phone.');
+    if (!fs.existsSync(p.abs) || !fs.statSync(p.abs).isFile()) throw notFound('That file is not on this computer for your phone.');
+    return p;
+  }
+
+  function rename({ path: rel, name } = {}, device) {
+    const p = changeable(rel, device);
+    const file = cleanName(name);
+    const ext = path.extname(p.abs);
+    if (!file) throw refused('Type a name.');
+    if (path.extname(file).toLowerCase() !== ext.toLowerCase()) throw refused(`Keep the ${ext} ending.`);
+    const target = path.join(path.dirname(p.abs), file);
+    if (target === p.abs) return { path: access.phonePathOf(p, p.abs), name: file };
+    if (fs.existsSync(target) && target.toLowerCase() !== p.abs.toLowerCase()) throw refused('A file with that name is already there.');
+    try { fs.renameSync(p.abs, target); } catch (err) { throw locked(err); }
+    told(p, target, fs.statSync(target).size, device);
+    return { path: access.phonePathOf(p, target), name: file };
+  }
+
+  function move({ path: rel, to } = {}, device) {
+    const p = changeable(rel, device);
+    const dest = place(to, device, 'full');
+    if (!dest.key) throw refused('Choose a folder to move it into.');
+    if (dest.root !== p.root) throw refused('Files can be moved inside the same main folder only. Move it on the computer.');
+    if (!fs.existsSync(dest.abs) || !fs.statSync(dest.abs).isDirectory()) throw notFound('That folder is not there any more.');
+    const target = path.join(dest.abs, path.basename(p.abs));
+    if (target === p.abs) return { path: access.phonePathOf(p, p.abs) };
+    if (fs.existsSync(target)) throw refused('A file with that name is already in that folder.');
+    try { fs.renameSync(p.abs, target); } catch (err) { throw locked(err); }
+    told(p, target, fs.statSync(target).size, device);
+    return { path: access.phonePathOf(p, target) };
+  }
+
+  /** Puts a file from the phone in place of an existing one; the old one goes to KaTuro Backups first. */
+  function replace({ path: rel, name, data } = {}, device) {
+    const p = changeable(rel, device);
+    const ext = path.extname(p.abs);
+    if (name && path.extname(String(name)).toLowerCase() !== ext.toLowerCase()) throw refused(`Choose a ${ext} file to put in its place.`);
+    const bytes = fileBytes(data);
+    const d = new Date(now());
+    const pad = (n) => String(n).padStart(2, '0');
+    const relDir = path.relative(p.root, path.dirname(p.abs));
+    const base = path.basename(p.abs, ext);
+    const backup = path.join(p.root, 'KaTuro Backups', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, relDir, `${base} (backup ${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())})${ext}`);
+    const temp = `${p.abs}.katuro-new`;
+    try {
+      fs.mkdirSync(path.dirname(backup), { recursive: true });
+      fs.copyFileSync(p.abs, backup, fs.constants.COPYFILE_EXCL);
+      fs.writeFileSync(temp, bytes);
+      fs.renameSync(temp, p.abs);
+    } catch (err) {
+      try { fs.rmSync(temp, { force: true }); } catch { /* nothing written */ }
+      throw locked(err);
+    }
+    told(p, p.abs, bytes.length, device);
+    return { path: access.phonePathOf(p, p.abs), size: bytes.length, backup: access.phonePathOf(p, backup) };
+  }
+
+  const LOCAL_OPS = new Set(['hello', 'list', 'read', 'upload', 'rename', 'move', 'replace']);
   async function handle(op, args, device) {
     if (op === 'hello') {
       return { deskId: store.deskId, deskName, version: VERSION, port, addresses: addresses().map((a) => a.address), phone: device.name };
     }
-    if (op === 'list') return list(args?.path || '');
-    if (op === 'read') return read(args?.path || '');
+    if (op === 'list') return list(args?.path || '', device);
+    if (op === 'read') return read(args?.path || '', device);
     if (op === 'upload') return upload(args, device);
+    if (op === 'rename') return rename(args, device);
+    if (op === 'move') return move(args, device);
+    if (op === 'replace') return replace(args, device);
     if (askDesk && typeof op === 'string' && !LOCAL_OPS.has(op)) return askDesk(op, args || {}, { id: device.id, name: device.name });
     throw Object.assign(new Error('KaTuroDesk does not know that request. Update KaTuroDesk.'), { code: 'UNKNOWN_OP' });
   }
@@ -262,7 +370,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       const deviceId = b64u(crypto.randomBytes(12));
       const deviceKey = crypto.randomBytes(32);
       const name = String(req.args?.deviceName || 'Phone').replace(/[\u0000-\u001f]/g, '').slice(0, 60) || 'Phone';
-      const device = { id: deviceId, name, uid: account, key: protect.encrypt(deviceKey), pairedAt: new Date(now()).toISOString(), lastSeen: new Date(now()).toISOString() };
+      const device = { id: deviceId, name, uid: account, key: protect.encrypt(deviceKey), pairedAt: new Date(now()).toISOString(), lastSeen: new Date(now()).toISOString(), access: {} };
       // Saved first: a phone that could not be saved is not linked (and leaves nothing behind).
       store = { ...store, devices: [...store.devices, device] };
       try {
@@ -382,6 +490,33 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       const before = store.devices.length;
       store.devices = store.devices.filter((d) => d.id !== id);
       if (store.devices.length !== before) { save(); onChange(status()); }
+      return status();
+    },
+    /** What one phone may do in one folder (Settings → Phones). */
+    setAccess(deviceId, key, level) {
+      const device = store.devices.find((d) => d.id === deviceId);
+      const folder = folders().find((f) => f.key === key);
+      if (!device || !folder || !access.validLevel(level)) throw new Error('That phone or folder is not there any more.');
+      if (access.LEVELS.indexOf(level) > access.LEVELS.indexOf(folder.max)) throw new Error(`${folder.name} can be set up to "${folder.max}" only.`);
+      device.access = { ...(device.access || {}), [key]: level };
+      save();
+      onChange(status());
+      return status();
+    },
+    /** A folder outside the KaTuro folder that phones may see (view, until the teacher changes it). */
+    addShared(dir) {
+      const folder = access.checkSharedFolder(dir, { home: home(), shared: store.shared, ...guard });
+      store = { ...store, shared: [...store.shared, folder] };
+      save();
+      onChange(status());
+      return status();
+    },
+    removeShared(id) {
+      const key = access.outKey(id);
+      store = { ...store, shared: store.shared.filter((s) => s.id !== id) };
+      for (const d of store.devices) if (d.access) delete d.access[key];
+      save();
+      onChange(status());
       return status();
     },
   };

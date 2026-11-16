@@ -7,6 +7,7 @@ import { teacherInfo } from '../../services/teacherInfo';
 import { parseLinkQr, pairWithDesk, createLinkClient } from '../../services/link/linkClient';
 import { loadLink, saveLink } from '../../services/link/linkStore';
 import { forgetPhoneData, unsentOnPhone } from '../../services/link/phoneData';
+import { canAdd } from '../../services/link/phoneFiles';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
 import ScoresFlow from './ScoresFlow';
@@ -81,7 +82,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
       .then((r) => {
         if (!alive) return;
         setState({ loading: false, items: r.items });
-        onLoaded?.();
+        onLoaded?.(r);
       })
       .catch((err) => {
         if (!alive) return;
@@ -111,7 +112,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
             <li key={i.path}>
               <button type="button" onClick={() => onOpen(i)} className={`nm nm-press flex w-full items-center gap-4 rounded-3xl px-5 text-left ${main ? 'py-5' : 'py-4'}`}>
                 {i.kind === 'directory'
-                  ? (main ? <FolderOpen size={26} className="nm-green flex-shrink-0" /> : <Folder size={22} className="text-amber-600 flex-shrink-0" />)
+                  ? (main ? <FolderOpen size={26} className="nm-green flex-shrink-0" /> : <Folder size={22} className={`${i.outside ? 'text-sky-700' : 'text-amber-600'} flex-shrink-0`} />)
                   : <FileText size={22} className="nm-muted flex-shrink-0" />}
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate ${main ? 'text-base font-semibold' : 'text-sm font-medium'}`}>{i.name}</span>
@@ -287,7 +288,17 @@ export default function PhoneApp() {
     if (err.code === 'NOT_LINKED') wipe();
   }, [wipe]);
 
-  const onListLoaded = useCallback(() => setOnline(true), []);
+  // The folder now listed, with what KaTuroDesk lets this phone do there (its "access").
+  const [listing, setListing] = useState(null);
+  const onListLoaded = useCallback((r) => { setOnline(true); setListing(r); }, []);
+  // Where the "+" sends files: this folder when KaTuroDesk allows adding here; from the top,
+  // Lessons (also while KaTuroDesk can't be reached: the files wait on the phone and it checks then).
+  const lessons = listing?.path === '' ? listing.items.find((i) => i.path === 'Lessons') : null;
+  let addTarget = null;
+  if (listing?.path === path) addTarget = path ? (canAdd(listing.access) ? path : null) : (canAdd(lessons?.access) ? 'Lessons' : null);
+  else if (!path && online === false) addTarget = 'Lessons';
+  // "Renamed to …", "Moved to …": shown on the Files tab until the next folder or file opens.
+  const [filesNote, setFilesNote] = useState('');
 
   /** Unlink or sign out: everything of the teacher's on this phone is cleared (after a warning about unsent work). */
   const clearPhone = async (what) => {
@@ -332,6 +343,7 @@ export default function PhoneApp() {
     window.history.pushState({ kt: true, link: navLink.current, d: below + 1, path: nextPath, file: nextFile }, '');
     setPath(nextPath);
     setFile(nextFile);
+    setFilesNote('');
   };
   /** A folder-path tap: back to that level through the back steps (never past the first). */
   const upTo = (depth) => {
@@ -368,7 +380,7 @@ export default function PhoneApp() {
       <div hidden={pinScreen} inert={pinScreen}>
           {file && client && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-              <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
+              <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} onChanged={(note) => { setFilesNote(note); bump(); window.history.back(); }} />
             </div>
           )}
           <header className="flex items-center justify-between px-5 pb-2 pt-5">
@@ -395,7 +407,7 @@ export default function PhoneApp() {
                   {path.split('/').map((part, i, all) => (
                     <span key={all.slice(0, i + 1).join('/')} className="flex items-center gap-1">
                       <ChevronRight size={12} />
-                      <button type="button" onClick={() => upTo(i + 1)} className={i === all.length - 1 ? 'nm-ink font-semibold' : 'font-semibold'}>{part}</button>
+                      <button type="button" onClick={() => upTo(i + 1)} className={i === all.length - 1 ? 'nm-ink font-semibold' : 'font-semibold'}>{part.replace(/^:/, '')}</button>
                     </span>
                   ))}
                 </nav>
@@ -416,9 +428,10 @@ export default function PhoneApp() {
                 </div>
               )}
               {sharedNote && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">{sharedNote}</p>}
+              {tab === 'files' && filesNote && <p className="nm-green mx-5 mt-3 text-xs font-medium">{filesNote}</p>}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
               {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go({ file: i })} />}
-              {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
+              {client && tab === 'files' && addTarget && <AddToFolder key={path} client={client} folder={addTarget} onSent={bump} />}
               {client && shared && <SharedFilesSheet client={client} files={shared} onClose={() => { setShared(null); setSharedNote(''); }} onSent={bump} />}
               {client && tab === 'files' && (
                 <FolderList

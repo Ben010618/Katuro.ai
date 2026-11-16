@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { Smartphone, ShieldCheck, Trash2, Wifi } from 'lucide-react';
+import { Folder, FolderPlus, Smartphone, ShieldCheck, Trash2, Wifi, X } from 'lucide-react';
 
 const desk = () => (typeof window !== 'undefined' ? window.katuroDeskApi : undefined);
 
@@ -20,6 +20,82 @@ const when = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? 'never' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 };
+
+// What a phone may do in a folder (electron/phoneAccess.cjs).
+const LEVELS = [
+  ['hidden', 'Hidden'],
+  ['view', 'View'],
+  ['add', 'View & add'],
+  ['full', 'Full'],
+];
+
+/**
+ * What phones can see: a level for each KaTuro folder and each folder added for phones, per
+ * phone. KaTuroDesk checks it on every request from the phone.
+ */
+function PhoneAccess({ api, status, onStatus }) {
+  const devices = status?.devices || [];
+  const folders = status?.folders || [];
+  const [chosen, setChosen] = useState('');
+  const [error, setError] = useState('');
+  const device = devices.find((d) => d.id === chosen) || devices[0];
+  const run = async (fn) => {
+    setError('');
+    try {
+      const next = await fn();
+      if (next) onStatus(next);
+    } catch (err) {
+      setError(String(err?.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+    }
+  };
+  const add = () => run(async () => (await api.addPhoneFolder())?.status);
+  const remove = (f) => {
+    if (!window.confirm(`Stop showing "${f.name}" on your phones? The folder stays on this computer.`)) return;
+    run(() => api.removePhoneFolder(f.id));
+  };
+
+  return (
+    <section>
+      <h3 className="text-xs font-bold text-gray-800 mb-0.5">What phones can see</h3>
+      <p className="text-[11px] text-gray-500 mb-3">Choose what each phone may do in each folder. Scores and attendance always use your prepared class records, whatever is set here.</p>
+      {!device ? <p className="text-[11px] text-gray-500">Link a phone first.</p> : (
+        <>
+          {devices.length > 1 && (
+            <label className="mb-2 flex items-center gap-2 text-[11px] text-gray-600">
+              For
+              <select value={device.id} onChange={(e) => setChosen(e.target.value)} className="!w-auto rounded-md border border-gray-300 px-2 py-1 text-xs">
+                {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </label>
+          )}
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+            {folders.map((f) => (
+              <li key={f.key} className="flex items-center gap-3 px-3 py-2">
+                <Folder size={15} className={f.kind === 'outside' ? 'text-amber-600 flex-shrink-0' : 'text-emerald-700 flex-shrink-0'} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{f.name}</p>
+                  {f.kind === 'outside' && <p className="text-[10.5px] text-gray-500 truncate" title={f.path}>{f.path}</p>}
+                </div>
+                <select
+                  aria-label={`What ${device.name} may do in ${f.name}`}
+                  value={device.levels?.[f.key] || 'view'}
+                  onChange={(e) => run(() => api.setPhoneAccess(device.id, f.key, e.target.value))}
+                  className="!w-48 flex-none rounded-md border border-gray-300 px-2 py-1 text-xs"
+                >
+                  {LEVELS.filter(([v]) => LEVELS.findIndex(([x]) => x === v) <= LEVELS.findIndex(([x]) => x === f.max)).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+                {f.kind === 'outside' && <button type="button" onClick={() => remove(f)} title={`Stop showing ${f.name}`} className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-600"><X size={14} /></button>}
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={add} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"><FolderPlus size={14} /> Add a folder from this computer…</button>
+          <p className="mt-1 text-[10.5px] text-gray-500">View: open files. View &amp; add: also send photos and files. Full: also rename, move and replace files (a replaced file is saved in KaTuro Backups first).</p>
+        </>
+      )}
+      {error && <p className="text-[11px] text-red-600 mt-2">{error}</p>}
+    </section>
+  );
+}
 
 /** Settings → Phones: link the KaTuro App on the teacher's phone, see and remove linked phones. */
 export default function DeskPhoneSettings() {
@@ -75,7 +151,7 @@ export default function DeskPhoneSettings() {
       <section>
         <h3 className="text-xs font-bold text-gray-800 mb-0.5 flex items-center gap-1.5"><Smartphone size={14} className="text-emerald-700" /> KaTuro App on your phone</h3>
         <p className="text-[11px] text-gray-500 mb-3">
-          A linked phone can see your KaTuro folder (Records, Lessons and your other folders) and open its files. It works over the same Wi-Fi or your phone&apos;s hotspot; no internet is needed, and nothing goes to the cloud.
+          A linked phone can see the folders you allow below and open their files. It works over the same Wi-Fi or your phone&apos;s hotspot; no internet is needed, and nothing goes to the cloud.
         </p>
         {status && !status.running && <p className="text-[11px] text-amber-700 mb-2">The phone link is not running. Close and reopen KaTuroDesk.</p>}
 
@@ -116,6 +192,8 @@ export default function DeskPhoneSettings() {
           </ul>
         ) : <p className="text-[11px] text-gray-500">No phone is linked yet.</p>}
       </section>
+
+      <PhoneAccess api={api} status={status} onStatus={setStatus} />
 
       <section className="rounded-lg bg-[#f6f8f7] p-3 text-[11px] text-gray-600 space-y-1">
         <p className="flex items-center gap-1.5 font-semibold text-gray-700"><ShieldCheck size={13} className="text-emerald-700" /> Private by design</p>

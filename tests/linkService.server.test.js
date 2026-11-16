@@ -84,9 +84,9 @@ describe('phone link', () => {
   it('never reaches outside the KaTuro folder', async () => {
     await setup();
     const client = createLinkClient((await pairPhone()).link);
-    await expect(client.read('../secret.txt')).rejects.toThrow(/not in your KaTuro folder/);
-    await expect(client.read('Records/../../secret.txt')).rejects.toThrow(/not in your KaTuro folder/);
-    await expect(client.list('..')).rejects.toThrow(/not in your KaTuro folder/);
+    await expect(client.read('../secret.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.read('Records/../../secret.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.list('..')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(insideHome('/home/KaTuro', 'C:/Windows')).toBeNull();
   });
 
@@ -158,13 +158,15 @@ describe('phone link', () => {
     expect(asked.map((a) => [a[0], a[2]])).toEqual([['classes', "Ma'am Ana's phone"], ['record', "Ma'am Ana's phone"]]);
   });
 
-  it('a phone can send files into Records or Lessons only, never over an existing file, and never programs', async () => {
+  it('a phone can send files where KaTuroDesk allows it (Lessons by default), never over an existing file, and never programs', async () => {
     const { home } = await setup();
     const client = createLinkClient((await pairPhone()).link);
     const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
     expect(await client.upload('Lessons/Week 1', 'Board notes.jpg', photo)).toMatchObject({ path: 'Lessons/Week 1/Board notes.jpg', size: 7 });
     expect(await client.upload('Lessons/Week 1', 'Board notes.jpg', photo)).toMatchObject({ path: 'Lessons/Week 1/Board notes (2).jpg' });
-    expect(await client.upload('Records/Scanned Papers/Quiz 3', 'Juan.jpg', photo)).toMatchObject({ path: 'Records/Scanned Papers/Quiz 3/Juan.jpg' });
+    // Records is view only by default: scores go in through the checked Scores flow.
+    await expect(client.upload('Records/Scanned Papers/Quiz 3', 'Juan.jpg', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    await expect(client.upload('', 'loose.jpg', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
     expect(fs.readFileSync(path.join(home, 'Lessons', 'Week 1', 'Board notes.jpg'))).toEqual(Buffer.from(photo));
     // A name with slashes stays inside the folder.
     expect(await client.upload('Lessons', '../../evil.pdf', photo)).toMatchObject({ path: 'Lessons/evil.pdf' });
@@ -250,3 +252,109 @@ describe('phone link', () => {
     expect(client.link.hosts.length).toBeLessThanOrEqual(6);
   });
 });
+
+describe('what phones can see (Settings → Phones)', () => {
+  const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const levelsOf = (items) => Object.fromEntries(items.map((i) => [i.name, i.access]));
+
+  it('starts with Records view, Lessons view & add, and shows each item with its level', async () => {
+    await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    const top = await client.list('');
+    expect(levelsOf(top.items)).toEqual({ Lessons: 'add', Records: 'view' });
+    expect((await client.list('Lessons')).access).toBe('add');
+    const st = service.status();
+    expect(st.folders.map((f) => [f.name, f.kind])).toEqual([['Records', 'home'], ['Lessons', 'home']]);
+    expect(st.devices[0].levels).toEqual({ 'home:records': 'view', 'home:lessons': 'add' });
+  });
+
+  it('a hidden folder is not on the phone at all; each phone has its own levels', async () => {
+    await setup();
+    const ana = createLinkClient((await pairPhone()).link);
+    const tablet = createLinkClient((await pairPhone()).link);
+    const [phoneId] = service.status().devices.map((d) => d.id);
+    service.setAccess(phoneId, 'home:records', 'hidden');
+    expect((await ana.list('')).items.map((i) => i.name)).toEqual(['Lessons']);
+    await expect(ana.list('Records')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(ana.read('Records/Grade 7 - Rizal - Science.xlsx')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    // The tablet keeps the default.
+    expect((await tablet.list('')).items.map((i) => i.name)).toEqual(['Lessons', 'Records']);
+    expect(() => service.setAccess(phoneId, 'home:records', 'boss')).toThrow();
+  });
+
+  it('an outside folder the teacher adds shows on the phone, view only until changed, and never leads outside', async () => {
+    const { home } = await setup();
+    const school = path.join(tmp, 'School Files');
+    fs.mkdirSync(path.join(school, 'Science'), { recursive: true });
+    fs.writeFileSync(path.join(school, 'Science', 'Quiz.docx'), 'quiz');
+    const client = createLinkClient((await pairPhone()).link);
+    const st = service.addShared(school);
+    const folder = st.folders.find((f) => f.kind === 'outside');
+    expect(folder).toMatchObject({ name: 'School Files', path: school });
+    const top = await client.list('');
+    expect(top.items.find((i) => i.outside)).toMatchObject({ name: 'School Files', path: ':School Files', access: 'view' });
+    expect((await client.list(':School Files/Science')).items[0]).toMatchObject({ path: ':School Files/Science/Quiz.docx', access: 'view' });
+    expect((await client.read(':School Files/Science/Quiz.docx')).name).toBe('Quiz.docx');
+    await expect(client.upload(':School Files/Science', 'a.jpg', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    service.setAccess(st.devices[0].id, folder.key, 'add');
+    expect(await client.upload(':School Files/Science', 'a.jpg', photo)).toMatchObject({ path: ':School Files/Science/a.jpg' });
+    await expect(client.read(':School Files/../secret.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.list(':Nope')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    // A shortcut inside it that leads out of it is refused.
+    fs.symlinkSync(tmp, path.join(school, 'Way out'), 'junction');
+    await expect(client.list(':School Files/Way out')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await client.list(':School Files')).items.map((i) => i.name)).toEqual(['Science']);
+    // Removed: gone from the phone.
+    service.removeShared(folder.id);
+    await expect(client.list(':School Files')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(fs.existsSync(path.join(home, 'Lessons'))).toBe(true);
+  });
+
+  it('refuses folders that are not safe to show: a drive, KaTuroDesk\'s own files, the KaTuro folder, overlaps', async () => {
+    const { home, storeFile } = await setup();
+    const appData = path.dirname(storeFile);
+    service.stop();
+    service = createLinkService({
+      account: TEACHER, home: () => home, storeFile, protect, addresses: () => [],
+      guard: { profile: path.join(tmp, 'me'), protectedPaths: [appData], systemPaths: [path.join(tmp, 'Windows')] },
+    });
+    fs.mkdirSync(path.join(tmp, 'me', 'Docs'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, 'Windows', 'System32'), { recursive: true });
+    const refuse = (dir, re) => expect(() => service.addShared(dir)).toThrow(re);
+    refuse(path.parse(tmp).root, /whole drive/);
+    refuse(path.join(tmp, 'Windows', 'System32'), /Windows/);
+    refuse(tmp, /KaTuroDesk's own files/);
+    refuse(path.join(tmp, 'me'), /whole user folder/);
+    refuse(home, /already on the phone/);
+    refuse(path.join(home, 'Lessons'), /already on the phone/);
+    refuse(path.join(tmp, 'missing'), /cannot be found/);
+    service.addShared(path.join(tmp, 'me', 'Docs'));
+    refuse(path.join(tmp, 'me', 'Docs'), /overlaps/);
+  });
+
+  it('full: rename (same ending), move inside the same folder, replace with a backup first', async () => {
+    const { home } = await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    const id = service.status().devices[0].id;
+    const cells = 'Lessons/Week 1/Cells.pdf';
+    await expect(client.request('rename', { path: cells, name: 'Plant cells.pdf' })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    service.setAccess(id, 'home:lessons', 'full');
+    expect((await client.list('Lessons/Week 1')).items[0].access).toBe('full');
+    await expect(client.request('rename', { path: cells, name: 'Cells.exe' })).rejects.toThrow(/Keep the .pdf ending/);
+    expect(await client.request('rename', { path: cells, name: 'Plant cells.pdf' })).toMatchObject({ path: 'Lessons/Week 1/Plant cells.pdf' });
+    fs.mkdirSync(path.join(home, 'Lessons', 'Week 2'));
+    expect(await client.request('move', { path: 'Lessons/Week 1/Plant cells.pdf', to: 'Lessons/Week 2' })).toMatchObject({ path: 'Lessons/Week 2/Plant cells.pdf' });
+    // Not into a folder the phone may not change (Records is view).
+    await expect(client.request('move', { path: 'Lessons/Week 2/Plant cells.pdf', to: 'Records' })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    const fresh = new TextEncoder().encode('%PDF-1.4 new');
+    const res = await client.request('replace', { path: 'Lessons/Week 2/Plant cells.pdf', name: 'scan.pdf', data: Buffer.from(fresh).toString('base64') });
+    expect(fs.readFileSync(path.join(home, 'Lessons', 'Week 2', 'Plant cells.pdf'), 'utf8')).toBe('%PDF-1.4 new');
+    expect(res.backup).toMatch(/^KaTuro Backups\/\d{4}-\d{2}-\d{2}\/Lessons\/Week 2\/Plant cells \(backup \d{6}\)\.pdf$/);
+    expect(fs.readFileSync(path.join(home, ...res.backup.split('/')), 'utf8')).toBe('%PDF-1.4 lesson');
+    await expect(client.request('replace', { path: 'Lessons/Week 2/Plant cells.pdf', name: 'x.docx', data: 'AA==' })).rejects.toThrow(/Choose a .pdf file/);
+    // The KaTuro folders themselves and KaTuro Backups stay as they are.
+    await expect(client.request('rename', { path: 'Lessons', name: 'X' })).rejects.toBeTruthy();
+    expect(() => service.setAccess(id, 'home:katuro backups', 'full')).toThrow(/up to "view"/);
+  });
+});
+
