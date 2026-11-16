@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { ChevronRight, ClipboardList, FileText, Folder, FolderOpen, Laptop, Loader2, LogOut, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
+import { Bot, CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, LogOut, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
@@ -12,6 +12,12 @@ import ScoresFlow from './ScoresFlow';
 import { KeptList, OutboxBanner, AddToFolder, SharedFilesSheet } from './PhoneLessons';
 import { takeSharedFiles, onFilesShared } from '../../services/link/shareTarget';
 import { forgetCachedClasses } from '../../services/link/scoreEntry';
+import PhoneToday from './PhoneToday';
+import PhoneAssistant from './PhoneAssistant';
+import { useChats, useChatNotifications } from '../../features/messages/chatStore';
+import { notifyNow } from '../../services/link/phoneReminders';
+
+const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
 
 const MAIN = ['Records', 'Lessons'];
 const HINT = { Records: 'Class records', Lessons: 'Learning materials' };
@@ -130,7 +136,7 @@ export default function PhoneApp() {
   const [path, setPath] = useState('');
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
-  const [tab, setTab] = useState('scores'); // scores | files
+  const [tab, setTab] = useState('today'); // today | scores | assistant | messages | files
   const [version, setVersion] = useState(0); // bumped after files are sent or kept
   const [shared, setShared] = useState(null); // files shared from another app
   const bump = useCallback(() => setVersion((v) => v + 1), []);
@@ -145,6 +151,22 @@ export default function PhoneApp() {
     const stop = onFilesShared(take);
     return () => { alive = false; stop(); };
   }, []);
+
+  // KaTuro Messages (cloud): a phone notification for a new message while the app is open
+  // in the background or on another tab.
+  const chatState = useChats(user?.uid);
+  useChatNotifications({
+    uid: user?.uid,
+    chats: chatState.chats,
+    invites: chatState.invites,
+    invitesReady: chatState.invitesReady,
+    teamInvites: chatState.teamInvites,
+    teamInvitesReady: chatState.teamInvitesReady,
+    ready: chatState.ready,
+    openCid: null,
+    panelOpen: tab === 'messages',
+    notify: (title, body) => { if (tab !== 'messages' || document.hidden) notifyNow(title, body); },
+  });
 
   const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => saveLink(l) }) : null), [link]);
 
@@ -232,7 +254,14 @@ export default function PhoneApp() {
                   Can&apos;t reach {link.deskName}. Check that KaTuroDesk is open on your computer and that this phone is on the same Wi-Fi or hotspot.
                 </p>
               )}
+              {client && tab === 'today' && <PhoneToday client={client} online={online} />}
               {client && tab === 'scores' && <ScoresFlow client={client} online={online} />}
+              {client && tab === 'assistant' && <PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go(() => setFile(i))} />}
+              {tab === 'messages' && (
+                <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
+                  <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 170px)" /></div>
+                </Suspense>
+              )}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
               {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go(() => setFile(i))} />}
               {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
@@ -251,10 +280,11 @@ export default function PhoneApp() {
                 />
               )}
               <div className="h-20" />
-              <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 border-t border-gray-200 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {[['scores', 'Scores', ClipboardList], ['files', 'Files', FolderOpen]].map(([id, label, Icon]) => (
-                  <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} className={`flex flex-col items-center gap-0.5 py-2 text-xs font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
+              <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-gray-200 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                {[['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'Assistant', Bot], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]].map(([id, label, Icon]) => (
+                  <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
                     <Icon size={22} /> {label}
+                    {id === 'messages' && chatState.badgeCount > 0 && <span className="absolute right-2 top-1 min-w-[18px] rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
                   </button>
                 ))}
               </nav>

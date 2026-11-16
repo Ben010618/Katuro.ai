@@ -166,7 +166,7 @@ These are Desk work that supports the app. They also make the Desk better on its
 | **1. Link** ⭐ ✅ | Login, pairing by QR, link service on the Desk, browse Records and Lessons from the phone | See your PC's KaTuro folder on the phone |
 | **2. Scores** ⭐ ✅ | Quick entry, bubble-sheet scan, review screen, the Desk writes the class record, missing papers, offline queue | Record a whole quiz without typing on the PC |
 | **3. Lessons** ⭐ ✅ | Open files, Snap & Send, scan to PDF, Keep on phone, Share to KaTuro | Carry and add lessons from the phone |
-| **4. Assistant** | Schedule and push, messages, personas, generators saving into Lessons | Use KaTuro daily on the phone |
+| **4. Assistant** ✅ | Schedule and push, messages, personas, generators saving into Lessons | Use KaTuro daily on the phone |
 | **5. Smarter capture** | Photo of a checked paper (handwritten score reading), attendance, history and undo, "Ask my Desk" | Snap the stack of papers instead |
 | **6. Google Play** | Internal test → a few teachers → public | Teachers install from Play |
 | **7. iOS** | Add `ios/` to the same project | iPhone teachers install it |

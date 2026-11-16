@@ -289,3 +289,13 @@ export function deskSpeaker() {
   }
   return appSpeaker;
 }
+
+// The KaTuro App (phone): the persona's natural voice from the server; the laptop voice
+// (Piper) is a KaTuroDesk download, so the phone falls back to Android's own voice.
+let phoneSpeakerInstance = null;
+export function phoneSpeaker() {
+  if (!phoneSpeakerInstance) {
+    phoneSpeakerInstance = createSpeaker({ callTts: serverTts, playWav: browserPlayWav, systemSay: browserSystemSay });
+  }
+  return phoneSpeakerInstance;
+}

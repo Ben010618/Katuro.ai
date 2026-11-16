@@ -852,7 +852,7 @@ function askDesk(op, args, device) {
     const timer = setTimeout(() => {
       deskAsks.delete(id);
       reject(Object.assign(new Error('KaTuroDesk took too long to answer. Try again.'), { code: 'TIMEOUT' }));
-    }, 90000);
+    }, op === 'ask' ? 5 * 60000 : 90000); // an assistant turn that writes documents takes minutes
     deskAsks.set(id, { resolve, reject, timer });
     mainWindow.webContents.send('link:request', { id, op, args, device });
   });

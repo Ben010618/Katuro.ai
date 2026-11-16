@@ -10,7 +10,9 @@ export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
-const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'quizzes', 'quiz']);
+const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'quizzes', 'quiz', 'schedule', 'addEvent']);
+// An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
+const ASK_MS = 5 * 60000 + 15000;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -159,7 +161,7 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
   let keyPromise = null;
   const key = () => (keyPromise ||= importKey(b64uDecode(current.key)));
 
-  async function call(op, args = {}, { timeoutMs = SLOW_OPS.has(op) ? READ_MS : TRY_MS } = {}) {
+  async function call(op, args = {}, { timeoutMs = op === 'ask' ? ASK_MS : SLOW_OPS.has(op) ? READ_MS : TRY_MS } = {}) {
     const k = await key();
     const { host, out } = await tryHosts(current.hosts, (h) => exchange({ host: h, port: current.port, id: current.deviceId, key: k, op, args, fetchImpl, timeoutMs }));
     if (host !== current.hosts[0]) {

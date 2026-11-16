@@ -136,6 +136,36 @@ export function scheduleSummary({ from, to = from, focus = 'all', state, now = D
   return { text: lines.join('\n'), count };
 }
 
+/**
+ * The same schedule as scheduleSummary, as data for the KaTuro App's Today screen.
+ * → [{ date, label, items: [{ kind: 'class'|'event'|'task'|'school', time: 'HH:MM'|'', title, detail?, id?, remindMinutes?, done? }] }]
+ * Days with nothing are left out. Built from the teacher's real data only, like the text answer.
+ */
+export function scheduleDays({ from, to = from, state, now = Date.now() }) {
+  const today = isoDay(now);
+  const s = state || {};
+  const out = [];
+  for (const d of days(from, to)) {
+    const items = [];
+    for (const p of periodsOn(s.myClasses, d, s.lessonSequences, s.teachingLog)) {
+      items.push({ kind: 'class', time: String(p.cls.start || ''), title: className(p.cls), detail: lessonText(p) });
+    }
+    for (const ev of eventsOn(s.calendarEvents, d)) {
+      items.push({ kind: 'event', id: ev.id, time: ev.time || '', title: ev.title, detail: ev.note || '', remindMinutes: ev.remindMinutes ?? null, done: Boolean(ev.doneAt) });
+    }
+    for (const t of (s.scheduledTasks || []).filter((x) => x.enabled !== false && x.nextRunAt && isoDay(x.nextRunAt) === d)) {
+      items.push({ kind: 'task', time: new Date(t.nextRunAt).toTimeString().slice(0, 5), title: t.name, detail: 'KaTuroDesk runs this by itself' });
+    }
+    const { school, observances } = activitiesOn(d);
+    for (const a of school) items.push({ kind: 'school', time: '', title: a.title, detail: a.holiday || '' });
+    for (const o of observances) items.push({ kind: 'school', time: '', title: o.title, detail: '' });
+    if (!items.length) continue;
+    items.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+    out.push({ date: d, label: dayLabel(d, today), items });
+  }
+  return out;
+}
+
 const stateNow = () => {
   const s = useDeskStore.getState();
   return { calendarEvents: s.calendarEvents, myClasses: s.myClasses, lessonSequences: s.lessonSequences, teachingLog: s.teachingLog, scheduledTasks: s.scheduledTasks };

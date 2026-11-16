@@ -67,7 +67,7 @@ export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
   const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating, deskTheme, notifyMessages, taskbarBadge } = useDeskStore();
   const { status: update, install: installUpdate } = useDeskUpdate();
-  usePhoneRequests();
+  usePhoneRequests({ user, profile });
 
   useEffect(() => {
     // Desktop: reopen the folder from last session so teachers don't re-pick it every day
