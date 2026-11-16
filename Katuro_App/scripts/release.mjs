@@ -48,7 +48,8 @@ run('npm', ['run', 'build:web'], APP);
 run('npx', ['cap', 'sync', 'android'], APP);
 const javaHome = process.env.KATURO_JAVA_HOME || 'C:\\Program Files\\Android\\Android Studio\\jbr';
 const androidHome = process.env.ANDROID_HOME || path.join(process.env.LOCALAPPDATA || '', 'Android', 'Sdk');
-run(process.platform === 'win32' ? 'gradlew.bat' : './gradlew', ['assembleRelease', '-q'], path.join(APP, 'android'), { JAVA_HOME: javaHome, ANDROID_HOME: androidHome });
+// The full path: cmd may not look in the current folder for gradlew.bat.
+run(process.platform === 'win32' ? q(path.join(APP, 'android', 'gradlew.bat')) : './gradlew',['assembleRelease', '-q'], path.join(APP, 'android'), { JAVA_HOME: javaHome, ANDROID_HOME: androidHome });
 
 const built = path.join(APP, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 if (!fs.existsSync(built)) throw new Error('The signed APK was not made (app-release.apk is missing).');
