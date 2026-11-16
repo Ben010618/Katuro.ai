@@ -2,6 +2,7 @@
  * signature.js — the teacher's e-signature for KaTuroDesk: a photo or a drawing turned into
  * a clean PNG (paper made transparent, cropped to the ink). Saved only on this computer.
  */
+import { base64ToBytes } from '../../utils/bytes.js';
 
 /**
  * Paper → transparent, ink kept (its own colour, alpha by darkness); the box around the ink.
@@ -80,9 +81,5 @@ export async function prepareSignatureImage(source, { maxWidth = 600 } = {}) {
 
 /** data:image/png;base64,… → bytes */
 export function dataUrlBytes(dataUrl) {
-  const b64 = String(dataUrl || '').split(',')[1] || '';
-  const bin = typeof atob === 'function' ? atob(b64) : globalThis.Buffer.from(b64, 'base64').toString('binary');
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
-  return out;
+  return base64ToBytes(String(dataUrl || '').split(',')[1] || '');
 }

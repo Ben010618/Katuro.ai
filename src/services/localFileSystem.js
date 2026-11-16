@@ -8,7 +8,8 @@
  *
  * All paths passed in are workspace-relative and use forward slashes.
  */
-import { parseClassRecordFileName } from './desk/records/classRecords.js';
+import { parseClassRecordFileName, isInRecords } from './desk/records/classRecords.js';
+import { sha256Hex } from '../utils/bytes.js';
 import { isAttendanceFile } from './desk/records/attendance.js';
 
 export const isFileSystemAccessSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
@@ -309,7 +310,7 @@ export async function backupFile(dirHandle, relPath, now = new Date()) {
 export const editsInPlace = (relPath, dirHandle) => {
   const p = cleanRelPath(relPath);
   return Boolean(dirHandle?.katuroHome)
-    && /^records\//i.test(p)
+    && isInRecords(p)
     && /\.xlsx$/i.test(p)
     && workingCopyPath(p) !== p
     && !isAttendanceFile(p)
@@ -319,11 +320,7 @@ export const editsInPlace = (relPath, dirHandle) => {
 /** Windows refuses to write a file that is open in Excel (EBUSY / EPERM). */
 export const isFileOpenError = (err) => /EBUSY|EPERM|resource busy|locked|being used by another process/i.test(String(err?.message || err || ''));
 
-/** SHA-256 of bytes, as hex (to tell whether a file changed since it was read). */
-export async function sha256Hex(bytes) {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', toUint8(bytes));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+export { sha256Hex };
 
 /**
  * Saves edited bytes for `originalPath` following the safe-edit SOP.

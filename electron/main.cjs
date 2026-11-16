@@ -341,7 +341,11 @@ function createWindow() {
 
   // A reload drops the page's phone-request listener until it registers again; requests it was
   // working on will never be answered, so the phone hears it now instead of after a timeout.
-  mainWindow.webContents.on('did-start-loading', () => {
+  // Only a real (re)load of the page counts, not a PDF or file preview loading in a frame.
+  mainWindow.webContents.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+    const mainFrame = e?.isMainFrame ?? isMainFrame;
+    const sameDocument = e?.isSameDocument ?? isInPlace;
+    if (!mainFrame || sameDocument) return;
     deskAnswering = false;
     for (const [id, ask] of deskAsks) {
       clearTimeout(ask.timer);

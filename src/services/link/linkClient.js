@@ -5,7 +5,7 @@
  * Plain WebCrypto (AES-256-GCM) and fetch, so it runs in the phone app and in tests.
  */
 
-import { bytesToBase64 } from '../../utils/bytes.js';
+import { bytesToBase64, base64ToBytes as decodeBase64 } from '../../utils/bytes.js';
 
 export const QR_PREFIX = 'KTLINK1:';
 export const VERSION = 1;
@@ -19,20 +19,17 @@ const ASK_MS = 5 * 60000 + 15000;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-export function b64uEncode(bytes) {
+function b64uEncode(bytes) {
   return bytesToBase64(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function b64uDecode(str) {
   const s = String(str || '').replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  return decodeBase64(s + '='.repeat((4 - (s.length % 4)) % 4));
 }
 
 /** Plain base64 (not url-safe) → bytes; the Desk sends file contents this way. */
-export const base64ToBytes = (s) => b64uDecode(String(s || '').replace(/\+/g, '-').replace(/\//g, '_'));
+export const base64ToBytes = decodeBase64;
 
 const aad = (id, kind, nonce = '') => enc.encode(`katuro-link|${id}|${kind}${nonce ? `|${nonce}` : ''}`);
 const importKey = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
@@ -145,6 +142,7 @@ export async function pairWithDesk(qr, { deviceName = 'Phone', uid = '', fetchIm
     key: out.key,
     hosts: [host, ...qr.hosts.filter((h) => h !== host)],
     port: qr.port,
+    uid,
     pairedAt: new Date().toISOString(),
   };
 }
@@ -156,20 +154,28 @@ export async function pairWithDesk(qr, { deviceName = 'Phone', uid = '', fetchIm
 export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () => {} } = {}) {
   let current = { ...link };
   let keyPromise = null;
+  // Closed when the phone is unlinked or signs out: nothing may write the teacher's data back.
+  let closed = false;
+  const changed = (l) => { if (!closed) onLinkChange(l); };
   const key = () => (keyPromise ||= importKey(b64uDecode(current.key)));
 
   async function call(op, args = {}, { timeoutMs = op === 'ask' ? ASK_MS : SLOW_OPS.has(op) ? READ_MS : TRY_MS } = {}) {
+    if (closed) throw new LinkError('This phone is no longer linked.', 'CLOSED');
     const k = await key();
     const { host, out } = await tryHosts(current.hosts, (h) => exchange({ host: h, port: current.port, id: current.deviceId, key: k, op, args, fetchImpl, timeoutMs }));
     if (host !== current.hosts[0]) {
       current = { ...current, hosts: [host, ...current.hosts.filter((h) => h !== host)] };
-      onLinkChange(current);
+      changed(current);
     }
+    if (closed) throw new LinkError('This phone is no longer linked.', 'CLOSED');
     return out.result;
   }
 
   return {
     get link() { return current; },
+    /** True after close(): answers that arrive later must not be stored on the phone. */
+    get closed() { return closed; },
+    close() { closed = true; },
     /** Checks the link and learns the Desk's current addresses. */
     async hello() {
       const r = await call('hello');
@@ -177,7 +183,7 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
       const changed = fresh.join() !== current.hosts.join() || (r.port && r.port !== current.port);
       if (changed) {
         current = { ...current, hosts: fresh, port: r.port || current.port, deskName: r.deskName || current.deskName };
-        onLinkChange(current);
+        changed(current);
       }
       return r;
     },

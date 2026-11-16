@@ -17,6 +17,8 @@ export function usePhoneRequests({ user, profile } = {}) {
   // Phones link only to the KaTuro account signed in here (and stop when it changes).
   useEffect(() => {
     window.katuroDeskApi?.setLinkAccount?.(user?.uid || '')?.catch?.(() => {});
+    // Signing out (the Desk page closes): no phone is served until someone signs in again.
+    return () => { window.katuroDeskApi?.setLinkAccount?.('')?.catch?.(() => {}); };
   }, [user?.uid]);
   useEffect(() => {
     const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;

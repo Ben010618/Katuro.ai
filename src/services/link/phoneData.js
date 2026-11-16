@@ -9,7 +9,7 @@ import { forgetPhoneFiles, outbox } from './phoneFiles.js';
 import { syncReminders } from './phoneReminders.js';
 
 // localStorage keys with the teacher's data (learner names, scores, schedule, chat).
-export const PHONE_DATA_KEYS = [
+const PHONE_DATA_KEYS = [
   'katuro-score-queue-v1',
   'katuro-phone-schedule-v1',
   'katuro-phone-chat-v1',

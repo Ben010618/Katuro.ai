@@ -67,12 +67,13 @@ export default function PhoneToday({ client, online }) {
       try {
         const from = isoDay();
         const r = await client.request('schedule', { from, to: addDays(isoDay(), 13) });
-        if (!alive) return;
+        if (!alive || client.closed) return;
         const v = { ...r, at: new Date().toISOString() };
         saveCache(v);
         setData(v);
         setError('');
         const { reminders } = await client.request('reminders');
+        if (!alive || client.closed) return;
         const res = await syncReminders(reminders);
         if (alive) setRang(res);
       } catch (err) {

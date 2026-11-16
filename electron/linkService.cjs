@@ -118,7 +118,11 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     for (const [n, exp] of JSON.parse(fs.readFileSync(seenFile, 'utf8'))) if (exp > now()) seen.set(n, exp);
   } catch { /* first run, or unreadable: start empty */ }
   const saveSeen = () => {
-    try { fs.writeFileSync(seenFile, JSON.stringify([...seen])); } catch { /* not critical: the clock window still applies */ }
+    // Written to a temporary file and renamed, so a crash mid-write never leaves a broken file.
+    try {
+      fs.writeFileSync(`${seenFile}.tmp`, JSON.stringify([...seen]));
+      fs.renameSync(`${seenFile}.tmp`, seenFile);
+    } catch { /* not critical: the clock window still applies */ }
   };
 
   // ── saved phones ──
@@ -279,7 +283,11 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk.', code: 'NOT_LINKED' } }; }
     if (!freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: "The phone's clock or message is off. Check the phone's date and time.", code: 'STALE' } };
     // KaTuroDesk is now signed in to another account (or signed out): that teacher's phone is not served.
-    if (!account || (device.uid && device.uid !== account)) {
+    if (!device.uid) {
+      // Linked before phones were tied to an account: link it again (from KaTuroDesk Settings → Phones).
+      return { code: 401, plain: { error: 'Link this phone again from KaTuroDesk Settings → Phones.', code: 'NOT_LINKED' } };
+    }
+    if (!account || device.uid !== account) {
       return { code: 200, sealed: seal(key, { error: 'KaTuroDesk is not signed in to your KaTuro account right now. Sign in on the computer with the same account as this phone.', code: 'OTHER_ACCOUNT' }, aad(id, 'res', req.nonce)) };
     }
     let body;

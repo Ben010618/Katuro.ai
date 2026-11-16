@@ -269,13 +269,15 @@ export async function runDeskAgentTurn({
   let steps = [];
   const emit = (extra = {}) => onUpdate?.({ steps, ...extra });
 
-  // The fingerprint of each file as this turn first read it: saving an edited class record
-  // is refused if it changed meanwhile (e.g. scores sent from the phone), see saveWorkingCopy.
-  const firstRead = new Map();
+  // The fingerprint of each file as this turn last read (or saved) it: saving an edited class
+  // record is refused if it changed since (e.g. scores sent from the phone), see saveWorkingCopy.
+  // Updated on every read and after this turn's own save, so a second tool in the same turn
+  // that re-reads the record and saves again is not refused.
+  const lastRead = new Map();
   const readBytes = async (path) => {
     const entry = findEntryByPath(tree, path);
     const bytes = await readFileBytes(handle, entry || path);
-    if (!firstRead.has(path)) firstRead.set(path, sha256Hex(bytes).catch(() => null));
+    lastRead.set(path, sha256Hex(bytes).catch(() => null));
     return bytes;
   };
 
@@ -335,8 +337,9 @@ export async function runDeskAgentTurn({
     async saveWorkingCopy(originalPath, bytes, format) {
       if (!handle) throw new Error('Open a classroom folder first so I can save files.');
       const ext = originalPath.split('.').pop().toLowerCase();
-      const baseHash = firstRead.has(originalPath) ? await firstRead.get(originalPath) : null;
+      const baseHash = lastRead.has(originalPath) ? await lastRead.get(originalPath) : null;
       const res = await saveWorkingCopy(handle, originalPath, bytes, MIME_BY_EXT[ext] || 'application/octet-stream', new Date(), { baseHash });
+      if (res.inPlace) lastRead.set(originalPath, sha256Hex(bytes).catch(() => null));
       const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? 0, backups: res.backups, originalPath };
       createdFiles.push(file);
       return file;

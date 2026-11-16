@@ -319,6 +319,7 @@ export default function ScoresFlow({ client, online }) {
     setLoading(summary.name);
     try {
       const full = await client.request('class', { path: summary.path });
+      if (client.closed) return;
       cacheClass(summary.path, full);
       setCls(full);
       setStep('columns');
@@ -338,6 +339,7 @@ export default function ScoresFlow({ client, online }) {
   const refreshClass = async () => {
     try {
       const full = await client.request('class', { path: cls.path });
+      if (client.closed) return;
       cacheClass(cls.path, full);
       setCls(full);
     } catch { /* keep what we have */ }

@@ -87,8 +87,9 @@ async function sendOutboxOnce(client) {
       sent.push(await client.upload(item.folder, item.name, item.bytes));
       await removeFromOutbox(item.id);
     } catch (err) {
-      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') return { sent, failed, unreachable: true };
-      await run(OUTBOX, 'readwrite', (s) => s.put({ ...item, error: err.message }));
+      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING' || err.code === 'CLOSED') return { sent, failed, unreachable: true };
+      // Cleared meanwhile (unlink / sign-out): not put back.
+      if (await run(OUTBOX, 'readonly', (s) => s.get(item.id))) await run(OUTBOX, 'readwrite', (s) => s.put({ ...item, error: err.message }));
       failed.push({ item, error: err.message });
     }
   }

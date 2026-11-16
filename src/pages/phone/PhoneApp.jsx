@@ -178,7 +178,15 @@ export default function PhoneApp() {
     notify: (title, body) => { if (tab !== 'messages' || document.hidden) notifyNow(title, body); },
   });
 
-  const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => saveLink(l) }) : null), [link]);
+  // Addresses learned later are saved only while this is still the phone's link.
+  const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => { if (loadLink()?.deviceId === l.deviceId) saveLink(l); } }) : null), [link]);
+  useEffect(() => () => client?.close(), [client]);
+
+  // The phone's data belongs to the account that linked it: another account signing in (also
+  // after a sign-out the app did not start, e.g. a disabled account) starts clean.
+  useEffect(() => {
+    if (link && user?.uid && link.uid !== user.uid) forgetPhoneData().finally(() => setLink(null));
+  }, [link, user?.uid]);
 
   useEffect(() => {
     if (!client) return;
@@ -206,9 +214,12 @@ export default function PhoneApp() {
     const { recordings, files } = await unsentOnPhone();
     const unsent = recordings || files ? ` ${[recordings && `${recordings} recording(s)`, files && `${files} file(s)`].filter(Boolean).join(' and ')} not sent to KaTuroDesk yet will be deleted.` : '';
     if (!window.confirm(`${what} Your class lists, kept files and schedule are removed from this phone.${unsent}`)) return false;
-    await forgetPhoneData();
+    // Stop the link and let the screens close first, so no answer still on its way writes back.
+    client?.close();
     setLink(null);
     setPath('');
+    await new Promise((r) => setTimeout(r, 0));
+    await forgetPhoneData();
     return true;
   };
   const unlink = () => clearPhone('Unlink this phone from KaTuroDesk? You can link it again any time.');
@@ -219,11 +230,11 @@ export default function PhoneApp() {
   useEffect(() => {
     const onPop = () => {
       if (file) setFile(null);
-      else if (path) setPath(path.split('/').slice(0, -1).join('/'));
+      else if (tab === 'files' && path) setPath(path.split('/').slice(0, -1).join('/'));
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [file, path]);
+  }, [file, path, tab]);
   const go = (next) => {
     window.history.pushState({ kt: true }, '');
     next();

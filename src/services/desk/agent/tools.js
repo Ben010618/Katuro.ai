@@ -28,6 +28,7 @@ import {
 import { visionPartsFor } from './visionPrep.js';
 import { GROUNDING_RULES, verifySpec } from './grounding.js';
 import { buildConsolidatedSpec } from './consolidate.js';
+import { base64ToBytes } from '../../../utils/bytes.js';
 
 const DOC_SPEC_GUIDE = `Return ONLY a JSON object (a "DocumentSpec"):
 {
@@ -223,13 +224,6 @@ async function extractTableWithAI(path, ctx, what = 'a table') {
   const rows = (result.rows || []).map((r) => (Array.isArray(r) ? r : [r]).map((c) => (c === null || c === undefined ? '' : String(c))));
   if (!columns.length && !rows.length) throw new Error(`I couldn't read a table from ${path}.`);
   return { title: result.title || '', columns, rows, notes: result.notes || '' };
-}
-
-function base64ToBytes(b64) {
-  const bin = typeof atob === 'function' ? atob(b64) : globalThis.Buffer.from(b64, 'base64').toString('binary');
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
 }
 
 /**

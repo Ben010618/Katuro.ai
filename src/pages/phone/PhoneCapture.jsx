@@ -51,7 +51,9 @@ export function SnapScores({ cls, hps, existing = {}, onDone }) {
     if (!photo || busy) return;
     const box = e.currentTarget.getBoundingClientRect();
     try {
+      const mine = token.current;
       const bytes = await cropAround(photo.file, (e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
+      if (mine !== token.current) return;
       setCrop({ url: keep(bytes), bytes });
     } catch (err) {
       setCrop({ error: err.message });

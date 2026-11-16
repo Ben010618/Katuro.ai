@@ -108,7 +108,7 @@ async function sendQueuedOnce(client) {
       removeQueued(item.id);
       sent.push({ item, result });
     } catch (err) {
-      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') return { sent, failed, unreachable: true };
+      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING' || err.code === 'CLOSED') return { sent, failed, unreachable: true };
       markQueued(item.id, err.message);
       failed.push({ item, error: err.message });
     }

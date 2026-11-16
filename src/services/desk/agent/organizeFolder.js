@@ -84,7 +84,4 @@ export function folderFor(info) {
 }
 
 /** A content fingerprint (SHA-256) to find exact duplicates. */
-export async function fingerprint(bytes) {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+export { sha256Hex as fingerprint } from '../../../utils/bytes.js';

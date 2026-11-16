@@ -225,4 +225,17 @@ describe('phone link', () => {
     service.setAccount(TEACHER);
     expect((await client.list('Records')).items.length).toBeGreaterThan(0);
   });
+
+  it('after unlink / sign-out the old client answers nothing and saves nothing', async () => {
+    await setup();
+    const saved = [];
+    const client = createLinkClient((await pairPhone()).link, { onLinkChange: (l) => saved.push(l) });
+    expect((await pairPhone()).link.uid).toBe(TEACHER);
+    const pending = client.list('Records');
+    client.close();
+    await expect(pending).rejects.toMatchObject({ code: 'CLOSED' });
+    await expect(client.hello()).rejects.toMatchObject({ code: 'CLOSED' });
+    expect(saved).toEqual([]);
+    expect(client.closed).toBe(true);
+  });
 });

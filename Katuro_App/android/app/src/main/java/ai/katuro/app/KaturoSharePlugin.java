@@ -82,7 +82,9 @@ public class KaturoSharePlugin extends Plugin {
             }
             long size = sizeOf(resolver, uri);
             // This file would make the batch too big: leave it for the next call (unless it is the first).
-            if (batch > 0 && size > 0 && batch + Math.min(size, MAX_BYTES) > MAX_BATCH) break;
+            // Unknown size counts as the largest file allowed.
+            long counted = size > 0 ? Math.min(size, MAX_BYTES) : MAX_BYTES;
+            if (batch > 0 && batch + counted > MAX_BATCH) break;
             synchronized (pending) {
                 pending.remove(0);
             }
