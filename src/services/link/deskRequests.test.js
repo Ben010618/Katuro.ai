@@ -172,3 +172,79 @@ describe('KaTuroDesk answering the phone', () => {
     expect((await ask('record', { id: 'busy', path: RECORD, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] })).written).toBe(1);
   });
 });
+
+describe('history and undo of phone recordings', () => {
+  it('keeps who recorded what, and Undo puts the scores (and a new HPS) back as they were', async () => {
+    const ws = await home();
+    const ask = createDeskRequestHandler({ handle: ws.handle, now: () => 1700000000000 });
+    const phone = { id: 'd1', name: "Ma'am Ana's phone" };
+    await ask('record', { id: 'r1', path: RECORD, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] }, phone);
+    await ask('record', { id: 'r2', path: RECORD, column: 'ww1', hps: 20, overwrite: true, scores: [{ lrn: '136512340001', score: 19 }, { lrn: '136512340003', score: 20 }] }, phone);
+    const { history } = await ask('history', { path: RECORD });
+    expect(history.map((h) => [h.id, h.device, h.columnLabel, h.count])).toEqual([['r2', "Ma'am Ana's phone", 'WW 1', 2], ['r1', "Ma'am Ana's phone", 'WW 1', 1]]);
+    expect(history[0].cells).toEqual([{ lrn: '136512340001', name: 'Dela Cruz, Juan P.', before: 18, after: 19 }, { lrn: '136512340003', name: 'Santos, Maria L.', before: null, after: 20 }]);
+
+    // Undo the newest: Juan back to 18, Maria blank again.
+    expect(await ask('undo', { id: 'r2' }, phone)).toMatchObject({ ok: true, restored: 2 });
+    let cls = await ask('class', { path: RECORD });
+    expect(cls.scores.ww1).toEqual({ '136512340001': 18 });
+    // Undo the first: Juan blank, and the HPS it set is cleared.
+    await ask('undo', { id: 'r1' }, phone);
+    cls = await ask('class', { path: RECORD });
+    expect(cls.scores.ww1).toEqual({});
+    expect(cls.columns.find((c) => c.key === 'ww1').hps).toBeNull();
+    expect((await ask('undo', { id: 'r1' }))).toMatchObject({ already: true });
+  });
+
+  it('never undoes over a score changed after the recording', async () => {
+    const ws = await home();
+    const ask = createDeskRequestHandler({ handle: ws.handle });
+    await ask('record', { id: 'a', path: RECORD, column: 'pt1', hps: 50, scores: [{ lrn: '136512340001', score: 40 }] });
+    await ask('record', { id: 'b', path: RECORD, column: 'pt1', hps: 50, overwrite: true, scores: [{ lrn: '136512340001', score: 45 }] });
+    await expect(ask('undo', { id: 'a' })).rejects.toMatchObject({ code: 'CHANGED_SINCE' });
+    expect((await ask('class', { path: RECORD })).scores.pt1).toEqual({ '136512340001': 45 });
+  });
+});
+
+describe('attendance by tap', () => {
+  const ATT = 'Records/Attendance/Grade 7 - Rizal - Science.xlsx';
+
+  it('makes Records/Attendance/<class>.xlsx, keeps each day, counts absences, warns on 3 in a row; not a class', async () => {
+    const ws = await home();
+    const ask = createDeskRequestHandler({ handle: ws.handle });
+    let n = 0;
+    const mark = (date, m) => ask('attendance', { id: `att-${(n += 1)}`, path: RECORD, date, marks: m });
+    const r1 = await mark('2026-11-16', { '136512340001': 'P', '136512340002': 'A', '136512340003': 'L' });
+    expect(r1).toMatchObject({ ok: true, file: ATT, counts: { P: 1, A: 1, L: 1 }, absentStreaks: [] });
+    await mark('2026-11-17', { '136512340002': 'A' });
+    const r3 = await mark('2026-11-18', { '136512340002': 'a', '136512340001': 'P' });
+    expect(r3.absentStreaks).toEqual([{ lrn: '136512340002', name: 'Reyes, Pedro A.', days: 3 }]);
+
+    const day1 = await ask('attendanceGet', { path: RECORD, date: '2026-11-16' });
+    expect(day1.marks).toEqual({ '136512340001': 'P', '136512340002': 'A', '136512340003': 'L' });
+    expect(day1.learners).toHaveLength(3);
+    // Changing a day keeps the others.
+    await mark('2026-11-16', { '136512340002': 'E' });
+    expect((await ask('attendanceGet', { path: RECORD, date: '2026-11-16' })).marks['136512340002']).toBe('E');
+    expect((await ask('attendanceGet', { path: RECORD, date: '2026-11-17' })).marks).toEqual({ '136512340002': 'A' });
+
+    // The Absences column counts with a live formula.
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(await readFileBytes(ws.handle, ATT)));
+    const sheet = wb.getWorksheet('Attendance');
+    const pedro = [4, 5, 6].find((r) => sheet.getCell(`B${r}`).value === '136512340002');
+    expect(sheet.getCell(`D${pedro}`).value.formula).toMatch(/^COUNTIF\(F\d+:/);
+    // The attendance file is not listed as a class.
+    expect((await ask('classes')).classes.map((c) => c.path)).toEqual([RECORD]);
+  });
+
+  it('only for a ready class record, only known learners and marks', async () => {
+    const ws = createVirtualWorkspace('KaTuro');
+    ws.handle.saveVirtualFile(RECORD, await ecr(LEARNERS.map((l, i) => ({ ...l, lrn: i ? l.lrn : '' }))));
+    const ask = createDeskRequestHandler({ handle: ws.handle });
+    await expect(ask('attendance', { path: RECORD, date: '2026-11-16', marks: { '136512340002': 'A' } })).rejects.toMatchObject({ code: 'NOT_READY' });
+    const ok = await home();
+    const ask2 = createDeskRequestHandler({ handle: ok.handle });
+    await expect(ask2('attendance', { path: RECORD, date: '2026-11-16', marks: { '999999999999': 'A', '136512340001': 'Z' } })).rejects.toMatchObject({ code: 'INVALID' });
+  });
+});

@@ -106,7 +106,7 @@ The gap today: the teacher checks papers by hand, then types every score into Ex
 |---|---|---|
 | ⭐ **Quick entry** | The phone shows the class list in order. Tap or say each score: "Juan, 38." | Exact |
 | ⭐ **Bubble sheet scan** | The camera reads the bubbles; checked against the answer key (the Desk's existing checker). | Exact |
-| **Photo of a checked paper** | The phone reads the score the teacher wrote ("38/50") on the phone itself, with no internet. It knows the learner from a QR code printed on the paper, the class list order, or the name matched to the class list. | Good on clear writing. Always confirmed. |
+| **Photo of a checked paper** | The teacher taps the written score on the photo; only that small square (no name) is read by the KaTuro AI (on-device ML Kit is not reliable on handwriting). Needs internet. It knows the learner from a QR code printed on the paper, the class list order, or the name matched to the class list. | Good on clear writing. Always confirmed. |
 
 Rules for every way in:
 - ⭐ **Confirm before saving.** A review screen highlights doubtful scores. Nothing is
@@ -167,7 +167,7 @@ These are Desk work that supports the app. They also make the Desk better on its
 | **2. Scores** ⭐ ✅ | Quick entry, bubble-sheet scan, review screen, the Desk writes the class record, missing papers, offline queue | Record a whole quiz without typing on the PC |
 | **3. Lessons** ⭐ ✅ | Open files, Snap & Send, scan to PDF, Keep on phone, Share to KaTuro | Carry and add lessons from the phone |
 | **4. Assistant** ✅ | Schedule and push, messages, personas, generators saving into Lessons | Use KaTuro daily on the phone |
-| **5. Smarter capture** | Photo of a checked paper (handwritten score reading), attendance, history and undo, "Ask my Desk" | Snap the stack of papers instead |
+| **5. Smarter capture** ✅ | Photo of a checked paper (handwritten score reading), attendance, history and undo, "Ask my Desk" | Snap the stack of papers instead |
 | **6. Google Play** | Internal test → a few teachers → public | Teachers install from Play |
 | **7. iOS** | Add `ios/` to the same project | iPhone teachers install it |
 

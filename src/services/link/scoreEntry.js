@@ -4,6 +4,17 @@
  * KaTuroDesk can't be reached (sent later, once: KaTuroDesk ignores a repeat of the same id).
  */
 
+/** The class record's groups: [['Male', [...]], ['Female', [...]], ['Learners', [...]]] (empty ones left out). */
+export function classGroups(learners = []) {
+  const m = learners.filter((l) => l.sex === 'M');
+  const f = learners.filter((l) => l.sex === 'F');
+  const other = learners.filter((l) => l.sex !== 'M' && l.sex !== 'F');
+  return [['Male', m], ['Female', f], ['Learners', other]].filter(([, list]) => list.length);
+}
+
+/** Male, then Female, then the rest: the class record's order. */
+export const classOrder = (learners = []) => classGroups(learners).flatMap(([, list]) => list);
+
 const ABSENT = /^(a|ab|abs|absent|x|-)$/i;
 
 /** What the teacher typed for one learner → { kind: 'blank' | 'absent' | 'score' | 'bad', score? } */
@@ -85,7 +96,10 @@ export async function sendQueued(client) {
   const failed = [];
   for (const item of queuedRecordings()) {
     try {
-      const result = await client.request('record', { id: item.id, path: item.path, column: item.column, hps: item.hps, scores: item.scores, overwrite: Boolean(item.overwrite) });
+      // Scores (op 'record', the original shape) or attendance (op + args).
+      const result = item.op && item.args
+        ? await client.request(item.op, { ...item.args, id: item.id })
+        : await client.request('record', { id: item.id, path: item.path, column: item.column, hps: item.hps, scores: item.scores, overwrite: Boolean(item.overwrite) });
       removeQueued(item.id);
       sent.push({ item, result });
     } catch (err) {

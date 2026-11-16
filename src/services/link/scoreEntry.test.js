@@ -70,3 +70,12 @@ describe('recordings kept on the phone while KaTuroDesk is off', () => {
     expect(cachedClasses().classes['Records/A.xlsx'].learners).toHaveLength(3);
   });
 });
+
+describe('attendance waits on the phone too', () => {
+  it('is sent with its own request', async () => {
+    queueRecording({ id: 'att1', op: 'attendance', args: { path: 'Records/A.xlsx', date: '2026-11-16', marks: { '136512340001': 'A' } }, className: 'A', columnLabel: 'Attendance' });
+    const calls = [];
+    await sendQueued({ request: async (op, args) => { calls.push([op, args]); return { ok: true }; } });
+    expect(calls).toEqual([['attendance', { path: 'Records/A.xlsx', date: '2026-11-16', marks: { '136512340001': 'A' }, id: 'att1' }]]);
+  });
+});

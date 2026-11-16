@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createDeskRequestHandler, localAppliedStore } from '../../services/link/deskRequests';
+import { createDeskRequestHandler, localAppliedStore, localHistoryStore } from '../../services/link/deskRequests';
 import { createAssistantHandler, ASSISTANT_OPS } from '../../services/link/deskAssistant';
 import { readDirectoryRecursively } from '../../services/localFileSystem';
 import { useDeskStore } from '../../store/deskStore';
@@ -33,6 +33,7 @@ export function usePhoneRequests({ user, profile } = {}) {
       handler = createDeskRequestHandler({
         handle: { kind: 'electron', isElectron: true, rootPath },
         applied: localAppliedStore(),
+        history: localHistoryStore(),
         onWrote: refreshIfHome,
       });
       const handle = { kind: 'electron', isElectron: true, rootPath };
@@ -52,7 +53,7 @@ export function usePhoneRequests({ user, profile } = {}) {
           return result;
         },
       });
-      const offRequests = api.onLinkRequest(({ op, args }) => (ASSISTANT_OPS.has(op) ? assistant(op, args) : handler(op, args)));
+      const offRequests = api.onLinkRequest(({ op, args, device }) => (ASSISTANT_OPS.has(op) ? assistant(op, args) : handler(op, args, device)));
       // A photo or file the phone sent into Records / Lessons shows up in the folder panel.
       const offFiles = api.onPhoneFileAdded?.(() => refreshIfHome());
       off = () => { offRequests(); offFiles?.(); };

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, ClipboardList, CloudOff, Loader2, RefreshCw, ScanLine, Send } from 'lucide-react';
-import { checkEntries, newId, queueRecording, queuedRecordings, sendQueued, cacheClassList, cacheClass, cachedClasses } from '../../services/link/scoreEntry';
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ChevronRight, ClipboardList, CloudOff, Loader2, RefreshCw, RotateCcw, ScanLine, Send, UserCheck } from 'lucide-react';
+import { checkEntries, classGroups, newId, queueRecording, queuedRecordings, sendQueued, cacheClassList, cacheClass, cachedClasses } from '../../services/link/scoreEntry';
 import BubbleScan from './BubbleScan';
+import { SnapScores, AttendanceScreen, RecentRecordings } from './PhoneCapture';
 
 const COMPONENT_TITLE = { ww: 'Written Work', pt: 'Performance Tasks', qa: 'Quarterly Assessment' };
 
@@ -104,10 +105,15 @@ function ClassList({ client, online, onPick }) {
 }
 
 /** Step 2: which task (WW 1…, PT 1…, QA). */
-function ColumnList({ cls, onPick }) {
+function ColumnList({ cls, client, onPick, onAttendance, onChanged }) {
   const total = cls.learners.length;
   return (
     <div className="p-3 space-y-4">
+      <button type="button" onClick={onAttendance} className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3.5 text-left shadow-sm">
+        <UserCheck size={22} className="text-emerald-700" />
+        <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Take attendance</span><span className="block text-xs text-gray-500">Tap P, L, A or E for each learner</span></span>
+        <ChevronRight size={18} className="text-gray-400" />
+      </button>
       {['ww', 'pt', 'qa'].map((k) => {
         const cols = cls.columns.filter((c) => c.component === k);
         if (!cols.length) return null;
@@ -128,22 +134,18 @@ function ColumnList({ cls, onPick }) {
           </section>
         );
       })}
+      <RecentRecordings client={client} cls={cls} onChanged={onChanged} />
     </div>
   );
 }
 
 /** Step 3: type the scores (or fill them from bubble sheets), then review. */
-function Entry({ cls, column, initial, onReview, onBubble }) {
+function Entry({ cls, column, initial, onReview, onBubble, onSnap }) {
   const existing = cls.scores?.[column.key] || {};
   const [hps, setHps] = useState(initial?.hps ?? (column.hps ?? ''));
   const [values, setValues] = useState(() => initial?.values || {});
   const refs = useRef({});
-  const groups = useMemo(() => {
-    const m = cls.learners.filter((l) => l.sex === 'M');
-    const f = cls.learners.filter((l) => l.sex === 'F');
-    const other = cls.learners.filter((l) => l.sex !== 'M' && l.sex !== 'F');
-    return [['Male', m], ['Female', f], ['Learners', other]].filter(([, list]) => list.length);
-  }, [cls]);
+  const groups = useMemo(() => classGroups(cls.learners), [cls]);
   const order = groups.flatMap(([, list]) => list.map((l) => l.lrn));
   const next = (lrn) => {
     const i = order.indexOf(lrn);
@@ -158,6 +160,9 @@ function Entry({ cls, column, initial, onReview, onBubble }) {
         <input id="kt-hps" type="number" inputMode="decimal" value={hps} disabled={column.hps !== null && column.hps !== undefined} onChange={(e) => setHps(e.target.value)} className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-lg font-bold disabled:bg-gray-100" />
         <button type="button" onClick={() => onBubble({ hps, values })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-800">
           <ScanLine size={18} /> Fill from bubble sheets
+        </button>
+        <button type="button" disabled={!(Number(hps) > 0)} onClick={() => onSnap({ hps, values })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-800 disabled:opacity-50">
+          <Camera size={18} /> Snap the checked papers{Number(hps) > 0 ? '' : ' (type the highest score first)'}
         </button>
         <p className="text-[11px] text-gray-500">Type a number for each learner. Leave it blank if there is no paper yet; type <b>a</b> for absent.</p>
       </Card>
@@ -208,7 +213,7 @@ function Review({ cls, column, entry, client, onBack, onDone }) {
     const item = { id: newId(), path: cls.path, className: cls.name, column: column.key, columnLabel: column.label, hps: Number(entry.hps), scores: check.scores, overwrite: replace };
     try {
       const result = await client.request('record', item);
-      onDone({ result });
+      onDone({ result, id: item.id });
     } catch (err) {
       if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') {
         queueRecording(item);
@@ -261,8 +266,18 @@ function Review({ cls, column, entry, client, onBack, onDone }) {
   );
 }
 
-function Done({ outcome, column, onAnother, onClasses }) {
+function Done({ outcome, column, client, onAnother, onClasses, onUndone }) {
   const r = outcome.result;
+  const [undo, setUndo] = useState('');
+  const undoIt = async () => {
+    try {
+      await client.request('undo', { id: outcome.id });
+      setUndo('Undone: the scores are back to how they were.');
+      onUndone?.();
+    } catch (err) {
+      setUndo(err.message);
+    }
+  };
   return (
     <div className="p-3 space-y-3">
       <Card className="text-center space-y-2">
@@ -281,6 +296,8 @@ function Done({ outcome, column, onAnother, onClasses }) {
           <ul className="mt-1 text-sm text-gray-700 list-disc pl-5">{r.missing.map((m) => <li key={m.lrn}>{m.name}</li>)}</ul>
         </Card>
       )}
+      {r?.written > 0 && outcome.id && !undo && <button type="button" onClick={undoIt} className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-800"><RotateCcw size={16} /> Undo this recording</button>}
+      {undo && <p className="text-center text-sm text-gray-700">{undo}</p>}
       <button type="button" onClick={onAnother} className="w-full rounded-xl bg-emerald-700 py-3 font-bold text-white">Record another task</button>
       <button type="button" onClick={onClasses} className="w-full rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-800">Choose another class</button>
     </div>
@@ -330,7 +347,7 @@ export default function ScoresFlow({ client, online }) {
     return (
       <div>
         <Bar title={cls.name} onBack={() => setStep('classes')} />
-        <ColumnList cls={cls} onPick={(c) => { setColumn(c); setEntry(null); setStep('entry'); }} />
+        <ColumnList cls={cls} client={client} onPick={(c) => { setColumn(c); setEntry(null); setStep('entry'); }} onAttendance={() => setStep('attendance')} onChanged={refreshClass} />
       </div>
     );
   }
@@ -344,8 +361,30 @@ export default function ScoresFlow({ client, online }) {
           column={column}
           initial={entry}
           onBubble={(e) => { setEntry(e); setStep('bubble'); }}
+          onSnap={(e) => { setEntry(e); setStep('snap'); }}
           onReview={(e) => { setEntry(e); setStep('review'); }}
         />
+      </div>
+    );
+  }
+  if (step === 'snap' && cls && column && entry) {
+    return (
+      <div>
+        <Bar title={`Snap papers · ${column.label}`} onBack={() => setStep('entry')} />
+        <SnapScores
+          cls={cls}
+          hps={Number(entry.hps)}
+          existing={{ ...(cls.scores?.[column.key] || {}), ...entry.values }}
+          onDone={(read) => { setEntry({ hps: entry.hps, values: { ...entry.values, ...read } }); setStep('entry'); }}
+        />
+      </div>
+    );
+  }
+  if (step === 'attendance' && cls) {
+    return (
+      <div>
+        <Bar title={`Attendance · ${cls.name}`} onBack={() => setStep('columns')} />
+        <AttendanceScreen client={client} cls={cls} onClose={() => setStep('columns')} />
       </div>
     );
   }
@@ -375,7 +414,7 @@ export default function ScoresFlow({ client, online }) {
     );
   }
   if (step === 'done' && outcome && column) {
-    return <Done outcome={outcome} column={column} onAnother={() => { setColumn(null); setEntry(null); setStep('columns'); }} onClasses={() => { setCls(null); setStep('classes'); }} />;
+    return <Done outcome={outcome} column={column} client={client} onUndone={refreshClass} onAnother={() => { setColumn(null); setEntry(null); setStep('columns'); }} onClasses={() => { setCls(null); setStep('classes'); }} />;
   }
   return (
     <div>

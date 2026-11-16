@@ -20,7 +20,8 @@ import { applyEdits } from '../desk/docmap/index.js';
 import { readClassRecord, planRecord } from '../desk/records/recordSheet.js';
 import { RECORDS_DIR, parseClassRecordFileName } from '../desk/records/classRecords.js';
 import { QUIZ_FILE, CHECK_FILE, parseQuiz } from '../desk/bubble/quiz.js';
-import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError } from '../localFileSystem.js';
+import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError, writeFileToDirectory, fileExists } from '../localFileSystem.js';
+import { attendancePathFor, isAttendanceFile, newAttendanceWorkbook, readAttendance, writeAttendance, MARKS } from '../desk/records/attendance.js';
 
 const RECORD_FILE = /\.(xlsx|xlsm)$/i;
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -51,15 +52,32 @@ export function localAppliedStore(key = 'katuro-phone-applied-v1') {
   };
 }
 
+/**
+ * The history of recordings made from the phone (newest last), for "who changed what, when"
+ * and Undo. Each entry: { id, at, device, path, class, column, columnLabel, cells: [{ lrn, name, before, after }],
+ * hps: { before, after } | null, undoneAt }.
+ */
+const KEEP_HISTORY = 300;
+export function memoryHistoryStore() {
+  let list = [];
+  return { all: () => list, add: (e) => { list = [...list, e].slice(-KEEP_HISTORY); }, update: (id, patch) => { list = list.map((e) => (e.id === id ? { ...e, ...patch } : e)); } };
+}
+export function localHistoryStore(key = 'katuro-phone-history-v1') {
+  const load = () => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } };
+  const save = (l) => { try { localStorage.setItem(key, JSON.stringify(l.slice(-KEEP_HISTORY))); } catch { /* full */ } };
+  return { all: load, add: (e) => save([...load(), e]), update: (id, patch) => save(load().map((e) => (e.id === id ? { ...e, ...patch } : e))) };
+}
+
 const isWorkingCopy = (p) => workingCopyPath(p) === p;
 const inRecords = (p) => p.toLowerCase().startsWith(`${RECORDS_DIR.toLowerCase()}/`);
 
 /**
  * handle   — the KaTuro folder (localFileSystem handle: 'electron' in the app, virtual in tests)
  * applied  — memoryAppliedStore() / localAppliedStore()
+ * history  — memoryHistoryStore() / localHistoryStore(): recordings from the phone, for Undo
  * onWrote(path) — after a class record was written (KaTuroDesk refreshes its file list)
  */
-export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(), onWrote = () => {} }) {
+export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(), history = memoryHistoryStore(), onWrote = () => {}, now = () => Date.now() }) {
   let queue = Promise.resolve(); // one write at a time
 
   const allFiles = async () => flattenFileTree(await readDirectoryRecursively(handle)).filter((f) => f.kind !== 'directory' && !SKIP_DIRS.test(f.path));
@@ -67,7 +85,7 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
   async function recordFiles() {
     const files = await allFiles();
     return files
-      .filter((f) => inRecords(f.path) && RECORD_FILE.test(f.path) && !isWorkingCopy(f.path) && !f.name.startsWith('~$'))
+      .filter((f) => inRecords(f.path) && RECORD_FILE.test(f.path) && !isWorkingCopy(f.path) && !isAttendanceFile(f.path) && !f.name.startsWith('~$'))
       .map((f) => ({ path: f.path, name: f.name, source: f.path }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }
@@ -113,7 +131,23 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     return { ...summary(file, record), learners: record.learners, columns: record.columns, scores: record.scores };
   }
 
-  async function record(args) {
+  /** Writes edits into the class record (backup first). → saveWorkingCopy's result */
+  async function writeRecord(file, bytes, edits) {
+    const out = await applyEdits(bytes, file.source.split('/').pop(), edits);
+    const skipped = out.skipped || [];
+    if (skipped.length === edits.length) throw new RequestError('None of the scores could be written: those cells hold formulas or are protected. Check the class record on KaTuroDesk.', 'NOT_WRITTEN');
+    let saved;
+    try {
+      saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME);
+    } catch (err) {
+      if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${file.name} is open in Excel on the computer. Close it there, then send again.`, 'FILE_OPEN');
+      throw err;
+    }
+    onWrote(saved.path);
+    return { saved, skipped };
+  }
+
+  async function record(args, device) {
     const id = String(args.id || '');
     if (id && applied.get(id)) return { ...applied.get(id), repeated: true };
     const { file, bytes, record: rec } = await load(String(args.path || ''));
@@ -122,16 +156,23 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     let saved = null;
     let skipped = [];
     if (plan.edits.length) {
-      const out = await applyEdits(bytes, file.source.split('/').pop(), plan.edits);
-      skipped = out.skipped || [];
-      if (skipped.length === plan.edits.length) throw new RequestError('None of the scores could be written: those cells hold formulas or are protected. Check the class record on KaTuroDesk.', 'NOT_WRITTEN');
-      try {
-        saved = await saveWorkingCopy(handle, file.path, out.bytes, XLSX_MIME);
-      } catch (err) {
-        if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${file.name} is open in Excel on the computer. Close it there, then send the scores again.`, 'FILE_OPEN');
-        throw err;
-      }
-      onWrote(saved.path);
+      ({ saved, skipped } = await writeRecord(file, bytes, plan.edits));
+      const skippedCells = new Set(skipped.map((s) => s.cell));
+      const col = plan.column;
+      history.add({
+        id: id || `h-${now()}`,
+        at: now(),
+        device: device?.name || 'Phone',
+        path: file.path,
+        class: file.name.replace(RECORD_FILE, ''),
+        column: col.key,
+        columnLabel: col.label,
+        hps: plan.hpsSet ? { before: col.hps, after: plan.hps } : null,
+        cells: plan.written
+          .filter((w) => !skippedCells.has(`${col.cell}${rec.learners.find((l) => l.lrn === w.lrn)?.row}`))
+          .map((w) => ({ lrn: w.lrn, name: w.name, before: w.before ?? null, after: w.score })),
+        undoneAt: null,
+      });
     }
     const result = {
       ok: true,
@@ -145,6 +186,81 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
       savedTo: saved?.path || null,
       backup: saved?.backups?.[0] || null,
     };
+    if (id) applied.set(id, result);
+    return result;
+  }
+
+  /** Recordings made from the phone, newest first (one class, or all). */
+  function recordings({ path } = {}) {
+    return {
+      history: history.all()
+        .filter((e) => !path || e.path === path)
+        .slice(-30)
+        .reverse()
+        .map(({ id, at, device, class: cls, columnLabel, cells, hps, undoneAt }) => ({ id, at, device, class: cls, columnLabel, count: cells.length, hps: hps?.after ?? null, undoneAt, cells: cells.slice(0, 60) })),
+    };
+  }
+
+  /**
+   * Puts back what a phone recording replaced. Only when the cells still hold what that
+   * recording wrote: a score changed since then is never overwritten (the teacher is told).
+   */
+  async function undo({ id } = {}, device) {
+    const entry = history.all().find((e) => e.id === id);
+    if (!entry) throw new RequestError('That recording is not in the history any more.', 'NOT_FOUND');
+    if (entry.undoneAt) return { ok: true, already: true };
+    const { file, bytes, record: rec } = await load(entry.path);
+    if (rec.error) throw new RequestError(rec.error, 'NOT_A_RECORD');
+    const col = rec.columns.find((c) => c.key === entry.column);
+    if (!col) throw new RequestError(`${entry.columnLabel} is no longer in ${file.name}.`, 'NO_COLUMN');
+    const now0 = rec.scores[entry.column] || {};
+    const changedSince = entry.cells.filter((c) => (now0[c.lrn] ?? null) !== c.after);
+    if (changedSince.length) {
+      throw new RequestError(`Not undone: ${changedSince.length} score(s) in ${entry.columnLabel} were changed after this recording (${changedSince.slice(0, 3).map((c) => c.name).join(', ')}). Fix them on KaTuroDesk.`, 'CHANGED_SINCE');
+    }
+    const rows = new Map(rec.learners.map((l) => [l.lrn, l.row]));
+    const edits = entry.cells.filter((c) => rows.has(c.lrn)).map((c) => ({ sheet: rec.sheet, cell: `${col.cell}${rows.get(c.lrn)}`, value: c.before }));
+    if (entry.hps && col.hpsCell && col.hps === entry.hps.after) edits.push({ sheet: rec.sheet, cell: col.hpsCell, value: entry.hps.before });
+    if (edits.length) await writeRecord(file, bytes, edits);
+    history.update(id, { undoneAt: now(), undoneBy: device?.name || 'Phone' });
+    return { ok: true, restored: edits.length, class: entry.class, column: entry.columnLabel };
+  }
+
+  // ── attendance (Records/Attendance/<class>.xlsx) ──
+  async function attendanceFor(path) {
+    const { file, record: rec } = await load(String(path || ''));
+    if (rec.error) throw new RequestError(rec.error, 'NOT_A_RECORD');
+    if (!rec.ready) throw new RequestError('This class record is not ready yet: every learner needs a clear full name and a 12-digit LRN. Fix it on KaTuroDesk first.', 'NOT_READY');
+    const attPath = attendancePathFor(file.path);
+    const exists = await fileExists(handle, attPath);
+    return { file, rec, attPath, exists };
+  }
+
+  async function attendanceGet({ path, date } = {}) {
+    const { rec, attPath, exists } = await attendanceFor(path);
+    const marks = exists ? await readAttendance(await readFileBytes(handle, attPath), String(date || '')) : {};
+    return { learners: rec.learners.map(({ lrn, name, sex }) => ({ lrn, name, sex })), marks, file: attPath };
+  }
+
+  async function attendance({ id, path, date, marks = {} } = {}) {
+    if (id && applied.get(id)) return { ...applied.get(id), repeated: true };
+    const { file, rec, attPath, exists } = await attendanceFor(path);
+    const known = new Set(rec.learners.map((l) => l.lrn));
+    const clean = Object.fromEntries(Object.entries(marks || {}).filter(([lrn, m]) => known.has(lrn) && MARKS.includes(String(m).toUpperCase())));
+    if (!Object.keys(clean).length) throw new RequestError('Mark at least one learner.', 'INVALID');
+    const learners = rec.learners.map(({ lrn, name }) => ({ lrn, name }));
+    const start = exists ? await readFileBytes(handle, attPath) : await newAttendanceWorkbook({ title: file.name.replace(RECORD_FILE, ''), learners });
+    const out = await writeAttendance(start, { date, marks: clean, learners });
+    try {
+      if (exists) await saveWorkingCopy(handle, attPath, out.bytes, XLSX_MIME);
+      else await writeFileToDirectory(handle, attPath, out.bytes, XLSX_MIME, { overwrite: false });
+    } catch (err) {
+      if (err.code === 'FILE_OPEN' || isFileOpenError(err)) throw new RequestError(`${attPath.split('/').pop()} is open in Excel on the computer. Close it there, then send again.`, 'FILE_OPEN');
+      throw err;
+    }
+    onWrote(attPath);
+    const counts = Object.values(clean).reduce((m, x) => ({ ...m, [x.toUpperCase()]: (m[x.toUpperCase()] || 0) + 1 }), {});
+    const result = { ok: true, file: attPath, date, counts, absentStreaks: out.absentStreaks };
     if (id) applied.set(id, result);
     return result;
   }
@@ -175,15 +291,22 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     return { quiz, answerKey };
   }
 
-  return async function handleRequest(op, args = {}) {
+  // Writes go one at a time (two phones, or a recording and an undo, never mix).
+  const serial = (fn) => {
+    const run = queue.then(fn);
+    queue = run.catch(() => {});
+    return run;
+  };
+
+  return async function handleRequest(op, args = {}, device = null) {
     switch (op) {
       case 'classes': return classes();
       case 'class': return oneClass(args);
-      case 'record': {
-        const run = queue.then(() => record(args));
-        queue = run.catch(() => {});
-        return run;
-      }
+      case 'record': return serial(() => record(args, device));
+      case 'history': return recordings(args);
+      case 'undo': return serial(() => undo(args, device));
+      case 'attendanceGet': return attendanceGet(args);
+      case 'attendance': return serial(() => attendance(args));
       case 'quizzes': return quizzes();
       case 'quiz': return oneQuiz(args);
       default: throw new RequestError('KaTuroDesk does not know that request. Update KaTuroDesk.', 'UNKNOWN_OP');
