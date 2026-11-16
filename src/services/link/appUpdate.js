@@ -12,7 +12,7 @@
  * opens Android's "update this app?" screen. Android installs it only when it is signed with
  * the same key as the installed app.
  */
-export const UPDATE_FEED = 'https://github.com/Ben010618/Katuro.ai/releases/download/katuro-app/katuro-app-latest.json';
+const UPDATE_FEED = 'https://github.com/Ben010618/Katuro.ai/releases/download/katuro-app/katuro-app-latest.json';
 const CHECKED_KEY = 'katuro-app-update-checked-v1';
 const DAY = 24 * 60 * 60 * 1000;
 

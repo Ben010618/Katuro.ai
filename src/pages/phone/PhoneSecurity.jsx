@@ -4,9 +4,10 @@ import { checkPin, setPin, validPin } from '../../services/link/appLock';
 
 /**
  * The PIN screen. mode 'set': choose a PIN (typed twice); 'unlock': type it.
- * onDone() when set / unlocked; onForgot() signs out (clears the teacher's data from the phone).
+ * onDone() when set / unlocked; onForgot() signs out (clears the teacher's data from the phone);
+ * onCancel() (changing an existing PIN only) keeps the old one.
  */
-export function LockScreen({ mode, onDone, onForgot }) {
+export function LockScreen({ mode, onDone, onForgot, onCancel }) {
   const [pin, setPinText] = useState('');
   const [first, setFirst] = useState('');
   const [note, setNote] = useState('');
@@ -59,6 +60,7 @@ export function LockScreen({ mode, onDone, onForgot }) {
         <button type="button" disabled={!validPin(pin) || busy} onClick={() => submit(pin)} className="h-16 rounded-2xl bg-emerald-500 text-sm font-bold disabled:opacity-30">{busy ? <Loader2 size={20} className="mx-auto animate-spin" /> : 'OK'}</button>
       </div>
       {!setting && <button type="button" onClick={onForgot} className="mt-6 text-sm text-emerald-100 underline">Forgot the PIN? Sign out</button>}
+      {setting && onCancel && <button type="button" onClick={onCancel} className="mt-6 text-sm text-emerald-100 underline">Cancel (keep my PIN)</button>}
     </div>
   );
 }

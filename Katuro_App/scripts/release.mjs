@@ -37,7 +37,10 @@ if (!fs.existsSync(signing)) throw new Error(`The release key is missing (${sign
 const outDir = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).build?.directories?.output || path.join(ROOT, 'release');
 fs.mkdirSync(outDir, { recursive: true });
 
-const run = (cmd, args, cwd, env = {}) => execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } });
+// On Windows npm / npx / gradlew / gh are .cmd/.bat files that need the shell, which splits
+// words: every argument is quoted.
+const q = (a) => (process.platform === 'win32' && /[\s"&|<>^()%!]/.test(a) ? `"${String(a).replace(/"/g, '""')}"` : a);
+const run = (cmd, args, cwd, env = {}) => execFileSync(cmd, args.map(q), { cwd, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } });
 
 console.log(`KaTuro App v${version} (${versionCode})`);
 run('npm', ['run', 'build:web'], APP);
@@ -74,9 +77,11 @@ if (!publish) {
   console.log('\nFor USB: copy the APK to the phone or tablet and open it.\nTo send this update to installed apps: node scripts/release.mjs --publish');
 } else {
   try {
-    execFileSync('gh', ['release', 'view', TAG, '--repo', REPO], { stdio: 'ignore', shell: process.platform === 'win32' });
+    execFileSync('gh', ['release', 'view', TAG, '--repo', REPO].map(q), { stdio: 'ignore', shell: process.platform === 'win32' });
   } catch {
-    run('gh', ['release', 'create', TAG, '--repo', REPO, '--title', 'KaTuro App', '--notes', 'Updates of the KaTuro App (phones and tablets). Installed apps read katuro-app-latest.json from here.', '--prerelease', '--latest=false'], APP);
+    const notesFile = path.join(os.tmpdir(), 'katuro-app-release-notes.md');
+    fs.writeFileSync(notesFile, 'Updates of the KaTuro App (phones and tablets). Installed apps read katuro-app-latest.json from here.\n');
+    run('gh', ['release', 'create', TAG, '--repo', REPO, '--title', 'KaTuro App', '--notes-file', notesFile, '--prerelease', '--latest=false'], APP);
   }
   // The APK first, the update file last: an app never sees an update whose APK is not there yet.
   run('gh', ['release', 'upload', TAG, apk, '--repo', REPO, '--clobber'], APP);

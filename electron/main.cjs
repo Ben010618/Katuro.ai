@@ -125,8 +125,7 @@ function resolveInsideRoot(targetPath) {
   if (typeof targetPath !== 'string' || !targetPath) throw new Error('Invalid path');
   const resolved = path.resolve(targetPath);
   for (const root of allowedRoots) {
-    const rel = path.relative(root, resolved);
-    if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) return resolved;
+    if (defaultFolders.isInsideFolder(resolved, root)) return resolved;
   }
   throw new Error('Access denied: path is outside the opened classroom folder');
 }
@@ -933,8 +932,11 @@ const readBackupInfo = () => {
   try { return JSON.parse(fs.readFileSync(backupInfoFile(), 'utf8')); } catch { return null; }
 };
 ipcMain.handle('backup:last', async () => readBackupInfo());
+// One backup at a time (Settings may be closed and opened again while one runs).
+let backupRunning = false;
 ipcMain.handle('backup:run', async (e) => {
   if (!fromMainWindow(e)) return { canceled: true };
+  if (backupRunning) return { ok: false, code: 'RUNNING', error: 'A backup is already running. Wait for it to finish.' };
   const last = readBackupInfo();
   const pick = await dialog.showOpenDialog(mainWindow, {
     title: 'Choose your USB drive or a folder for the backup',
@@ -944,6 +946,7 @@ ipcMain.handle('backup:run', async (e) => {
   if (pick.canceled || !pick.filePaths.length) return { canceled: true };
   const dest = pick.filePaths[0];
   const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
+  backupRunning = true;
   try {
     const res = await folderBackup.backupFolder({ home, dest, onProgress: (p) => sendToWindow('backup:progress', p) });
     const info = { at: new Date().toISOString(), dest, path: res.path, files: res.files, bytes: res.bytes };
@@ -951,6 +954,8 @@ ipcMain.handle('backup:run', async (e) => {
     return { ok: true, ...info };
   } catch (err) {
     return { ok: false, error: err.message, code: err.code || 'ERROR' };
+  } finally {
+    backupRunning = false;
   }
 });
 

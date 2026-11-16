@@ -11,6 +11,8 @@ export const QR_PREFIX = 'KTLINK1:';
 export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
+// Addresses kept per KaTuroDesk: each unreachable one costs a wait, so the list stays short.
+export const MAX_HOSTS = 6;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
 const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
 // An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
@@ -28,8 +30,6 @@ function b64uDecode(str) {
   return decodeBase64(s + '='.repeat((4 - (s.length % 4)) % 4));
 }
 
-/** Plain base64 (not url-safe) → bytes; the Desk sends file contents this way. */
-export const base64ToBytes = decodeBase64;
 
 const aad = (id, kind, nonce = '') => enc.encode(`katuro-link|${id}|${kind}${nonce ? `|${nonce}` : ''}`);
 const importKey = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
@@ -179,9 +179,10 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
     /** Checks the link and learns the Desk's current addresses. */
     async hello() {
       const r = await call('hello');
-      const fresh = [...new Set([current.hosts[0], ...(r.addresses || []), ...current.hosts])].filter(Boolean);
-      const changed = fresh.join() !== current.hosts.join() || (r.port && r.port !== current.port);
-      if (changed) {
+      // The address that answered first, then the Desk's current ones; at most MAX_HOSTS to try.
+      const fresh = [...new Set([current.hosts[0], ...(r.addresses || []), ...current.hosts])].filter(Boolean).slice(0, MAX_HOSTS);
+      const moved = fresh.join() !== current.hosts.join() || (r.port && r.port !== current.port);
+      if (moved) {
         current = { ...current, hosts: fresh, port: r.port || current.port, deskName: r.deskName || current.deskName };
         changed(current);
       }
@@ -196,7 +197,7 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
     /** One file. → { name, size, bytes: Uint8Array } */
     async read(path) {
       const r = await call('read', { path });
-      return { name: r.name, size: r.size, bytes: base64ToBytes(r.data) };
+      return { name: r.name, size: r.size, bytes: decodeBase64(r.data) };
     },
   };
 }

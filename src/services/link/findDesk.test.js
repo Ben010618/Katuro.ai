@@ -18,3 +18,12 @@ describe('finding KaTuroDesk again after its Wi-Fi address changed', () => {
     expect(withPublishedAddresses(LINK, null)).toBeNull();
   });
 });
+
+describe('only private network addresses', () => {
+  it('a public address is never used for the link', () => {
+    expect(withPublishedAddresses(LINK, { deskId: 'desk-1', addresses: ['8.8.8.8'], port: 47821 })).toBeNull();
+    expect(withPublishedAddresses(LINK, { deskId: 'desk-1', addresses: ['172.20.1.4', '8.8.8.8'], port: 47821 })).toMatchObject({ hosts: ['172.20.1.4', '192.168.1.5'] });
+    const many = withPublishedAddresses(LINK, { deskId: 'desk-1', addresses: ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4', '10.0.0.5', '10.0.0.6', '10.0.0.7'], port: 47821 });
+    expect(many.hosts).toHaveLength(6);
+  });
+});

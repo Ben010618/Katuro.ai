@@ -57,4 +57,20 @@ describe('backup of the KaTuro folder', () => {
   it('names the backup by date and time', () => {
     expect(backupName(new Date(2026, 0, 5, 7, 3))).toBe('KaTuro Backup 2026-01-05 0703');
   });
+
+  it('a backup that fails midway leaves nothing half-done on the drive, and says why plainly', async () => {
+    const { home, usb } = setup();
+    const failing = async (from, to, opts) => {
+      await fs.promises.cp(path.join(from, 'Lessons'), path.join(to, 'Lessons'), { ...opts, recursive: true });
+      throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+    };
+    await expect(backupFolder({ home, dest: usb, copy: failing })).rejects.toMatchObject({ code: 'COPY_FAILED', message: expect.stringMatching(/drive is full.*Nothing half-done/) });
+    expect(fs.readdirSync(usb)).toEqual([]);
+  });
+
+  it('a folder inside KaTuro whose name starts with ".." is still inside', async () => {
+    const { home } = setup();
+    fs.mkdirSync(path.join(home, '..cache'));
+    await expect(backupFolder({ home, dest: path.join(home, '..cache') })).rejects.toMatchObject({ code: 'INSIDE_HOME' });
+  });
 });

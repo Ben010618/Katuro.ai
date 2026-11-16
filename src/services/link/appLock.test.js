@@ -34,3 +34,25 @@ describe('the KaTuro App PIN lock', () => {
     expect(hasPin()).toBe(false);
   });
 });
+
+describe('the wait grows with each round of wrong PINs', () => {
+  it('30 seconds, then 1 minute, then 2 minutes', async () => {
+    await setup2468();
+    let t = 5_000_000;
+    const round = async () => { let r; for (let i = 0; i < MAX_TRIES; i++) r = await checkPin('0000', t); return r.waitMs; };
+    expect(await round()).toBe(WAIT_MS);
+    t += WAIT_MS + 1;
+    expect(await round()).toBe(WAIT_MS * 2);
+    t += WAIT_MS * 2 + 1;
+    expect(await round()).toBe(WAIT_MS * 4);
+    t += WAIT_MS * 4 + 1;
+    expect((await checkPin('2468', t)).ok).toBe(true);
+    // A right PIN starts the count again.
+    expect(await round()).toBe(WAIT_MS);
+  });
+});
+
+async function setup2468() {
+  localStorage.clear();
+  await setPin('2468');
+}

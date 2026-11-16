@@ -141,6 +141,7 @@ export default function PhoneApp() {
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
   const [deskNote, setDeskNote] = useState(''); // why KaTuroDesk refused (e.g. another account signed in there)
+  const [update, setUpdate] = useState(null); // a newer KaTuro App (appUpdate.js)
   // PIN lock: locked when the app opens and after 5 minutes away (appLock.js).
   const [locked, setLocked] = useState(() => hasPin());
   const [settingPin, setSettingPin] = useState(false);
@@ -150,6 +151,8 @@ export default function PhoneApp() {
       if (document.hidden) { hiddenAt.current = Date.now(); return; }
       if (hasPin() && shouldLock(hiddenAt.current)) setLocked(true);
       hiddenAt.current = 0;
+      // Back in front after a long time in the background: the daily update check too.
+      if (canUpdate() && dueForCheck()) checkForUpdate().then((r) => { if (r.update) setUpdate(r.update); }).catch(() => {});
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -157,7 +160,6 @@ export default function PhoneApp() {
   // App menu and online updates.
   const [menuOpen, setMenuOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('');
-  const [update, setUpdate] = useState(null);
   const [updateState, setUpdateState] = useState({});
   const [menuNote, setMenuNote] = useState('');
   useEffect(() => {
@@ -230,15 +232,37 @@ export default function PhoneApp() {
     notify: (title, body) => { if (tab !== 'messages' || document.hidden) notifyNow(title, body); },
   });
 
+  // The link belongs to the account that made it: no client at all for another account.
   // Addresses learned later are saved only while this is still the phone's link.
-  const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => { if (loadLink()?.deviceId === l.deviceId) saveLink(l); } }) : null), [link]);
-  useEffect(() => () => client?.close(), [client]);
-
-  // The phone's data belongs to the account that linked it: another account signing in (also
-  // after a sign-out the app did not start, e.g. a disabled account) starts clean.
+  const ownLink = Boolean(link && user?.uid && link.uid === user.uid);
+  const client = useMemo(() => (ownLink ? createLinkClient(link, { onLinkChange: (l) => { if (loadLink()?.deviceId === l.deviceId) saveLink(l); } }) : null), [link, ownLink]);
+  // An old client is closed once it is replaced or the app closes (a moment later, so React's
+  // development double-run of effects does not close the client in use).
+  const clientRef = useRef(null);
+  const closing = useRef(null);
   useEffect(() => {
-    if (link && user?.uid && link.uid !== user.uid) forgetPhoneData().finally(() => setLink(null));
-  }, [link, user?.uid]);
+    clientRef.current = client;
+    if (closing.current?.client === client) clearTimeout(closing.current.timer);
+    return () => { if (client) closing.current = { client, timer: setTimeout(() => client.close(), 0) }; };
+  }, [client]);
+
+  /**
+   * The one way the teacher's data leaves the phone: close the link, let the screens close,
+   * then clear (so no answer still on its way writes anything back).
+   */
+  const wipe = useCallback(async () => {
+    clientRef.current?.close();
+    setLink(null);
+    setPath('');
+    await new Promise((r) => setTimeout(r, 0));
+    await forgetPhoneData();
+  }, []);
+
+  // Another account signed in (also after a sign-out the app did not start, e.g. a disabled
+  // account): the phone starts clean.
+  useEffect(() => {
+    if (link && user?.uid && link.uid !== user.uid) Promise.resolve().then(wipe);
+  }, [link, user?.uid, wipe]);
 
   useEffect(() => {
     if (!client) return;
@@ -248,7 +272,7 @@ export default function PhoneApp() {
       setOnline(false);
       setDeskNote(err.code === 'OTHER_ACCOUNT' ? err.message : '');
       // KaTuroDesk removed this phone: nothing of that teacher's classes stays on it.
-      if (err.code === 'NOT_LINKED') forgetPhoneData().finally(() => setLink(null));
+      if (err.code === 'NOT_LINKED') wipe();
       // Not reachable at the saved addresses: KaTuroDesk may have a new Wi-Fi address.
       if (err.code === 'UNREACHABLE' && link && searched.current !== `${link.deviceId}|${link.hosts.join()}|${link.port}`) {
         searched.current = `${link.deviceId}|${link.hosts.join()}|${link.port}`;
@@ -259,13 +283,13 @@ export default function PhoneApp() {
       }
     });
     return () => { alive = false; };
-  }, [client, link, user?.uid]);
+  }, [client, link, user?.uid, wipe]);
 
   const onListError = useCallback((err) => {
     if (err.code === 'UNREACHABLE' || err.code === 'OTHER_ACCOUNT') setOnline(false);
     setDeskNote(err.code === 'OTHER_ACCOUNT' ? err.message : '');
-    if (err.code === 'NOT_LINKED') forgetPhoneData().finally(() => setLink(null));
-  }, []);
+    if (err.code === 'NOT_LINKED') wipe();
+  }, [wipe]);
 
   const onListLoaded = useCallback(() => setOnline(true), []);
 
@@ -274,12 +298,7 @@ export default function PhoneApp() {
     const { recordings, files } = await unsentOnPhone();
     const unsent = recordings || files ? ` ${[recordings && `${recordings} recording(s)`, files && `${files} file(s)`].filter(Boolean).join(' and ')} not sent to KaTuroDesk yet will be deleted.` : '';
     if (!window.confirm(`${what} Your class lists, kept files and schedule are removed from this phone.${unsent}`)) return false;
-    // Stop the link and let the screens close first, so no answer still on its way writes back.
-    client?.close();
-    setLink(null);
-    setPath('');
-    await new Promise((r) => setTimeout(r, 0));
-    await forgetPhoneData();
+    await wipe();
     return true;
   };
   const unlink = () => clearPhone('Unlink this phone from KaTuroDesk? You can link it again any time.');
@@ -300,12 +319,17 @@ export default function PhoneApp() {
     next();
   };
 
+  const showUnlock = Boolean(link) && hasPin() && locked;
+  const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
+  const pinScreen = showUnlock || showSetPin;
+
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* A linked phone needs a PIN first (class lists live on it), then asks for it when opened. */}
-      {link && (!hasPin() || settingPin) && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); }} />}
-      {link && hasPin() && locked && !settingPin && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} />}
-      {menuOpen && (
+      {/* A linked phone needs a PIN first (class lists live on it), then asks for it when opened.
+          While a PIN screen shows, nothing else is on the page (not even for the screen reader). */}
+      {showUnlock && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} />}
+      {showSetPin && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); }} onCancel={hasPin() ? () => setSettingPin(false) : undefined} />}
+      {menuOpen && !pinScreen && (
         <PhoneMenu
           version={appVersion}
           linked={Boolean(link)}
@@ -317,13 +341,13 @@ export default function PhoneApp() {
         />
       )}
       {menuOpen && menuNote && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
-      {update && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
-      {file && client && (
+      {update && !pinScreen && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
+      {file && client && !pinScreen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
         </div>
       )}
-      {(
+      {!pinScreen && (
         <>
           <header className="flex items-center justify-between px-4 py-3 bg-[#1f3a2c] text-white">
             <div className="min-w-0">

@@ -2,7 +2,7 @@
  * backup.js — when KaTuroDesk gently reminds the teacher to back up the KaTuro folder to a USB
  * drive or another folder (Settings → Backup). The copy itself is made by electron/folderBackup.cjs.
  */
-export const REMIND_AFTER_DAYS = 7;
+const REMIND_AFTER_DAYS = 7;
 const DAY = 86400000;
 
 /** True when there is no backup yet, or the last one is older than 7 days. */

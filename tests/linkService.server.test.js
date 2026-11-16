@@ -238,4 +238,15 @@ describe('phone link', () => {
     expect(saved).toEqual([]);
     expect(client.closed).toBe(true);
   });
+
+  it('learns an address KaTuroDesk has that the phone did not save (no crash), and keeps the list short', async () => {
+    await setup();
+    const { link } = await pairPhone();
+    const saved = [];
+    // The phone reached the Desk as "localhost"; the Desk reports 127.0.0.1.
+    const client = createLinkClient({ ...link, hosts: ['localhost'] }, { onLinkChange: (l) => saved.push(l) });
+    await client.hello();
+    expect(saved.at(-1).hosts).toEqual(['localhost', '127.0.0.1']);
+    expect(client.link.hosts.length).toBeLessThanOrEqual(6);
+  });
 });

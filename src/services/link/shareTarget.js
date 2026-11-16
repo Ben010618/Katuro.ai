@@ -3,7 +3,7 @@
  * Talks to the native KaturoSharePlugin (Katuro_App/android/.../KaturoSharePlugin.java)
  * through the Capacitor bridge, without the Capacitor JS package in src/.
  */
-import { base64ToBytes } from './linkClient.js';
+import { base64ToBytes } from '../../utils/bytes.js';
 
 const bridge = () => {
   const cap = typeof window !== 'undefined' ? window.Capacitor : undefined;

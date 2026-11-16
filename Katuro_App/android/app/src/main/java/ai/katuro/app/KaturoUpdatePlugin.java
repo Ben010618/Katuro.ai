@@ -94,6 +94,11 @@ public class KaturoUpdatePlugin extends Plugin {
             return;
         }
 
+        // The download runs on its own thread, so Share and notifications keep working meanwhile.
+        new Thread(() -> download(call, url, sha, wantCode), "KaTuro update").start();
+    }
+
+    private void download(PluginCall call, String url, String sha, long wantCode) {
         File dir = new File(getContext().getCacheDir(), "updates");
         dir.mkdirs();
         File[] old = dir.listFiles();

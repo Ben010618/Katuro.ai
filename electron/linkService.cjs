@@ -26,6 +26,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { isInsideFolder } = require('./defaultFolders.cjs');
 
 const VERSION = 1;
 const PAIR_MS = 10 * 60 * 1000;
@@ -73,8 +74,7 @@ function insideHome(home, rel) {
   const clean = String(rel || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   if (clean.split('/').some((p) => p === '..' || HIDDEN.test(p))) return null;
   const abs = path.resolve(home, clean);
-  const r = path.relative(path.resolve(home), abs);
-  return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)) ? abs : null;
+  return isInsideFolder(abs, home) ? abs : null;
 }
 
 function plainJson(res, code, body) {

@@ -29,6 +29,16 @@ function ensureHomeFolder(documentsDir) {
   return home;
 }
 
+/**
+ * True when `target` is `folder` itself or inside it. path.relative ignores letter case on
+ * Windows; a name starting with ".." ("..cache") is still inside. Shared by the phone link,
+ * the file access of the KaTuroDesk window and the backup.
+ */
+function isInsideFolder(target, folder) {
+  const rel = path.relative(path.resolve(folder), path.resolve(target));
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+}
+
 /** True when `dir` is the KaTuro home folder (any letter case, as Windows treats it). */
 function isHomeFolder(dir, documentsDir) {
   const a = path.resolve(dir);
@@ -36,4 +46,4 @@ function isHomeFolder(dir, documentsDir) {
   return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
-module.exports = { MAIN_FOLDERS, ensureHomeFolder, isHomeFolder };
+module.exports = { MAIN_FOLDERS, ensureHomeFolder, isHomeFolder, isInsideFolder };
