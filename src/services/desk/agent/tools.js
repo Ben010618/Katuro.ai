@@ -262,7 +262,7 @@ export const TOOLS = {
     async run({ folder }, ctx, report) {
       const O = await import('./organizeFolder.js');
       const dir = folder ? String(folder).replace(/^\/+|\/+$/g, '').toLowerCase() : '';
-      const files = ctx.allFiles().filter((f) => !f.path.startsWith('KaTuro Outputs/') && (!dir || f.path.toLowerCase().startsWith(`${dir}/`)));
+      const files = ctx.allFiles().filter((f) => !/(^|\/)KaTuro Outputs\//.test(f.path) && (!dir || f.path.toLowerCase().startsWith(`${dir}/`)));
       if (!files.length) throw needsInfo(folder ? `I found no files in "${folder}".` : 'There are no files in this folder to organize yet.');
       if (files.length > 500) throw needsInfo(`That is ${files.length} files. I can organize up to 500 at a time; tell me which subfolder to start with.`);
       const big = files.filter((f) => (f.size || 0) > 50 * 1024 * 1024);
@@ -983,6 +983,9 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
     args: '{ "sourcePath": string, "targetPath": string, "targetColumn": string (column letter or header text, e.g. "F" or "WW3"), "sheetName"?: string, "nameColumn"?: string, "startRow"?: number, "overwrite"?: boolean }',
     async run({ sourcePath, targetPath, targetColumn, sheetName, nameColumn, startRow, overwrite = false }, ctx, report) {
       if (!targetColumn) throw new Error('Tell me which column to fill (e.g. "column F" or "WW3").');
+      // A class record in Records/ must be ready first (full names + LRNs), see records/classRecords.js.
+      const { requireReadyClassRecord } = await import('./understandTools.js');
+      await requireReadyClassRecord(targetPath, ctx);
       report(`Reading scores from ${sourcePath}…`);
       const { table } = await loadScoreTable(sourcePath, ctx);
       const totals = toTotals(table);

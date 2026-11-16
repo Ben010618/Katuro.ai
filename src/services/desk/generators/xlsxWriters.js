@@ -174,9 +174,12 @@ const numOrNull = (v) => (v === null || v === undefined || v === '' || Number.is
 
 /**
  * Quarterly e-Class Record (DO 8 s.2015) with live formulas and cached results.
+ * Learners with an LRN get an LRN column before the names (withLrn: true forces it).
  * Returns Uint8Array.
  */
-export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRESETS.scienceMath, hps = {}, learners = [] } = {}) {
+export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRESETS.scienceMath, hps = {}, learners = [], withLrn } = {}) {
+  const lrnCol = (withLrn ?? learners.some((l) => String(l?.lrn ?? '').trim())) ? 2 : null;
+  const NAME = lrnCol ? 3 : 2;
   const w = { ww: Number(weights?.ww) || 0, pt: Number(weights?.pt) || 0, qa: Number(weights?.qa) || 0 };
   const H = {
     ww: (hps.ww?.length ? hps.ww : [null]).map(numOrNull),
@@ -191,7 +194,7 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
 
   // Column map
   const cols = {};
-  let c = 3;
+  let c = NAME + 1;
   for (const k of ['ww', 'pt', 'qa']) {
     cols[k] = { first: c, last: c + H[k].length - 1 };
     c += H[k].length;
@@ -243,10 +246,11 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
   for (const k of ['ww', 'pt', 'qa']) {
     merge(G, cols[k].first, cols[k].ws, `${groupNames[k]} (${round2(w[k] * 100)}%)`, { bold: true, size: 10 });
   }
-  merge(G, 1, 2, '', {});
+  merge(G, 1, NAME, '', {});
   const sub = ws.getRow(S);
   sub.getCell(1).value = 'No.';
-  sub.getCell(2).value = "LEARNERS' NAMES";
+  if (lrnCol) sub.getCell(lrnCol).value = 'LRN';
+  sub.getCell(NAME).value = "LEARNERS' NAMES";
   for (const k of ['ww', 'pt', 'qa']) {
     H[k].forEach((_, i) => { sub.getCell(cols[k].first + i).value = k === 'qa' ? `QA ${i + 1}` : `${k.toUpperCase()} ${i + 1}`; });
     sub.getCell(cols[k].total).value = 'Total';
@@ -270,7 +274,7 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
 
   // Highest possible score row
   const hpsRow = ws.getRow(HPSR);
-  hpsRow.getCell(2).value = 'HIGHEST POSSIBLE SCORE';
+  hpsRow.getCell(NAME).value = 'HIGHEST POSSIBLE SCORE';
   for (const k of ['ww', 'pt', 'qa']) {
     const { first, last, total, ps } = cols[k];
     H[k].forEach((v, i) => { hpsRow.getCell(first + i).value = v; });
@@ -285,7 +289,7 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
     cell.font = { bold: true, size: 9 };
     cell.fill = fill(GRAY);
     cell.border = BOX;
-    cell.alignment = { horizontal: cc === 2 ? 'left' : 'center' };
+    cell.alignment = { horizontal: cc === NAME ? 'left' : 'center' };
   }
 
   // Learner groups
@@ -308,7 +312,12 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
     [...list].sort(byName).forEach((l, idx) => {
       const row = ws.getRow(r);
       row.getCell(1).value = idx + 1;
-      row.getCell(2).value = String(l.name || '');
+      if (lrnCol) {
+        // Text, so a 12-digit LRN never turns into 1.23E+11.
+        row.getCell(lrnCol).value = String(l.lrn ?? '').replace(/\s/g, '');
+        row.getCell(lrnCol).numFmt = '@';
+      }
+      row.getCell(NAME).value = String(l.name || '');
       const comps = {};
       for (const k of ['ww', 'pt', 'qa']) {
         const scores = H[k].map((_, i) => numOrNull(l?.[k]?.scores?.[i]));
@@ -333,7 +342,7 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
         const cell = row.getCell(cc);
         cell.border = BOX;
         cell.font = { size: 10, bold: cc === qgCol };
-        if (cc !== 2) cell.alignment = { horizontal: 'center' };
+        if (cc !== NAME) cell.alignment = { horizontal: 'center' };
       }
       for (const k of ['ww', 'pt', 'qa']) {
         row.getCell(cols[k].ps).numFmt = '0.00';
@@ -347,15 +356,16 @@ export async function buildClassRecordWorkbook({ meta = {}, weights = WEIGHT_PRE
 
   // Widths
   ws.getColumn(1).width = 5;
-  ws.getColumn(2).width = 32;
-  for (let cc = 3; cc <= lastCol; cc++) ws.getColumn(cc).width = 6.5;
+  if (lrnCol) ws.getColumn(lrnCol).width = 15;
+  ws.getColumn(NAME).width = 32;
+  for (let cc = NAME + 1; cc <= lastCol; cc++) ws.getColumn(cc).width = 6.5;
   for (const k of ['ww', 'pt', 'qa']) {
     ws.getColumn(cols[k].ps).width = 7.5;
     ws.getColumn(cols[k].ws).width = 7.5;
   }
   ws.getColumn(initialCol).width = 10;
   ws.getColumn(qgCol).width = 11;
-  ws.views = [{ state: 'frozen', xSplit: 2, ySplit: HPSR }];
+  ws.views = [{ state: 'frozen', xSplit: NAME, ySplit: HPSR }];
   ws.pageSetup.printTitlesRow = `${G}:${HPSR}`;
 
   // Transmutation sheet

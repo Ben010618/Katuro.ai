@@ -16,8 +16,24 @@ import { extractData } from '../understand/extract.js';
 import { planTransfer, compareTables, mapColumns, locationLabel } from '../understand/transfer.js';
 import { mapFromGrids } from '../understand/gridMap.js';
 import { sharedTemplateMemory } from '../understand/templateMemory.js';
-import { normalizeDocumentSpec } from '../docSpec.js';
-import { extractTableWithAI, documentArtifact, saveDocumentOutputs, headerFor, teacherSignatures, baseMeta, slug } from './tools.js';
+import { normalizeDocumentSpec, normalizeSheetSpec } from '../docSpec.js';
+import { extractTableWithAI, documentArtifact, saveDocumentOutputs, headerFor, teacherSignatures, baseMeta, slug, needsInfo } from './tools.js';
+import { WEIGHT_PRESETS, weightPresetFor } from '../depedGrading.js';
+import { RECORDS_DIR, checkClassList, classRecordFileName, isInRecords, readinessText } from '../records/classRecords.js';
+
+/**
+ * The records rule: nothing is recorded into a class record in Records/ unless every learner
+ * has a clear full name and a 12-digit LRN (see records/classRecords.js). Files outside
+ * Records/ are the teacher's own working papers and are not checked here.
+ * Throws a NEEDS_INFO error listing what to fix; returns the check when the record is ready.
+ */
+export async function requireReadyClassRecord(path, ctx, table) {
+  if (!isInRecords(path)) return null;
+  const t = table || pickTable((await understandFile(path, ctx)).data, 'class_record');
+  const check = checkClassList(t?.learners || []);
+  if (!check.ready) throw needsInfo(readinessText(path.split('/').pop(), check));
+  return check;
+}
 
 const EDITABLE = /\.(xlsx|xlsm|docx)$/i;
 const DOC_TYPE_LABEL = {
@@ -134,6 +150,67 @@ function describeUnderstanding(u) {
 }
 
 export const UNDERSTAND_TOOLS = {
+  setup_class_record: {
+    label: 'Set up a class record',
+    description: 'Prepare a NEW DepEd E-Class Record (DO 8 s.2015) for one class and subject in the Records folder, named "Records/Grade 7 - Rizal - Science.xlsx", with the learners (full names, LRN, Male/Female) filled in from the teacher\'s class list (SF1, Excel, Word, CSV, PDF or photo). Every learner must have a clear full name and a 12-digit LRN; if not, nothing is made and the teacher is told what to fix. Use when the teacher wants to set up, prepare, create or add a class / class record.',
+    args: '{ "listPath": string, "gradeLevel": string, "section": string, "subject": string, "weights"?: "languages"|"scienceMath"|"mapehEpp"|"shsCore"|"shsAcademic"|"shsImmersion"|"shsTvl" }',
+    async run({ listPath, gradeLevel = '', section = '', subject = '', weights }, ctx, report) {
+      const missing = [!String(gradeLevel).trim() && 'grade level', !String(section).trim() && 'section', !String(subject).trim() && 'subject'].filter(Boolean);
+      if (missing.length) throw needsInfo(`To set up the class record, tell me the ${missing.join(', ')} (for example: Grade 7, Rizal, Science).`);
+      if (!listPath) throw needsInfo('Which file has the learners of this class? Attach your class list (SF1, Excel, Word, CSV, PDF or a photo). Each learner needs a full name and a 12-digit LRN.');
+      const fileName = classRecordFileName({ gradeLevel, section, subject });
+      const target = `${RECORDS_DIR}/${fileName}`;
+      if (ctx.hasFile?.(target)) throw needsInfo(`${target} already exists, so I left it as it is. To record into it, just tell me what to record. To start over, rename or remove the old file first.`);
+
+      report(`Reading the learners in ${listPath}…`);
+      const u = await understandFile(listPath, ctx);
+      const table = pickTable(u.data, 'masterlist');
+      const check = checkClassList(table?.learners || []);
+      if (!check.ready) throw needsInfo(readinessText(listPath.split('/').pop(), check));
+
+      const presetKey = WEIGHT_PRESETS[weights] ? weights : weightPresetFor(subject, gradeLevel);
+      const preset = WEIGHT_PRESETS[presetKey];
+      const meta = {
+        region: ctx.teacher.region || '',
+        division: ctx.teacher.division || '',
+        school: ctx.teacher.school || '',
+        schoolId: ctx.teacher.schoolId || '',
+        schoolYear: ctx.schoolYear,
+        quarter: '',
+        gradeSection: `${fileName.split(' - ')[0]} - ${String(section).trim()}`,
+        subject: String(subject).trim(),
+        teacher: ctx.teacher.fullName || '',
+      };
+      // Ten Written Work and ten Performance Task columns and one Quarterly Assessment, as on
+      // the DepEd E-Class Record; the HPS row stays blank until the teacher records a task.
+      const hps = { ww: Array(10).fill(null), pt: Array(10).fill(null), qa: [null] };
+      const learners = check.learners.map((l) => ({ name: l.name, lrn: l.lrn, gender: l.sex }));
+      report(`Making ${fileName} for ${learners.length} learners…`);
+      const { buildClassRecordWorkbook } = await import('../generators/xlsxWriters.js');
+      const file = await ctx.saveOutput(fileName, await buildClassRecordWorkbook({ meta, weights: preset, hps, learners, withLrn: true }), 'xlsx', RECORDS_DIR);
+
+      const { male, female } = check.counts;
+      const spec = normalizeSheetSpec({
+        title: `Learners in ${fileName}`,
+        sheets: [{ name: 'Learners', columns: [{ header: 'No.' }, { header: 'LRN' }, { header: "Learner's name" }, { header: 'Sex' }], rows: learners.map((l, i) => [i + 1, l.lrn, l.name, l.gender]) }],
+      });
+      const summary = `${file.path} is ready: ${learners.length} learners (${male} male, ${female} female), each with a full name and an LRN. Weights: ${preset.label}, WW ${Math.round(preset.ww * 100)}% / PT ${Math.round(preset.pt * 100)}% / QA ${Math.round(preset.qa * 100)}%. Please check the names; tell me if any is wrong before we record.`;
+      return { summary, artifacts: [{ type: 'sheet', title: spec.title, subtitle: summary, spec, files: [file], editable: false }] };
+    },
+  },
+
+  check_class_record: {
+    label: 'Check a class record',
+    description: 'Check whether a class record in the Records folder is ready for recording: every learner with a clear full name and a 12-digit LRN, no duplicate names or LRNs. Lists exactly what to fix. Nothing is changed. Use when the teacher asks if a class record is ready / complete / set up, or after they finish typing the learners.',
+    args: '{ "path": string }',
+    async run({ path }, ctx, report) {
+      report(`Reading the learners in ${path}…`);
+      const u = await understandFile(path, ctx);
+      const check = checkClassList(pickTable(u.data, 'class_record')?.learners || []);
+      return { summary: readinessText(path.split('/').pop(), check), artifacts: [] };
+    },
+  },
+
   understand_file: {
     label: 'Understand file',
     description: "Recognize what a school paper is in ANY school's own format (attendance, class record, masterlist, score sheet, school form, report card...) and where its data is (names, days, scores, header facts). Use when the teacher asks what a file is/contains, or to check that KaTuro read it right. Remembers the template for next time.",
@@ -173,6 +250,7 @@ export const UNDERSTAND_TOOLS = {
       if (!sTable) throw new Error(`I couldn't find learner data in ${sourcePath}.`);
       const tTable = pickTable(tgt.data, sTable.purpose);
       if (!tTable) throw new Error(`I couldn't find the learner list in ${targetPath} to fill in.`);
+      await requireReadyClassRecord(targetPath, ctx, tTable);
 
       report(`Matching ${sTable.learners.length} learners and columns…`);
       let mapping = {};
@@ -263,6 +341,7 @@ export const UNDERSTAND_TOOLS = {
       if (!u.editable) throw new Error(`${targetPath} can't be edited (it may be protected or read-only).`);
       const table = pickTable(u.data, 'class_record');
       if (!table) throw new Error(`I couldn't find a learner list in ${targetPath}.`);
+      await requireReadyClassRecord(targetPath, ctx, table);
       // Only columns a score can go into (never names, totals, grades or attendance).
       const columns = table.columns
         .filter((c) => c.meaning === 'score' || c.meaning === 'other')
@@ -371,6 +450,7 @@ export const UNDERSTAND_TOOLS = {
       if (!u.editable) throw new Error(`${targetPath} can't be edited (it may be protected or read-only).`);
       const table = pickTable(u.data, 'class_record');
       if (!table) throw new Error(`I couldn't find a learner list in ${targetPath}.`);
+      await requireReadyClassRecord(targetPath, ctx, table);
       const columns = table.columns
         .filter((c) => c.meaning === 'score' || c.meaning === 'other')
         .map((c) => ({ key: c.key, header: c.header || '', column: String(c.column ?? ''), meaning: c.meaning, ...(c.component ? { component: c.component } : {}), ...(Number.isFinite(c.item) ? { item: c.item } : {}), ...(Number.isFinite(c.max) && c.max > 0 ? { max: c.max } : {}) }));

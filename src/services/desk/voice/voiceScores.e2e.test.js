@@ -76,11 +76,11 @@ describe('end to end: spoken scores → the teacher\'s own class record', () => 
   it('opens the panel, matches what was said, asks when unsure, and writes only approved cells', async () => {
     const workspace = createVirtualWorkspace('X');
     const original = await classRecord();
-    workspace.handle.saveVirtualFile('Records/G7 Rizal.xlsx', original);
+    workspace.handle.saveVirtualFile('Class Lists/G7 Rizal.xlsx', original);
     workspace.files = workspace.handle.getFiles();
 
     // 1. "Encode scores by voice into column D" → panel (quick route, no planner call).
-    const res = await runDeskAgentTurn({ prompt: 'Encode scores by voice into column D', workspace, attachedPaths: ['Records/G7 Rizal.xlsx'], user: { uid: 'u1' } });
+    const res = await runDeskAgentTurn({ prompt: 'Encode scores by voice into column D', workspace, attachedPaths: ['Class Lists/G7 Rizal.xlsx'], user: { uid: 'u1' } });
     const panel = res.artifacts.find((a) => a.type === 'voice_scores');
     expect(panel, res.content).toBeTruthy();
     expect(panel.data.columns.map((c) => c.header)).toEqual(['WW1', 'WW2']); // never TOTAL
@@ -125,10 +125,10 @@ describe('end to end: spoken scores → the teacher\'s own class record', () => 
     const changes = scoreChangesArtifact(ready.plan, { targetPath: panel.data.targetPath, kind: panel.data.kind, columnLabel: 'WW2' });
     useDeskStore.setState({ workspace, artifacts: [changes], activeArtifact: changes });
     const saved = await useDeskStore.getState().applyPendingChanges(changes.id);
-    expect(saved.path).toBe('Records/G7 Rizal (KaTuro edit).xlsx');
+    expect(saved.path).toBe('Class Lists/G7 Rizal (KaTuro edit).xlsx');
 
     // Original untouched; working copy has exactly the approved scores, styles and formulas intact.
-    expect(Array.from(await readFileBytes(workspace.handle, 'Records/G7 Rizal.xlsx'))).toEqual(Array.from(original));
+    expect(Array.from(await readFileBytes(workspace.handle, 'Class Lists/G7 Rizal.xlsx'))).toEqual(Array.from(original));
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await readFileBytes(workspace.handle, saved.path));
     const ws = wb.getWorksheet('TERM1');
@@ -140,10 +140,10 @@ describe('end to end: spoken scores → the teacher\'s own class record', () => 
     // 5. Next week: WW1 by voice for the same file. KaTuro continues in the working copy,
     //    so the WW2 scores applied above are kept (the original still untouched).
     workspace.files = workspace.handle.getFiles();
-    const res2 = await runDeskAgentTurn({ prompt: 'Encode scores by voice into column C', workspace, attachedPaths: ['Records/G7 Rizal.xlsx'], user: { uid: 'u1' } });
+    const res2 = await runDeskAgentTurn({ prompt: 'Encode scores by voice into column C', workspace, attachedPaths: ['Class Lists/G7 Rizal.xlsx'], user: { uid: 'u1' } });
     const panel2 = res2.artifacts.find((a) => a.type === 'voice_scores');
-    expect(panel2.data.targetPath).toBe('Records/G7 Rizal (KaTuro edit).xlsx');
-    expect(panel2.data.continuedFrom).toBe('Records/G7 Rizal.xlsx');
+    expect(panel2.data.targetPath).toBe('Class Lists/G7 Rizal (KaTuro edit).xlsx');
+    expect(panel2.data.continuedFrom).toBe('Class Lists/G7 Rizal.xlsx');
     expect(res2.content).toMatch(/continuing in your working copy/i);
     const ww1 = panel2.data.columns.find((c) => c.key === 'ww1');
     const s2 = addNamedEntries(emptySession(), parseNamedScores(await speak('Cruz = 11', NAMED_SCORES_PROMPT)), panel2.data.learners);
@@ -151,13 +151,13 @@ describe('end to end: spoken scores → the teacher\'s own class record', () => 
     const changes2 = scoreChangesArtifact(plan2.plan, { targetPath: panel2.data.targetPath, kind: panel2.data.kind, columnLabel: 'WW1', now: Date.now() + 1 });
     useDeskStore.setState({ workspace, artifacts: [changes2], activeArtifact: changes2 });
     const saved2 = await useDeskStore.getState().applyPendingChanges(changes2.id);
-    expect(saved2.path).toBe('Records/G7 Rizal (KaTuro edit).xlsx');
+    expect(saved2.path).toBe('Class Lists/G7 Rizal (KaTuro edit).xlsx');
     const wb2 = new ExcelJS.Workbook();
     await wb2.xlsx.load(await readFileBytes(workspace.handle, saved2.path));
     const ws2 = wb2.getWorksheet('TERM1');
     expect(ws2.getCell('C6').value).toBe(11); // new WW1 score
     expect(['D5', 'D7', 'D9'].map((a) => ws2.getCell(a).value)).toEqual([18, 16, 15]); // WW2 from before: kept
-    expect(Array.from(await readFileBytes(workspace.handle, 'Records/G7 Rizal.xlsx'))).toEqual(Array.from(original));
+    expect(Array.from(await readFileBytes(workspace.handle, 'Class Lists/G7 Rizal.xlsx'))).toEqual(Array.from(original));
   });
 
   it('list mode: scores fill in order from the chosen learner; non-English is refused', async () => {

@@ -4,7 +4,8 @@
  *   Teacher request
  *     → planner (1 Gemini call, JSON)          — or the offline keyword planner
  *     → task graph (runner.js, 3 at a time)    — READ / THINK / WRITE tools (tools.js)
- *     → outputs saved to "KaTuro Outputs/<date>/" (never overwrites; auto-renames)
+ *     → outputs saved to "KaTuro Outputs/<date>/" (never overwrites; auto-renames); in the
+ *       KaTuro folder: "Lessons/KaTuro Outputs/<date>/" or, for records, "Records/KaTuro Outputs/<date>/"
  *     → reply + live checklist + Canvas artifacts
  *
  * Access is controlled by the teacher's plan (Free / Subscription) through the server's daily limits.
@@ -39,6 +40,7 @@ import { calendarContext, calendarFacts } from '../knowledge/schoolCalendar.js';
 import { loadRuleCards, ruleCardsText } from '../knowledge/ruleCards.js';
 import { teacherInfo, signatoryList, teacherFactsForAI } from '../../teacherInfo.js';
 import { GROUNDING_RULES } from './grounding.js';
+import { defaultOutputFolder, isKaturoHome } from '../records/classRecords.js';
 
 export const OUTPUT_ROOT = 'KaTuro Outputs';
 
@@ -256,8 +258,10 @@ export async function runDeskAgentTurn({
   const tree = workspace?.files || [];
   const flat = flattenFileTree(tree);
   const today = new Date();
-  const outputRoot = `${OUTPUT_ROOT}/${localDateStamp(today)}`;
-  let outputFolder = outputRoot;
+  // In the KaTuro folder new files go into Lessons (or Records, see runTaskGraph below).
+  const home = isKaturoHome(tree);
+  const outputPlace = (toolName) => defaultOutputFolder(toolName, { home, outputRoot: OUTPUT_ROOT, date: localDateStamp(today) });
+  let outputFolder = outputPlace('');
   const createdFiles = [];
   const parsedCache = new Map();
 
@@ -485,7 +489,9 @@ export async function runDeskAgentTurn({
       tasks,
       async (task, deps, report) => {
         const tool = TOOLS[task.tool];
-        const folder = typeof task.args.outputFolder === 'string' ? task.args.outputFolder.replace(/^\/+|\/+$/g, '') : null;
+        const folder = typeof task.args.outputFolder === 'string'
+          ? task.args.outputFolder.replace(/^\/+|\/+$/g, '')
+          : home && outputPlace(task.tool) !== outputFolder ? outputPlace(task.tool) : null;
         const taskCtx = folder ? { ...ctx, saveOutput: (n, b, f) => ctx.saveOutput(n, b, f, folder) } : ctx;
         return tool.run(task.args, taskCtx, report, deps);
       },
