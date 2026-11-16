@@ -12,6 +12,8 @@ const ITERATIONS = 150000;
 export const MAX_TRIES = 5;
 export const WAIT_MS = 30 * 1000;
 const MAX_WAIT_MS = 60 * 60 * 1000;
+/** After this many rounds of wrong PINs (50 tries) the phone signs out and clears its data. */
+export const MAX_ROUNDS = 10;
 
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const unhex = (s) => new Uint8Array(String(s).match(/../g).map((h) => parseInt(h, 16)));
@@ -35,22 +37,33 @@ export async function setPin(pin) {
   if (!save({ salt: hex(salt), iterations: ITERATIONS, hash: await derive(pin, salt, ITERATIONS), tries: 0, waitUntil: 0 })) throw new Error('The PIN could not be saved on this phone.');
 }
 
+const roundWait = (rounds) => Math.min(MAX_WAIT_MS, WAIT_MS * 2 ** (Math.max(1, rounds) - 1));
+
 /**
- * Checks a PIN. → { ok } or { ok: false, left, waitMs }. After MAX_TRIES wrong PINs the teacher
- * waits WAIT_MS before the next try.
+ * Checks a PIN. → { ok } or { ok: false, left, waitMs } or { ok: false, wipe: true }.
+ * After MAX_TRIES wrong PINs the teacher waits (longer each round). The wait uses the phone's
+ * clock, so a clock moved forward could skip it: the round count does not, and after
+ * MAX_ROUNDS rounds the caller signs out (wipe). A clock moved back never makes the wait longer
+ * than one round's wait.
  */
 export async function checkPin(pin, now = Date.now()) {
   const v = load();
   if (!v?.hash) return { ok: true };
-  if (v.waitUntil > now) return { ok: false, left: 0, waitMs: v.waitUntil - now };
+  if ((v.rounds || 0) >= MAX_ROUNDS) return { ok: false, wipe: true };
+  if (v.waitUntil > now) {
+    const cap = roundWait(v.rounds);
+    if (v.waitUntil - now > cap) { save({ ...v, waitUntil: now + cap }); return { ok: false, left: 0, waitMs: cap }; }
+    return { ok: false, left: 0, waitMs: v.waitUntil - now };
+  }
   const ok = await derive(String(pin || ''), unhex(v.salt), v.iterations || ITERATIONS) === v.hash;
   if (ok) { save({ ...v, tries: 0, waitUntil: 0, rounds: 0 }); return { ok: true }; }
   const tries = (v.tries || 0) + 1;
   const waiting = tries >= MAX_TRIES;
   // Each round of 5 wrong PINs doubles the wait: 30 s, 1 min, 2 min … up to 1 hour.
   const rounds = (v.rounds || 0) + (waiting ? 1 : 0);
-  const waitMs = waiting ? Math.min(MAX_WAIT_MS, WAIT_MS * 2 ** (rounds - 1)) : 0;
+  const waitMs = waiting ? roundWait(rounds) : 0;
   save({ ...v, tries: waiting ? 0 : tries, rounds, waitUntil: waiting ? now + waitMs : 0 });
+  if (rounds >= MAX_ROUNDS) return { ok: false, wipe: true };
   return { ok: false, left: waiting ? 0 : MAX_TRIES - tries, waitMs };
 }
 

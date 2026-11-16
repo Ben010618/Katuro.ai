@@ -68,6 +68,18 @@ describe('backup of the KaTuro folder', () => {
     expect(fs.readdirSync(usb)).toEqual([]);
   });
 
+  it('a half-done copy left by a KaTuroDesk closed mid-backup is cleared by the next backup', async () => {
+    const { home, usb } = setup();
+    const now = new Date(2026, 10, 16, 14, 32);
+    const left = path.join(usb, 'KaTuro Backup 2026-11-16 1432 (incomplete)');
+    fs.mkdirSync(path.join(left, 'Records'), { recursive: true });
+    fs.writeFileSync(path.join(left, 'Records', 'half.xlsx'), 'x');
+    fs.mkdirSync(path.join(usb, 'My (incomplete) notes'));
+    const res = await backupFolder({ home, dest: usb, now });
+    expect(res.path).toBe(path.join(usb, 'KaTuro Backup 2026-11-16 1432'));
+    expect(fs.readdirSync(usb).sort()).toEqual(['KaTuro Backup 2026-11-16 1432', 'My (incomplete) notes']);
+  });
+
   it('a folder inside KaTuro whose name starts with ".." is still inside', async () => {
     const { home } = setup();
     fs.mkdirSync(path.join(home, '..cache'));

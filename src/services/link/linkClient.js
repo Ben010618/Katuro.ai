@@ -30,7 +30,6 @@ function b64uDecode(str) {
   return decodeBase64(s + '='.repeat((4 - (s.length % 4)) % 4));
 }
 
-
 const aad = (id, kind, nonce = '') => enc.encode(`katuro-link|${id}|${kind}${nonce ? `|${nonce}` : ''}`);
 const importKey = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 

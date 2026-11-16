@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { versionCodeOf, parseUpdate } from './appUpdate.js';
+import { versionCodeOf, parseUpdate, checkQuietly } from './appUpdate.js';
 
 const GOOD = {
   version: '1.0.1',
@@ -29,5 +29,42 @@ describe('KaTuro App versions and online updates', () => {
     expect(parseUpdate({ ...GOOD, sha256: 'nope' })).toBeNull();
     expect(parseUpdate({ ...GOOD, versionCode: 10002 })).toBeNull(); // must match the version
     expect(parseUpdate('not json')).toBeNull();
+  });
+});
+
+describe('the quiet daily update check', () => {
+  const fakePhone = (fetchText) => {
+    globalThis.window = { Capacitor: {
+      isNativePlatform: () => true,
+      nativePromise: async (_plugin, method) => (method === 'current' ? { versionName: '1.0.0', versionCode: 10000 } : fetchText()),
+    } };
+  };
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('offline: tries again in an hour, not every time the app opens', async () => {
+    localStorage.clear();
+    let asked = 0;
+    fakePhone(async () => { asked += 1; throw new Error('offline'); });
+    const t = 1_000_000_000;
+    checkQuietly(() => {}, t);
+    await settle();
+    checkQuietly(() => {}, t + 60 * 1000);
+    await settle();
+    expect(asked).toBe(1);
+    checkQuietly(() => {}, t + 61 * 60 * 1000);
+    await settle();
+    expect(asked).toBe(2);
+    delete globalThis.window;
+  });
+
+  it('online: tells the app about a newer version', async () => {
+    localStorage.clear();
+    fakePhone(async () => ({ text: JSON.stringify(GOOD) }));
+    let got = null;
+    checkQuietly((u) => { got = u; });
+    await settle();
+    await settle();
+    expect(got).toMatchObject({ version: '1.0.1' });
+    delete globalThis.window;
   });
 });

@@ -14,7 +14,8 @@
  */
 const UPDATE_FEED = 'https://github.com/Ben010618/Katuro.ai/releases/download/katuro-app/katuro-app-latest.json';
 const CHECKED_KEY = 'katuro-app-update-checked-v1';
-const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 
 const bridge = () => {
   const cap = typeof window !== 'undefined' ? window.Capacitor : undefined;
@@ -73,10 +74,21 @@ export async function checkForUpdate() {
 }
 
 /** True once a day, for the quiet check when the app opens. */
-export function dueForCheck(now = Date.now()) {
+function dueForCheck(now = Date.now()) {
   let last = 0;
   try { last = Number(localStorage.getItem(CHECKED_KEY)) || 0; } catch { /* first time */ }
   return now - last > DAY;
+}
+
+/**
+ * The quiet daily check (app opened, or back in front). onUpdate(update) only when a newer
+ * KaTuro App is out. Without internet it tries again in an hour, not every time the app opens.
+ */
+export function checkQuietly(onUpdate, now = Date.now()) {
+  if (!canUpdate() || !dueForCheck(now)) return;
+  checkForUpdate().then((r) => { if (r.update) onUpdate(r.update); }).catch(() => {
+    try { localStorage.setItem(CHECKED_KEY, String(now - DAY + HOUR)); } catch { /* not kept */ }
+  });
 }
 
 /** Downloads and opens Android's update screen. onProgress({ received, total }). */

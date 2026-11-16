@@ -38,8 +38,9 @@ const outDir = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8
 fs.mkdirSync(outDir, { recursive: true });
 
 // On Windows npm / npx / gradlew / gh are .cmd/.bat files that need the shell, which splits
-// words: every argument is quoted.
-const q = (a) => (process.platform === 'win32' && /[\s"&|<>^()%!]/.test(a) ? `"${String(a).replace(/"/g, '""')}"` : a);
+// words: every argument is quoted. (cmd still expands %NAME% inside quotes; no argument here
+// has a %.)
+const q = (a) => (process.platform === 'win32' && /[\s"&|<>^()]/.test(a) ? `"${String(a).replace(/"/g, '""')}"` : a);
 const run = (cmd, args, cwd, env = {}) => execFileSync(cmd, args.map(q), { cwd, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } });
 
 console.log(`KaTuro App v${version} (${versionCode})`);

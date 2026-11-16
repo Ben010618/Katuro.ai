@@ -19,7 +19,7 @@ import { notifyNow } from '../../services/link/phoneReminders';
 import { formatBytes } from '../../utils/bytes';
 import { LockScreen, PhoneMenu, UpdateSheet } from './PhoneSecurity';
 import { hasPin, shouldLock } from '../../services/link/appLock';
-import { canUpdate, checkForUpdate, dueForCheck, installUpdate, installedVersion } from '../../services/link/appUpdate';
+import { canUpdate, checkForUpdate, checkQuietly, installUpdate, installedVersion } from '../../services/link/appUpdate';
 import { publishedDesk, withPublishedAddresses } from '../../services/link/findDesk';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
@@ -152,7 +152,7 @@ export default function PhoneApp() {
       if (hasPin() && shouldLock(hiddenAt.current)) setLocked(true);
       hiddenAt.current = 0;
       // Back in front after a long time in the background: the daily update check too.
-      if (canUpdate() && dueForCheck()) checkForUpdate().then((r) => { if (r.update) setUpdate(r.update); }).catch(() => {});
+      checkQuietly((u) => setUpdate(u));
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -166,8 +166,7 @@ export default function PhoneApp() {
     if (!canUpdate()) return undefined;
     let alive = true;
     installedVersion().then((v) => alive && setAppVersion(v.versionName || ''));
-    // Quietly, once a day: is a newer KaTuro App out?
-    if (dueForCheck()) checkForUpdate().then((r) => { if (alive && r.update) setUpdate(r.update); }).catch(() => {});
+    checkQuietly((u) => alive && setUpdate(u));
     return () => { alive = false; };
   }, []);
   const checkNow = async () => {
@@ -303,6 +302,8 @@ export default function PhoneApp() {
   };
   const unlink = () => clearPhone('Unlink this phone from KaTuroDesk? You can link it again any time.');
   const signOutHere = async () => { if (await clearPhone('Sign out of KaTuro on this phone?')) signOut(auth); };
+  // Too many wrong PINs: no question (whoever is guessing must not be able to say No).
+  const lockedOut = async () => { await wipe(); signOut(auth); };
   const openTab = (id) => { setTab(id); setVisited((v) => (v.has(id) ? v : new Set([...v, id]))); };
 
   // Android back button / gesture: go up a folder instead of closing the app.
@@ -326,8 +327,10 @@ export default function PhoneApp() {
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* A linked phone needs a PIN first (class lists live on it), then asks for it when opened.
-          While a PIN screen shows, nothing else is on the page (not even for the screen reader). */}
-      {showUnlock && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} />}
+          While a PIN screen shows, the app underneath is hidden (not shown, not read aloud, not
+          tappable) but stays mounted, so typed scores, an open file and a running Assistant turn
+          are still there after the PIN. */}
+      {showUnlock && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} onLockedOut={lockedOut} />}
       {showSetPin && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); }} onCancel={hasPin() ? () => setSettingPin(false) : undefined} />}
       {menuOpen && !pinScreen && (
         <PhoneMenu
@@ -342,13 +345,12 @@ export default function PhoneApp() {
       )}
       {menuOpen && menuNote && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
       {update && !pinScreen && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
-      {file && client && !pinScreen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
-        </div>
-      )}
-      {!pinScreen && (
-        <>
+      <div hidden={pinScreen} inert={pinScreen}>
+          {file && client && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+              <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
+            </div>
+          )}
           <header className="flex items-center justify-between px-4 py-3 bg-[#1f3a2c] text-white">
             <div className="min-w-0">
               <p className="text-base font-bold">KaTuro</p>
@@ -426,8 +428,7 @@ export default function PhoneApp() {
               </nav>
             </>
           )}
-        </>
-      )}
+      </div>
     </div>
   );
 }

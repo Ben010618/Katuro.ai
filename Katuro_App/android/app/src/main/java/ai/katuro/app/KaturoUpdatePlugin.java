@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Online updates of the KaTuro App without the Play Store (installed by USB first).
@@ -39,6 +40,8 @@ import java.security.MessageDigest;
 public class KaturoUpdatePlugin extends Plugin {
     private static final int TIMEOUT_MS = 20000;
     private static final long MAX_APK = 120L * 1024 * 1024;
+    /** One download at a time (a second one would delete the APK Android may still be reading). */
+    private static final AtomicBoolean DOWNLOADING = new AtomicBoolean(false);
 
     @PluginMethod
     public void current(PluginCall call) {
@@ -95,7 +98,10 @@ public class KaturoUpdatePlugin extends Plugin {
         }
 
         // The download runs on its own thread, so Share and notifications keep working meanwhile.
-        new Thread(() -> download(call, url, sha, wantCode), "KaTuro update").start();
+        if (!DOWNLOADING.compareAndSet(false, true)) { call.reject("The update is already downloading.", "BUSY"); return; }
+        new Thread(() -> {
+            try { download(call, url, sha, wantCode); } finally { DOWNLOADING.set(false); }
+        }, "KaTuro update").start();
     }
 
     private void download(PluginCall call, String url, String sha, long wantCode) {

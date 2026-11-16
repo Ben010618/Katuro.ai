@@ -9,7 +9,8 @@
  *
  * The copy goes into "<name> (incomplete)" and gets its real name only when everything is
  * copied. If it fails (USB pulled, drive full, a OneDrive file not on the computer), the
- * half-done folder is removed, so a dated backup on the drive is always a whole one.
+ * half-done folder is removed, so a dated backup on the drive is always a whole one. One left
+ * by a KaTuroDesk that was closed mid-copy is cleared by the next backup.
  * Testable without Electron, like defaultFolders.cjs.
  */
 const fs = require('fs');
@@ -43,6 +44,7 @@ async function backupFolder({ home, dest, now = new Date(), onProgress = () => {
   for (let i = 2; fs.existsSync(target); i += 1) target = path.join(dest, `${base} (${i})`);
 
   const partial = `${target} (incomplete)`;
+  await clearIncomplete(dest);
   let files = 0;
   let bytes = 0;
   try {
@@ -61,7 +63,7 @@ async function backupFolder({ home, dest, now = new Date(), onProgress = () => {
       return true;
     },
     });
-    await fs.promises.rename(partial, target);
+    await renameWithRetry(partial, target);
   } catch (err) {
     await fs.promises.rm(partial, { recursive: true, force: true }).catch(() => {});
     const why = /ENOSPC/.test(String(err?.code || err?.message)) ? 'the drive is full'
@@ -71,6 +73,26 @@ async function backupFolder({ home, dest, now = new Date(), onProgress = () => {
   }
   onProgress({ files, bytes });
   return { path: target, files, bytes };
+}
+
+/** Removes "KaTuro Backup … (incomplete)" folders left in `dest` by an earlier copy that stopped. */
+async function clearIncomplete(dest) {
+  const names = await fs.promises.readdir(dest).catch(() => []);
+  await Promise.all(names.filter((n) => /^KaTuro Backup .* \(incomplete\)$/.test(n))
+    .map((n) => fs.promises.rm(path.join(dest, n), { recursive: true, force: true }).catch(() => {})));
+}
+
+/** Antivirus or the Windows indexer can hold a just-copied folder for a moment: try again. */
+async function renameWithRetry(from, to, tries = 5) {
+  for (let i = 1; ; i += 1) {
+    try {
+      await fs.promises.rename(from, to);
+      return;
+    } catch (err) {
+      if (i >= tries || !/EPERM|EBUSY|EACCES/.test(String(err?.code))) throw err;
+      await new Promise((r) => setTimeout(r, 200 * i));
+    }
+  }
 }
 
 module.exports = { backupFolder, backupName };

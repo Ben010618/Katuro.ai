@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setPin, checkPin, hasPin, forgetPin, validPin, shouldLock, LOCK_KEY, MAX_TRIES, WAIT_MS, LOCK_AFTER_MS } from './appLock.js';
+import { setPin, checkPin, hasPin, forgetPin, validPin, shouldLock, LOCK_KEY, MAX_TRIES, MAX_ROUNDS, WAIT_MS, LOCK_AFTER_MS } from './appLock.js';
 
 beforeEach(() => localStorage.clear());
 
@@ -49,6 +49,31 @@ describe('the wait grows with each round of wrong PINs', () => {
     expect((await checkPin('2468', t)).ok).toBe(true);
     // A right PIN starts the count again.
     expect(await round()).toBe(WAIT_MS);
+  });
+});
+
+describe('changing the phone clock does not get around the PIN', () => {
+  it('a clock moved back waits one round, not until the old clock time', async () => {
+    await setup2468();
+    const t = 9_000_000_000;
+    for (let i = 0; i < MAX_TRIES; i++) await checkPin('0000', t);
+    // The clock is moved back a year: still only the normal 30 seconds.
+    const back = t - 365 * 24 * 3600 * 1000;
+    expect(await checkPin('2468', back)).toMatchObject({ ok: false, waitMs: WAIT_MS });
+    expect((await checkPin('2468', back + WAIT_MS + 1)).ok).toBe(true);
+  });
+
+  it('a clock moved forward each time: after 50 wrong PINs the phone signs out', async () => {
+    await setup2468();
+    let t = 1_000;
+    let last;
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      for (let i = 0; i < MAX_TRIES; i++) last = await checkPin('0000', t);
+      t += 10 * 24 * 3600 * 1000; // jump past any wait
+    }
+    expect(last).toEqual({ ok: false, wipe: true });
+    // Even the right PIN does not open it now: only signing out (Forgot the PIN).
+    expect(await checkPin('2468', t)).toEqual({ ok: false, wipe: true });
   });
 });
 

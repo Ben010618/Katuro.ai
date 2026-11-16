@@ -5,9 +5,10 @@ import { checkPin, setPin, validPin } from '../../services/link/appLock';
 /**
  * The PIN screen. mode 'set': choose a PIN (typed twice); 'unlock': type it.
  * onDone() when set / unlocked; onForgot() signs out (clears the teacher's data from the phone);
+ * onLockedOut() does the same without asking, after too many wrong PINs;
  * onCancel() (changing an existing PIN only) keeps the old one.
  */
-export function LockScreen({ mode, onDone, onForgot, onCancel }) {
+export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
   const [pin, setPinText] = useState('');
   const [first, setFirst] = useState('');
   const [note, setNote] = useState('');
@@ -27,6 +28,12 @@ export function LockScreen({ mode, onDone, onForgot, onCancel }) {
       }
       const r = await checkPin(value);
       if (r.ok) { onDone(); return; }
+      if (r.wipe) {
+        // 50 wrong PINs: the class lists leave this phone (KaTuroDesk still has everything).
+        setNote('Too many wrong PINs. Signing out and clearing KaTuro from this phone…');
+        await onLockedOut();
+        return;
+      }
       setPinText('');
       setNote(r.waitMs ? `Too many wrong PINs. Wait ${Math.ceil(r.waitMs / 1000)} seconds.` : `Wrong PIN. ${r.left} tr${r.left === 1 ? 'y' : 'ies'} left before a short wait.`);
     } catch (err) {

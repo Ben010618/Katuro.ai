@@ -937,17 +937,17 @@ let backupRunning = false;
 ipcMain.handle('backup:run', async (e) => {
   if (!fromMainWindow(e)) return { canceled: true };
   if (backupRunning) return { ok: false, code: 'RUNNING', error: 'A backup is already running. Wait for it to finish.' };
-  const last = readBackupInfo();
-  const pick = await dialog.showOpenDialog(mainWindow, {
-    title: 'Choose your USB drive or a folder for the backup',
-    properties: ['openDirectory', 'createDirectory'],
-    ...(last?.dest && fs.existsSync(last.dest) ? { defaultPath: last.dest } : {}),
-  });
-  if (pick.canceled || !pick.filePaths.length) return { canceled: true };
-  const dest = pick.filePaths[0];
-  const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
   backupRunning = true;
   try {
+    const last = readBackupInfo();
+    const pick = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose your USB drive or a folder for the backup',
+      properties: ['openDirectory', 'createDirectory'],
+      ...(last?.dest && fs.existsSync(last.dest) ? { defaultPath: last.dest } : {}),
+    });
+    if (pick.canceled || !pick.filePaths.length) return { canceled: true };
+    const dest = pick.filePaths[0];
+    const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
     const res = await folderBackup.backupFolder({ home, dest, onProgress: (p) => sendToWindow('backup:progress', p) });
     const info = { at: new Date().toISOString(), dest, path: res.path, files: res.files, bytes: res.bytes };
     try { fs.writeFileSync(backupInfoFile(), JSON.stringify(info, null, 2)); } catch { /* the backup itself is done */ }
