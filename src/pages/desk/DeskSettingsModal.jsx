@@ -13,6 +13,7 @@ import DeskVoiceSettings from './DeskVoiceSettings';
 import DeskOwnKeySettings from './DeskOwnKeySettings';
 import DeskPhoneSettings from './DeskPhoneSettings';
 import DeskBackupSettings from './DeskBackupSettings';
+import { startDeskTour } from './tour/tourSteps';
 
 const canLinkPhones = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.linkStatus);
 const canBackUp = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.runBackup);
@@ -210,6 +211,14 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
               <button onClick={install} className="ml-2 font-semibold text-emerald-700 hover:underline">Restart now</button>
             ) : update.state !== 'unsupported' && (
               <button onClick={check} disabled={busy} className="ml-2 font-semibold text-emerald-700 hover:underline disabled:opacity-40 disabled:no-underline">Check for updates</button>
+            )}
+            {update.state !== 'unsupported' && (
+              <>
+                <span className="mx-1">·</span>
+                <button onClick={() => { onClose(); startDeskTour('welcome'); }} className="font-semibold text-emerald-700 hover:underline">Take the tour</button>
+                <span className="mx-1">·</span>
+                <button onClick={() => { onClose(); startDeskTour('new'); }} className="font-semibold text-emerald-700 hover:underline">What&apos;s new</button>
+              </>
             )}
           </div>
           <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-[#2d6a4f] hover:bg-[#235841] text-white text-xs font-semibold">

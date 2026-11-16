@@ -104,6 +104,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
     return () => ipcRenderer.removeListener('link:changed', listener);
   },
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  isFirstRun: () => ipcRenderer.invoke('app:firstRun'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
   // The teacher's own AI key: the key goes in once and never comes back out.
   brain: {

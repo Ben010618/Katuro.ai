@@ -722,6 +722,9 @@ ipcMain.handle('app:isPresenting', async () => {
 });
 
 ipcMain.handle('app:getVersion', async () => app.getVersion());
+// True when this start is KaTuroDesk's first on this computer (src/pages/desk/tour).
+let firstRun = false;
+ipcMain.handle('app:firstRun', async () => firstRun);
 
 // The window's title-bar buttons follow the Desk theme (light or dark neumorphic surface).
 ipcMain.handle('app:setTitleBarColors', async (event, colors = {}) => {
@@ -1051,6 +1054,8 @@ app.whenReady().then(() => {
   // never files the developer copy's default Electron icon under the real app.
   if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
   backgroundSettings = readBackgroundSettings();
+  // A first start on this computer: KaTuroDesk has never opened a folder here (the welcome tour).
+  firstRun = !fs.existsSync(lastFolderFile());
   createWindow();
   if (backgroundSettings.keepRunning) ensureTray();
   setupAutoUpdate();

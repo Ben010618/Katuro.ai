@@ -45,6 +45,8 @@ import { calendarPosition, manilaDate } from '../../services/desk/knowledge/scho
 import { playMessageTone } from './messageTone';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 import { flattenFileTree, findEntryByPath, readFileBytes, writeFileToDirectory, openInDefaultApp } from '../../services/localFileSystem';
+import ConnectPhoneButton from './ConnectPhoneButton';
+import DeskTourHost from './tour/DeskTour';
 
 const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
 // In the desktop app the Windows title bar is hidden: the top bar is the drag area and
@@ -250,6 +252,7 @@ export default function KaTuroDeskPage() {
       )}
       {showCalendar && <DeskCalendarPanel onClose={() => setShowCalendar(false)} />}
       <CalendarAlarms />
+      <DeskTourHost />
       <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
       <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
       {schedule && (
@@ -317,6 +320,7 @@ export default function KaTuroDeskPage() {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2">
+          <ConnectPhoneButton onOpen={() => { setSettingsTab('phones'); setShowSettings(true); }} />
           {update.state === 'ready' && (
             <button
               onClick={installUpdate}
@@ -351,6 +355,7 @@ export default function KaTuroDeskPage() {
           </button>
 
           <button
+            data-tour="classes"
             onClick={() => setShowClasses(true)}
             title="My classes: your class schedule, lessons prepared ahead, and reminders before each class"
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
@@ -370,6 +375,7 @@ export default function KaTuroDeskPage() {
           </button>
 
           <button
+            data-tour="messages"
             onClick={() => setShowMessages(true)}
             title="Messages: find teachers by @username and chat with your contacts"
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
@@ -380,6 +386,7 @@ export default function KaTuroDeskPage() {
           </button>
 
           <button
+            data-tour="settings"
             onClick={() => { setSettingsTab('assistant'); setShowSettings(true); }}
             title="Settings: choose your assistant (Matt, Luna, Grey or Lola Carmen)"
             className="flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
@@ -406,7 +413,7 @@ export default function KaTuroDeskPage() {
         {resizing && <div className="absolute inset-0 z-30 cursor-col-resize" />}
         {/* Desktop Left Panel (Folder / File Tree) */}
         {showLeftPanel && (
-          <div className="hidden md:flex h-full flex-shrink-0 relative transition-all duration-200">
+          <div data-tour="folder" className="hidden md:flex h-full flex-shrink-0 relative transition-all duration-200">
             <DeskFolderPanel
               user={user}
               profile={profile}
@@ -429,7 +436,7 @@ export default function KaTuroDeskPage() {
         </div>
 
         {/* Desktop Center Panel (Agent Conversation Stream - Wide & Expansive Hero) */}
-        <div ref={chatPanelRef} className="hidden md:flex flex-1 h-full min-w-0">
+        <div ref={chatPanelRef} data-tour="chat" className="hidden md:flex flex-1 h-full min-w-0">
           <DeskAgentChatPanel
             user={user}
             profile={profile}
@@ -471,12 +478,13 @@ export default function KaTuroDeskPage() {
 
         {/* Desktop Right Panel (Live DepEd Canvas) */}
         {showRightPanel ? (
-          <div className="hidden md:flex h-full flex-shrink-0">
+          <div data-tour="canvas" className="hidden md:flex h-full flex-shrink-0">
             <DeskCanvasPanel width={shownCanvasWidth} onCollapse={() => setShowRightPanel(false)} />
           </div>
         ) : (
           /* Slim Minimized Ribbon when Canvas is Collapsed */
           <div
+            data-tour="canvas"
             onClick={() => setShowRightPanel(true)}
             title="Click to expand Document Canvas"
             className="hidden md:flex w-9 h-full bg-[#f1f5f3] hover:bg-[#e4ede7] border-l border-gray-300 flex-col items-center py-4 cursor-pointer select-none transition group"
