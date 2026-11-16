@@ -99,7 +99,10 @@ function resolvePhonePath(phonePath, { home, shared = [] }) {
   const realRoot = real(root);
   const found = realExisting(abs, root);
   if (!isInsideFolder(found, realRoot)) return null;
-  const realTop = path.relative(realRoot, found).split(path.sep)[0] || '';
+  const realParts = path.relative(realRoot, found).split(path.sep).filter(Boolean);
+  // The real names count too: ".git" sent as its short name GIT~1 is still hidden.
+  if (realParts.some((p) => HIDDEN.test(p))) return null;
+  const realTop = realParts[0] || '';
   // The first folder inside: its real name when it exists, else the name sent (a folder not made yet).
   const top = (realTop || inner[0] || '').toLowerCase();
   let key;

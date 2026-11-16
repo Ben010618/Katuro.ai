@@ -443,6 +443,22 @@ describe('a phone holding a valid key cannot get around the levels', () => {
     expect(fs.readFileSync(path.join(home, ...b.backup.split('/')), 'utf8')).toBe('%PDF one');
   });
 
+  it('a dot folder reached by its short name (.git as GIT~1) stays hidden', async () => {
+    await setup();
+    const sci = path.join(tmp, 'Sci');
+    fs.mkdirSync(path.join(sci, '.git'), { recursive: true });
+    fs.writeFileSync(path.join(sci, '.git', 'config.txt'), 'secret');
+    const client = createLinkClient((await pairPhone()).link);
+    const st = service.addShared(sci);
+    service.setAccess(st.devices[0].id, st.folders.find((f) => f.kind === 'outside').key, 'full');
+    const short = shortName(path.join(sci, '.git'));
+    if (!short) return;
+    await expect(client.read(`:Sci/${short}/config.txt`)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.list(`:Sci/${short}`)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.upload(`:Sci/${short}`, 'hook.txt', photo)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(fs.readdirSync(path.join(sci, '.git'))).toEqual(['config.txt']);
+  });
+
   it('a hidden folder such as .ssh cannot be added for phones', async () => {
     await setup();
     fs.mkdirSync(path.join(tmp, '.ssh'));

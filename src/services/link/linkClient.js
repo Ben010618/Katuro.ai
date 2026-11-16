@@ -16,9 +16,11 @@ export const MAX_HOSTS = 6;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
 const SLOW_OPS = new Set(['read', 'upload', 'rename', 'move', 'replace', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
 // File changes on KaTuroDesk: one that runs out of time may still have been done there, so it is
-// never sent again to another address of the computer, nor kept to send later (TIMEOUT, not
-// UNREACHABLE). The teacher looks first.
-const FILE_CHANGES = new Set(['upload', 'rename', 'move', 'replace']);
+// never sent again to another address of the computer (TIMEOUT, not UNREACHABLE). The teacher
+// looks first. Not uploads: an address that is not on this network also just runs out of time,
+// and a sent file never overwrites anything (at worst a "name (2)" copy), so an upload that
+// runs out of time is kept on the phone to send later, as before.
+const FILE_CHANGES = new Set(['rename', 'move', 'replace']);
 // An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
 const ASK_MS = 5 * 60000 + 15000;
 

@@ -338,10 +338,14 @@ export function SharedFilesSheet({ client, files, onClose, onSent }) {
         <ul className="text-sm text-gray-800 space-y-0.5">{files.map((f) => <li key={f.name} className="truncate">• {f.name} <span className="text-gray-500">({formatBytes(f.bytes.byteLength)})</span></li>)}</ul>
         {!results && (
           <>
-            <label className="block text-xs font-semibold text-gray-600" htmlFor="kt-share-folder">Folder</label>
-            <select id="kt-share-folder" value={folder} onChange={(e) => setFolder(e.target.value)} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm">
-              {(folders.length ? folders : ['Lessons']).map((p) => <option key={p} value={p}>{folderLabel(p)}</option>)}
-            </select>
+            {folders.length > 0 && (
+              <>
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="kt-share-folder">Folder</label>
+                <select id="kt-share-folder" value={folder} onChange={(e) => setFolder(e.target.value)} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm">
+                  {folders.map((p) => <option key={p} value={p}>{folderLabel(p)}</option>)}
+                </select>
+              </>
+            )}
             {!loaded && <p className="text-[11px] text-gray-500">Checking which folders KaTuroDesk lets this phone add to…</p>}
             {note && <p className="text-xs text-amber-800">{note}</p>}
             <button type="button" disabled={Boolean(busy) || !folder} onClick={send} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-60">{busy || `Send ${files.length} file${files.length > 1 ? 's' : ''}`}</button>

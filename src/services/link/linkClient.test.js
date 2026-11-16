@@ -17,6 +17,13 @@ describe('a file change that runs out of time', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('an upload that runs out of time tries the next address and can be kept to send later (UNREACHABLE)', async () => {
+    const calls = [];
+    const client = createLinkClient(LINK, { fetchImpl: hanging(calls) });
+    await expect(client.request('upload', { folder: 'Lessons', name: 'a.jpg', data: 'AA==' }, { timeoutMs: 30 })).rejects.toMatchObject({ code: 'UNREACHABLE' });
+    expect(calls).toHaveLength(2);
+  });
+
   it('a read that runs out of time still tries the next address', async () => {
     const calls = [];
     const client = createLinkClient(LINK, { fetchImpl: hanging(calls) });
