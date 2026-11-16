@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createDeskRequestHandler, localAppliedStore, localHistoryStore } from '../../services/link/deskRequests';
 import { createAssistantHandler, ASSISTANT_OPS } from '../../services/link/deskAssistant';
+import { deskAddressDoc, deskAddressKey, publishDeskAddress } from '../../services/link/deskAddress';
 import { readDirectoryRecursively } from '../../services/localFileSystem';
 import { useDeskStore } from '../../store/deskStore';
 
@@ -19,6 +20,27 @@ export function usePhoneRequests({ user, profile } = {}) {
     window.katuroDeskApi?.setLinkAccount?.(user?.uid || '')?.catch?.(() => {});
     // Signing out (the Desk page closes): no phone is served until someone signs in again.
     return () => { window.katuroDeskApi?.setLinkAccount?.('')?.catch?.(() => {}); };
+  }, [user?.uid]);
+  // Where the phone link listens, saved for this teacher so a linked phone can find this
+  // computer again after its Wi-Fi address changes (deskAddress.js). Written only on change.
+  useEffect(() => {
+    const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
+    const uid = user?.uid;
+    if (!uid || !api?.linkStatus) return undefined;
+    let lastKey = '';
+    const publish = (status) => {
+      const doc = deskAddressDoc(status);
+      const key = deskAddressKey(doc);
+      if (!doc || key === lastKey) return;
+      lastKey = key;
+      publishDeskAddress(uid, doc).catch(() => { lastKey = ''; }); // offline: tried again on the next change
+    };
+    const check = () => api.linkStatus().then(publish).catch(() => {});
+    check();
+    const off = api.onLinkChanged?.(publish);
+    // A new Wi-Fi address is not an event of the link itself: looked at once a minute.
+    const timer = setInterval(check, 60000);
+    return () => { off?.(); clearInterval(timer); };
   }, [user?.uid]);
   useEffect(() => {
     const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;

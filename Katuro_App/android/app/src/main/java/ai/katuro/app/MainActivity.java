@@ -10,6 +10,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Share → KaTuro (KaturoSharePlugin): registered before the bridge starts.
         registerPlugin(KaturoSharePlugin.class);
+        // Online updates of the app (KaturoUpdatePlugin).
+        registerPlugin(KaturoUpdatePlugin.class);
         super.onCreate(savedInstanceState);
         KaturoSharePlugin.receive(getIntent());
     }

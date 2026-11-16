@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// The KaTuro App's version comes from Katuro_App/package.json ("1.2.3").
+// versionCode (what Android compares to allow an update over the installed app) = 1.2.3 -> 10203.
+def katuroVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def katuroVersionCode = katuroVersion.tokenize('.').collect { it as int }.with { it[0] * 10000 + it[1] * 100 + it[2] }
+
+// Release signing: the key lives OUTSIDE the project (never in git), in the user's profile:
+//   <home>/.katuro-signing/keystore.properties  (storeFile, storePassword, keyAlias, keyPassword)
+// Every update must be signed with this same key, or Android will not install it over the app.
+def signingProps = new Properties()
+def signingFile = new File(System.getProperty('user.home'), '.katuro-signing/keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+
 android {
     namespace = "ai.katuro.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "ai.katuro.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode katuroVersionCode
+        versionName katuroVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +28,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (signingProps.storeFile) {
+                storeFile file(signingProps.storeFile)
+                storePassword signingProps.storePassword
+                keyAlias signingProps.keyAlias
+                keyPassword signingProps.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (signingProps.storeFile) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

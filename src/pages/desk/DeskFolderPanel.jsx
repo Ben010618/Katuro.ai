@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FolderOpen,
   FolderPlus,
@@ -27,6 +27,7 @@ import {
   openInDefaultApp,
 } from '../../services/localFileSystem';
 import { getFileIcon } from './deskFileIcons';
+import { backupDue } from '../../services/desk/backup';
 import { planStatusText, SUBSCRIBE_CONTACT_URL } from '../../services/plans';
 import { teacherInfo } from '../../services/teacherInfo';
 import AvatarImage from '../../components/AvatarImage';
@@ -107,7 +108,18 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
   );
 }
 
-export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
+export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpenBackup }) {
+  // A gentle reminder when the KaTuro folder has not been backed up for a week (Settings → Backup).
+  const [backupReminder, setBackupReminder] = useState(false);
+  useEffect(() => {
+    const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
+    if (!api?.lastBackup) return undefined;
+    let alive = true;
+    api.lastBackup().then((info) => { if (alive) setBackupReminder(backupDue(info)); }).catch(() => {});
+    const done = () => setBackupReminder(false);
+    window.addEventListener('katuro-backup-done', done);
+    return () => { alive = false; window.removeEventListener('katuro-backup-done', done); };
+  }, []);
   const {
     workspace,
     setWorkspace,
@@ -339,6 +351,11 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
             <span>Open</span>
           </button>
         </div>
+        {backupReminder && onOpenBackup && (
+          <button type="button" onClick={onOpenBackup} className="mt-2 w-full text-left text-[10.5px] text-[#b3c9bc] hover:text-white bg-[#223328] hover:bg-[#2b4133] border border-[#2b3e32] rounded px-2 py-1" title="Settings → Backup">
+            No backup in the last 7 days. Back up your KaTuro folder to a USB drive.
+          </button>
+        )}
       </div>
 
       {/* Action Toolbar: Search + Import + Add File + Add Folder */}

@@ -926,6 +926,34 @@ ipcMain.handle('link:account', (e, uid) => {
   linkService?.setAccount(linkAccount);
 });
 
+// ── Backup of the KaTuro folder to a USB drive or another folder (never the cloud) ──
+const folderBackup = require('./folderBackup.cjs');
+const backupInfoFile = () => path.join(app.getPath('userData'), 'last-backup.json');
+const readBackupInfo = () => {
+  try { return JSON.parse(fs.readFileSync(backupInfoFile(), 'utf8')); } catch { return null; }
+};
+ipcMain.handle('backup:last', async () => readBackupInfo());
+ipcMain.handle('backup:run', async (e) => {
+  if (!fromMainWindow(e)) return { canceled: true };
+  const last = readBackupInfo();
+  const pick = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose your USB drive or a folder for the backup',
+    properties: ['openDirectory', 'createDirectory'],
+    ...(last?.dest && fs.existsSync(last.dest) ? { defaultPath: last.dest } : {}),
+  });
+  if (pick.canceled || !pick.filePaths.length) return { canceled: true };
+  const dest = pick.filePaths[0];
+  const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
+  try {
+    const res = await folderBackup.backupFolder({ home, dest, onProgress: (p) => sendToWindow('backup:progress', p) });
+    const info = { at: new Date().toISOString(), dest, path: res.path, files: res.files, bytes: res.bytes };
+    try { fs.writeFileSync(backupInfoFile(), JSON.stringify(info, null, 2)); } catch { /* the backup itself is done */ }
+    return { ok: true, ...info };
+  } catch (err) {
+    return { ok: false, error: err.message, code: err.code || 'ERROR' };
+  }
+});
+
 // ── Wake phrase ("Hello Matt"): the offline speech model (Vosk small English, Apache-2.0) ──
 // Downloaded once when the teacher turns the wake phrase on (not in the installer), checked
 // against its SHA-256, kept in the app's data folder. Listening itself runs in the window.

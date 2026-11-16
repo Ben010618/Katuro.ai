@@ -66,6 +66,14 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
   removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
   setLinkAccount: (uid) => ipcRenderer.invoke('link:account', uid),
+  // Backup of the KaTuro folder to a USB drive or folder (Settings → Backup).
+  lastBackup: () => ipcRenderer.invoke('backup:last'),
+  runBackup: () => ipcRenderer.invoke('backup:run'),
+  onBackupProgress: (callback) => {
+    const listener = (_, p) => callback(p);
+    ipcRenderer.on('backup:progress', listener);
+    return () => ipcRenderer.removeListener('backup:progress', listener);
+  },
   // KaTuroDesk answers the phone's class-record requests (src/pages/desk/usePhoneRequests.js).
   phoneHomeRoot: () => ipcRenderer.invoke('workspace:homeRoot'),
   onLinkRequest: (callback) => {

@@ -7,6 +7,7 @@ import { forgetLink } from './linkStore.js';
 import { forgetCachedClasses, queuedRecordings } from './scoreEntry.js';
 import { forgetPhoneFiles, outbox } from './phoneFiles.js';
 import { syncReminders } from './phoneReminders.js';
+import { forgetPin } from './appLock.js';
 
 // localStorage keys with the teacher's data (learner names, scores, schedule, chat).
 const PHONE_DATA_KEYS = [
@@ -25,6 +26,7 @@ export async function unsentOnPhone() {
 export async function forgetPhoneData() {
   forgetLink();
   forgetCachedClasses();
+  forgetPin();
   for (const key of PHONE_DATA_KEYS) {
     try { localStorage.removeItem(key); } catch { /* storage blocked */ }
   }

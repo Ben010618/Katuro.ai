@@ -412,6 +412,7 @@ export default function KaTuroDeskPage() {
               profile={profile}
               plan={plan}
               onCollapse={() => setShowLeftPanel(false)}
+              onOpenBackup={() => { setSettingsTab('backup'); setShowSettings(true); }}
             />
           </div>
         )}
@@ -500,6 +501,7 @@ export default function KaTuroDeskPage() {
                 user={user}
                 profile={profile}
                 plan={plan}
+                onOpenBackup={() => { setSettingsTab('backup'); setShowSettings(true); }}
               />
             </div>
           )}

@@ -7,7 +7,7 @@ import { reloadForNewVersion } from './utils/staleChunk.js'
 import { installGlobalErrorReporter } from './utils/globalErrorReporter.js'
 import { reportAIError } from './services/db.js'
 import { auth } from './firebase.js'
-import { isWeb } from './services/platform.js'
+import { isWeb, getPlatform } from './services/platform.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -44,5 +44,5 @@ window.addEventListener('vite:preloadError', (event) => {
 // admin's AI Error Reports too, deduplicated (see utils/globalErrorReporter.js).
 installGlobalErrorReporter(window, async (entry) => {
   if (!auth.currentUser) return // the reports collection only accepts signed-in writes
-  await reportAIError({ uid: auth.currentUser.uid, ...entry })
+  await reportAIError({ uid: auth.currentUser.uid, ...entry, inputContext: { ...(entry.inputContext || {}), app: getPlatform() } })
 })

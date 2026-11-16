@@ -12,8 +12,10 @@ import { PAPER_SIZES } from '../../services/desk/docSpec';
 import DeskVoiceSettings from './DeskVoiceSettings';
 import DeskOwnKeySettings from './DeskOwnKeySettings';
 import DeskPhoneSettings from './DeskPhoneSettings';
+import DeskBackupSettings from './DeskBackupSettings';
 
 const canLinkPhones = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.linkStatus);
+const canBackUp = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.runBackup);
 
 /** KaTuroDesk Settings: assistant persona (Matt / Luna / Grey / Lola Carmen) and privacy. */
 export default function DeskSettingsModal({ open, onClose, user, profile, initialTab = 'assistant' }) {
@@ -74,7 +76,7 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         </div>
 
         <div className="px-5 pt-3 flex gap-1 border-b border-gray-200" role="tablist">
-          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(canLinkPhones ? [['phones', 'Phones']] : []), ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : []), ...(ownKeyTab ? [['ownkey', 'AI key']] : [])].map(([id, label]) => (
+          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(canLinkPhones ? [['phones', 'Phones']] : []), ...(canBackUp ? [['backup', 'Backup']] : []), ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : []), ...(ownKeyTab ? [['ownkey', 'AI key']] : [])].map(([id, label]) => (
             <button
               key={id}
               role="tab"
@@ -114,6 +116,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
               <p className="text-[11px] text-gray-500 mt-3">Bubble sheets have their own paper choice. School forms with an official size keep it.</p>
             </section>
           </div>
+        ) : tab === 'backup' && canBackUp ? (
+          <DeskBackupSettings />
         ) : tab === 'phones' && canLinkPhones ? (
           <DeskPhoneSettings />
         ) : tab === 'signature' ? (

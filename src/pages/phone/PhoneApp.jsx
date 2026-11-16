@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { Bot, CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, LogOut, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
+import { Bot, CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, Menu, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
@@ -17,6 +17,10 @@ import PhoneAssistant from './PhoneAssistant';
 import { useChats, useChatNotifications } from '../../features/messages/chatStore';
 import { notifyNow } from '../../services/link/phoneReminders';
 import { formatBytes } from '../../utils/bytes';
+import { LockScreen, PhoneMenu, UpdateSheet } from './PhoneSecurity';
+import { hasPin, shouldLock } from '../../services/link/appLock';
+import { canUpdate, checkForUpdate, dueForCheck, installUpdate, installedVersion } from '../../services/link/appUpdate';
+import { publishedDesk, withPublishedAddresses } from '../../services/link/findDesk';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
 
@@ -137,6 +141,54 @@ export default function PhoneApp() {
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
   const [deskNote, setDeskNote] = useState(''); // why KaTuroDesk refused (e.g. another account signed in there)
+  // PIN lock: locked when the app opens and after 5 minutes away (appLock.js).
+  const [locked, setLocked] = useState(() => hasPin());
+  const [settingPin, setSettingPin] = useState(false);
+  const hiddenAt = useRef(0);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden) { hiddenAt.current = Date.now(); return; }
+      if (hasPin() && shouldLock(hiddenAt.current)) setLocked(true);
+      hiddenAt.current = 0;
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  // App menu and online updates.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+  const [update, setUpdate] = useState(null);
+  const [updateState, setUpdateState] = useState({});
+  const [menuNote, setMenuNote] = useState('');
+  useEffect(() => {
+    if (!canUpdate()) return undefined;
+    let alive = true;
+    installedVersion().then((v) => alive && setAppVersion(v.versionName || ''));
+    // Quietly, once a day: is a newer KaTuro App out?
+    if (dueForCheck()) checkForUpdate().then((r) => { if (alive && r.update) setUpdate(r.update); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const checkNow = async () => {
+    setMenuNote('Checking…');
+    try {
+      const r = await checkForUpdate();
+      if (r.update) { setMenuOpen(false); setMenuNote(''); setUpdate(r.update); }
+      else setMenuNote(`You have the latest version (v${r.installed.versionName}).`);
+    } catch (err) {
+      setMenuNote(err.message || 'Could not check for updates. Check the internet connection.');
+    }
+  };
+  const runUpdate = async () => {
+    setUpdateState({ busy: true });
+    try {
+      await installUpdate(update, (progress) => setUpdateState({ busy: true, progress }));
+      setUpdateState({ note: 'Follow Android’s screen to finish the update.' });
+    } catch (err) {
+      setUpdateState({ note: err.message });
+    }
+  };
+  // Found KaTuroDesk again at its new Wi-Fi address (published under this account) once per link.
+  const searched = useRef('');
   const [tab, setTab] = useState('today'); // today | scores | assistant | messages | files
   const [version, setVersion] = useState(0); // bumped after files are sent or kept
   const [shared, setShared] = useState(null); // files shared from another app
@@ -197,9 +249,17 @@ export default function PhoneApp() {
       setDeskNote(err.code === 'OTHER_ACCOUNT' ? err.message : '');
       // KaTuroDesk removed this phone: nothing of that teacher's classes stays on it.
       if (err.code === 'NOT_LINKED') forgetPhoneData().finally(() => setLink(null));
+      // Not reachable at the saved addresses: KaTuroDesk may have a new Wi-Fi address.
+      if (err.code === 'UNREACHABLE' && link && searched.current !== `${link.deviceId}|${link.hosts.join()}|${link.port}`) {
+        searched.current = `${link.deviceId}|${link.hosts.join()}|${link.port}`;
+        publishedDesk(user?.uid, link.deskId).then((published) => {
+          const moved = withPublishedAddresses(link, published);
+          if (moved && alive && loadLink()?.deviceId === moved.deviceId) { saveLink(moved); setLink(moved); }
+        });
+      }
     });
     return () => { alive = false; };
-  }, [client]);
+  }, [client, link, user?.uid]);
 
   const onListError = useCallback((err) => {
     if (err.code === 'UNREACHABLE' || err.code === 'OTHER_ACCOUNT') setOnline(false);
@@ -242,6 +302,22 @@ export default function PhoneApp() {
 
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {/* A linked phone needs a PIN first (class lists live on it), then asks for it when opened. */}
+      {link && (!hasPin() || settingPin) && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); }} />}
+      {link && hasPin() && locked && !settingPin && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} />}
+      {menuOpen && (
+        <PhoneMenu
+          version={appVersion}
+          linked={Boolean(link)}
+          onClose={() => setMenuOpen(false)}
+          onCheckUpdate={checkNow}
+          onChangePin={() => { setMenuOpen(false); setSettingPin(true); }}
+          onUnlink={() => { setMenuOpen(false); unlink(); }}
+          onSignOut={() => { setMenuOpen(false); signOutHere(); }}
+        />
+      )}
+      {menuOpen && menuNote && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
+      {update && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
       {file && client && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
@@ -254,7 +330,7 @@ export default function PhoneApp() {
               <p className="text-base font-bold">KaTuro</p>
               <p className="text-xs text-emerald-100 truncate">{firstName ? `Hi, ${firstName}` : user?.email}</p>
             </div>
-            <button type="button" onClick={signOutHere} aria-label="Sign out" className="p-2 -mr-2"><LogOut size={20} /></button>
+            <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="p-2 -mr-2"><Menu size={22} /></button>
           </header>
 
           {!link ? (
