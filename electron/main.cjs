@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, Notification, na
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const defaultFolders = require('./defaultFolders.cjs');
 
 // QA only: run on a separate profile (e.g. to test updates without touching the teacher's data).
 if (process.env.KATURO_DESK_USER_DATA) app.setPath('userData', process.env.KATURO_DESK_USER_DATA);
@@ -365,15 +366,31 @@ ipcMain.handle('dialog:selectFolder', async () => {
   return openFolder(result.filePaths[0]);
 });
 
+// The KaTuro home folder (Documents\KaTuro with Records and Lessons), see defaultFolders.cjs.
+async function openHomeFolder() {
+  return openFolder(defaultFolders.ensureHomeFolder(app.getPath('documents')));
+}
+
+// Startup: the folder from last time; on a first run (or if that folder is gone), the
+// KaTuro home folder, made on the spot.
 ipcMain.handle('workspace:reopenLast', async () => {
   try {
     const { path: lastPath } = JSON.parse(fs.readFileSync(lastFolderFile(), 'utf-8'));
     if (lastPath && fs.existsSync(lastPath) && fs.statSync(lastPath).isDirectory()) {
+      // Records and Lessons come back if the teacher deleted them from the home folder.
+      if (defaultFolders.isHomeFolder(lastPath, app.getPath('documents'))) return openHomeFolder();
       return openFolder(lastPath);
     }
   } catch (e) {}
-  return { canceled: true };
+  try {
+    return await openHomeFolder();
+  } catch (e) {
+    console.error('Could not make the KaTuro folder:', e);
+    return { canceled: true };
+  }
 });
+
+ipcMain.handle('workspace:openHome', async () => openHomeFolder());
 
 ipcMain.handle('fs:readDirectory', async (_, dirPath) => {
   return await readDirectoryRecursive(resolveInsideRoot(dirPath));

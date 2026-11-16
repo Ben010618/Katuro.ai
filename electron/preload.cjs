@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   titleBarHeight: 40,
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   reopenLastFolder: () => ipcRenderer.invoke('workspace:reopenLast'),
+  openHomeFolder: () => ipcRenderer.invoke('workspace:openHome'),
   readDirectory: (dirPath) => ipcRenderer.invoke('fs:readDirectory', dirPath),
   readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
   readBinary: (filePath) => ipcRenderer.invoke('fs:readBinary', filePath),

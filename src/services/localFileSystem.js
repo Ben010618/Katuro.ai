@@ -88,6 +88,14 @@ export async function reopenLastDirectory() {
   return electronWorkspace(res);
 }
 
+/** Desktop only: opens the KaTuro home folder (Documents\KaTuro, with Records and Lessons). */
+export async function openHomeDirectory() {
+  if (!desk()?.openHomeFolder) return null;
+  const res = await desk().openHomeFolder();
+  if (!res || res.canceled) return null;
+  return electronWorkspace(res);
+}
+
 /**
  * Reads a directory (any backend) recursively and returns a tree of files and subdirectories.
  */

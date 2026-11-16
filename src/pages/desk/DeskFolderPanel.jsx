@@ -15,10 +15,12 @@ import {
   Upload,
   ExternalLink,
   Paperclip,
+  Home,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import {
   pickLocalDirectory,
+  openHomeDirectory,
   writeFileToDirectory,
   createDirectoryInWorkspace,
   flattenFileTree,
@@ -152,6 +154,22 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
       }
     } catch (err) {
       console.warn('Folder selection dismissed or failed:', err);
+    } finally {
+      setIsOpeningFolder(false);
+    }
+  };
+
+  const handleOpenHome = async () => {
+    setIsOpeningFolder(true);
+    try {
+      const result = await openHomeDirectory();
+      if (result) {
+        setWorkspace({ name: result.name, handle: result.handle, files: result.files, rootPath: result.rootPath, isVirtual: false });
+        setExpanded({});
+      }
+    } catch (err) {
+      console.warn('Could not open the KaTuro folder:', err);
+      flash('Could not open your KaTuro folder.');
     } finally {
       setIsOpeningFolder(false);
     }
@@ -300,6 +318,17 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse }) {
                   : `${fileCount} files · stays on this PC`}
             </p>
           </div>
+          {isElectron && workspace?.name !== 'KaTuro' && (
+            <button
+              onClick={handleOpenHome}
+              disabled={isOpeningFolder}
+              className="px-2 py-1 bg-[#223328] hover:bg-[#2b4133] text-[#b3c9bc] hover:text-white text-[10.5px] font-semibold rounded border border-[#2b3e32] flex items-center gap-1 transition flex-shrink-0 disabled:opacity-50"
+              title="Go back to your KaTuro folder (Records and Lessons)"
+            >
+              <Home size={12} />
+              <span>KaTuro</span>
+            </button>
+          )}
           <button
             onClick={handleOpenFolder}
             disabled={isOpeningFolder}
