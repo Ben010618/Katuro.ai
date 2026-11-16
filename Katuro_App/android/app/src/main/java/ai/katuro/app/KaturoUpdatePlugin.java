@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class KaturoUpdatePlugin extends Plugin {
     private static final int TIMEOUT_MS = 20000;
     private static final long MAX_APK = 120L * 1024 * 1024;
-    /** One download at a time (a second one would delete the APK Android may still be reading). */
+    /** One download at a time. */
     private static final AtomicBoolean DOWNLOADING = new AtomicBoolean(false);
 
     @PluginMethod
@@ -107,9 +107,12 @@ public class KaturoUpdatePlugin extends Plugin {
     private void download(PluginCall call, String url, String sha, long wantCode) {
         File dir = new File(getContext().getCacheDir(), "updates");
         dir.mkdirs();
+        // Each download gets its own file; old ones are removed only after an hour, so an APK
+        // Android's install screen may still be reading is never deleted under it.
         File[] old = dir.listFiles();
-        if (old != null) for (File f : old) f.delete();
-        File apk = new File(dir, "KaTuro-update-" + wantCode + ".apk");
+        long now = System.currentTimeMillis();
+        if (old != null) for (File f : old) if (now - f.lastModified() > 3600000L) f.delete();
+        File apk = new File(dir, "KaTuro-update-" + wantCode + "-" + now + ".apk");
         try {
             HttpURLConnection c = open(url);
             long total = c.getContentLengthLong();

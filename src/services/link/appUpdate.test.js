@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { versionCodeOf, parseUpdate, checkQuietly } from './appUpdate.js';
 
 const GOOD = {
@@ -40,6 +40,7 @@ describe('the quiet daily update check', () => {
     } };
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
+  afterEach(() => { delete globalThis.window; });
 
   it('offline: tries again in an hour, not every time the app opens', async () => {
     localStorage.clear();
@@ -54,7 +55,6 @@ describe('the quiet daily update check', () => {
     checkQuietly(() => {}, t + 61 * 60 * 1000);
     await settle();
     expect(asked).toBe(2);
-    delete globalThis.window;
   });
 
   it('online: tells the app about a newer version', async () => {
@@ -65,6 +65,5 @@ describe('the quiet daily update check', () => {
     await settle();
     await settle();
     expect(got).toMatchObject({ version: '1.0.1' });
-    delete globalThis.window;
   });
 });

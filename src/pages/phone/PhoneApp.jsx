@@ -306,23 +306,26 @@ export default function PhoneApp() {
   const lockedOut = async () => { await wipe(); signOut(auth); };
   const openTab = (id) => { setTab(id); setVisited((v) => (v.has(id) ? v : new Set([...v, id]))); };
 
-  // Android back button / gesture: go up a folder instead of closing the app.
+  const showUnlock = Boolean(link) && hasPin() && locked;
+  const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
+  const pinScreen = showUnlock || showSetPin;
+
+  // Android back button / gesture: go up a folder instead of closing the app (not while the
+  // PIN screen shows: the app underneath stays as it was).
   useEffect(() => {
     const onPop = () => {
+      if (pinScreen) return;
       if (file) setFile(null);
       else if (tab === 'files' && path) setPath(path.split('/').slice(0, -1).join('/'));
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [file, path, tab]);
+  }, [file, path, tab, pinScreen]);
   const go = (next) => {
     window.history.pushState({ kt: true }, '');
     next();
   };
 
-  const showUnlock = Boolean(link) && hasPin() && locked;
-  const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
-  const pinScreen = showUnlock || showSetPin;
 
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
@@ -343,7 +346,7 @@ export default function PhoneApp() {
           onSignOut={() => { setMenuOpen(false); signOutHere(); }}
         />
       )}
-      {menuOpen && menuNote && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
+      {menuOpen && menuNote && !pinScreen && <p className="fixed inset-x-0 bottom-0 z-[55] bg-gray-900 px-4 py-3 text-center text-sm text-white" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>{menuNote}</p>}
       {update && !pinScreen && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
       <div hidden={pinScreen} inert={pinScreen}>
           {file && client && (

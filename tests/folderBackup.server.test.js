@@ -74,10 +74,13 @@ describe('backup of the KaTuro folder', () => {
     const left = path.join(usb, 'KaTuro Backup 2026-11-16 1432 (incomplete)');
     fs.mkdirSync(path.join(left, 'Records'), { recursive: true });
     fs.writeFileSync(path.join(left, 'Records', 'half.xlsx'), 'x');
+    fs.mkdirSync(path.join(usb, 'KaTuro Backup 2026-11-15 0900 (2) (incomplete)'));
+    // The teacher's own folders that only look alike stay.
     fs.mkdirSync(path.join(usb, 'My (incomplete) notes'));
+    fs.mkdirSync(path.join(usb, 'KaTuro Backup old laptop (incomplete)'));
     const res = await backupFolder({ home, dest: usb, now });
     expect(res.path).toBe(path.join(usb, 'KaTuro Backup 2026-11-16 1432'));
-    expect(fs.readdirSync(usb).sort()).toEqual(['KaTuro Backup 2026-11-16 1432', 'My (incomplete) notes']);
+    expect(fs.readdirSync(usb).sort()).toEqual(['KaTuro Backup 2026-11-16 1432', 'KaTuro Backup old laptop (incomplete)', 'My (incomplete) notes']);
   });
 
   it('a folder inside KaTuro whose name starts with ".." is still inside', async () => {

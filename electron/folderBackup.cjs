@@ -75,10 +75,14 @@ async function backupFolder({ home, dest, now = new Date(), onProgress = () => {
   return { path: target, files, bytes };
 }
 
-/** Removes "KaTuro Backup … (incomplete)" folders left in `dest` by an earlier copy that stopped. */
+/**
+ * Removes half-done copies left in `dest` by an earlier backup that stopped: only names this
+ * file makes ("KaTuro Backup 2026-11-16 1432 (incomplete)", "… 1432 (2) (incomplete)"), never
+ * a folder of the teacher's that only looks alike.
+ */
 async function clearIncomplete(dest) {
   const names = await fs.promises.readdir(dest).catch(() => []);
-  await Promise.all(names.filter((n) => /^KaTuro Backup .* \(incomplete\)$/.test(n))
+  await Promise.all(names.filter((n) => /^KaTuro Backup \d{4}-\d{2}-\d{2} \d{4}(?: \(\d+\))? \(incomplete\)$/.test(n))
     .map((n) => fs.promises.rm(path.join(dest, n), { recursive: true, force: true }).catch(() => {})));
 }
 
