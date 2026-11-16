@@ -65,6 +65,22 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   linkPhone: () => ipcRenderer.invoke('link:pair'),
   cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
   removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
+  // KaTuroDesk answers the phone's class-record requests (src/pages/desk/usePhoneRequests.js).
+  phoneHomeRoot: () => ipcRenderer.invoke('workspace:homeRoot'),
+  onLinkRequest: (callback) => {
+    const listener = (_, req) => {
+      Promise.resolve()
+        .then(() => callback(req))
+        .then((result) => ipcRenderer.invoke('link:reply', req.id, { result }))
+        .catch((err) => ipcRenderer.invoke('link:reply', req.id, { error: err?.message || 'KaTuroDesk could not do that.', code: err?.code || 'ERROR', details: err?.details }));
+    };
+    ipcRenderer.on('link:request', listener);
+    ipcRenderer.invoke('link:answering', true);
+    return () => {
+      ipcRenderer.removeListener('link:request', listener);
+      ipcRenderer.invoke('link:answering', false);
+    };
+  },
   onLinkChanged: (callback) => {
     const listener = (_, st) => callback(st);
     ipcRenderer.on('link:changed', listener);

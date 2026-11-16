@@ -9,6 +9,8 @@ export const QR_PREFIX = 'KTLINK1:';
 export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
+// Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
+const SLOW_OPS = new Set(['read', 'classes', 'class', 'record', 'quizzes', 'quiz']);
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -62,9 +64,10 @@ export function parseLinkQr(text) {
 }
 
 export class LinkError extends Error {
-  constructor(message, code = 'ERROR') {
+  constructor(message, code = 'ERROR', details = null) {
     super(message);
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -105,7 +108,7 @@ async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs })
   } catch {
     throw new LinkError('The answer from KaTuroDesk could not be checked. Link this phone again.', 'BAD_ANSWER');
   }
-  if (out.error) throw new LinkError(out.error, out.code || 'ERROR');
+  if (out.error) throw new LinkError(out.error, out.code || 'ERROR', out.details || null);
   return out;
 }
 
@@ -150,7 +153,7 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
   let keyPromise = null;
   const key = () => (keyPromise ||= importKey(b64uDecode(current.key)));
 
-  async function call(op, args = {}, { timeoutMs = op === 'read' ? READ_MS : TRY_MS } = {}) {
+  async function call(op, args = {}, { timeoutMs = SLOW_OPS.has(op) ? READ_MS : TRY_MS } = {}) {
     const k = await key();
     const { host, out } = await tryHosts(current.hosts, (h) => exchange({ host: h, port: current.port, id: current.deviceId, key: k, op, args, fetchImpl, timeoutMs }));
     if (host !== current.hosts[0]) {
@@ -175,6 +178,8 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
     },
     /** One folder of the KaTuro folder ('' = the top). → { path, items: [{ name, path, kind, size?, lastModified? }] } */
     list: (path = '') => call('list', { path }),
+    /** Any other request KaTuroDesk answers (classes, class, record, quizzes, quiz). */
+    request: (op, args) => call(op, args),
     /** One file. → { name, size, bytes: Uint8Array } */
     async read(path) {
       const r = await call('read', { path });

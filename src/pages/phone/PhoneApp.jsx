@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { ChevronRight, FileText, Folder, FolderOpen, Laptop, Loader2, LogOut, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
+import { ChevronRight, ClipboardList, FileText, Folder, FolderOpen, Laptop, Loader2, LogOut, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
@@ -8,6 +8,8 @@ import { parseLinkQr, pairWithDesk, createLinkClient } from '../../services/link
 import { loadLink, saveLink, forgetLink } from '../../services/link/linkStore';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
+import ScoresFlow from './ScoresFlow';
+import { forgetCachedClasses } from '../../services/link/scoreEntry';
 
 const MAIN = ['Records', 'Lessons'];
 const HINT = { Records: 'Class records', Lessons: 'Learning materials' };
@@ -126,6 +128,7 @@ export default function PhoneApp() {
   const [path, setPath] = useState('');
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
+  const [tab, setTab] = useState('scores'); // scores | files
 
   const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => saveLink(l) }) : null), [link]);
 
@@ -150,6 +153,7 @@ export default function PhoneApp() {
   const unlink = () => {
     if (!window.confirm('Unlink this phone from KaTuroDesk? You can link it again any time.')) return;
     forgetLink();
+    forgetCachedClasses();
     setLink(null);
     setPath('');
   };
@@ -196,7 +200,7 @@ export default function PhoneApp() {
                 </p>
                 <button type="button" onClick={unlink} aria-label="Unlink this phone" className="p-1.5 text-gray-400"><Unlink size={15} /></button>
               </div>
-              {path && (
+              {tab === 'files' && path && (
                 <nav className="flex items-center gap-1 px-4 pt-3 text-xs text-emerald-800 overflow-x-auto whitespace-nowrap">
                   <button type="button" onClick={() => setPath('')} className="font-semibold">KaTuro</button>
                   {path.split('/').map((part, i, all) => (
@@ -212,7 +216,8 @@ export default function PhoneApp() {
                   Can&apos;t reach {link.deskName}. Check that KaTuroDesk is open on your computer and that this phone is on the same Wi-Fi or hotspot.
                 </p>
               )}
-              {client && (
+              {client && tab === 'scores' && <ScoresFlow client={client} online={online} />}
+              {client && tab === 'files' && (
                 <FolderList
                   key={path}
                   client={client}
@@ -225,6 +230,14 @@ export default function PhoneApp() {
                   }}
                 />
               )}
+              <div className="h-20" />
+              <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 border-t border-gray-200 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                {[['scores', 'Scores', ClipboardList], ['files', 'Files', FolderOpen]].map(([id, label, Icon]) => (
+                  <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} className={`flex flex-col items-center gap-0.5 py-2 text-xs font-semibold ${tab === id ? 'text-emerald-800' : 'text-gray-500'}`}>
+                    <Icon size={22} /> {label}
+                  </button>
+                ))}
+              </nav>
             </>
           )}
         </>

@@ -14,8 +14,10 @@
  *   - the answer is bound to that nonce, so it can't be swapped for another answer
  *   Anyone on the same Wi-Fi sees only scrambled bytes.
  *
- * What a paired phone can do (Phase 1, read only): see the KaTuro folder (Records, Lessons
- * and any other folder) and open its files. Paths are always kept inside the KaTuro folder.
+ * What a paired phone can do: see the KaTuro folder (Records, Lessons and any other folder)
+ * and open its files (answered here, paths always kept inside the KaTuro folder); the other
+ * requests (class records, recording scores, bubble quizzes) go to the KaTuroDesk window
+ * through askDesk(op, args, device), see src/services/link/deskRequests.js.
  *
  * Phone keys are saved encrypted (Windows DPAPI through Electron's safeStorage) in
  * linked-phones.json in KaTuroDesk's app data. The teacher can remove a phone at any time.
@@ -28,7 +30,7 @@ const path = require('path');
 const VERSION = 1;
 const PAIR_MS = 10 * 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
-const MAX_REQUEST_BYTES = 64 * 1024;
+const MAX_REQUEST_BYTES = 512 * 1024;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_DEVICES = 10;
 const MAX_LIST = 2000;
@@ -90,8 +92,9 @@ const CORS = {
  * deskName      → shown on the phone ("Teacher's laptop")
  * addresses()   → [{ address, name }] this computer's LAN addresses (phoneCapture.lanAddresses)
  * onChange(st)  → after pairing / removing / a phone being seen
+ * askDesk(op, args, device) → Promise of the answer from the KaTuroDesk window (optional)
  */
-function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, now = () => Date.now() }) {
+function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, now = () => Date.now() }) {
   let server = null;
   let port = null;
   let pairing = null; // { id, key, expiresAt }
@@ -157,12 +160,14 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     return { name: path.basename(abs), size, data: fs.readFileSync(abs).toString('base64') };
   }
 
-  function handle(op, args, device) {
+  const LOCAL_OPS = new Set(['hello', 'list', 'read']);
+  async function handle(op, args, device) {
     if (op === 'hello') {
       return { deskId: store.deskId, deskName, version: VERSION, port, addresses: addresses().map((a) => a.address), phone: device.name };
     }
     if (op === 'list') return list(args?.path || '');
     if (op === 'read') return read(args?.path || '');
+    if (askDesk && typeof op === 'string' && !LOCAL_OPS.has(op)) return askDesk(op, args || {}, { id: device.id, name: device.name });
     throw Object.assign(new Error('KaTuroDesk does not know that request. Update KaTuroDesk.'), { code: 'UNKNOWN_OP' });
   }
 
@@ -176,7 +181,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     return true;
   }
 
-  function onMessage(env) {
+  async function onMessage(env) {
     const id = String(env?.id || '');
     // Pairing message: encrypted with the key from the QR code on the screen.
     if (pairing && id === pairing.id) {
@@ -206,9 +211,9 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (!freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: "The phone's clock or message is off. Check the phone's date and time.", code: 'STALE' } };
     let body;
     try {
-      body = { ok: true, result: handle(req.op, req.args || {}, device) };
+      body = { ok: true, result: await handle(req.op, req.args || {}, device) };
     } catch (err) {
-      body = { error: err.message, code: err.code || 'ERROR' };
+      body = { error: err.message, code: err.code || 'ERROR', ...(err.details ? { details: err.details } : {}) };
     }
     const today = new Date(now()).toISOString();
     if (!device.lastSeen || today.slice(0, 13) !== String(device.lastSeen).slice(0, 13)) {
@@ -231,14 +236,14 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       if (size > MAX_REQUEST_BYTES) { tooBig = true; req.destroy(); return; }
       chunks.push(c);
     });
-    req.on('end', () => {
+    req.on('end', async () => {
       if (tooBig) return undefined;
       let env;
       try { env = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return plainJson(res, 400, { error: 'Bad request.' }); }
       if (env?.v !== VERSION) return plainJson(res, 400, { error: 'Update the KaTuro App and KaTuroDesk to the same version.', code: 'VERSION' });
       let out;
       try {
-        out = onMessage(env);
+        out = await onMessage(env);
       } catch (err) {
         console.error('[link]', err);
         return plainJson(res, 500, { error: 'KaTuroDesk could not answer. Try again.', code: 'DESK_ERROR' });

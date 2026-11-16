@@ -23,7 +23,7 @@ afterEach(() => {
   if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-async function setup({ now } = {}) {
+async function setup({ now, askDesk } = {}) {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-link-'));
   const home = path.join(tmp, 'KaTuro');
   fs.mkdirSync(path.join(home, 'Records'), { recursive: true });
@@ -37,6 +37,7 @@ async function setup({ now } = {}) {
     home: () => home, storeFile, protect, deskName: "Teacher's laptop",
     addresses: () => [{ address: '127.0.0.1', name: 'test' }],
     ...(now ? { now } : {}),
+    ...(askDesk ? { askDesk } : {}),
   });
   await service.start(0);
   return { home, storeFile };
@@ -138,5 +139,20 @@ describe('phone link', () => {
     const { link } = await pairPhone();
     service.stop();
     await expect(createLinkClient(link).hello()).rejects.toMatchObject({ code: 'UNREACHABLE' });
+  });
+
+  it('class-record requests go to the KaTuroDesk window, with its answer or its reason back', async () => {
+    const asked = [];
+    await setup({
+      askDesk: async (op, args, device) => {
+        asked.push([op, args, device.name]);
+        if (op === 'record') throw Object.assign(new Error('1 learner(s) already have a score.'), { code: 'CONFLICTS', details: { conflicts: [{ lrn: '1', before: 4, after: 5 }] } });
+        return { classes: [{ name: 'Grade 7 - Rizal - Science' }] };
+      },
+    });
+    const client = createLinkClient((await pairPhone()).link);
+    expect(await client.request('classes')).toEqual({ classes: [{ name: 'Grade 7 - Rizal - Science' }] });
+    await expect(client.request('record', { path: 'Records/x.xlsx' })).rejects.toMatchObject({ code: 'CONFLICTS', details: { conflicts: [{ lrn: '1', before: 4, after: 5 }] } });
+    expect(asked.map((a) => [a[0], a[2]])).toEqual([['classes', "Ma'am Ana's phone"], ['record', "Ma'am Ana's phone"]]);
   });
 });

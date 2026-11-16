@@ -31,6 +31,7 @@ import ktLogo from '../../assets/KT-Favicon.webp';
 import './neumorphism.css';
 import { useDeskScheduler } from './deskScheduler';
 import { useDeskUpdate } from './useDeskUpdate';
+import { usePhoneRequests } from './usePhoneRequests';
 import MessagesPanel from '../../features/messages/MessagesPanel';
 import { badgeDataUrl } from './unreadBadge';
 import DeskCalendarPanel from './calendar/DeskCalendarPanel';
@@ -66,6 +67,7 @@ export default function KaTuroDeskPage() {
   const { user, profile, photoURL, plan } = useAuth();
   const { workspace, activeArtifact, persona, startFolderIndex, restoreLastWorkspace, scheduledTasks, isGenerating, deskTheme, notifyMessages, taskbarBadge } = useDeskStore();
   const { status: update, install: installUpdate } = useDeskUpdate();
+  usePhoneRequests();
 
   useEffect(() => {
     // Desktop: reopen the folder from last session so teachers don't re-pick it every day

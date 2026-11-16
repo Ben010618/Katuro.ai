@@ -337,6 +337,9 @@ function createWindow() {
     }
   });
 
+  // A reload drops the page's phone-request listener until it registers again.
+  mainWindow.webContents.on('did-start-loading', () => { deskAnswering = false; });
+
   // Links in AI answers open in the real browser, never inside the app window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
@@ -835,6 +838,42 @@ ipcMain.handle('capture:status', async () => phoneCapture.status());
 
 // ── KaTuro App: paired phones see the KaTuro folder over the same Wi-Fi (linkService.cjs) ──
 let linkService = null;
+// Requests about class records and quizzes are answered by the KaTuroDesk window (it has
+// the readers and writers): sent there, answered through 'link:reply'.
+const deskAsks = new Map();
+let deskAnswering = false;
+function askDesk(op, args, device) {
+  return new Promise((resolve, reject) => {
+    if (!deskAnswering || !mainWindow || mainWindow.isDestroyed()) {
+      reject(Object.assign(new Error('KaTuroDesk is still opening on the computer. Try again in a moment.'), { code: 'DESK_STARTING' }));
+      return;
+    }
+    const id = require('crypto').randomUUID();
+    const timer = setTimeout(() => {
+      deskAsks.delete(id);
+      reject(Object.assign(new Error('KaTuroDesk took too long to answer. Try again.'), { code: 'TIMEOUT' }));
+    }, 90000);
+    deskAsks.set(id, { resolve, reject, timer });
+    mainWindow.webContents.send('link:request', { id, op, args, device });
+  });
+}
+const fromMainWindow = (e) => Boolean(mainWindow && !mainWindow.isDestroyed() && e.sender === mainWindow.webContents);
+ipcMain.handle('link:answering', (e, on) => { if (fromMainWindow(e)) deskAnswering = Boolean(on); });
+ipcMain.handle('link:reply', (e, id, res = {}) => {
+  if (!fromMainWindow(e)) return;
+  const ask = deskAsks.get(id);
+  if (!ask) return;
+  deskAsks.delete(id);
+  clearTimeout(ask.timer);
+  if (res.error) ask.reject(Object.assign(new Error(String(res.error)), { code: res.code || 'ERROR', ...(res.details ? { details: res.details } : {}) }));
+  else ask.resolve(res.result);
+});
+// The KaTuro folder for the phone requests, without changing the folder the teacher has open.
+ipcMain.handle('workspace:homeRoot', async () => {
+  const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
+  allowedRoots.add(path.resolve(home));
+  return home;
+});
 function startLinkService() {
   const { safeStorage } = require('electron');
   linkService = require('./linkService.cjs').createLinkService({
@@ -851,6 +890,7 @@ function startLinkService() {
     deskName: require('os').hostname(),
     addresses: () => phoneCapture.lanAddresses(),
     onChange: (st) => sendToWindow('link:changed', st),
+    askDesk,
   });
   linkService.start().catch((err) => console.error('Phone link could not start:', err));
 }
