@@ -18,11 +18,11 @@
   --nm-light: rgba(255, 255, 255, 0.95);
   --nm-ink: #26332c;
   --nm-muted: #5f6b64;
-  --nm-accent: #1a7a50;
+  --nm-accent: #187349;
   --nm-raised: 8px 8px 18px var(--nm-dark), -8px -8px 18px var(--nm-light);
   --nm-raised-sm: 4px 4px 10px var(--nm-dark), -4px -4px 10px var(--nm-light);
   --nm-inset: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
-  --nm-accent-shadow: 5px 5px 14px rgba(26, 122, 80, 0.32), -5px -5px 12px var(--nm-light);
+  --nm-accent-shadow: 5px 5px 14px rgba(24, 115, 73, 0.32), -5px -5px 12px var(--nm-light);
   min-height: 100vh;
   background: var(--nm-bg);
   color: var(--nm-ink);
@@ -43,7 +43,7 @@
 /* The logo: no box around it, it floats over the surface. */
 .kt-phone .kt-logo { filter: drop-shadow(5px 7px 9px rgba(120, 135, 126, 0.45)); transition: transform 0.18s ease, filter 0.18s ease; }
 .kt-phone button:active .kt-logo, .kt-phone .kt-logo-btn:active .kt-logo { transform: scale(0.92); }
-.kt-phone .kt-logo-btn[aria-pressed='true'] .kt-logo { filter: drop-shadow(0 6px 14px rgba(30, 138, 90, 0.55)); transform: translateY(-2px); }
+.kt-phone .kt-logo-btn[aria-pressed='true'] .kt-logo { filter: drop-shadow(0 6px 14px rgba(24, 115, 73, 0.55)); transform: translateY(-2px); }
 
 /* The bottom bar: one soft raised strip; the logo sits in the middle, larger, above it. While a
    screen shows its own bottom bar (.kt-covers-nav: Review scores, Send…), the tab bar steps away
@@ -79,7 +79,7 @@
 /* A field keeps a warning border (a choice still to settle); a locked field looks locked. */
 .kt-phone :is(input, textarea, select):not([class*='border-amber']) { border-color: transparent; }
 .kt-phone :is(input, textarea, select):disabled { opacity: 0.55; }
-.kt-phone :is(input, textarea, select):focus { outline: 2px solid rgba(30, 138, 90, 0.35); outline-offset: 1px; }
+.kt-phone :is(input, textarea, select):focus { outline: 2px solid rgba(24, 115, 73, 0.35); outline-offset: 1px; }
 .kt-phone input::placeholder,
 .kt-phone textarea::placeholder { color: var(--nm-muted); }
 .kt-phone .text-gray-500 { color: var(--nm-muted); }

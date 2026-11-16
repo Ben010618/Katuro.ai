@@ -249,6 +249,7 @@ export default function PhoneApp() {
     clientRef.current?.close();
     setLink(null);
     setPath('');
+    setFile(null);
     await new Promise((r) => setTimeout(r, 0));
     await forgetPhoneData();
   }, []);
@@ -314,8 +315,10 @@ export default function PhoneApp() {
   const linkId = link?.deviceId || '';
   const navLink = useRef(linkId);
   useEffect(() => { navLink.current = linkId; }, [linkId]);
+  const stepping = useRef(false); // a folder-path tap is going back; a second tap waits for it
   useEffect(() => {
     const onPop = (e) => {
+      stepping.current = false;
       const s = e.state?.kt && e.state.link === navLink.current ? e.state : null;
       setPath(s?.path || '');
       setFile(s?.file || null);
@@ -334,8 +337,11 @@ export default function PhoneApp() {
   const upTo = (depth) => {
     const below = window.history.state?.kt ? window.history.state.d : 0;
     const steps = Math.min(path.split('/').length - depth, below);
-    if (steps > 0) window.history.go(-steps);
-    else setPath(path.split('/').slice(0, depth).join('/'));
+    if (stepping.current) return;
+    if (steps > 0) {
+      stepping.current = true;
+      window.history.go(-steps);
+    } else setPath(path.split('/').slice(0, depth).join('/'));
   };
 
   return (
@@ -405,7 +411,7 @@ export default function PhoneApp() {
               {visited.has('messages') && (
                 <div hidden={tab !== 'messages'}>
                   <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
-                    <div className="bg-white"><MessagesPanel user={user} height={`calc(100vh - ${online === false ? 290 : 230}px - env(safe-area-inset-top))`} /></div>
+                    <div className="bg-white"><MessagesPanel user={user} height={`calc(100vh - ${online === false ? 290 : 230}px - env(safe-area-inset-top) - env(safe-area-inset-bottom))`} /></div>
                   </Suspense>
                 </div>
               )}
