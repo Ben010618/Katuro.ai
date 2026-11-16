@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
-import { TOUR_KEY, TOUR_EVENT, FIRST_RUN, tourToShow, whatsNewSteps } from './tourSteps';
+import { TOUR_KEY, TOUR_EVENT, FIRST_RUN, tourToShow, latestWhatsNew } from './tourSteps';
 
 const GAP = 14; // between the highlighted part and the card
 const PAD = 6; // around the highlighted part
@@ -57,6 +57,14 @@ function TourOverlay({ steps, kind, onDone }) {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key === 'Tab') {
+        const items = [...(cardRef.current?.querySelectorAll('button') || [])];
+        if (!items.length) return;
+        const at = items.indexOf(document.activeElement);
+        e.preventDefault();
+        items[(at + (e.shiftKey ? -1 : 1) + items.length) % items.length].focus();
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); onDone(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); if (last) onDone(); else setI((n) => n + 1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); setI((n) => Math.max(0, n - 1)); }
@@ -81,7 +89,7 @@ function TourOverlay({ steps, kind, onDone }) {
       <div
         ref={cardRef}
         className="fixed w-[340px] max-w-[calc(100vw-32px)] rounded-2xl bg-white p-5 shadow-2xl transition-all duration-300"
-        style={pos ? { left: pos.left, top: pos.top } : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', visibility: 'hidden' }}
+        style={pos ? { left: pos.left, top: pos.top } : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', opacity: 0 }}
       >
         <div className="mb-1 flex items-start justify-between gap-3">
           <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
@@ -133,7 +141,7 @@ export default function DeskTourHost() {
     }).catch(() => {});
     const replay = (e) => {
       const kind = e.detail === 'new' ? 'new' : 'welcome';
-      const steps = kind === 'new' ? whatsNewSteps(null, version.current) : FIRST_RUN;
+      const steps = kind === 'new' ? latestWhatsNew(version.current) : FIRST_RUN;
       if (steps.length) setTour({ kind, steps, version: version.current });
     };
     window.addEventListener(TOUR_EVENT, replay);

@@ -267,3 +267,15 @@
 
 /* Text on the teacher's own (green) chat bubble follows the accent's ink. */
 .kt-neu .bg-\[\#2d6a4f\] :is(.text-emerald-100\/90, .text-emerald-100, .text-emerald-50) { color: var(--neu-on-accent); opacity: 0.85; }
+
+/* "Connect your phone" (ConnectPhoneButton.jsx): the one bright call to action in the top bar,
+   the same in Light and Dark. White on deep green reads at 5.5:1; the mint ring makes it stand out. */
+.kt-phone-cta,
+.kt-neu button.kt-phone-cta.kt-phone-cta {
+  background-color: #047857;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.45), 0 2px 10px rgba(4, 120, 87, 0.45);
+}
+.kt-neu button.kt-phone-cta.kt-phone-cta svg { color: #ffffff; }
+.kt-neu button.kt-phone-cta.kt-phone-cta:hover { background-color: #065f46; }
+.kt-neu button.kt-phone-cta.kt-phone-cta:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FIRST_RUN, WHATS_NEW, compareVersions, whatsNewSteps, tourToShow } from './tourSteps.js';
+import { FIRST_RUN, WHATS_NEW, compareVersions, whatsNewSteps, latestWhatsNew, tourToShow } from './tourSteps.js';
 
 describe('which KaTuroDesk tour to show', () => {
   it('compares versions as numbers', () => {
@@ -23,6 +23,13 @@ describe('which KaTuroDesk tour to show', () => {
     expect(tourToShow({ seen: { version: '1.19.0' }, firstRun: false, version: '1.19.1' })).toBeNull(); // no highlights for a fix
     expect(whatsNewSteps('1.18.0', '1.19.0').length).toBeGreaterThan(0);
     expect(tourToShow({ seen: { version: '1.16.2' }, firstRun: false, version: '1.19.0' }).kind).toBe('new');
+  });
+
+  it('Settings → What\'s new replays the newest highlights, also on a later fix version', () => {
+    expect(latestWhatsNew('1.19.0')).toEqual(WHATS_NEW[0].steps);
+    expect(latestWhatsNew('1.19.3')).toEqual(WHATS_NEW[0].steps);
+    expect(latestWhatsNew('')).toEqual(WHATS_NEW[0].steps);
+    expect(latestWhatsNew('1.0.0')).toEqual([]);
   });
 
   it('the phone step is in both tours, and every step has a title and text', () => {

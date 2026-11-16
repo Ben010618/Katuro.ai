@@ -100,6 +100,13 @@ export function whatsNewSteps(from, to) {
     .flatMap((n) => n.steps);
 }
 
+/** The newest highlights at or before `version` (Settings → What's new), [] when there are none. */
+export function latestWhatsNew(version) {
+  const n = WHATS_NEW.filter((w) => !version || compareVersions(w.version, version) <= 0)
+    .sort((a, b) => compareVersions(b.version, a.version))[0];
+  return n ? n.steps : [];
+}
+
 /**
  * Which tour to show now. → { kind: 'welcome' | 'new', steps } or null.
  *   seen      what this computer remembers ({ version } of the last tour shown or skipped), or null

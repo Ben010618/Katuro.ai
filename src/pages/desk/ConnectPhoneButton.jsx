@@ -38,7 +38,7 @@ export default function ConnectPhoneButton({ onOpen }) {
       data-tour="phone"
       onClick={onOpen}
       title="Link the KaTuro App on your phone: scores, attendance, your schedule, your files and your assistant, over the same Wi-Fi."
-      className="relative flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-[11.5px] font-bold text-white shadow-[0_0_0_3px_rgba(52,211,153,0.25)] transition hover:brightness-110"
+      className="kt-phone-cta relative flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-bold transition"
     >
       <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75 motion-reduce:hidden" />
