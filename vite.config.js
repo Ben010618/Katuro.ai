@@ -7,8 +7,13 @@ import path from 'node:path'
 // asked for /lesson-gen/assets/index.js, got GitHub Pages' 404 page instead, and
 // stayed blank (seen 2026-10-03 after a reload on Step 3). KaTuroDesk loads
 // dist/index.html from disk (file://), which needs RELATIVE paths, so desktop
-// builds use `vite build --mode desk`.
-export const baseFor = (mode) => (mode === 'desk' ? './' : '/')
+// builds use `vite build --mode desk`. The phone app (Capacitor, Katuro_App/) serves the
+// files from a local origin, so it uses relative paths too: `vite build --mode mobile`.
+export const baseFor = (mode) => (mode === 'desk' || mode === 'mobile' ? './' : '/')
+
+// The phone app's files go to dist-mobile/ (Katuro_App/capacitor.config.json webDir), so they
+// never mix with the website/KaTuroDesk dist/.
+export const outDirFor = (mode) => (mode === 'mobile' ? 'dist-mobile' : 'dist')
 
 // KaTuroDesk's voice on the laptop (Piper, see src/services/desk/voice/piperVoice.js) needs its
 // engine files next to index.html, so it works offline. Desktop builds only: the website
@@ -34,6 +39,7 @@ export function deskVoiceAssets(mode) {
 
 export default defineConfig(({ mode }) => ({
   base: baseFor(mode),
+  build: { outDir: outDirFor(mode) },
   plugins: [
     react(),
     tailwindcss(),

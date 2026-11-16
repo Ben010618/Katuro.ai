@@ -7,6 +7,7 @@ import { reloadForNewVersion } from './utils/staleChunk.js'
 import { installGlobalErrorReporter } from './utils/globalErrorReporter.js'
 import { reportAIError } from './services/db.js'
 import { auth } from './firebase.js'
+import { isWeb } from './services/platform.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -16,7 +17,9 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-if ('serviceWorker' in navigator) {
+// The offline cache is for the website only. The phone app ships its files inside the app,
+// and a cache there could keep showing old screens after an app update.
+if ('serviceWorker' in navigator && isWeb()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
