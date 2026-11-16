@@ -125,7 +125,7 @@ export function SnapScores({ cls, hps, existing = {}, onDone }) {
           {crop && !busy && <button type="button" onClick={() => { token.current += 1; setCrop(null); setValue(''); }} className="text-xs font-semibold text-emerald-800 underline">Tap another spot</button>}
         </Card>
       )}
-      <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-2 border-t border-gray-200 bg-white p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-2 border-t border-gray-200 bg-white p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" disabled={busy} onClick={() => goTo(i + 1)} className="flex items-center justify-center gap-1 rounded-xl border border-gray-300 py-3 text-sm font-semibold disabled:opacity-40"><SkipForward size={16} /> No paper</button>
         <button type="button" disabled={busy} onClick={() => onDone(got)} className="rounded-xl border border-gray-300 py-3 text-sm font-semibold disabled:opacity-40">Finish</button>
         <button type="button" disabled={!value.trim() || busy} onClick={() => goTo(i + 1, value.trim())} className="flex items-center justify-center gap-1 rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white disabled:opacity-40"><Check size={16} /> Next</button>
@@ -212,7 +212,7 @@ export function AttendanceScreen({ client, cls, onClose }) {
           );
         })}
       </ul>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={save} disabled={state.busy} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-50">{state.busy ? 'Saving…' : `Save attendance for ${date}`}</button>
       </div>
     </div>

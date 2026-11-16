@@ -173,7 +173,7 @@ export default function BubbleScan({ client, cls, onScores }) {
       ))}
 
       {review && review.rows.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3 space-y-1" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3 space-y-1" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           {review.open > 0 && <p className="text-xs text-amber-800">{review.open} thing{review.open > 1 ? 's' : ''} to settle above.</p>}
           {ready && notInClass.length > 0 && <p className="text-xs text-amber-800">{notInClass.length} sheet(s) are for learners not in {cls.name}; they are left out.</p>}
           <button

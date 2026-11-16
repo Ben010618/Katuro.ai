@@ -192,7 +192,7 @@ function Entry({ cls, column, initial, onReview, onBubble, onSnap }) {
           </ul>
         </section>
       ))}
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={() => onReview({ hps, values })} disabled={!typed} className="w-full rounded-xl bg-emerald-700 py-3.5 text-white font-bold disabled:opacity-50">Review {typed} score{typed === 1 ? '' : 's'}</button>
       </div>
     </div>

@@ -36,7 +36,7 @@ export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
         return;
       }
       setPinText('');
-      setNote(r.waitMs ? `Wait ${Math.ceil(r.waitMs / 1000)} seconds.` : `Wrong PIN · ${r.left} left`);
+      setNote(r.waitMs ? `Wait ${Math.ceil(r.waitMs / 1000)} seconds.` : `Wrong PIN · ${r.left} more before a wait`);
     } catch (err) {
       setNote(err.message);
     } finally {

@@ -207,7 +207,7 @@ function ScanToPdf({ client, folder, onClose, onSent }) {
       </div>
       {busy && <p className="flex items-center gap-2 text-sm text-gray-700"><Loader2 size={16} className="animate-spin" /> {busy}</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" disabled={!pages.length || Boolean(busy)} onClick={send} className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white disabled:opacity-50">
           Make PDF ({pages.length} page{pages.length === 1 ? '' : 's'}) and send
         </button>

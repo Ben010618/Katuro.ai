@@ -306,33 +306,36 @@ export default function PhoneApp() {
   const showSetPin = Boolean(link) && !showUnlock && (!hasPin() || settingPin);
   const pinScreen = showUnlock || showSetPin;
 
-  // A folder-path tap: step back through history (one entry per folder opened), so the Android
-  // back button stays in step with the screen. jumpTo makes that one popstate land on the level.
-  const jumpTo = useRef(null);
-
-  // Android back button / gesture: go up a folder instead of closing the app. Also while the
-  // PIN screen shows (it covers everything): the back step is used up either way, so the screen
-  // must follow it or an open file could no longer be closed after unlocking.
+  // Android back button / gesture. Every step into a folder or a file is a history entry that
+  // remembers what it shows ({ path, file, d: KaTuro steps below it, link }). Going back shows
+  // exactly the entry it lands on, so the screen and Android's back stack cannot drift apart:
+  // not under the PIN screen, not after back on another tab, not after a folder-path tap.
+  // Entries from before an unlink / another link show the top of the folder.
+  const linkId = link?.deviceId || '';
+  const navLink = useRef(linkId);
+  useEffect(() => { navLink.current = linkId; }, [linkId]);
   useEffect(() => {
-    const onPop = () => {
-      if (jumpTo.current !== null) { setPath(jumpTo.current); jumpTo.current = null; return; }
-      if (file) setFile(null);
-      else if (tab === 'files' && path) setPath(path.split('/').slice(0, -1).join('/'));
+    const onPop = (e) => {
+      const s = e.state?.kt && e.state.link === navLink.current ? e.state : null;
+      setPath(s?.path || '');
+      setFile(s?.file || null);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [file, path, tab]);
-  const go = (next) => {
-    window.history.pushState({ kt: true }, '');
-    next();
+  }, []);
+  /** Opens a folder ({ path }) or a file ({ file }) as a new back step. */
+  const go = ({ path: nextPath = path, file: nextFile = null }) => {
+    const below = window.history.state?.kt ? window.history.state.d : 0;
+    window.history.pushState({ kt: true, link: navLink.current, d: below + 1, path: nextPath, file: nextFile }, '');
+    setPath(nextPath);
+    setFile(nextFile);
   };
-  // A folder-path tap (see jumpTo above).
+  /** A folder-path tap: back to that level through the back steps (never past the first). */
   const upTo = (depth) => {
-    const parts = path.split('/');
-    const steps = parts.length - depth;
-    if (steps <= 0) return;
-    jumpTo.current = parts.slice(0, depth).join('/');
-    window.history.go(-steps);
+    const below = window.history.state?.kt ? window.history.state.d : 0;
+    const steps = Math.min(path.split('/').length - depth, below);
+    if (steps > 0) window.history.go(-steps);
+    else setPath(path.split('/').slice(0, depth).join('/'));
   };
 
   return (
@@ -398,17 +401,17 @@ export default function PhoneApp() {
               )}
               {client && visited.has('today') && <div hidden={tab !== 'today'}><PhoneToday client={client} online={online} /></div>}
               {client && visited.has('scores') && <div hidden={tab !== 'scores'}><ScoresFlow client={client} online={online} /></div>}
-              {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go(() => setFile(i))} /></div>}
+              {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go({ file: i })} /></div>}
               {visited.has('messages') && (
                 <div hidden={tab !== 'messages'}>
                   <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
-                    <div className="bg-white"><MessagesPanel user={user} height="calc(100vh - 190px)" /></div>
+                    <div className="bg-white"><MessagesPanel user={user} height={`calc(100vh - ${online === false ? 290 : 230}px - env(safe-area-inset-top))`} /></div>
                   </Suspense>
                 </div>
               )}
               {sharedNote && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">{sharedNote}</p>}
               {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
-              {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go(() => setFile(i))} />}
+              {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go({ file: i })} />}
               {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
               {client && shared && <SharedFilesSheet client={client} files={shared} onClose={() => { setShared(null); setSharedNote(''); }} onSent={bump} />}
               {client && tab === 'files' && (
@@ -419,8 +422,8 @@ export default function PhoneApp() {
                   onError={onListError}
                   onLoaded={onListLoaded}
                   onOpen={(i) => {
-                    if (i.kind === 'directory') go(() => setPath(i.path));
-                    else go(() => setFile(i));
+                    if (i.kind === 'directory') go({ path: i.path });
+                    else go({ file: i });
                   }}
                 />
               )}
