@@ -17,15 +17,23 @@ export function usePhoneRequests() {
     let alive = true;
     api.phoneHomeRoot().then((rootPath) => {
       if (!alive) return;
+      let timer = null;
+      const refreshIfHome = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const { workspace, refreshFiles } = useDeskStore.getState();
+          if (workspace?.rootPath && workspace.rootPath.toLowerCase() === String(rootPath).toLowerCase()) refreshFiles();
+        }, 800);
+      };
       handler = createDeskRequestHandler({
         handle: { kind: 'electron', isElectron: true, rootPath },
         applied: localAppliedStore(),
-        onWrote: () => {
-          const { workspace, refreshFiles } = useDeskStore.getState();
-          if (workspace?.rootPath && workspace.rootPath.toLowerCase() === String(rootPath).toLowerCase()) refreshFiles();
-        },
+        onWrote: refreshIfHome,
       });
-      off = api.onLinkRequest(({ op, args }) => handler(op, args));
+      const offRequests = api.onLinkRequest(({ op, args }) => handler(op, args));
+      // A photo or file the phone sent into Records / Lessons shows up in the folder panel.
+      const offFiles = api.onPhoneFileAdded?.(() => refreshIfHome());
+      off = () => { offRequests(); offFiles?.(); };
     }).catch((err) => console.warn('Phone requests are off:', err));
     return () => {
       alive = false;

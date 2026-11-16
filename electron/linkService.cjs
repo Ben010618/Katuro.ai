@@ -30,7 +30,13 @@ const path = require('path');
 const VERSION = 1;
 const PAIR_MS = 10 * 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
-const MAX_REQUEST_BYTES = 512 * 1024;
+// A file sent from the phone (up to 25 MB) arrives base64-encoded inside the encrypted message.
+const MAX_REQUEST_BYTES = 40 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+// Folders a phone may add files to (and their subfolders). The others are view only.
+const WRITABLE_TOP = ['records', 'lessons'];
+// What a phone may send: documents, pictures, sound and video for lessons. Never programs.
+const UPLOAD_TYPES = /\.(pdf|docx?|xlsx?|xlsm|pptx?|csv|txt|rtf|odt|ods|odp|jpe?g|png|webp|heic|heif|gif|bmp|mp3|m4a|wav|ogg|mp4|mov|3gp|webm)$/i;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_DEVICES = 10;
 const MAX_LIST = 2000;
@@ -93,8 +99,9 @@ const CORS = {
  * addresses()   → [{ address, name }] this computer's LAN addresses (phoneCapture.lanAddresses)
  * onChange(st)  → after pairing / removing / a phone being seen
  * askDesk(op, args, device) → Promise of the answer from the KaTuroDesk window (optional)
+ * onFileAdded({ path, name, size, phone }) → after a phone sent a file into Records / Lessons
  */
-function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, now = () => Date.now() }) {
+function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', addresses = () => [], onChange = () => {}, askDesk = null, onFileAdded = () => {}, now = () => Date.now() }) {
   let server = null;
   let port = null;
   let pairing = null; // { id, key, expiresAt }
@@ -160,13 +167,51 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     return { name: path.basename(abs), size, data: fs.readFileSync(abs).toString('base64') };
   }
 
-  const LOCAL_OPS = new Set(['hello', 'list', 'read']);
+  const cleanName = (name) => String(name || '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s.]+|[\s.]+$/g, '')
+    .slice(0, 120);
+
+  /** Saves a file from the phone into Records or Lessons (or a folder inside them), never over an existing file. */
+  function upload({ folder, name, data } = {}, device) {
+    const root = home();
+    const rel = String(folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    if (!WRITABLE_TOP.includes(rel.split('/')[0].toLowerCase())) throw Object.assign(new Error('Files from the phone can go into Records or Lessons only.'), { code: 'NOT_ALLOWED' });
+    const dir = insideHome(root, rel);
+    if (!dir) throw Object.assign(new Error('That folder is not in your KaTuro folder.'), { code: 'NOT_FOUND' });
+    const file = cleanName(name);
+    if (!file || !UPLOAD_TYPES.test(file)) throw Object.assign(new Error('KaTuro takes documents, pictures, sound and video files only.'), { code: 'NOT_ALLOWED' });
+    const bytes = Buffer.from(String(data || ''), 'base64');
+    if (!bytes.length) throw Object.assign(new Error('The file is empty.'), { code: 'EMPTY' });
+    if (bytes.length > MAX_UPLOAD_BYTES) throw Object.assign(new Error('This file is too big to send (up to 25 MB).'), { code: 'TOO_BIG' });
+    fs.mkdirSync(dir, { recursive: true });
+    const ext = path.extname(file);
+    const base = file.slice(0, file.length - ext.length);
+    for (let i = 1; i < 1000; i += 1) {
+      const candidate = i === 1 ? file : `${base} (${i})${ext}`;
+      const full = path.join(dir, candidate);
+      try {
+        fs.writeFileSync(full, bytes, { flag: 'wx' });
+      } catch (err) {
+        if (err.code === 'EEXIST') continue;
+        throw err;
+      }
+      const savedPath = path.relative(root, full).split(path.sep).join('/');
+      onFileAdded({ path: savedPath, name: candidate, size: bytes.length, phone: device?.name || 'Phone' });
+      return { path: savedPath, name: candidate, size: bytes.length };
+    }
+    throw new Error('Too many files with this name in that folder.');
+  }
+
+  const LOCAL_OPS = new Set(['hello', 'list', 'read', 'upload']);
   async function handle(op, args, device) {
     if (op === 'hello') {
       return { deskId: store.deskId, deskName, version: VERSION, port, addresses: addresses().map((a) => a.address), phone: device.name };
     }
     if (op === 'list') return list(args?.path || '');
     if (op === 'read') return read(args?.path || '');
+    if (op === 'upload') return upload(args, device);
     if (askDesk && typeof op === 'string' && !LOCAL_OPS.has(op)) return askDesk(op, args || {}, { id: device.id, name: device.name });
     throw Object.assign(new Error('KaTuroDesk does not know that request. Update KaTuroDesk.'), { code: 'UNKNOWN_OP' });
   }

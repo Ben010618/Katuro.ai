@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, HardDriveDownload, Loader2 } from 'lucide-react';
+import { keepFile, keptFile, forgetKept } from '../../services/link/phoneFiles';
 import { readDocument, loadPdfjs } from '../../services/desk/readers/index.js';
 
 const IMAGE = /\.(png|jpe?g|webp|gif|bmp)$/i;
@@ -72,17 +73,34 @@ function SheetView({ sheets }) {
   );
 }
 
-/** Opens one file from the KaTuro folder on the phone (read only). */
-export default function PhoneFileView({ entry, client, onBack }) {
+/**
+ * Opens one file from the KaTuro folder on the phone (read only). "Keep on phone" saves a
+ * copy that opens without KaTuroDesk; when KaTuroDesk can't be reached the kept copy is used.
+ */
+export default function PhoneFileView({ entry, client, onBack, onKeptChange }) {
   const [state, setState] = useState({ loading: true });
+  const [file, setFile] = useState(null); // { bytes, size, fromPhone }
+  const [kept, setKept] = useState(false);
+  const [keepNote, setKeepNote] = useState('');
 
   useEffect(() => {
     let alive = true;
     let url = null;
     (async () => {
       try {
-        const file = await client.read(entry.path);
+        const copy = await keptFile(entry.path).catch(() => null);
+        if (alive) setKept(Boolean(copy));
+        let file;
+        try {
+          file = await client.read(entry.path);
+          // A kept copy is refreshed whenever the file is opened from KaTuroDesk.
+          if (copy) keepFile(entry.path, { name: entry.name, size: file.size, bytes: file.bytes }).catch(() => {});
+        } catch (err) {
+          if (!copy || (err.code !== 'UNREACHABLE' && err.code !== 'DESK_STARTING')) throw err;
+          file = { bytes: copy.bytes, size: copy.size, fromPhone: true };
+        }
         if (!alive) return;
+        setFile(file);
         if (IMAGE.test(entry.name)) {
           url = URL.createObjectURL(new Blob([file.bytes]));
           setState({ image: url });
@@ -109,9 +127,26 @@ export default function PhoneFileView({ entry, client, onBack }) {
     <div className="min-h-full">
       <div className="sticky top-0 z-10 flex items-center gap-2 bg-[#eef2ef] px-3 py-2 border-b border-gray-200">
         <button type="button" onClick={onBack} aria-label="Back" className="p-2 -ml-2"><ArrowLeft size={20} /></button>
-        <p className="text-sm font-semibold text-gray-900 truncate">{entry.name}</p>
+        <p className="text-sm font-semibold text-gray-900 truncate flex-1">{entry.name}</p>
+        {file && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                if (kept) { await forgetKept(entry.path); setKept(false); setKeepNote('Removed from this phone.'); }
+                else { await keepFile(entry.path, { name: entry.name, size: file.size, bytes: file.bytes }); setKept(true); setKeepNote('Kept on this phone: it opens even without KaTuroDesk.'); }
+                onKeptChange?.();
+              } catch (err) { setKeepNote(err.message); }
+            }}
+            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${kept ? 'bg-emerald-700 text-white' : 'border border-emerald-300 bg-white text-emerald-800'}`}
+          >
+            <HardDriveDownload size={14} /> {kept ? 'On this phone' : 'Keep on phone'}
+          </button>
+        )}
       </div>
       <div className="p-3">
+        {keepNote && <p className="mb-2 text-xs text-emerald-800">{keepNote}</p>}
+        {file?.fromPhone && <p className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900">KaTuroDesk can't be reached, so this is the copy kept on this phone.</p>}
         {state.loading && <p className="flex items-center gap-2 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening from KaTuroDesk…</p>}
         {state.error && <p className="text-sm text-red-700">{state.error}</p>}
         {state.image && <img src={state.image} alt={entry.name} className="w-full h-auto rounded-lg" />}

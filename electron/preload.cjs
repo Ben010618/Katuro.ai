@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
       ipcRenderer.invoke('link:answering', false);
     };
   },
+  onPhoneFileAdded: (callback) => {
+    const listener = (_, info) => callback(info);
+    ipcRenderer.on('link:fileAdded', listener);
+    return () => ipcRenderer.removeListener('link:fileAdded', listener);
+  },
   onLinkChanged: (callback) => {
     const listener = (_, st) => callback(st);
     ipcRenderer.on('link:changed', listener);

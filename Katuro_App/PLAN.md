@@ -165,7 +165,7 @@ These are Desk work that supports the app. They also make the Desk better on its
 | **0. Groundwork** ✅ | KaTuro folder. Desk items 2–4. Capacitor project in `Katuro_App/`, `--mode mobile` build, a `platform` helper in `src/`. | Install a test APK on your phone |
 | **1. Link** ⭐ ✅ | Login, pairing by QR, link service on the Desk, browse Records and Lessons from the phone | See your PC's KaTuro folder on the phone |
 | **2. Scores** ⭐ ✅ | Quick entry, bubble-sheet scan, review screen, the Desk writes the class record, missing papers, offline queue | Record a whole quiz without typing on the PC |
-| **3. Lessons** ⭐ | Open files, Snap & Send, scan to PDF, Keep on phone, Share to KaTuro | Carry and add lessons from the phone |
+| **3. Lessons** ⭐ ✅ | Open files, Snap & Send, scan to PDF, Keep on phone, Share to KaTuro | Carry and add lessons from the phone |
 | **4. Assistant** | Schedule and push, messages, personas, generators saving into Lessons | Use KaTuro daily on the phone |
 | **5. Smarter capture** | Photo of a checked paper (handwritten score reading), attendance, history and undo, "Ask my Desk" | Snap the stack of papers instead |
 | **6. Google Play** | Internal test → a few teachers → public | Teachers install from Play |

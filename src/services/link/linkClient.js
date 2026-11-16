@@ -10,7 +10,7 @@ export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
-const SLOW_OPS = new Set(['read', 'classes', 'class', 'record', 'quizzes', 'quiz']);
+const SLOW_OPS = new Set(['read', 'upload', 'classes', 'class', 'record', 'quizzes', 'quiz']);
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -29,6 +29,12 @@ export function b64uDecode(str) {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+
+/** Bytes → plain base64 (not url-safe); files are sent to the Desk this way. */
+export const bytesToBase64 = (bytes) => {
+  const s = b64uEncode(bytes).replace(/-/g, '+').replace(/_/g, '/');
+  return s + '='.repeat((4 - (s.length % 4)) % 4);
+};
 
 /** Plain base64 (not url-safe) → bytes; the Desk sends file contents this way. */
 export const base64ToBytes = (s) => b64uDecode(String(s || '').replace(/\+/g, '-').replace(/\//g, '_'));
@@ -180,6 +186,8 @@ export function createLinkClient(link, { fetchImpl = fetch, onLinkChange = () =>
     list: (path = '') => call('list', { path }),
     /** Any other request KaTuroDesk answers (classes, class, record, quizzes, quiz). */
     request: (op, args) => call(op, args),
+    /** Sends a file into Records or Lessons (or a folder in them). → { path, name, size } */
+    upload: (folder, name, bytes) => call('upload', { folder, name, data: bytesToBase64(bytes) }),
     /** One file. → { name, size, bytes: Uint8Array } */
     async read(path) {
       const r = await call('read', { path });

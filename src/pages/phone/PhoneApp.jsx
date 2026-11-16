@@ -9,6 +9,8 @@ import { loadLink, saveLink, forgetLink } from '../../services/link/linkStore';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
 import ScoresFlow from './ScoresFlow';
+import { KeptList, OutboxBanner, AddToFolder, SharedFilesSheet } from './PhoneLessons';
+import { takeSharedFiles, onFilesShared } from '../../services/link/shareTarget';
 import { forgetCachedClasses } from '../../services/link/scoreEntry';
 
 const MAIN = ['Records', 'Lessons'];
@@ -129,6 +131,20 @@ export default function PhoneApp() {
   const [file, setFile] = useState(null);
   const [online, setOnline] = useState(null); // null = checking, true, false
   const [tab, setTab] = useState('scores'); // scores | files
+  const [version, setVersion] = useState(0); // bumped after files are sent or kept
+  const [shared, setShared] = useState(null); // files shared from another app
+  const bump = useCallback(() => setVersion((v) => v + 1), []);
+
+  // Share → KaTuro from another app: on start, and while the app is open.
+  useEffect(() => {
+    let alive = true;
+    const take = () => takeSharedFiles().then(({ files }) => {
+      if (alive && files.length) { setShared(files); setTab('files'); }
+    });
+    take();
+    const stop = onFilesShared(take);
+    return () => { alive = false; stop(); };
+  }, []);
 
   const client = useMemo(() => (link ? createLinkClient(link, { onLinkChange: (l) => saveLink(l) }) : null), [link]);
 
@@ -175,7 +191,7 @@ export default function PhoneApp() {
   return (
     <div className="min-h-screen bg-[#eef2ef] text-gray-900" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {file && client ? (
-        <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} />
+        <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} />
       ) : (
         <>
           <header className="flex items-center justify-between px-4 py-3 bg-[#1f3a2c] text-white">
@@ -217,9 +233,13 @@ export default function PhoneApp() {
                 </p>
               )}
               {client && tab === 'scores' && <ScoresFlow client={client} online={online} />}
+              {client && tab === 'files' && <OutboxBanner client={client} onSent={bump} version={version} />}
+              {tab === 'files' && !path && <KeptList version={version} onOpen={(i) => go(() => setFile(i))} />}
+              {client && tab === 'files' && <AddToFolder key={path} client={client} path={path} onSent={bump} />}
+              {client && shared && <SharedFilesSheet client={client} files={shared} onClose={() => setShared(null)} onSent={bump} />}
               {client && tab === 'files' && (
                 <FolderList
-                  key={path}
+                  key={`${path}|${version}`}
                   client={client}
                   path={path}
                   onError={onListError}

@@ -155,4 +155,20 @@ describe('phone link', () => {
     await expect(client.request('record', { path: 'Records/x.xlsx' })).rejects.toMatchObject({ code: 'CONFLICTS', details: { conflicts: [{ lrn: '1', before: 4, after: 5 }] } });
     expect(asked.map((a) => [a[0], a[2]])).toEqual([['classes', "Ma'am Ana's phone"], ['record', "Ma'am Ana's phone"]]);
   });
+
+  it('a phone can send files into Records or Lessons only, never over an existing file, and never programs', async () => {
+    const { home } = await setup();
+    const client = createLinkClient((await pairPhone()).link);
+    const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    expect(await client.upload('Lessons/Week 1', 'Board notes.jpg', photo)).toMatchObject({ path: 'Lessons/Week 1/Board notes.jpg', size: 7 });
+    expect(await client.upload('Lessons/Week 1', 'Board notes.jpg', photo)).toMatchObject({ path: 'Lessons/Week 1/Board notes (2).jpg' });
+    expect(await client.upload('Records/Scanned Papers/Quiz 3', 'Juan.jpg', photo)).toMatchObject({ path: 'Records/Scanned Papers/Quiz 3/Juan.jpg' });
+    expect(fs.readFileSync(path.join(home, 'Lessons', 'Week 1', 'Board notes.jpg'))).toEqual(Buffer.from(photo));
+    // A name with slashes stays inside the folder.
+    expect(await client.upload('Lessons', '../../evil.pdf', photo)).toMatchObject({ path: 'Lessons/evil.pdf' });
+    await expect(client.upload('Seminars', 'a.pdf', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    await expect(client.upload('Lessons/../..', 'a.pdf', photo)).rejects.toThrow();
+    await expect(client.upload('Lessons', 'setup.exe', photo)).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(fs.existsSync(path.join(tmp, 'a.pdf'))).toBe(false);
+  });
 });

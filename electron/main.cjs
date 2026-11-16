@@ -891,6 +891,7 @@ function startLinkService() {
     addresses: () => phoneCapture.lanAddresses(),
     onChange: (st) => sendToWindow('link:changed', st),
     askDesk,
+    onFileAdded: (info) => sendToWindow('link:fileAdded', info),
   });
   linkService.start().catch((err) => console.error('Phone link could not start:', err));
 }
