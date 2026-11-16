@@ -10,6 +10,7 @@ import { auth } from './firebase';
 import AppShell from './components/AppShell';
 import EmailCodeGate from './components/EmailCodeGate';
 import { Clock, LogOut as LogOutIcon } from 'lucide-react';
+import { isMobile } from './services/platform';
 
 // Pages — LoginPage stays eager (near-universal first paint); everything
 // behind auth is lazy so a teacher only downloads the module(s) they visit.
@@ -58,6 +59,7 @@ const KaturoProtectPage       = lazy(() => import('./features/katuroProtect'));
 const KaTuroDeskPage          = lazy(() => import('./pages/desk/KaTuroDeskPage'));
 const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
 const MessagesPage            = lazy(() => import('./pages/MessagesPage'));
+const PhoneApp                = lazy(() => import('./pages/phone/PhoneApp'));
 
 function LoadingScreen() {
   return (
@@ -215,8 +217,44 @@ function DesktopAppShell() {
   return <KaTuroDeskPage />;
 }
 
+// The KaTuro App on the phone (Katuro_App/, Capacitor): sign in, then the phone home.
+function MobileAppShell() {
+  const { user, loading, disabled, pendingApproval } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    ensureTeacherProfile(user.uid, user.email).catch((err) => {
+      console.error('[kaTuro] Teacher profile check in the phone app:', err);
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (disabled && !pendingApproval && user) signOut(auth);
+  }, [disabled, pendingApproval, user]);
+
+  if (loading) return <LoadingScreen />;
+  if (disabled && !pendingApproval && user) return null;
+  if (!user) return <LoginPage />;
+  if (pendingApproval) return <PendingApprovalScreen />;
+  return <PhoneApp />;
+}
+
 export default function App() {
   const isDesktopApp = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
+
+  if (isMobile()) {
+    return (
+      <ThemeProvider>
+        <ToastProvider>
+          <HashRouter>
+            <Suspense fallback={<LoadingScreen />}>
+              <MobileAppShell />
+            </Suspense>
+          </HashRouter>
+        </ToastProvider>
+      </ThemeProvider>
+    );
+  }
 
   if (isDesktopApp) {
     return (

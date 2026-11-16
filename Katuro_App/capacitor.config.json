@@ -1,5 +1,8 @@
 {
   "appId": "ai.katuro.app",
   "appName": "KaTuro",
-  "webDir": "../dist-mobile"
+  "webDir": "../dist-mobile",
+  "android": {
+    "allowMixedContent": true
+  }
 }

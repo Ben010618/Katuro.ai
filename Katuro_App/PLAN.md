@@ -81,8 +81,12 @@ features that already live there.
                            schedule push, AI, voices)
 ```
 
-- **Pairing:** the Desk shows a QR code, the phone scans it, and they share a secret key. From then on
-  only that phone can talk to that Desk. The Desk can remove a phone at any time.
+- **Pairing (built):** KaTuroDesk → Settings → Phones → Link a phone shows a QR code holding a
+  one-time key (one phone, 10 minutes). The phone reads it with its camera, so the key never
+  travels over the network, and gets its own long-term key back, encrypted. Every message after
+  that is AES-256-GCM encrypted, time-stamped and single-use. Paired phones are saved on the PC
+  only (Windows DPAPI), not in Firestore, so no record of the teacher's devices goes to the
+  cloud. The Desk can remove a phone at any time.
 - **Desk side:** a small local link service in Electron. It grows out of today's
   `electron/phoneCapture.cjs`, but stays on while KaTuroDesk is open, and it only
   accepts paired phones and only reaches into the KaTuro folder.
@@ -159,7 +163,7 @@ These are Desk work that supports the app. They also make the Desk better on its
 | Phase | What we build | You can do after it |
 |---|---|---|
 | **0. Groundwork** ✅ | KaTuro folder. Desk items 2–4. Capacitor project in `Katuro_App/`, `--mode mobile` build, a `platform` helper in `src/`. | Install a test APK on your phone |
-| **1. Link** ⭐ | Login, pairing by QR, link service on the Desk, browse Records and Lessons from the phone | See your PC's KaTuro folder on the phone |
+| **1. Link** ⭐ ✅ | Login, pairing by QR, link service on the Desk, browse Records and Lessons from the phone | See your PC's KaTuro folder on the phone |
 | **2. Scores** ⭐ | Quick entry, bubble-sheet scan, review screen, the Desk writes the class record, missing papers, offline queue | Record a whole quiz without typing on the PC |
 | **3. Lessons** ⭐ | Open files, Snap & Send, scan to PDF, Keep on phone, Share to KaTuro | Carry and add lessons from the phone |
 | **4. Assistant** | Schedule and push, messages, personas, generators saving into Lessons | Use KaTuro daily on the phone |

@@ -60,6 +60,16 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
     ipcRenderer.on('capture:ended', listener);
     return () => ipcRenderer.removeListener('capture:ended', listener);
   },
+  // KaTuro App: phones linked to this KaTuroDesk (Settings → Phones).
+  linkStatus: () => ipcRenderer.invoke('link:status'),
+  linkPhone: () => ipcRenderer.invoke('link:pair'),
+  cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
+  removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
+  onLinkChanged: (callback) => {
+    const listener = (_, st) => callback(st);
+    ipcRenderer.on('link:changed', listener);
+    return () => ipcRenderer.removeListener('link:changed', listener);
+  },
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
   // The teacher's own AI key: the key goes in once and never comes back out.

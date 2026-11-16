@@ -833,6 +833,36 @@ ipcMain.handle('capture:stop', async () => {
 });
 ipcMain.handle('capture:status', async () => phoneCapture.status());
 
+// ── KaTuro App: paired phones see the KaTuro folder over the same Wi-Fi (linkService.cjs) ──
+let linkService = null;
+function startLinkService() {
+  const { safeStorage } = require('electron');
+  linkService = require('./linkService.cjs').createLinkService({
+    home: () => defaultFolders.ensureHomeFolder(app.getPath('documents')),
+    storeFile: path.join(app.getPath('userData'), 'linked-phones.json'),
+    // Phone keys are saved with Windows DPAPI; without it no phone can be linked.
+    protect: {
+      encrypt: (buf) => {
+        if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows could not protect the phone key.');
+        return safeStorage.encryptString(Buffer.from(buf).toString('base64')).toString('base64');
+      },
+      decrypt: (s) => Buffer.from(safeStorage.decryptString(Buffer.from(s, 'base64')), 'base64'),
+    },
+    deskName: require('os').hostname(),
+    addresses: () => phoneCapture.lanAddresses(),
+    onChange: (st) => sendToWindow('link:changed', st),
+  });
+  linkService.start().catch((err) => console.error('Phone link could not start:', err));
+}
+const linkReady = () => {
+  if (!linkService) throw new Error('The phone link is still starting. Try again in a moment.');
+  return linkService;
+};
+ipcMain.handle('link:status', async () => (linkService ? linkService.status() : { running: false, devices: [] }));
+ipcMain.handle('link:pair', async () => linkReady().beginPairing());
+ipcMain.handle('link:cancel', async () => linkReady().cancelPairing());
+ipcMain.handle('link:remove', async (_, id) => linkReady().removeDevice(String(id || '')));
+
 // ── Wake phrase ("Hello Matt"): the offline speech model (Vosk small English, Apache-2.0) ──
 // Downloaded once when the teacher turns the wake phrase on (not in the installer), checked
 // against its SHA-256, kept in the app's data folder. Listening itself runs in the window.
@@ -894,6 +924,7 @@ app.on('second-instance', () => showMainWindow());
 app.on('before-quit', () => {
   isQuitting = true;
   phoneCapture.stop();
+  linkService?.stop();
 });
 
 app.whenReady().then(() => {
@@ -906,6 +937,7 @@ app.whenReady().then(() => {
   createWindow();
   if (backgroundSettings.keepRunning) ensureTray();
   setupAutoUpdate();
+  startLinkService();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
