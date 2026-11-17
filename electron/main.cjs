@@ -694,7 +694,7 @@ ipcMain.on('bubble:drag', (event, d = {}) => {
   if (!bubbleWindow || event.sender !== bubbleWindow.webContents) return;
   const x = Number(d.x);
   const y = Number(d.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 100000 || Math.abs(y) > 100000) return;
   const { width, height } = bubbleWindow.getBounds();
   let nx = Math.round(x);
   let ny = Math.round(y);
@@ -953,7 +953,7 @@ ipcMain.handle('link:removeFolder', async (e, id) => {
 // phone unless KaTuroDesk is allowed there; and a "Cancel" on Windows' first prompt leaves Block
 // rules that stop phones on every network. Settings → Phones shows either case and offers one
 // click (Windows asks the teacher's OK) that replaces KaTuroDesk's incoming rules with one Allow
-// for the phone link port.
+// for the program (electron/phoneFirewall.cjs).
 const phoneFirewall = require('./phoneFirewall.cjs');
 ipcMain.handle('link:network', async (e) => {
   if (!fromMainWindow(e) || process.platform !== 'win32') return { checked: false };
@@ -961,7 +961,7 @@ ipcMain.handle('link:network', async (e) => {
 });
 ipcMain.handle('link:allowNetwork', async (e) => {
   if (!fromMainWindow(e) || process.platform !== 'win32') return { ok: false };
-  return phoneFirewall.allow(process.execPath, linkService?.status().port || 47821);
+  return phoneFirewall.allow(process.execPath);
 });
 
 // The KaTuro account signed in on KaTuroDesk: phones link only to the same account.

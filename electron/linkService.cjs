@@ -362,10 +362,11 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     return true;
   }
 
-  // A refused time or nonce. The answer carries this computer's time, so a phone whose clock
-  // is off (common on school tablets) sets its own offset and sends again at once. A message is
-  // still accepted only once and only within the time window, so this weakens nothing.
-  const stale = (ts) => ({ code: 400, plain: { error: "The phone's date and time are off. Set them to automatic in the phone's settings.", code: 'STALE', now: now(), skewed: Number.isFinite(ts) && Math.abs(now() - ts) > CLOCK_SKEW_MS } });
+  // A refused time or nonce. The answer (encrypted, so nobody else on the Wi-Fi can fake it)
+  // carries this computer's time: a phone whose clock is off (common on school tablets) sets its
+  // own offset and sends again at once. A message is still accepted only once and only within
+  // the time window, so this weakens nothing.
+  const stale = (key, id, req) => ({ code: 200, sealed: seal(key, { error: "The phone's date and time are off. Set them to automatic in the phone's settings.", code: 'STALE', now: now() }, aad(id, 'res', req.nonce)) });
 
   async function onMessage(env) {
     const id = String(env?.id || '');
@@ -376,7 +377,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       let req;
       try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This QR code is not valid.' } }; }
       if (req.op !== 'pair') return { code: 400, plain: { error: 'Bad pairing request.' } };
-      if (!freshNonce(req.nonce, req.ts)) return stale(req.ts);
+      if (!freshNonce(req.nonce, req.ts)) return stale(key, id, req);
       const refuse = (error, code) => ({ code: 200, sealed: seal(key, { error, code }, aad(id, 'res', req.nonce)) });
       if (store.devices.length >= MAX_DEVICES) return refuse(`Up to ${MAX_DEVICES} phones can be linked. Remove one in KaTuroDesk first.`, 'TOO_MANY');
       // One KaTuro account on both sides: the phone must be signed in as the teacher on KaTuroDesk.
@@ -405,7 +406,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (!key) return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk. Link it again from KaTuroDesk Settings → Phones.', code: 'NOT_LINKED' } };
     let req;
     try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk.', code: 'NOT_LINKED' } }; }
-    if (!freshNonce(req.nonce, req.ts)) return stale(req.ts);
+    if (!freshNonce(req.nonce, req.ts)) return stale(key, id, req);
     // KaTuroDesk is now signed in to another account (or signed out): that teacher's phone is not served.
     if (!device.uid) {
       // Linked before phones were tied to an account: link it again (from KaTuroDesk Settings → Phones).

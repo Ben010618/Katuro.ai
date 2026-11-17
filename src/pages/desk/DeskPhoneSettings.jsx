@@ -118,8 +118,9 @@ function NetworkCheck({ api }) {
     try {
       const r = await api.allowLinkNetwork();
       const again = await api.linkNetwork();
-      setNet(again);
-      if (!r?.ok || !again?.allowed || again?.blocked) setNote('Windows did not allow it. Click again and choose Yes when Windows asks.');
+      if (again?.checked) setNet(again);
+      if (!again?.checked) setNote(r?.ok ? 'Windows was asked. Close and reopen Settings to check it.' : 'Windows did not allow it. Click again and choose Yes when Windows asks.');
+      else if (!r?.ok || !again.allowed || again.blocked) setNote('Windows did not allow it. Click again and choose Yes when Windows asks.');
     } catch {
       setNote('Windows did not allow it. Click again and choose Yes when Windows asks.');
     } finally {

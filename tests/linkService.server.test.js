@@ -8,6 +8,7 @@ import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
+import crypto from 'crypto';
 import { parseLinkQr, pairWithDesk, createLinkClient } from '../src/services/link/linkClient.js';
 
 const require = createRequire(import.meta.url);
@@ -45,6 +46,21 @@ async function setup({ now, askDesk } = {}) {
   });
   await service.start(0);
   return { home, storeFile };
+}
+
+// Opens KaTuroDesk's encrypted answer to a captured request (the test holds the phone's key).
+function openAnswer(link, capturedBody, answer) {
+  const key = Buffer.from(link.key, 'base64url');
+  const open = (env, aadText) => {
+    const iv = Buffer.from(env.iv, 'base64url');
+    const all = Buffer.from(env.ct, 'base64url');
+    const d = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    d.setAAD(Buffer.from(aadText));
+    d.setAuthTag(all.subarray(all.length - 16));
+    return JSON.parse(Buffer.concat([d.update(all.subarray(0, all.length - 16)), d.final()]).toString('utf8'));
+  };
+  const req = open(JSON.parse(capturedBody), `katuro-link|${link.deviceId}|req`);
+  return open(answer, `katuro-link|${link.deviceId}|res|${req.nonce}`);
 }
 
 async function pairPhone() {
@@ -130,7 +146,8 @@ describe('phone link', () => {
     const spy = async (url, init) => { captured = init.body; return fetch(url, init); };
     await createLinkClient(link, { fetchImpl: spy }).list('Records');
     const post = (body) => fetch(`http://127.0.0.1:${port}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then((r) => r.json());
-    expect(await post(captured)).toMatchObject({ code: 'STALE' });
+    // Refused, in KaTuroDesk's encrypted answer (so nobody on the Wi-Fi can fake the time in it).
+    expect(openAnswer(link, captured, await post(captured))).toMatchObject({ code: 'STALE' });
     const env = JSON.parse(captured);
     const flipped = env.ct.slice(0, -2) + (env.ct.endsWith('A') ? 'BB' : 'AA');
     expect(await post(JSON.stringify({ ...env, ct: flipped }))).toMatchObject({ code: 'NOT_LINKED' });
@@ -194,7 +211,7 @@ describe('phone link', () => {
     service = createLinkService({ home: () => home, storeFile, protect, addresses: () => [{ address: '127.0.0.1', name: 'test' }], account: TEACHER });
     await service.start(0);
     const res = await fetch(`http://127.0.0.1:${service.status().port}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: captured }).then((r) => r.json());
-    expect(res).toMatchObject({ code: 'STALE' });
+    expect(openAnswer(link, captured, res)).toMatchObject({ code: 'STALE' });
     // The phone itself still works after the restart.
     expect(await createLinkClient({ ...link, port: service.status().port }).hello()).toMatchObject({ phone: "Ma'am Ana's phone" });
   });

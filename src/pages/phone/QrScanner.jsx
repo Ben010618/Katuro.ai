@@ -56,6 +56,7 @@ export default function QrScanner({ onResult, onClose }) {
     let alive = true;
     let detector = null;
     let round = 0;
+    let misses = 0; // Android's reader failing in a row
     const found = (text) => {
       doneRef.current = true;
       navigator.vibrate?.(40);
@@ -69,11 +70,12 @@ export default function QrScanner({ onResult, onClose }) {
       if (v && v.readyState >= 2) {
         let text = null;
         try {
-          if (detector) text = (await detector.detect(v))?.[0]?.rawValue || null;
+          if (detector) { text = (await detector.detect(v))?.[0]?.rawValue || null; misses = 0; }
           else text = readQr(v, v.videoWidth, v.videoHeight, canvasRef.current, round % 3 === 2 ? 1 : 0.7);
         } catch {
-          // Android's reader is there but does not work on this phone: read the picture ourselves.
-          detector = null;
+          // Android's reader is there but keeps failing on this phone: read the picture ourselves.
+          misses += 1;
+          if (misses >= 3) detector = null;
         }
         round += 1;
         if (text && alive && !doneRef.current) { found(text); return; }

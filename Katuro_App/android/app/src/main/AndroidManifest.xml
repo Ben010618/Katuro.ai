@@ -81,6 +81,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Scan the QR code on KaTuroDesk to link this phone -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- A short buzz when the camera reads the KaTuroDesk code. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Online updates of the app (KaturoUpdatePlugin), after the teacher allows it -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

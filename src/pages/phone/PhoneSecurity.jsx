@@ -62,7 +62,7 @@ export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <button key={d} type="button" onClick={() => press(d)} className="nm-sm nm-press h-[72px] w-[72px] rounded-full text-2xl font-medium">{d}</button>
         ))}
-        <button type="button" aria-label="Erase" onClick={() => setPinText(pin.slice(0, -1))} className="nm-muted nm-press grid h-[72px] w-[72px] place-items-center rounded-full"><Delete size={24} /></button>
+        <button type="button" aria-label="Erase" onClick={() => setPinText((p) => p.slice(0, -1))} className="nm-muted nm-press grid h-[72px] w-[72px] place-items-center rounded-full"><Delete size={24} /></button>
         <button type="button" onClick={() => press('0')} className="nm-sm nm-press h-[72px] w-[72px] rounded-full text-2xl font-medium">0</button>
         <button type="button" disabled={!validPin(pin) || busy} onClick={() => submit(pin)} className="nm-accent nm-press grid h-[72px] w-[72px] place-items-center rounded-full text-sm font-semibold disabled:opacity-30">{busy ? <Loader2 size={20} className="animate-spin" /> : 'OK'}</button>
       </div>

@@ -9,6 +9,16 @@ const hanging = (calls) => (url, { signal }) => {
   return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted'))));
 };
 
+describe('the phone clock', () => {
+  it('a plain (not encrypted) "STALE" with a time is not trusted and not sent again', async () => {
+    const calls = [];
+    const fake = async (url) => { calls.push(url); return { status: 400, json: async () => ({ code: 'STALE', now: Date.now() + 9e9, error: 'stale' }) }; };
+    const client = createLinkClient({ ...LINK, hosts: ['10.0.0.2'] }, { fetchImpl: fake });
+    await expect(client.request('classes')).rejects.toMatchObject({ code: 'STALE' });
+    expect(calls).toHaveLength(1);
+  });
+});
+
 describe('a file change that runs out of time', () => {
   it('is not sent again to the computer\'s other address, and is not kept to send later', async () => {
     const calls = [];

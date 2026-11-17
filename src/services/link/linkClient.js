@@ -63,9 +63,10 @@ export function parseLinkQr(text) {
   const t = String(text || '').trim();
   if (t.startsWith(QR_PREFIX)) {
     const [, id, key, port, hosts, deskId] = t.split('|');
-    const list = String(hosts || '').split(',').map((h) => h.trim()).filter(Boolean);
-    if (!id || !key || !Number(port) || !list.length) return null;
-    return { id, key, hosts: list, port: Number(port), deskName: 'KaTuroDesk', deskId: String(deskId || '') };
+    const list = String(hosts || '').split(',').map((h) => h.trim()).filter(Boolean).slice(0, 6);
+    const p = Number(port);
+    if (!id || !/^[A-Za-z0-9_-]{43}$/.test(String(key)) || !Number.isInteger(p) || p < 1 || p > 65535 || !list.length) return null;
+    return { id, key, hosts: list, port: p, deskName: 'KaTuroDesk', deskId: String(deskId || '') };
   }
   if (!t.startsWith(OLD_QR_PREFIX)) return null;
   try {
@@ -116,17 +117,18 @@ async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, r
   } catch {
     throw new LinkError(UNREACHABLE, 'UNREACHABLE');
   }
-  // The phone's clock is off: take KaTuroDesk's time and send once more (a new message).
-  if (!json?.ct && json?.code === 'STALE' && Number.isFinite(json.now) && !retried) {
-    clockOffset = json.now - Date.now();
-    return exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, retried: true });
-  }
   if (!json?.ct) throw new LinkError(json?.error || 'KaTuroDesk refused the request.', json?.code || `HTTP_${res.status}`);
   let out;
   try {
     out = await open(key, json, aad(id, 'res', nonce));
   } catch {
     throw new LinkError('The answer from KaTuroDesk could not be checked. Link this phone again.', 'BAD_ANSWER');
+  }
+  // The phone's clock is off: take KaTuroDesk's time (from its encrypted answer, so nobody else
+  // can set it) and send once more, as a new message (the refused one was not done).
+  if (out.error && out.code === 'STALE' && Number.isFinite(out.now) && !retried) {
+    clockOffset = out.now - Date.now();
+    return exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, retried: true });
   }
   if (out.error) throw new LinkError(out.error, out.code || 'ERROR', out.details || null);
   return out;
@@ -151,7 +153,8 @@ async function tryHosts(hosts, run) {
  * network cards links as fast as its quickest one). → { host, out }
  */
 async function raceHosts(hosts, run) {
-  if (hosts.length <= 1) return tryHosts(hosts, run);
+  // An older Android WebView (before Chrome 85) has no Promise.any: one address at a time.
+  if (hosts.length <= 1 || typeof Promise.any !== 'function') return tryHosts(hosts, run);
   try {
     return await Promise.any(hosts.map((host) => run(host).then((out) => ({ host, out }))));
   } catch (all) {

@@ -77,9 +77,9 @@
     try { face.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     if (frame) { cancelAnimationFrame(frame); frame = 0; }
     if (moved) {
-      const x = e.screenX - grab.x;
-      const y = e.screenY - grab.y;
-      window.ktBubble.moveTo(x, y, true);
+      // Where the head was last seen (a cancelled pointer may not report a place).
+      const at = e.type === 'pointercancel' && want ? want : { x: e.screenX - grab.x, y: e.screenY - grab.y };
+      window.ktBubble.moveTo(at.x, at.y, true);
     } else window.ktBubble.action('toggle');
     start = null;
   };

@@ -13,14 +13,17 @@ describe('Windows Firewall and the phone link', () => {
     expect(parseCheck('not json')).toEqual({ checked: false });
   });
 
-  it('the check names this program; the allow command replaces its rules with one for the port', () => {
-    expect(checkScript("C:\\Users\\O'Neil\\k.exe")).toContain("-ieq 'C:\\Users\\O''Neil\\k.exe'");
-    const s = allowScript('C:\\Program Files\\KaTuroDesk\\KaTuroDesk.exe', 47821);
+  it('the check counts only this program\'s rules; the allow command replaces them with one for the whole program', () => {
+    const check = checkScript("C:\\Users\\O'Neil\\k.exe");
+    expect(check).toContain("-ieq 'C:\\Users\\O''Neil\\k.exe'");
+    expect(check).not.toContain('DisplayName'); // a rule's name alone never counts
+    expect(checkScript('C:\\Users\\O\u2019Neil\\k.exe')).toContain('O\u2019\u2019Neil');
+    const s = allowScript('C:\\Program Files\\KaTuroDesk\\KaTuroDesk.exe');
     expect(s).toContain('-Verb RunAs');
     expect(s).toContain('delete rule name=all dir=in program="C:\\Program Files\\KaTuroDesk\\KaTuroDesk.exe"');
-    expect(s).toContain(`add rule name="${RULE}" dir=in action=allow`);
-    expect(s).toContain('localport=47821 profile=any');
-    expect(allowScript('C:\\a"b.exe', 47821)).toBeNull();
-    expect(allowScript('C:\\k.exe', 'x')).toBeNull();
+    expect(s).toContain(`add rule name="${RULE}" dir=in action=allow program="C:\\Program Files\\KaTuroDesk\\KaTuroDesk.exe" protocol=TCP profile=any`);
+    expect(s).not.toContain('localport'); // the phone capture page has a port of its own
+    expect(allowScript('C:\\a"b.exe')).toBeNull();
+    expect(allowScript('C:\\%TEMP%\\k.exe')).toBeNull();
   });
 });
