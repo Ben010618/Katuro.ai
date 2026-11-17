@@ -58,7 +58,8 @@ describe('phone link', () => {
   it('pairs once by QR code, then lists and opens files in the KaTuro folder', async () => {
     const { storeFile } = await setup();
     const { qr, link } = await pairPhone();
-    expect(qr).toMatchObject({ hosts: ['127.0.0.1'], deskName: "Teacher's laptop" });
+    expect(qr).toMatchObject({ hosts: ['127.0.0.1'] });
+    expect(link.deskName).toBe("Teacher's laptop");
     expect(link.deviceId).toBeTruthy();
     expect(link.key).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
@@ -463,6 +464,40 @@ describe('a phone holding a valid key cannot get around the levels', () => {
     await setup();
     fs.mkdirSync(path.join(tmp, '.ssh'));
     expect(() => service.addShared(path.join(tmp, '.ssh'))).toThrow(/Hidden folders/);
+  });
+});
+
+describe('linking is quick: a short QR code, every address at once, a phone clock that is off', () => {
+  it('the QR code is short (a sparse code a camera reads at once) and old codes still read', async () => {
+    await setup();
+    const { qrText } = service.beginPairing();
+    expect(qrText.startsWith('KT2|')).toBe(true);
+    expect(qrText.length).toBeLessThan(110);
+    expect(parseLinkQr(qrText)).toMatchObject({ hosts: ['127.0.0.1'], port: service.status().port });
+    const old = 'KTLINK1:' + Buffer.from(JSON.stringify({ v: 1, id: 'p-x', k: 'A'.repeat(43), h: ['10.0.0.2'], p: 47821, n: 'Old PC', d: 'd' })).toString('base64url');
+    expect(parseLinkQr(old)).toMatchObject({ id: 'p-x', hosts: ['10.0.0.2'], deskName: 'Old PC' });
+    expect(parseLinkQr('KT2|only|two')).toBeNull();
+    expect(parseLinkQr('hello')).toBeNull();
+  });
+
+  it('a phone whose clock is an hour off still links and works (KaTuroDesk tells it the time)', async () => {
+    const hourAhead = () => Date.now() + 60 * 60 * 1000;
+    await setup({ now: hourAhead });
+    const { link } = await pairPhone();
+    expect(link.deviceId).toBeTruthy();
+    const client = createLinkClient(link);
+    expect((await client.list('')).items.length).toBeGreaterThan(0);
+  });
+
+  it('an address that does not answer does not slow linking down', async () => {
+    await setup();
+    const { qrText } = service.beginPairing();
+    const qr = parseLinkQr(qrText);
+    const started = Date.now();
+    // 192.0.2.1 is a documentation address: nothing answers there.
+    const link = await pairWithDesk({ ...qr, hosts: ['192.0.2.1', ...qr.hosts] }, { deviceName: 'Tablet', uid: TEACHER });
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(link.hosts[0]).toBe('127.0.0.1');
   });
 });
 

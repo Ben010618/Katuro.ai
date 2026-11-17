@@ -9,10 +9,10 @@ function QrImage({ text }) {
     const qr = qrcode(0, 'M');
     qr.addData(text);
     qr.make();
-    return qr.createSvgTag({ cellSize: 5, margin: 3, scalable: true });
+    return qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
   }, [text]);
   // The SVG comes from our own QR generator (no outside text is inserted as markup).
-  return <div className="h-56 w-56 rounded-lg border border-gray-200 bg-white p-1" aria-label="QR code to link the KaTuro App" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div className="h-72 w-72 flex-shrink-0 rounded-lg border border-gray-200 bg-white p-1" aria-label="QR code to link the KaTuro App" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 const when = (iso) => {
@@ -97,6 +97,44 @@ function PhoneAccess({ api, status, onStatus }) {
   );
 }
 
+/**
+ * Windows Firewall: on a network Windows calls "Public" it blocks the phone unless KaTuroDesk
+ * is allowed. One click asks Windows (it shows its own prompt) to allow the phone link.
+ */
+function NetworkCheck({ api }) {
+  const [net, setNet] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    if (!api?.linkNetwork) return undefined;
+    let alive = true;
+    api.linkNetwork().then((n) => alive && setNet(n)).catch(() => {});
+    return () => { alive = false; };
+  }, [api]);
+  if (!net?.checked || !(net.blocked || !net.allowed)) return null;
+  const allow = async () => {
+    setBusy(true);
+    setNote('');
+    try {
+      const r = await api.allowLinkNetwork();
+      const again = await api.linkNetwork();
+      setNet(again);
+      if (!r?.ok || !again?.allowed || again?.blocked) setNote('Windows did not allow it. Click again and choose Yes when Windows asks.');
+    } catch {
+      setNote('Windows did not allow it. Click again and choose Yes when Windows asks.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 space-y-2">
+      <p><b>Windows may block your phone.</b> {net.blocked ? 'Windows Firewall is set to block KaTuroDesk' : `Windows Firewall does not let phones reach KaTuroDesk on this ${net.public ? 'Public ' : ''}network`}. Allow it once and your phone can link.</p>
+      <button type="button" onClick={allow} disabled={busy} className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold disabled:opacity-50">{busy ? 'Waiting for Windows…' : 'Allow phones on this network'}</button>
+      {note && <p className="text-red-700">{note}</p>}
+    </div>
+  );
+}
+
 /** Settings → Phones: link the KaTuro App on the teacher's phone, see and remove linked phones. */
 export default function DeskPhoneSettings() {
   const api = desk();
@@ -154,6 +192,7 @@ export default function DeskPhoneSettings() {
           A linked phone can see the folders you allow below and open their files. It works over the same Wi-Fi or your phone&apos;s hotspot; no internet is needed, and nothing goes to the cloud.
         </p>
         {status && !status.running && <p className="text-[11px] text-amber-700 mb-2">The phone link is not running. Close and reopen KaTuroDesk.</p>}
+        <div className="mb-3"><NetworkCheck api={api} /></div>
 
         {qr && !expired ? (
           <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -161,7 +200,7 @@ export default function DeskPhoneSettings() {
             <div className="text-xs text-gray-700 space-y-2">
               <ol className="list-decimal pl-4 space-y-1">
                 <li>Open the KaTuro App on your phone and sign in.</li>
-                <li>Tap <b>Link to KaTuroDesk</b>, then point the camera at this code.</li>
+                <li>Tap <b>Scan the code</b> and point the camera at this code. It links at once.</li>
               </ol>
               <p className="text-[11px] text-gray-500">This code links one phone and works for {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')} more. Show it only to your own phone.</p>
               <button type="button" onClick={() => { api.cancelLinkPhone(); setQr(null); }} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>

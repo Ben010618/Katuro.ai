@@ -66,6 +66,9 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   cancelLinkPhone: () => ipcRenderer.invoke('link:cancel'),
   removeLinkedPhone: (id) => ipcRenderer.invoke('link:remove', id),
   setPhoneAccess: (deviceId, key, level) => ipcRenderer.invoke('link:access', deviceId, key, level),
+  // Windows Firewall on this network: { checked, public, allowed }; allowLinkNetwork() asks Windows once.
+  linkNetwork: () => ipcRenderer.invoke('link:network'),
+  allowLinkNetwork: () => ipcRenderer.invoke('link:allowNetwork'),
   addPhoneFolder: () => ipcRenderer.invoke('link:addFolder'),
   removePhoneFolder: (id) => ipcRenderer.invoke('link:removeFolder', id),
   setLinkAccount: (uid) => ipcRenderer.invoke('link:account', uid),

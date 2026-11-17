@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('ktBubble', {
     return () => ipcRenderer.removeListener('bubble:state', listener);
   },
   action: (id, text) => ipcRenderer.send('bubble:action', { id, text }),
-  drag: (dx, dy, end = false) => ipcRenderer.send('bubble:drag', { dx, dy, end }),
+  // Dragging the head: the window's new top-left corner on the screen (end: let go).
+  moveTo: (x, y, end = false) => ipcRenderer.send('bubble:drag', { x, y, end }),
 });

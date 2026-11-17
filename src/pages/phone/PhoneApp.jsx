@@ -144,6 +144,9 @@ export default function PhoneApp() {
   // PIN lock: locked when the app opens and after 5 minutes away (appLock.js).
   const [locked, setLocked] = useState(() => hasPin());
   const [settingPin, setSettingPin] = useState(false);
+  // hasPin() reads the phone's storage, which React does not watch: a new PIN bumps this so
+  // the screen is drawn again (without it a first PIN stayed on "Once more" for good).
+  const [, setPinChanged] = useState(0);
   const hiddenAt = useRef(0);
   useEffect(() => {
     const onVisible = () => {
@@ -364,7 +367,7 @@ export default function PhoneApp() {
           tappable) but stays mounted, so typed scores, an open file and a running Assistant turn
           are still there after the PIN. */}
       {showUnlock && <LockScreen mode="unlock" onDone={() => setLocked(false)} onForgot={signOutHere} onLockedOut={lockedOut} />}
-      {showSetPin && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); }} onCancel={hasPin() ? () => setSettingPin(false) : undefined} />}
+      {showSetPin && <LockScreen mode="set" onDone={() => { setSettingPin(false); setLocked(false); setPinChanged((n) => n + 1); }} onCancel={hasPin() ? () => setSettingPin(false) : undefined} />}
       {menuOpen && !pinScreen && (
         <PhoneMenu
           version={appVersion}

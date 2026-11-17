@@ -61,6 +61,16 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.20.0',
+    steps: [
+      {
+        target: 'phone',
+        title: 'Linking your phone is quick now',
+        body: 'Point the phone at the code and it links at once. If Windows blocks your phone on this network, Settings → Phones shows a button to allow it.',
+      },
+    ],
+  },
+  {
     version: '1.19.0',
     steps: [
       {
@@ -117,7 +127,8 @@ export function tourToShow({ seen, firstRun, version }) {
   if (!version) return null;
   if (!seen?.version) {
     if (firstRun) return { kind: 'welcome', steps: FIRST_RUN };
-    const steps = whatsNewSteps(null, version);
+    // Used KaTuroDesk before the tours existed: every highlight so far, oldest first.
+    const steps = whatsNewSteps('0', version);
     return steps.length ? { kind: 'new', steps } : null;
   }
   if (compareVersions(seen.version, version) >= 0) return null;

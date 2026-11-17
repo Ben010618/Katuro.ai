@@ -688,16 +688,24 @@ ipcMain.on('bubble:action', (event, action = {}) => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bubble:action', { id, text: typeof action.text === 'string' ? action.text.slice(0, 1000) : undefined, expanded: bubbleState.expanded });
 });
 
-// Dragging the head: the window follows the pointer; the place is remembered.
+// Dragging the head: the window goes to the pointer's place (only moved, never resized, so it
+// stays smooth); when let go it settles fully on the screen it is on, and the place is remembered.
 ipcMain.on('bubble:drag', (event, d = {}) => {
   if (!bubbleWindow || event.sender !== bubbleWindow.webContents) return;
-  const b = bubbleWindow.getBounds();
-  const dx = Math.max(-400, Math.min(400, Math.round(Number(d.dx) || 0)));
-  const dy = Math.max(-400, Math.min(400, Math.round(Number(d.dy) || 0)));
-  bubbleWindow.setBounds({ ...b, x: b.x + dx, y: b.y + dy });
+  const x = Number(d.x);
+  const y = Number(d.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const { width, height } = bubbleWindow.getBounds();
+  let nx = Math.round(x);
+  let ny = Math.round(y);
   if (d.end) {
-    const n = bubbleWindow.getBounds();
-    try { fs.writeFileSync(bubbleFile(), JSON.stringify({ right: n.x + n.width, bottom: n.y + n.height })); } catch (e) {}
+    const area = screen.getDisplayMatching({ x: nx, y: ny, width, height }).workArea;
+    nx = Math.min(Math.max(area.x, nx), area.x + area.width - width);
+    ny = Math.min(Math.max(area.y, ny), area.y + area.height - height);
+  }
+  bubbleWindow.setPosition(nx, ny);
+  if (d.end) {
+    try { fs.writeFileSync(bubbleFile(), JSON.stringify({ right: nx + width, bottom: ny + height })); } catch (e) {}
   }
 });
 
@@ -941,6 +949,21 @@ ipcMain.handle('link:removeFolder', async (e, id) => {
   if (!fromMainWindow(e)) return null;
   return linkReady().removeShared(String(id || ''));
 });
+// Windows Firewall: on a network Windows calls "Public" (school Wi-Fi often is), it blocks the
+// phone unless KaTuroDesk is allowed there; and a "Cancel" on Windows' first prompt leaves Block
+// rules that stop phones on every network. Settings → Phones shows either case and offers one
+// click (Windows asks the teacher's OK) that replaces KaTuroDesk's incoming rules with one Allow
+// for the phone link port.
+const phoneFirewall = require('./phoneFirewall.cjs');
+ipcMain.handle('link:network', async (e) => {
+  if (!fromMainWindow(e) || process.platform !== 'win32') return { checked: false };
+  return phoneFirewall.check(process.execPath);
+});
+ipcMain.handle('link:allowNetwork', async (e) => {
+  if (!fromMainWindow(e) || process.platform !== 'win32') return { ok: false };
+  return phoneFirewall.allow(process.execPath, linkService?.status().port || 47821);
+});
+
 // The KaTuro account signed in on KaTuroDesk: phones link only to the same account.
 let linkAccount = '';
 ipcMain.handle('link:account', (e, uid) => {

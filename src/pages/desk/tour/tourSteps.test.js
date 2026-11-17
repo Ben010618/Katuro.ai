@@ -12,10 +12,15 @@ describe('which KaTuroDesk tour to show', () => {
     expect(tourToShow({ seen: null, firstRun: true, version: '1.19.0' })).toEqual({ kind: 'welcome', steps: FIRST_RUN });
   });
 
-  it('a teacher who updated (KaTuroDesk was used before) gets only what is new', () => {
+  it('a teacher who updated (KaTuroDesk was used before) gets what is new, never the welcome tour', () => {
     const r = tourToShow({ seen: null, firstRun: false, version: '1.19.0' });
     expect(r.kind).toBe('new');
     expect(r.steps).toEqual(WHATS_NEW.find((n) => n.version === '1.19.0').steps);
+    // Straight from before the tours existed to 1.20.0: every highlight so far, oldest first.
+    const all = tourToShow({ seen: null, firstRun: false, version: '1.20.0' }).steps;
+    expect(all).toEqual([...WHATS_NEW.find((n) => n.version === '1.19.0').steps, ...WHATS_NEW.find((n) => n.version === '1.20.0').steps]);
+    // Seen 1.19.0: only 1.20.0's.
+    expect(tourToShow({ seen: { version: '1.19.0' }, firstRun: false, version: '1.20.0' }).steps).toEqual(WHATS_NEW.find((n) => n.version === '1.20.0').steps);
   });
 
   it('nothing again once seen or skipped for this version; the next update shows its own highlights', () => {
@@ -26,8 +31,10 @@ describe('which KaTuroDesk tour to show', () => {
   });
 
   it('Settings → What\'s new replays the newest highlights, also on a later fix version', () => {
-    expect(latestWhatsNew('1.19.0')).toEqual(WHATS_NEW[0].steps);
-    expect(latestWhatsNew('1.19.3')).toEqual(WHATS_NEW[0].steps);
+    const v119 = WHATS_NEW.find((n) => n.version === '1.19.0').steps;
+    expect(latestWhatsNew('1.19.0')).toEqual(v119);
+    expect(latestWhatsNew('1.19.3')).toEqual(v119);
+    expect(latestWhatsNew('1.20.4')).toEqual(WHATS_NEW[0].steps);
     expect(latestWhatsNew('')).toEqual(WHATS_NEW[0].steps);
     expect(latestWhatsNew('1.0.0')).toEqual([]);
   });

@@ -46,32 +46,45 @@
   window.ktBubble.onState(render);
 
   // Drag the head to move it; a click without moving opens or closes the card.
-  let start = null;
-  let last = null;
+  // The window goes where the pointer is (minus where it was grabbed), at most once per screen
+  // frame: no steps piling up, no drift, smooth on any screen scale.
+  let start = null; // pointer on the screen at the press
+  let grab = null; // pointer inside the window at the press
   let moved = false;
+  let want = null; // where the window should go next
+  let frame = 0;
+  const send = () => {
+    frame = 0;
+    if (want) window.ktBubble.moveTo(want.x, want.y);
+  };
   face.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     face.setPointerCapture(e.pointerId);
     start = { x: e.screenX, y: e.screenY };
-    last = { ...start };
+    grab = { x: e.screenX - window.screenX, y: e.screenY - window.screenY };
     moved = false;
+    want = null;
   });
   face.addEventListener('pointermove', (e) => {
     if (!start) return;
     if (!moved && Math.hypot(e.screenX - start.x, e.screenY - start.y) < 5) return;
     moved = true;
-    window.ktBubble.drag(e.screenX - last.x, e.screenY - last.y);
-    last = { x: e.screenX, y: e.screenY };
+    want = { x: e.screenX - grab.x, y: e.screenY - grab.y };
+    if (!frame) frame = requestAnimationFrame(send);
   });
   const end = (e) => {
     if (!start) return;
     try { face.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-    if (moved) window.ktBubble.drag(0, 0, true);
-    else window.ktBubble.action('toggle');
+    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    if (moved) {
+      const x = e.screenX - grab.x;
+      const y = e.screenY - grab.y;
+      window.ktBubble.moveTo(x, y, true);
+    } else window.ktBubble.action('toggle');
     start = null;
   };
   face.addEventListener('pointerup', end);
-  face.addEventListener('pointercancel', () => { start = null; });
+  face.addEventListener('pointercancel', (e) => { if (moved) end(e); start = null; });
   face.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.ktBubble.action('toggle'); } });
 
   $('close').addEventListener('click', () => window.ktBubble.action('toggle'));

@@ -45,8 +45,8 @@ export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
   };
   const press = (d) => {
     if (busy) return;
-    const next = (pin + d).slice(0, 6);
-    setPinText(next);
+    // From the latest digits, so quick taps never drop one.
+    setPinText((p) => (p + d).slice(0, 6));
     setNote('');
   };
 

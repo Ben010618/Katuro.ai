@@ -43,7 +43,11 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_DEVICES = 10;
 const MAX_LIST = 2000;
 const PREFERRED_PORT = 47821;
-const QR_PREFIX = 'KTLINK1:';
+// The pairing QR code, kept short so a phone camera reads it at once (a small, sparse code):
+//   KT2|<pairing id>|<key>|<port>|<address>,<address>|<desk id>
+// The desk's name comes with the pairing answer. Up to three addresses.
+const QR_PREFIX = 'KT2|';
+const QR_HOSTS = 3;
 const { HIDDEN } = access;
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
@@ -358,6 +362,11 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     return true;
   }
 
+  // A refused time or nonce. The answer carries this computer's time, so a phone whose clock
+  // is off (common on school tablets) sets its own offset and sends again at once. A message is
+  // still accepted only once and only within the time window, so this weakens nothing.
+  const stale = (ts) => ({ code: 400, plain: { error: "The phone's date and time are off. Set them to automatic in the phone's settings.", code: 'STALE', now: now(), skewed: Number.isFinite(ts) && Math.abs(now() - ts) > CLOCK_SKEW_MS } });
+
   async function onMessage(env) {
     const id = String(env?.id || '');
     // Pairing message: encrypted with the key from the QR code on the screen.
@@ -366,7 +375,8 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
       const key = pairing.key;
       let req;
       try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This QR code is not valid.' } }; }
-      if (req.op !== 'pair' || !freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: 'Bad pairing request.' } };
+      if (req.op !== 'pair') return { code: 400, plain: { error: 'Bad pairing request.' } };
+      if (!freshNonce(req.nonce, req.ts)) return stale(req.ts);
       const refuse = (error, code) => ({ code: 200, sealed: seal(key, { error, code }, aad(id, 'res', req.nonce)) });
       if (store.devices.length >= MAX_DEVICES) return refuse(`Up to ${MAX_DEVICES} phones can be linked. Remove one in KaTuroDesk first.`, 'TOO_MANY');
       // One KaTuro account on both sides: the phone must be signed in as the teacher on KaTuroDesk.
@@ -395,7 +405,7 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (!key) return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk. Link it again from KaTuroDesk Settings → Phones.', code: 'NOT_LINKED' } };
     let req;
     try { req = open(key, env, aad(id, 'req')); } catch { return { code: 401, plain: { error: 'This phone is not linked to this KaTuroDesk.', code: 'NOT_LINKED' } }; }
-    if (!freshNonce(req.nonce, req.ts)) return { code: 400, plain: { error: "The phone's clock or message is off. Check the phone's date and time.", code: 'STALE' } };
+    if (!freshNonce(req.nonce, req.ts)) return stale(req.ts);
     // KaTuroDesk is now signed in to another account (or signed out): that teacher's phone is not served.
     if (!device.uid) {
       // Linked before phones were tied to an account: link it again (from KaTuroDesk Settings → Phones).
@@ -477,10 +487,10 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     /** A new pairing QR code (replaces any earlier one). → { qrText, expiresAt } */
     beginPairing() {
       if (!server) throw new Error('The phone link is not running.');
-      pairing = { id: `p-${b64u(crypto.randomBytes(12))}`, key: crypto.randomBytes(32), expiresAt: now() + PAIR_MS };
-      const payload = { v: VERSION, id: pairing.id, k: b64u(pairing.key), h: addresses().map((a) => a.address), p: port, n: deskName, d: store.deskId };
+      pairing = { id: `p${b64u(crypto.randomBytes(9))}`, key: crypto.randomBytes(32), expiresAt: now() + PAIR_MS };
+      const hosts = addresses().map((a) => a.address).slice(0, QR_HOSTS);
       onChange(status());
-      return { qrText: QR_PREFIX + b64u(Buffer.from(JSON.stringify(payload))), expiresAt: pairing.expiresAt };
+      return { qrText: [QR_PREFIX.slice(0, -1), pairing.id, b64u(pairing.key), port, hosts.join(','), store.deskId].join('|'), expiresAt: pairing.expiresAt };
     },
     cancelPairing() {
       pairing = null;

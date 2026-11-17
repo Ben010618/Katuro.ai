@@ -7,7 +7,12 @@
 
 import { bytesToBase64, base64ToBytes as decodeBase64 } from '../../utils/bytes.js';
 
-export const QR_PREFIX = 'KTLINK1:';
+// Pairing QR codes: "KT2|id|key|port|addresses|deskId" (KaTuroDesk 1.20+, short so it scans at
+// once) and the older "KTLINK1:" + base64 JSON.
+export const QR_PREFIX = 'KT2|';
+const OLD_QR_PREFIX = 'KTLINK1:';
+// The phone's clock minus KaTuroDesk's, learned when KaTuroDesk refuses a message as stale.
+let clockOffset = 0;
 export const VERSION = 1;
 const TRY_MS = 4000;
 const READ_MS = 60000;
@@ -56,9 +61,15 @@ async function open(key, { iv, ct }, additional) {
  */
 export function parseLinkQr(text) {
   const t = String(text || '').trim();
-  if (!t.startsWith(QR_PREFIX)) return null;
+  if (t.startsWith(QR_PREFIX)) {
+    const [, id, key, port, hosts, deskId] = t.split('|');
+    const list = String(hosts || '').split(',').map((h) => h.trim()).filter(Boolean);
+    if (!id || !key || !Number(port) || !list.length) return null;
+    return { id, key, hosts: list, port: Number(port), deskName: 'KaTuroDesk', deskId: String(deskId || '') };
+  }
+  if (!t.startsWith(OLD_QR_PREFIX)) return null;
   try {
-    const p = JSON.parse(dec.decode(b64uDecode(t.slice(QR_PREFIX.length))));
+    const p = JSON.parse(dec.decode(b64uDecode(t.slice(OLD_QR_PREFIX.length))));
     if (p.v !== VERSION || !p.id || !p.k || !Array.isArray(p.h) || !p.p) return null;
     return { id: String(p.id), key: String(p.k), hosts: p.h.map(String).filter(Boolean), port: Number(p.p), deskName: String(p.n || 'KaTuroDesk'), deskId: String(p.d || '') };
   } catch {
@@ -86,9 +97,9 @@ function withTimeout(ms) {
  * One encrypted request to one address. → the Desk's decrypted answer object.
  * Throws LinkError('…', 'UNREACHABLE') when nothing answers at that address.
  */
-async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs }) {
+async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, retried = false }) {
   const nonce = b64uEncode(crypto.getRandomValues(new Uint8Array(18)));
-  const body = JSON.stringify({ v: VERSION, id, ...(await seal(key, { op, args, ts: Date.now(), nonce }, aad(id, 'req'))) });
+  const body = JSON.stringify({ v: VERSION, id, ...(await seal(key, { op, args, ts: Date.now() + clockOffset, nonce }, aad(id, 'req'))) });
   const t = withTimeout(timeoutMs);
   let res;
   try {
@@ -104,6 +115,11 @@ async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs })
     json = await res.json();
   } catch {
     throw new LinkError(UNREACHABLE, 'UNREACHABLE');
+  }
+  // The phone's clock is off: take KaTuroDesk's time and send once more (a new message).
+  if (!json?.ct && json?.code === 'STALE' && Number.isFinite(json.now) && !retried) {
+    clockOffset = json.now - Date.now();
+    return exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, retried: true });
   }
   if (!json?.ct) throw new LinkError(json?.error || 'KaTuroDesk refused the request.', json?.code || `HTTP_${res.status}`);
   let out;
@@ -131,6 +147,20 @@ async function tryHosts(hosts, run) {
 }
 
 /**
+ * Tries every address at once (pairing: the first to answer wins, so a computer with several
+ * network cards links as fast as its quickest one). → { host, out }
+ */
+async function raceHosts(hosts, run) {
+  if (hosts.length <= 1) return tryHosts(hosts, run);
+  try {
+    return await Promise.any(hosts.map((host) => run(host).then((out) => ({ host, out }))));
+  } catch (all) {
+    const errors = all?.errors || [];
+    throw errors.find((e) => e.code !== 'UNREACHABLE') || errors[0] || new LinkError(UNREACHABLE, 'UNREACHABLE');
+  }
+}
+
+/**
  * Pairs with the KaTuroDesk whose QR code was scanned.
  * → the saved link: { deskId, deskName, deviceId, key, hosts, port, pairedAt }
  */
@@ -140,7 +170,7 @@ async function tryHosts(hosts, run) {
  */
 export async function pairWithDesk(qr, { deviceName = 'Phone', uid = '', fetchImpl = fetch } = {}) {
   const key = await importKey(b64uDecode(qr.key));
-  const { host, out } = await tryHosts(qr.hosts, (h) => exchange({ host: h, port: qr.port, id: qr.id, key, op: 'pair', args: { deviceName, uid }, fetchImpl, timeoutMs: TRY_MS }));
+  const { host, out } = await raceHosts(qr.hosts, (h) => exchange({ host: h, port: qr.port, id: qr.id, key, op: 'pair', args: { deviceName, uid }, fetchImpl, timeoutMs: TRY_MS }));
   return {
     deskId: out.deskId,
     deskName: out.deskName || qr.deskName,
