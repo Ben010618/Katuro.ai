@@ -52,6 +52,7 @@ export function userStats(teachers = [], opts = {}) {
   return {
     total: list.length,
     active: list.filter((t) => isActiveUser(t, opts)).length,
-    subscribed: list.filter((t) => planInfo(t).plan === 'subscription').length,
+    // On the same "now" as Active (planInfo used the real clock, so the count drifted from it).
+    subscribed: list.filter((t) => planInfo(t, false, new Date(opts.now ?? Date.now())).plan === 'subscription').length,
   };
 }
