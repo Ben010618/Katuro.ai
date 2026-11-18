@@ -37,3 +37,9 @@ electron/vendor/
 # Phone app (Katuro_App/, Capacitor): mobile web build and its packages
 dist-mobile
 Katuro_App/node_modules
+marketing/reel/frames/
+marketing/reel/vo/
+marketing/reel/sfx/
+marketing/reel/reelenv/
+marketing/reel/*.onnx*
+marketing/reel/*.mp4

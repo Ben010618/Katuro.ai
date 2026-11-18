@@ -1,0 +1,450 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>KaTuro reel</title>
+<style>
+  @font-face { font-family: 'Bangers'; src: url('fonts/Bangers.woff2') format('woff2'); }
+  @font-face { font-family: 'Comic Neue'; font-weight: 700; src: url('fonts/Comic-Neue-wght-700.woff2') format('woff2'); }
+  html, body { margin: 0; padding: 0; background: #111; }
+  #stage { width: 1080px; height: 1920px; display: block; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+// ── The reel: 60 s, 1080 × 1920. render(t) draws second t (any order, same result each time). ──
+const VO = { night: 6.653, ask: 5.283, sleep: 9.752, morning: 4.168, scores: 7.419, teach: 4.087, recap: 5.747, cta: 6.374 };
+const TEXT = {
+  night: "This is Teacher Ana. It's eleven at night, and she's still making slides, lesson plans, and checking papers.",
+  ask: 'So tonight, she tries something new. She simply tells KaTuroDesk what she needs for tomorrow.',
+  sleep: 'Then she goes to bed. While she sleeps, KaTuroDesk prepares her lesson log, her PowerPoint, a quiz, and worksheets, all ready in her Lessons folder.',
+  morning: 'Good morning! Her phone reminds her: everything for today is ready.',
+  scores: 'After the quiz, she snaps the checked papers with her phone. The scores go straight into her class record, with a backup first.',
+  teach: 'And the rest of her time? She spends it where it matters most. Teaching.',
+  recap: 'Lesson plans, slides, quizzes, scores, and reminders. All on your own computer.',
+  cta: 'KaTuroDesk, and the KaTuro App. Less paperwork. More teaching. Get it at katuro.website',
+};
+// Scene starts (s); each line starts LEAD s into its scene.
+const LEAD = 0.45;
+const SCENES = [
+  ['night', 0], ['ask', 7.6], ['sleep', 13.6], ['morning', 24.2], ['scores', 29.4], ['teach', 37.6], ['recap', 42.6], ['cta', 49.2],
+];
+const END = 60;
+window.REEL = { END, LEAD, SCENES: SCENES.map(([id, at]) => ({ id, at, vo: at + LEAD })) };
+
+// ── helpers ──
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, p) => a + (b - a) * p;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const outCubic = (p) => 1 - (1 - p) ** 3;
+const outBack = (p) => { const c = 1.9; return p <= 0 ? 0 : p >= 1 ? 1 : 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2; };
+const inOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2);
+const wob = (t, f = 1, a = 1) => Math.sin(t * Math.PI * 2 * f) * a;
+const INK = '#151515';
+const pop = (p, x, y, inner) => `<g transform="translate(${x} ${y}) scale(${outBack(p)})" opacity="${clamp(p * 3)}">${inner}</g>`;
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// Comic box with an offset ink shadow.
+function box(x, y, w, h, fill, { r = 18, sw = 7, sh = 12 } = {}) {
+  return `<rect x="${x + sh}" y="${y + sh}" width="${w}" height="${h}" rx="${r}" fill="${INK}"/>`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" stroke="${INK}" stroke-width="${sw}"/>`;
+}
+function text(x, y, s, { size = 48, font = 'Comic Neue', fill = INK, anchor = 'middle', weight = 700, stroke = '', sw = 0, ls = 0 } = {}) {
+  const st = stroke ? ` stroke="${stroke}" stroke-width="${sw}" paint-order="stroke" stroke-linejoin="round"` : '';
+  return `<text x="${x}" y="${y}" font-family="${font}" font-weight="${weight}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" letter-spacing="${ls}"${st}>${esc(s)}</text>`;
+}
+// Lines of text, centred, wrapped by hand (\n).
+function lines(x, y, s, opts = {}, gap = 1.18) {
+  const size = opts.size || 48;
+  return s.split('\n').map((l, i) => text(x, y + i * size * gap, l, opts)).join('');
+}
+// The yellow narration box at the top (comic caption).
+function caption(t, start, s, { y = 120, w = 900, size = 56, fill = '#ffe14d', rot = -2 } = {}) {
+  const p = outBack(seg(t, start, start + 0.45));
+  if (p <= 0) return '';
+  const n = s.split('\n').length;
+  const h = n * size * 1.18 + 56;
+  return `<g transform="translate(540 ${y + h / 2}) rotate(${rot}) scale(${p}) translate(-540 ${-(y + h / 2)})">${box(540 - w / 2, y, w, h, fill, { r: 10 })}${lines(540, y + 28 + size * 0.85, s, { size, font: 'Bangers', ls: 1.5 })}</g>`;
+}
+// Comic action word ("ZZZ", "BZZT!", "SNAP!").
+function bang(t, start, s, x, y, { size = 120, fill = '#ff5a3c', rot = -8 } = {}) {
+  const p = seg(t, start, start + 0.35);
+  if (p <= 0) return '';
+  const sc = outBack(p) * (1 + wob(t, 2.2, 0.03));
+  return `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${sc})">${text(0, 0, s, { size, font: 'Bangers', fill, stroke: INK, sw: 14, ls: 3 })}</g>`;
+}
+// Speech bubble (tail toward tx,ty).
+function bubble(t, start, x, y, w, h, s, tx, ty, { size = 40, fill = '#ffffff' } = {}) {
+  const p = seg(t, start, start + 0.4);
+  if (p <= 0) return '';
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const tail = `<path d="M ${cx - 40} ${y + h - 10} L ${tx} ${ty} L ${cx + 20} ${y + h - 10} Z" fill="${fill}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>`;
+  const inner = `<ellipse cx="${cx + 10}" cy="${cy + 12}" rx="${w / 2}" ry="${h / 2}" fill="${INK}"/>${tail}<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" fill="${fill}" stroke="${INK}" stroke-width="7"/><path d="M ${cx - 36} ${y + h - 14} L ${cx + 16} ${y + h - 14}" stroke="${fill}" stroke-width="12"/>`
+    + lines(cx, cy - ((s.split('\n').length - 1) * size * 1.15) / 2 + size * 0.35, s, { size });
+  return `<g transform="translate(${cx} ${cy}) scale(${outBack(p)}) translate(${-cx} ${-cy})">${inner}</g>`;
+}
+// Halftone backgrounds (classic comic dots).
+const DEFS = `<defs>
+  <pattern id="dotsDark" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="4.5" fill="#ffffff" opacity="0.07"/></pattern>
+  <pattern id="dotsWarm" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="6" fill="#ff8a3d" opacity="0.22"/></pattern>
+  <pattern id="dotsBlue" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="6" fill="#3a8dde" opacity="0.18"/></pattern>
+  <pattern id="dotsGreen" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="6" fill="#1f8a5a" opacity="0.16"/></pattern>
+  <pattern id="lined" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M0 39 H40" stroke="#9fc3e6" stroke-width="3"/></pattern>
+  <radialGradient id="lamp" cx="0.5" cy="0" r="1"><stop offset="0" stop-color="#ffe68a" stop-opacity="0.75"/><stop offset="1" stop-color="#ffe68a" stop-opacity="0"/></radialGradient>
+  <radialGradient id="screenGlow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#7fffd0" stop-opacity="0.55"/><stop offset="1" stop-color="#7fffd0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="0.55" stop-color="#ffd98a"/><stop offset="1" stop-color="#fff1c9"/></linearGradient>
+</defs>`;
+
+// ── Teacher Ana (cartoon). Origin: the middle of her shoulders. ──
+const SKIN = '#c98f63';
+const HAIR = '#2a1b14';
+function ana({ x, y, s = 1, eyes = 'open', mouth = 'smile', blouse = '#2f9e6e', tilt = 0, arms = 'down', talk = 0, sweat = false }) {
+  const eye = (ex) => {
+    if (eyes === 'closed') return `<path d="M ${ex - 16} -150 Q ${ex} -138 ${ex + 16} -150" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`;
+    if (eyes === 'happy') return `<path d="M ${ex - 16} -144 Q ${ex} -164 ${ex + 16} -144" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`;
+    if (eyes === 'tired') return `<path d="M ${ex - 16} -150 H ${ex + 16}" stroke="${INK}" stroke-width="6" stroke-linecap="round"/><ellipse cx="${ex}" cy="-142" rx="9" ry="6" fill="${INK}"/><path d="M ${ex - 14} -128 Q ${ex} -122 ${ex + 14} -128" fill="none" stroke="#7a4f37" stroke-width="4"/>`;
+    return `<ellipse cx="${ex}" cy="-148" rx="10" ry="13" fill="${INK}"/><circle cx="${ex + 4}" cy="-153" r="4" fill="#fff"/>`;
+  };
+  let m;
+  if (mouth === 'frown') m = '<path d="M -26 -96 Q 0 -112 26 -96" fill="none" stroke="#151515" stroke-width="6" stroke-linecap="round"/>';
+  else if (mouth === 'flat') m = '<path d="M -20 -102 H 20" stroke="#151515" stroke-width="6" stroke-linecap="round"/>';
+  else if (mouth === 'o') m = '<ellipse cx="0" cy="-102" rx="12" ry="14" fill="#7a2230" stroke="#151515" stroke-width="5"/>';
+  else if (mouth === 'big') m = '<path d="M -34 -112 Q 0 -66 34 -112 Z" fill="#7a2230" stroke="#151515" stroke-width="6" stroke-linejoin="round"/><path d="M -22 -104 Q 0 -86 22 -104" fill="#ff8f9b"/>';
+  else m = '<path d="M -28 -110 Q 0 -84 28 -110" fill="none" stroke="#151515" stroke-width="6" stroke-linecap="round"/>';
+  if (talk) m = talk > 0.5 ? '<ellipse cx="0" cy="-102" rx="16" ry="12" fill="#7a2230" stroke="#151515" stroke-width="5"/>' : '<path d="M -24 -106 Q 0 -90 24 -106" fill="#7a2230" stroke="#151515" stroke-width="5"/>';
+  const armL = arms === 'up'
+    ? `<path d="M -92 -10 Q -150 -90 -120 -190" fill="none" stroke="${INK}" stroke-width="44" stroke-linecap="round"/><path d="M -92 -10 Q -150 -90 -120 -190" fill="none" stroke="${blouse}" stroke-width="30" stroke-linecap="round"/><circle cx="-120" cy="-196" r="22" fill="${SKIN}" stroke="${INK}" stroke-width="6"/>`
+    : '';
+  const armR = arms === 'up' || arms === 'point'
+    ? `<path d="M 92 -10 Q 170 -60 200 -150" fill="none" stroke="${INK}" stroke-width="44" stroke-linecap="round"/><path d="M 92 -10 Q 170 -60 200 -150" fill="none" stroke="${blouse}" stroke-width="30" stroke-linecap="round"/><circle cx="204" cy="-158" r="22" fill="${SKIN}" stroke="${INK}" stroke-width="6"/>`
+    : '';
+  return `<g transform="translate(${x} ${y}) scale(${s}) rotate(${tilt})">
+    <circle cx="0" cy="-268" r="46" fill="${HAIR}" stroke="${INK}" stroke-width="7"/>
+    <ellipse cx="0" cy="-150" rx="112" ry="118" fill="${HAIR}" stroke="${INK}" stroke-width="7"/>
+    ${armL}${armR}
+    <path d="M -110 120 Q -118 10 -60 -18 L 60 -18 Q 118 10 110 120 Z" fill="${blouse}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M -34 -18 L 0 22 L 34 -18" fill="#ffffff" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
+    <rect x="-24" y="-60" width="48" height="50" fill="${SKIN}" stroke="${INK}" stroke-width="6"/>
+    <ellipse cx="0" cy="-140" rx="92" ry="96" fill="${SKIN}" stroke="${INK}" stroke-width="7"/>
+    <path d="M -92 -150 Q -84 -236 0 -238 Q 84 -236 92 -150 Q 60 -196 6 -200 Q -40 -190 -92 -150 Z" fill="${HAIR}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
+    ${eye(-36)}${eye(36)}
+    <rect x="-66" y="-172" width="56" height="44" rx="14" fill="none" stroke="${INK}" stroke-width="5"/>
+    <rect x="10" y="-172" width="56" height="44" rx="14" fill="none" stroke="${INK}" stroke-width="5"/>
+    <path d="M -10 -152 H 10" stroke="${INK}" stroke-width="5"/>
+    <circle cx="-62" cy="-112" r="12" fill="#ff8a8a" opacity="0.55"/><circle cx="62" cy="-112" r="12" fill="#ff8a8a" opacity="0.55"/>
+    ${m}
+    ${sweat ? '<path d="M 100 -196 Q 116 -168 100 -158 Q 84 -168 100 -196 Z" fill="#7fd3ff" stroke="#151515" stroke-width="4"/>' : ''}
+  </g>`;
+}
+
+// ── props ──
+function laptop(x, y, w, screen, { glow = false } = {}) {
+  const h = w * 0.62;
+  return `<g transform="translate(${x} ${y})">
+    ${glow ? `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${w * 0.9}" ry="${h * 0.9}" fill="url(#screenGlow)"/>` : ''}
+    <rect x="${10}" y="${10}" width="${w}" height="${h}" rx="18" fill="${INK}"/>
+    <rect x="0" y="0" width="${w}" height="${h}" rx="18" fill="#3b4a55" stroke="${INK}" stroke-width="7"/>
+    <rect x="16" y="16" width="${w - 32}" height="${h - 32}" rx="8" fill="#eef4f0" stroke="${INK}" stroke-width="4"/>
+    <g transform="translate(16 16)">${screen(w - 32, h - 32)}</g>
+    <path d="M ${-40} ${h + 6} L ${w + 40} ${h + 6} L ${w + 10} ${h + 40} L ${-10} ${h + 40} Z" fill="#8e9aa3" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
+  </g>`;
+}
+// KaTuroDesk on a screen: green bar, then whatever `body` draws.
+const deskScreen = (body) => (w, h) => `<rect width="${w}" height="44" fill="#1f3a2c"/><circle cx="26" cy="22" r="10" fill="#34d399"/>${text(48, 32, 'KaTuroDesk', { size: 26, anchor: 'start', fill: '#ffffff' })}<g transform="translate(0 44)">${body(w, h - 44)}</g>`;
+function phone(x, y, w, h, content, { rot = 0 } = {}) {
+  return `<g transform="translate(${x} ${y}) rotate(${rot})">
+    <rect x="12" y="12" width="${w}" height="${h}" rx="44" fill="${INK}"/>
+    <rect x="0" y="0" width="${w}" height="${h}" rx="44" fill="#2b3640" stroke="${INK}" stroke-width="8"/>
+    <rect x="18" y="40" width="${w - 36}" height="${h - 80}" rx="22" fill="#e8ece9"/>
+    <rect x="${w / 2 - 40}" y="16" width="80" height="12" rx="6" fill="#151515"/>
+    <g transform="translate(18 40)">${content(w - 36, h - 80)}</g>
+  </g>`;
+}
+function doc(x, y, w, h, title, color, kind, p, check = 0) {
+  if (p <= 0) return '';
+  let icon = '';
+  if (kind === 'slides') icon = `<rect x="22" y="70" width="${w - 44}" height="${h * 0.42}" rx="8" fill="#ffd2a8" stroke="${INK}" stroke-width="4"/><circle cx="${w / 2}" cy="${70 + h * 0.21}" r="${h * 0.12}" fill="#ff8a3d" stroke="${INK}" stroke-width="4"/>`;
+  else if (kind === 'quiz') icon = [0, 1, 2].map((i) => `<circle cx="38" cy="${86 + i * 46}" r="13" fill="${i === 1 ? INK : '#fff'}" stroke="${INK}" stroke-width="4"/><rect x="62" y="${78 + i * 46}" width="${w - 100}" height="14" rx="7" fill="#c9d6dd"/>`).join('');
+  else icon = [0, 1, 2, 3].map((i) => `<rect x="24" y="${78 + i * 34}" width="${w - 48 - (i % 2) * 40}" height="14" rx="7" fill="#c9d6dd"/>`).join('');
+  const c = check > 0 ? `<g transform="translate(${w - 24} 0) scale(${outBack(check)})"><circle r="34" fill="#22c55e" stroke="${INK}" stroke-width="6"/><path d="M -15 0 L -4 12 L 17 -12" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g>` : '';
+  return `<g transform="translate(${x} ${y}) scale(${outBack(p)})" opacity="${clamp(p * 3)}">
+    ${box(0, 0, w, h, '#ffffff', { r: 14, sw: 6, sh: 9 })}
+    <rect x="0" y="0" width="${w}" height="52" rx="14" fill="${color}" stroke="${INK}" stroke-width="6"/>
+    ${text(w / 2, 36, title, { size: 28, fill: '#ffffff', font: 'Bangers', ls: 1 })}
+    ${icon}${c}
+  </g>`;
+}
+function clock(x, y, r, hour, minute) {
+  const ha = ((hour % 12) + minute / 60) * 30;
+  const ma = minute * 6;
+  return `<g transform="translate(${x} ${y})">
+    <circle r="${r + 6}" fill="${INK}" transform="translate(8 8)"/><circle r="${r}" fill="#fff8e0" stroke="${INK}" stroke-width="8"/>
+    ${[0, 1, 2, 3].map((i) => `<rect x="-4" y="${-r + 10}" width="8" height="18" fill="${INK}" transform="rotate(${i * 90})"/>`).join('')}
+    <line x1="0" y1="0" x2="0" y2="${-r * 0.5}" stroke="${INK}" stroke-width="10" stroke-linecap="round" transform="rotate(${ha})"/>
+    <line x1="0" y1="0" x2="0" y2="${-r * 0.75}" stroke="${INK}" stroke-width="7" stroke-linecap="round" transform="rotate(${ma})"/>
+    <circle r="9" fill="${INK}"/>
+  </g>`;
+}
+function moon(x, y, r) {
+  return `<g transform="translate(${x} ${y})"><circle r="${r}" fill="#fff3b0" stroke="${INK}" stroke-width="7"/><circle cx="${r * 0.42}" cy="${-r * 0.2}" r="${r * 0.86}" fill="#16233f"/><circle cx="${-r * 0.35}" cy="${r * 0.2}" r="${r * 0.12}" fill="#e8d98a"/></g>`;
+}
+function star(x, y, s, o = 1) {
+  return `<path transform="translate(${x} ${y}) scale(${s})" opacity="${o}" d="M0 -20 L5 -5 L20 0 L5 5 L0 20 L-5 5 L-20 0 L-5 -5 Z" fill="#fff6c2"/>`;
+}
+function zzz(t, x, y) {
+  return [0, 1, 2].map((i) => {
+    const p = ((t * 0.55 + i / 3) % 1);
+    return `<g opacity="${Math.sin(p * Math.PI)}">${text(x + p * 120 + i * 10, y - p * 220, 'Z', { size: 70 + i * 22, font: 'Bangers', fill: '#ffffff', stroke: INK, sw: 10 })}</g>`;
+  }).join('');
+}
+function kid(x, y, s, shirt, hair, handUp = 0) {
+  return `<g transform="translate(${x} ${y}) scale(${s})">
+    ${handUp > 0 ? `<path d="M 40 -10 L ${60 + handUp * 10} ${-90 - handUp * 60}" stroke="${INK}" stroke-width="30" stroke-linecap="round"/><path d="M 40 -10 L ${60 + handUp * 10} ${-90 - handUp * 60}" stroke="${shirt}" stroke-width="18" stroke-linecap="round"/><circle cx="${60 + handUp * 10}" cy="${-98 - handUp * 60}" r="16" fill="#b97d52" stroke="${INK}" stroke-width="5"/>` : ''}
+    <path d="M -60 90 Q -62 0 0 -6 Q 62 0 60 90 Z" fill="${shirt}" stroke="${INK}" stroke-width="6"/>
+    <circle cx="0" cy="-60" r="56" fill="${hair}" stroke="${INK}" stroke-width="6"/>
+  </g>`;
+}
+
+// ── scenes: (t = seconds into the scene, d = its length) ──
+const SCENE = {};
+
+SCENE.night = (t) => {
+  const pile = (n, x) => Array.from({ length: n }, (_, i) => {
+    const drop = clamp(seg(t, 0.15 * i, 0.15 * i + 0.4));
+    if (drop <= 0) return '';
+    const yy = 1290 - i * 26 - (1 - outCubic(drop)) * 260;
+    return `<rect x="${x + wob(i, 0.37, 14)}" y="${yy}" width="230" height="22" rx="4" fill="${i % 3 ? '#ffffff' : '#fff2b8'}" stroke="${INK}" stroke-width="5" transform="rotate(${wob(i, 0.23, 4)} ${x + 115} ${yy})"/>`;
+  }).join('');
+  const sway = wob(t, 0.35, 3);
+  return `
+    <rect width="1080" height="1920" fill="#16233f"/><rect width="1080" height="1920" fill="url(#dotsDark)"/>
+    <rect x="610" y="420" width="360" height="380" rx="14" fill="#0d1630" stroke="${INK}" stroke-width="10"/>
+    ${moon(800, 560, 70)}${star(700, 480, 0.9, 0.6 + wob(t, 0.8, 0.4))}${star(900, 700, 0.7, 0.6 + wob(t, 0.6, 0.4))}${star(680, 720, 0.6)}
+    <path d="M 790 420 V 800 M 610 610 H 970" stroke="${INK}" stroke-width="8"/>
+    ${clock(250, 560, 110, 11, Math.min(59, t * 1.5))}
+    <path d="M 540 360 V 600" stroke="${INK}" stroke-width="6"/>
+    <path d="M 540 680 L 260 1300 L 820 1300 Z" fill="url(#lamp)"/>
+    <path d="M 480 600 L 600 600 L 650 680 L 430 680 Z" fill="#ffcf3f" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
+    ${ana({ x: 540, y: 1180 + sway, s: 1.25, eyes: 'tired', mouth: 'frown', sweat: t > 3, tilt: sway })}
+    <rect x="0" y="1310" width="1080" height="610" fill="#8a5a3b" stroke="${INK}" stroke-width="8"/>
+    <rect x="0" y="1310" width="1080" height="610" fill="url(#dotsWarm)"/>
+    ${laptop(330, 1080, 420, deskScreen((w) => `<rect x="20" y="20" width="${w - 40}" height="40" rx="6" fill="#ffd2a8"/><rect x="20" y="76" width="${w * 0.6}" height="18" rx="9" fill="#c9d6dd"/><rect x="20" y="106" width="${w * 0.45}" height="18" rx="9" fill="#c9d6dd"/>`))}
+    ${pile(14, 40)}${pile(11, 810)}
+    <g transform="translate(860 1180)"><rect x="-6" y="-6" width="96" height="100" rx="10" fill="${INK}" transform="translate(8 8)"/><rect x="-6" y="-6" width="96" height="100" rx="10" fill="#ff7a59" stroke="${INK}" stroke-width="7"/><path d="M 90 18 Q 130 40 90 70" fill="none" stroke="${INK}" stroke-width="8"/>${[0, 1, 2].map((i) => `<path d="M ${18 + i * 26} -20 q -14 -24 0 -48" fill="none" stroke="#e7f0ff" stroke-width="7" stroke-linecap="round" opacity="${0.4 + wob(t + i, 0.7, 0.4)}"/>`).join('')}</g>
+    ${caption(t, 0.2, "11:00 PM.\nSTILL NOT DONE...", { y: 150 })}
+    ${bang(t, 3.4, 'SIGH...', 270, 950, { size: 100, fill: '#9fd3ff', rot: -6 })}
+  `;
+};
+
+SCENE.ask = (t) => {
+  const typed = 'Prepare my Grade 7 Science lessons for tomorrow';
+  const n = Math.round(clamp(seg(t, 1.6, 3.4)) * typed.length);
+  const reply = seg(t, 3.7, 4.1);
+  const screen = deskScreen((w) => `
+    <rect x="${w - 30 - w * 0.78}" y="22" width="${w * 0.78}" height="${n ? 96 : 0}" rx="16" fill="#2d6a4f"/>
+    ${n ? lines(w - 30 - w * 0.39, 58, typed.slice(0, n).replace(/(.{1,26})(\s|$)/g, '$1\n').trim(), { size: 24, fill: '#ffffff' }) : ''}
+    ${reply > 0 ? `<g opacity="${reply}"><circle cx="46" cy="170" r="24" fill="#ffd2a8" stroke="${INK}" stroke-width="4"/><rect x="82" y="140" width="${w * 0.7}" height="62" rx="16" fill="#ffffff" stroke="#c9d6dd" stroke-width="3"/>${text(100, 180, 'On it! Sleep well, Ma’am Ana.', { size: 24, anchor: 'start' })}</g>` : ''}`);
+  return `
+    <rect width="1080" height="1920" fill="#1d2f52"/><rect width="1080" height="1920" fill="url(#dotsDark)"/>
+    ${laptop(160, 470, 760, screen, { glow: true })}
+    ${ana({ x: 780, y: 1500, s: 0.95, eyes: 'open', mouth: 'smile', talk: t > 0.8 && t < 3.6 ? (Math.floor(t * 7) % 2) : 0 })}
+    <rect x="0" y="1610" width="1080" height="310" fill="#8a5a3b" stroke="${INK}" stroke-width="8"/>
+    ${bubble(t, 0.6, 30, 1060, 620, 250, '“Prepare my Grade 7\nScience lessons\nfor tomorrow!”', 640, 1250, { size: 44 })}
+    ${caption(t, 0.15, 'JUST TELL KATURODESK\nWHAT YOU NEED.', { y: 150, fill: '#7ff0c4' })}
+  `;
+};
+
+SCENE.sleep = (t) => {
+  const docs = [
+    ['LESSON LOG (DLL)', '#2f6fd1', 'lines', 3.6],
+    ['POWERPOINT', '#ff7a2f', 'slides', 4.6],
+    ['10-ITEM QUIZ', '#9b4dde', 'quiz', 5.6],
+    ['WORKSHEET', '#1f9e6e', 'lines', 6.4],
+  ];
+  const hour = t < 2 ? 11 : t < 5 ? 2 : 5;
+  const flown = docs.map(([title, color, kind, at], i) => {
+    const p = seg(t, at, at + 0.7);
+    const x = lerp(700, 70 + (i % 2) * 480, outCubic(p));
+    const y = lerp(450, 660 + Math.floor(i / 2) * 320, outCubic(p));
+    return doc(x, y, 420, 290, title, color, kind, p, seg(t, at + 0.6, at + 1.0));
+  }).join('');
+  return `
+    <rect width="1080" height="1920" fill="#101a33"/><rect width="1080" height="1920" fill="url(#dotsDark)"/>
+${star(140, 250, 1, 0.8)}${star(330, 420, 0.7, 0.5 + wob(t, 0.5, 0.4))}${star(700, 470, 0.8)}
+    ${clock(150, 470, 80, hour, (t * 40) % 60)}
+    ${text(150, 610, hour === 11 ? '11 PM' : hour === 2 ? '2 AM' : '5 AM', { size: 52, font: 'Bangers', fill: '#ffe14d', stroke: INK, sw: 8 })}
+    ${laptop(640, 400, 330, deskScreen((w) => `${text(w / 2, 70, 'SCHEDULED', { size: 30, font: 'Bangers', fill: '#1f3a2c' })}${text(w / 2, 110, '2:00 AM', { size: 34, font: 'Bangers', fill: '#2d6a4f' })}`), { glow: true })}
+    <g transform="translate(0 ${wob(t, 0.25, 6)})">
+      <rect x="40" y="1330" width="1000" height="420" rx="40" fill="${INK}" transform="translate(10 10)"/>
+      <rect x="40" y="1330" width="1000" height="420" rx="40" fill="#6f4a9e" stroke="${INK}" stroke-width="8"/>
+      <rect x="70" y="1250" width="330" height="170" rx="60" fill="#ffffff" stroke="${INK}" stroke-width="8"/>
+      ${ana({ x: 250, y: 1450, s: 0.82, eyes: 'closed', mouth: 'flat', tilt: -78, blouse: '#f6a6c1' })}
+      <path d="M 300 1330 Q 680 1290 1040 1360 L 1040 1750 L 300 1750 Z" fill="#9b7bd1" stroke="${INK}" stroke-width="8"/>
+      <rect x="300" y="1330" width="740" height="420" fill="url(#dotsBlue)" opacity="0.6"/>
+    </g>
+    ${flown}
+    ${zzz(t, 330, 1260)}
+    ${caption(t, 0.2, 'WHILE SHE SLEEPS...', { y: 130 })}
+    ${t > 3.2 ? caption(t, 3.2, '...KATURODESK GETS IT ALL READY!', { y: 260, fill: '#7ff0c4', size: 50, rot: 2 }) : ''}
+  `;
+};
+
+SCENE.morning = (t) => {
+  const shake = t > 0.3 && t < 1.6 ? wob(t, 9, 6) : 0;
+  const notif = seg(t, 0.5, 0.95);
+  return `
+    <rect width="1080" height="1920" fill="url(#dawn)"/><rect width="1080" height="1920" fill="url(#dotsWarm)"/>
+    <g transform="translate(540 ${560 - outCubic(seg(t, 0, 1.4)) * 120})">${Array.from({ length: 12 }, (_, i) => `<rect x="-10" y="-330" width="20" height="90" rx="10" fill="#ffb200" stroke="${INK}" stroke-width="5" transform="rotate(${i * 30 + t * 12})"/>`).join('')}<circle r="200" fill="#ffcc33" stroke="${INK}" stroke-width="9"/></g>
+    ${[0, 1].map((i) => `<path transform="translate(${180 + i * 620 + t * 30} ${330 + i * 60})" d="M -30 0 Q -15 -18 0 0 Q 15 -18 30 0" fill="none" stroke="${INK}" stroke-width="6"/>`).join('')}
+    ${ana({ x: 300, y: 1470, s: 1.0, eyes: t > 1.3 ? 'happy' : 'open', mouth: t > 1.3 ? 'big' : 'o', arms: t > 1.3 ? 'up' : 'down', blouse: '#f6a6c1' })}
+    <rect x="0" y="1560" width="1080" height="360" fill="#6f4a9e" stroke="${INK}" stroke-width="8"/>
+    <g transform="translate(${shake} 0)">${phone(520, 760, 520, 560, (w) => notif > 0 ? `<g opacity="${notif}" transform="translate(0 ${(1 - notif) * -40})">
+        ${box(14, 30, w - 28, 330, '#ffffff', { r: 22, sw: 5, sh: 6 })}
+        <circle cx="62" cy="80" r="24" fill="#1f8a5a"/>${text(62, 90, 'KT', { size: 24, font: 'Bangers', fill: '#fff' })}
+        ${text(100, 92, 'KaTuro · 6:30 AM', { size: 26, anchor: 'start', fill: '#5f6b64' })}
+        ${text(36, 150, 'Good morning, Ma’am Ana!', { size: 28, anchor: 'start' })}
+        ${text(36, 198, 'Grade 7 Science is ready:', { size: 26, anchor: 'start' })}
+        ${text(36, 242, '✓ DLL ✓ Slides ✓ Quiz', { size: 26, anchor: 'start', fill: '#1f8a5a' })}
+        ${text(36, 296, 'Class at 7:30 — Room 12', { size: 26, anchor: 'start' })}</g>` : '')}</g>
+    ${bang(t, 0.3, 'BZZT!', 800, 720, { size: 120, fill: '#ffe14d', rot: 10 })}
+    ${caption(t, 0.2, "GOOD MORNING!\nEVERYTHING'S READY.", { y: 150 })}
+  `;
+};
+
+SCENE.scores = (t) => {
+  const flash = t > 1.2 && t < 1.55 ? 1 - seg(t, 1.2, 1.55) : 0;
+  const fill = seg(t, 3.4, 4.4);
+  const rows = [['Dela Cruz, Juan', '18'], ['Santos, Maria', '20'], ['Reyes, Paolo', '17'], ['Garcia, Bea', '19']];
+  const grid = (w) => `
+    <rect x="16" y="16" width="${w - 32}" height="54" fill="#1f8a5a"/>${text(32, 54, 'Grade 7 - Rizal - Science', { size: 26, anchor: 'start', fill: '#fff' })}
+    ${rows.map(([n, sc], i) => {
+      const on = clamp((fill - i * 0.22) / 0.25);
+      return `<rect x="16" y="${80 + i * 58}" width="${w - 32}" height="54" fill="${on > 0 && on < 1 ? '#fff2a8' : i % 2 ? '#f3f6f4' : '#ffffff'}" stroke="#c9d6dd" stroke-width="2"/>${text(30, 116 + i * 58, n, { size: 24, anchor: 'start' })}${on > 0 ? `<g opacity="${on}">${text(w - 70, 118 + i * 58, sc, { size: 30, font: 'Bangers', fill: '#1f8a5a' })}</g>` : ''}`;
+    }).join('')}`;
+  return `
+    <rect width="1080" height="1920" fill="#e9f3ff"/><rect width="1080" height="1920" fill="url(#dotsBlue)"/>
+    <g transform="translate(110 600) rotate(-5)">${box(0, 0, 460, 600, '#ffffff', { r: 10 })}<rect x="0" y="0" width="460" height="600" fill="url(#lined)" opacity="0.8"/>
+      ${text(40, 80, 'QUIZ 1 — Cells', { size: 36, anchor: 'start', font: 'Bangers' })}${text(40, 130, 'Juan Dela Cruz', { size: 30, anchor: 'start' })}
+      <circle cx="350" cy="110" r="70" fill="none" stroke="#e23b3b" stroke-width="8"/>${text(350, 128, '18/20', { size: 46, font: 'Bangers', fill: '#e23b3b' })}
+      ${[0, 1, 2, 3, 4].map((i) => `${text(46, 220 + i * 70, `${i + 1}. ____________`, { size: 30, anchor: 'start' })}<path d="M 370 ${200 + i * 70} l 14 16 l 26 -30" fill="none" stroke="#e23b3b" stroke-width="7" stroke-linecap="round"/>`).join('')}
+    </g>
+    ${phone(500 - outCubic(seg(t, 0.2, 0.9)) * 60, 520, 470, 760, (w, h) => `<rect width="${w}" height="${h}" fill="#33414d"/>${[[24, 24], [w - 24, 24], [24, h - 24], [w - 24, h - 24]].map(([cx, cy], i) => `<path d="M ${cx + (i % 2 ? -50 : 50)} ${cy} H ${cx} V ${cy + (i < 2 ? 50 : -50)}" fill="none" stroke="#ffffff" stroke-width="8"/>`).join('')}${text(w / 2, h / 2, 'SCORE: 18', { size: 54, font: 'Bangers', fill: '#ffe14d' })}${text(w / 2, h / 2 + 60, 'Juan Dela Cruz', { size: 30, fill: '#ffffff' })}<circle cx="${w / 2}" cy="${h - 70}" r="40" fill="#ffffff" stroke="${INK}" stroke-width="6"/>`, { rot: 6 })}
+    <rect width="1080" height="1920" fill="#ffffff" opacity="${flash}"/>
+    ${bang(t, 1.2, 'SNAP!', 760, 520, { size: 130, fill: '#ffe14d', rot: 10 })}
+    ${t > 2.6 ? `<g transform="translate(0 ${(1 - outCubic(seg(t, 2.6, 3.2))) * 300})" opacity="${seg(t, 2.6, 3)}">${laptop(170, 1290, 740, deskScreen(grid))}</g>` : ''}
+    ${t > 5 ? pop(seg(t, 5, 5.4), 540, 1215, `${box(-230, -50, 460, 100, '#22c55e', { r: 50 })}${text(0, 16, '✓ BACKUP SAVED', { size: 46, font: 'Bangers', fill: '#ffffff', stroke: INK, sw: 6 })}`) : ''}
+    ${caption(t, 0.2, 'SNAP. RECORDED.\nBACKED UP.', { y: 150, fill: '#7ff0c4' })}
+  `;
+};
+
+SCENE.teach = (t) => `
+    <rect width="1080" height="1920" fill="#ffe9c7"/><rect width="1080" height="1920" fill="url(#dotsWarm)"/>
+    <rect x="60" y="430" width="960" height="560" rx="18" fill="#8a5a3b" stroke="${INK}" stroke-width="10"/>
+    <rect x="90" y="460" width="900" height="500" rx="8" fill="#1f5a44" stroke="${INK}" stroke-width="6"/>
+    ${text(540, 540, 'THE CELL', { size: 64, font: 'Bangers', fill: '#ffffff', ls: 4 })}
+    <ellipse cx="720" cy="760" rx="190" ry="140" fill="none" stroke="#ffffff" stroke-width="8" stroke-dasharray="${seg(t, 0.2, 1.6) * 1100} 1200"/>
+    <circle cx="720" cy="760" r="48" fill="none" stroke="#ffe14d" stroke-width="8" opacity="${seg(t, 1.2, 1.8)}"/>
+    ${text(330, 690, 'nucleus', { size: 40, fill: '#ffe14d' })}<path d="M 400 700 L 660 750" stroke="#ffe14d" stroke-width="5" opacity="${seg(t, 1.4, 2)}"/>
+    ${ana({ x: 300, y: 1370, s: 1.05, eyes: 'happy', mouth: 'big', arms: 'point' })}
+    ${kid(560, 1660, 1, '#3a8dde', '#2a1b14', t > 1.6 ? outBack(seg(t, 1.6, 2)) : 0)}
+    ${kid(780, 1700, 1.05, '#ff7a2f', '#4a2e1c', t > 2.1 ? outBack(seg(t, 2.1, 2.5)) : 0)}
+    ${kid(990, 1650, 0.95, '#9b4dde', '#2a1b14')}
+    ${kid(170, 1760, 1, '#22c55e', '#3b2416', t > 2.6 ? outBack(seg(t, 2.6, 3)) : 0)}
+    ${[0, 1, 2].map((i) => pop(seg(t, 2 + i * 0.4, 2.4 + i * 0.4), 600 + i * 150, 1240 - i * 40, `<path d="M0 -26 C -30 -60 -70 -10 0 30 C 70 -10 30 -60 0 -26 Z" fill="#ff5a7a" stroke="${INK}" stroke-width="6"/>`)).join('')}
+    ${caption(t, 0.15, 'MORE TIME FOR WHAT\nMATTERS: TEACHING!', { y: 150 })}
+  `;
+
+SCENE.recap = (t) => {
+  const items = [
+    ['LESSON PLANS & DLL', '#2f6fd1'],
+    ['POWERPOINT SLIDES', '#ff7a2f'],
+    ['QUIZZES & WORKSHEETS', '#9b4dde'],
+    ['SCORES BY PHONE', '#1f9e6e'],
+    ['REMINDERS BEFORE CLASS', '#e23b6b'],
+  ];
+  return `
+    <rect width="1080" height="1920" fill="#fff6d6"/>
+    <g transform="translate(540 1000) rotate(${t * 8})">${Array.from({ length: 18 }, (_, i) => `<path d="M0 0 L ${Math.cos((i * 20) * Math.PI / 180) * 1500} ${Math.sin((i * 20) * Math.PI / 180) * 1500} L ${Math.cos((i * 20 + 10) * Math.PI / 180) * 1500} ${Math.sin((i * 20 + 10) * Math.PI / 180) * 1500} Z" fill="#ffe28a"/>`).join('')}</g>
+    ${items.map(([label, color], i) => pop(seg(t, 0.35 + i * 0.55, 0.75 + i * 0.55), 540, 520 + i * 165, `${box(-410, -62, 820, 124, color, { r: 62 })}<circle cx="-340" cy="0" r="40" fill="#ffffff" stroke="${INK}" stroke-width="6"/><path d="M -358 0 L -344 14 L -320 -14" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>${text(30, 18, label, { size: 50, font: 'Bangers', fill: '#ffffff', stroke: INK, sw: 6, ls: 1.5 })}`)).join('')}
+    ${pop(seg(t, 3.6, 4.0), 540, 1400, `${box(-430, -70, 860, 140, '#1f3a2c', { r: 24 })}<g transform="translate(-350 -6)"><rect x="-26" y="-6" width="52" height="44" rx="8" fill="#ffe14d" stroke="${INK}" stroke-width="5"/><path d="M -16 -6 V -22 A 16 16 0 0 1 16 -22 V -6" fill="none" stroke="#ffe14d" stroke-width="8"/></g>${text(40, 16, 'YOUR FILES STAY ON YOUR COMPUTER', { size: 40, font: 'Bangers', fill: '#ffffff', ls: 1 })}`)}
+    ${caption(t, 0.1, 'ALL IN ONE TEACHING DESK', { y: 170, fill: '#ffffff' })}
+  `;
+};
+
+SCENE.cta = (t) => {
+  const logo = outBack(seg(t, 0.2, 0.9));
+  return `
+    <rect width="1080" height="1920" fill="#1f3a2c"/><rect width="1080" height="1920" fill="url(#dotsDark)"/>
+    <g transform="translate(540 1000) rotate(${-t * 6})">${Array.from({ length: 16 }, (_, i) => `<path d="M0 0 L ${Math.cos((i * 22.5) * Math.PI / 180) * 1500} ${Math.sin((i * 22.5) * Math.PI / 180) * 1500} L ${Math.cos((i * 22.5 + 11) * Math.PI / 180) * 1500} ${Math.sin((i * 22.5 + 11) * Math.PI / 180) * 1500} Z" fill="#244a37"/>`).join('')}</g>
+    <g transform="translate(540 520) scale(${logo})"><circle r="230" fill="#ffffff" stroke="${INK}" stroke-width="10" transform="translate(12 12)" opacity="0.25"/><image href="logo.png" x="-230" y="-230" width="460" height="460"/></g>
+    ${pop(seg(t, 0.8, 1.2), 540, 860, text(0, 0, 'KaTuroDesk + KaTuro App', { size: 72, font: 'Bangers', fill: '#ffffff', stroke: INK, sw: 12, ls: 2 }))}
+    ${pop(seg(t, 1.8, 2.2), 540, 1010, text(0, 0, 'LESS PAPERWORK.', { size: 104, font: 'Bangers', fill: '#ffe14d', stroke: INK, sw: 16, ls: 3 }))}
+    ${pop(seg(t, 2.6, 3.0), 540, 1130, text(0, 0, 'MORE TEACHING.', { size: 104, font: 'Bangers', fill: '#7ff0c4', stroke: INK, sw: 16, ls: 3 }))}
+    ${pop(seg(t, 3.8, 4.2), 540, 1300, `${box(-330, -66, 660, 132, '#ffffff', { r: 66 })}${text(0, 18, 'katuro.website', { size: 64, font: 'Bangers', fill: '#1f3a2c', ls: 2 })}`)}
+    ${pop(seg(t, 4.6, 5.0), 540, 1450, text(0, 0, 'For Windows  ·  For Android', { size: 44, fill: '#d6f5e6' }))}
+  `;
+};
+
+// ── subtitles: the voice-over in short chunks, timed across its line ──
+function subtitle(t) {
+  for (const { id, vo } of window.REEL.SCENES) {
+    const d = VO[id];
+    if (t < vo || t > vo + d + 0.15) continue;
+    const words = TEXT[id].split(' ');
+    const chunks = [];
+    let cur = [];
+    for (const w of words) { cur.push(w); if (cur.join(' ').length > 26 || /[.?!,]$/.test(w) && cur.join(' ').length > 12) { chunks.push(cur.join(' ')); cur = []; } }
+    if (cur.length) chunks.push(cur.join(' '));
+    const total = chunks.reduce((a, c) => a + c.length, 0);
+    let at = vo;
+    for (const c of chunks) {
+      const len = (c.length / total) * d;
+      if (t >= at && t < at + len + (c === chunks.at(-1) ? 0.15 : 0)) {
+        const w = Math.min(980, c.length * 29 + 90);
+        return `<g><rect x="${540 - w / 2}" y="1478" width="${w}" height="92" rx="46" fill="#000000" opacity="0.62"/>${text(540, 1540, c, { size: 54, fill: '#ffffff', font: 'Comic Neue' })}</g>`;
+      }
+      at += len;
+    }
+  }
+  return '';
+}
+
+// ── render(t): the scene (and a short slide into the next), subtitles on top ──
+function render(t) {
+  const list = window.REEL.SCENES;
+  let i = list.length - 1;
+  while (i > 0 && t < list[i].at) i -= 1;
+  const cur = list[i];
+  const next = list[i + 1];
+  const end = next ? next.at : END;
+  const local = t - cur.at;
+  let body = SCENE[cur.id](local, end - cur.at);
+  // Comic panel wipe into the next scene (0.35 s): the next panel slides in at an angle.
+  if (next && t > next.at - 0.35) {
+    const p = inOut(seg(t, next.at - 0.35, next.at));
+    body += `<g transform="translate(${(1 - p) * 1300} 0) rotate(${(1 - p) * 6} 540 960)"><rect x="-30" y="-60" width="1140" height="2040" fill="${INK}"/>${SCENE[next.id](0, 0)}</g>`;
+  }
+  // Fade out at the very end.
+  const fade = seg(t, END - 0.6, END);
+  document.getElementById('stage').innerHTML = DEFS + body + subtitle(t) + (fade > 0 ? `<rect width="1080" height="1920" fill="#000" opacity="${fade}"/>` : '');
+}
+window.render = render;
+
+// Preview: plays in a browser window (?t=12 shows one moment).
+const q = new URLSearchParams(location.search);
+if (q.has('t')) render(Number(q.get('t')));
+// Frame mode (the renderer): #<seconds> draws that moment, then the title says it is done.
+if (q.has('frames')) {
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1); render(Number(h)); document.title = 'f' + h; });
+  document.fonts.ready.then(() => { document.title = 'ready'; });
+}
+else if (!q.has('frames')) {
+  const t0 = performance.now();
+  const loop = () => { render(((performance.now() - t0) / 1000) % END); requestAnimationFrame(loop); };
+  document.fonts.ready.then(loop);
+}
+</script>
+</body>
+</html>
