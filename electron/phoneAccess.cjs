@@ -166,4 +166,19 @@ function checkSharedFolder(dir, { home, shared = [], profile, protectedPaths = [
   return { id: crypto.randomBytes(6).toString('base64url'), name, path: abs, addedAt: new Date().toISOString() };
 }
 
-module.exports = { LEVELS, OUTSIDE, HIDDEN, badPart, atLeast, validLevel, homeKey, outKey, defaultLevel, maxLevel, levelFor, levelAt, resolvePhonePath, phonePathOf, homeFolders, checkSharedFolder };
+/**
+ * Why the KaTuro folder may not be moved to `dest` (a message), or null. Phones see the home
+ * folder with its own levels, so it must not land inside (or around) a folder already shown to
+ * phones, KaTuroDesk's own files, or Windows and program folders.
+ */
+function homePlaceProblem(dest, { shared = [], protectedPaths = [], systemPaths = [] }) {
+  const resolved = path.resolve(dest);
+  const both = [resolved, path.join(real(path.dirname(resolved)), path.basename(resolved))];
+  const overlaps = (a, b) => isInsideFolder(a, b) || isInsideFolder(b, a);
+  for (const sys of systemPaths.filter(Boolean)) if (both.some((p) => isInsideFolder(p, sys))) return 'Windows and program folders cannot hold your KaTuro folder.';
+  for (const keep of protectedPaths.filter(Boolean)) if (both.some((p) => overlaps(p, keep))) return "That place holds KaTuroDesk's own files. Choose another.";
+  for (const s of shared) if (both.some((p) => overlaps(p, s.path) || overlaps(p, real(s.path)))) return `That place overlaps "${s.name}", which phones can already see. Choose another, or remove it in Settings → Phones first.`;
+  return null;
+}
+
+module.exports = { homePlaceProblem, LEVELS, OUTSIDE, HIDDEN, badPart, atLeast, validLevel, homeKey, outKey, defaultLevel, maxLevel, levelFor, levelAt, resolvePhonePath, phonePathOf, homeFolders, checkSharedFolder };

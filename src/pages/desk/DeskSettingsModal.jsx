@@ -12,6 +12,7 @@ import { PAPER_SIZES } from '../../services/desk/docSpec';
 import DeskVoiceSettings from './DeskVoiceSettings';
 import DeskOwnKeySettings from './DeskOwnKeySettings';
 import DeskPhoneSettings from './DeskPhoneSettings';
+import DeskHomeFolderSettings from './DeskHomeFolderSettings';
 import DeskBackupSettings from './DeskBackupSettings';
 import { startDeskTour } from './tour/tourSteps';
 
@@ -97,7 +98,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
         ) : tab === 'notifications' ? (
           <DeskNotificationSettings />
         ) : tab === 'documents' ? (
-          <div className="p-5 space-y-3 overflow-y-auto">
+          <div className="p-5 space-y-5 overflow-y-auto">
+            <DeskHomeFolderSettings />
             <section>
               <h3 className="text-xs font-bold text-gray-800 mb-0.5">Paper for new documents</h3>
               <p className="text-[11px] text-gray-500 mb-3">Used when you do not name a paper size in your request. You can still change the paper of any document in the Canvas (Edit, then Page setup) and when you print.</p>

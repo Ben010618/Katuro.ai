@@ -76,7 +76,7 @@ export default function DeskBackupSettings() {
       <section className="rounded-lg bg-[#f6f8f7] p-3 text-[11px] text-gray-600 space-y-1">
         <p className="flex items-center gap-1.5 font-semibold text-gray-700"><ShieldCheck size={13} className="text-emerald-700" /> Stays off the cloud</p>
         <p>The backup is a plain copy on the drive you choose. Nothing is uploaded. Keep the USB drive in a safe place: it holds your learners&apos; records.</p>
-        <p>To bring files back, copy them from the backup folder into Documents\KaTuro.</p>
+        <p>To bring files back, copy them from the backup folder into your KaTuro folder (Settings → Documents shows where it is).</p>
       </section>
     </div>
   );

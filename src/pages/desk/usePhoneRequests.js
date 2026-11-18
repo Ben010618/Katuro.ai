@@ -8,7 +8,7 @@ import { useDeskStore } from '../../store/deskStore';
 /**
  * KaTuroDesk answers the linked phone's requests: class records and bubble quizzes
  * (KaTuro App, Phase 2), and the schedule and the assistant (Phase 4; the agent runs here,
- * as the teacher signed in on KaTuroDesk). Always on the KaTuro folder (Documents\KaTuro), whatever folder
+ * as the teacher signed in on KaTuroDesk). Always on the KaTuro folder (Records and Lessons), whatever folder
  * the teacher has open; when the KaTuro folder is open, its file list refreshes after the
  * phone records scores.
  */

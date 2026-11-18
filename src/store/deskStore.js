@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { remapPaths, isUnderPath } from '../services/desk/remapPaths';
 import { persist } from 'zustand/middleware';
 import {
   createVirtualWorkspace,
@@ -171,6 +172,22 @@ export const useDeskStore = create(
         })),
 
       clearAttachments: () => set({ attachedPaths: [] }),
+
+      /**
+       * A file or folder was renamed (newPath) or deleted (null) from the Explorer: attachments
+       * follow it or are dropped, and its open preview closes.
+       */
+      pathMoved: (oldPath, newPath) =>
+        set((state) => {
+          const under = (p) => isUnderPath(p, oldPath);
+          const attachedPaths = remapPaths(state.attachedPaths, oldPath, newPath);
+          const previewHit = state.activeArtifact?.type === 'preview' && under(state.activeArtifact.path || '');
+          return {
+            attachedPaths,
+            ...(state.activeFile && under(state.activeFile.path || '') ? { activeFile: null } : {}),
+            ...(previewHit ? { activeArtifact: null } : {}),
+          };
+        }),
 
       /**
        * Copies files from anywhere (drag & drop, paste, file picker, phone photos)

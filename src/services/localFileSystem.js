@@ -45,7 +45,7 @@ async function contentToBytes(content) {
 
 function electronWorkspace(res) {
   return {
-    // katuroHome: the KaTuro folder (Documents\KaTuro), where class records are edited in place.
+    // katuroHome: the KaTuro folder (Desktop\Katuro Teaching Assistant, or where the teacher moved it), where class records are edited in place.
     handle: { kind: 'electron', isElectron: true, rootPath: res.path, katuroHome: Boolean(res.isHome) },
     name: res.name,
     rootPath: res.path,
@@ -92,7 +92,7 @@ export async function reopenLastDirectory() {
   return electronWorkspace(res);
 }
 
-/** Desktop only: opens the KaTuro home folder (Documents\KaTuro, with Records and Lessons). */
+/** Desktop only: opens the KaTuro home folder (with Records and Lessons). */
 export async function openHomeDirectory() {
   if (!desk()?.openHomeFolder) return null;
   const res = await desk().openHomeFolder();
@@ -406,6 +406,27 @@ export async function openInDefaultApp(dirHandle, relPath) {
 export async function revealInFolder(dirHandle, relPath) {
   if (dirHandle?.kind !== 'electron') return false;
   await desk().showItemInFolder(joinRoot(dirHandle.rootPath, cleanRelPath(relPath)));
+  return true;
+}
+
+/** Desktop only: rename a file or folder (same place). → the new workspace path. */
+export async function renameInWorkspace(dirHandle, relPath, newName) {
+  if (dirHandle?.kind !== 'electron' || !desk()?.renamePath) throw new Error('Renaming works in the KaTuroDesk app.');
+  const rel = cleanRelPath(relPath);
+  if (!rel) throw new Error('The open folder itself cannot be renamed here.');
+  const name = String(newName ?? '').trim();
+  if (!name || /[\\/]/.test(name)) throw new Error('Type a name without \\ or /.');
+  await desk().renamePath(joinRoot(dirHandle.rootPath, rel), name);
+  const parent = rel.split('/').slice(0, -1).join('/');
+  return parent ? `${parent}/${name}` : name;
+}
+
+/** Desktop only: move a file or folder to the Windows Recycle Bin. */
+export async function trashInWorkspace(dirHandle, relPath) {
+  if (dirHandle?.kind !== 'electron' || !desk()?.trashPath) throw new Error('Deleting works in the KaTuroDesk app.');
+  const rel = cleanRelPath(relPath);
+  if (!rel) throw new Error('The open folder itself cannot be deleted here.');
+  await desk().trashPath(joinRoot(dirHandle.rootPath, rel));
   return true;
 }
 

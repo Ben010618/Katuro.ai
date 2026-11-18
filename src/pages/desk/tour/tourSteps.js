@@ -24,7 +24,7 @@ export const FIRST_RUN = [
   {
     target: 'folder',
     title: '1 · Your folder',
-    body: 'Your KaTuro folder is on the left: Records for your class records, Lessons for learning materials. Everything stays on this computer.',
+    body: 'Your KaTuro folder is on the left: Records for your class records, Lessons for learning materials. Right-click any folder or file for more. Everything stays on this computer.',
   },
   {
     target: 'chat',
@@ -61,6 +61,21 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.21.0',
+    steps: [
+      {
+        target: 'folder',
+        title: 'Right-click for more',
+        body: 'Right-click any folder or file: rename it, make a new folder, pin it to the top, show it in File Explorer, or delete it (it goes to the Recycle Bin).',
+      },
+      {
+        target: 'settings',
+        title: 'Your folder, your place',
+        body: 'New computers keep Records and Lessons on the Desktop, in Katuro Teaching Assistant. Settings → Documents shows where your KaTuro folder is, and can move it.',
+      },
+    ],
+  },
+  {
     version: '1.20.0',
     steps: [
       {
@@ -86,7 +101,7 @@ export const WHATS_NEW = [
       {
         target: 'folder',
         title: 'Your KaTuro folder',
-        body: 'Documents\\KaTuro, with Records for class records and Lessons for learning materials. Class records are updated in place, with a backup first.',
+        body: 'Records for class records and Lessons for learning materials. Class records are updated in place, with a backup first. Settings → Documents shows where it is.',
       },
     ],
   },

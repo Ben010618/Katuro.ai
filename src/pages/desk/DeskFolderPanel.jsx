@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FolderOpen,
   FolderPlus,
@@ -16,6 +16,15 @@ import {
   ExternalLink,
   Paperclip,
   Home,
+  MoreHorizontal,
+  Pin,
+  PinOff,
+  Pencil,
+  Trash2,
+  FolderSearch,
+  Copy,
+  FilePlus,
+  Eye,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import {
@@ -25,7 +34,13 @@ import {
   createDirectoryInWorkspace,
   flattenFileTree,
   openInDefaultApp,
+  revealInFolder,
+  renameInWorkspace,
+  trashInWorkspace,
+  absolutePath,
 } from '../../services/localFileSystem';
+import { ExplorerContextMenu, ExplorerDialog } from './ExplorerMenu';
+import { loadPins, savePins, togglePin, movePins, indexTree } from './explorerPins';
 import { getFileIcon } from './deskFileIcons';
 import { backupDue } from '../../services/desk/backup';
 import { planStatusText, SUBSCRIBE_CONTACT_URL } from '../../services/plans';
@@ -34,9 +49,44 @@ import AvatarImage from '../../components/AvatarImage';
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.katuroDeskApi);
 
-function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpen, onAttach, onOpenExternal }) {
+// One file or folder name, as Windows allows it (the main process checks again).
+function checkName(raw) {
+  const n = String(raw ?? '').trim();
+  if (!n || n === '.' || n === '..') throw new Error('Type a name.');
+  if (/[<>:"/\\|?*]/.test(n)) throw new Error('A name cannot have any of these: \\ / : * ? " < > |');
+  if (/[. ]$/.test(n)) throw new Error('A name cannot end with a dot or a space.');
+  return n;
+}
+
+function moreButton(item, onMenu) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        onMenu(item, r.left, r.bottom + 2, e.detail === 0);
+      }}
+      aria-label={`More for ${item.name}`}
+      aria-haspopup="menu"
+      title="More (or right-click)"
+      className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 text-[#9eb6a6] hover:text-white rounded flex-shrink-0"
+    >
+      <MoreHorizontal size={12} />
+    </button>
+  );
+}
+
+function TreeNode({ item, depth, ...props }) {
+  const { expanded, onToggle, activePath, attached, onOpen, onAttach, onOpenExternal, onMenu, pinned } = props;
   const isDirectory = item.kind === 'directory' || item.children;
   const pad = { paddingLeft: `${6 + depth * 12}px` };
+  const rightClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onMenu(item, e.clientX, e.clientY);
+  };
+  const isPinned = pinned.includes(item.path);
 
   if (isDirectory) {
     const isOpen = expanded[item.path] ?? depth === 0;
@@ -44,27 +94,20 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
       <div>
         <div
           onClick={() => onToggle(item.path, !isOpen)}
+          onContextMenu={rightClick}
+          data-path={item.path}
           style={pad}
-          className="flex items-center gap-1.5 pr-2 py-1 rounded hover:bg-[#223328] cursor-pointer text-[#d3e0d8] font-medium text-[11.5px] transition"
+          className="group flex items-center gap-1.5 pr-1.5 py-1 rounded hover:bg-[#223328] cursor-pointer text-[#d3e0d8] font-medium text-[11.5px] transition"
         >
           {isOpen ? <ChevronDown size={13} className="text-[#8ca495] flex-shrink-0" /> : <ChevronRight size={13} className="text-[#8ca495] flex-shrink-0" />}
           <Folder size={14} className="text-amber-400 flex-shrink-0" />
           <span className="truncate">{item.name}</span>
+          {isPinned && <Pin size={9} className="text-[#9eb6a6] flex-shrink-0" aria-label="Pinned" />}
           <span className="ml-auto text-[9px] text-[#718b7b]">{item.children?.length || 0}</span>
+          {moreButton(item, onMenu)}
         </div>
         {isOpen && item.children?.map((child) => (
-          <TreeNode
-            key={child.path}
-            item={child}
-            depth={depth + 1}
-            expanded={expanded}
-            onToggle={onToggle}
-            activePath={activePath}
-            attached={attached}
-            onOpen={onOpen}
-            onAttach={onAttach}
-            onOpenExternal={onOpenExternal}
-          />
+          <TreeNode key={child.path} item={child} depth={depth + 1} {...props} />
         ))}
       </div>
     );
@@ -76,8 +119,10 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
     <div
       onClick={() => onOpen(item)}
       onDoubleClick={() => onOpenExternal(item)}
+      onContextMenu={rightClick}
+      data-path={item.path}
       style={pad}
-      title={isElectron ? `${item.path}\nClick to preview · double-click to open in its app` : item.path}
+      title={isElectron ? `${item.path}\nClick to preview · double-click to open in its app · right-click for more` : item.path}
       className={`group flex items-center gap-1.5 pr-1.5 py-1 rounded cursor-pointer text-[11px] transition ${
         isSelected ? 'bg-[#2d563f] text-white font-semibold' : 'text-[#c6d6cb] hover:bg-[#223328]'
       }`}
@@ -92,6 +137,7 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
       />
       {getFileIcon(item.name)}
       <span className="truncate flex-1 min-w-0">{item.name}</span>
+      {isPinned && <Pin size={9} className="text-[#9eb6a6] flex-shrink-0" aria-label="Pinned" />}
       {isElectron && (
         <button
           onClick={(e) => {
@@ -104,6 +150,7 @@ function TreeNode({ item, depth, expanded, onToggle, activePath, attached, onOpe
           <ExternalLink size={11} />
         </button>
       )}
+      {moreButton(item, onMenu)}
     </div>
   );
 }
@@ -193,35 +240,187 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
     setIsRefreshing(false);
   };
 
+  // A new file at a workspace path ("Lessons/Week 2.docx"). Office names get a real blank file.
+  const createFileAt = async (relName) => {
+    const name = relName.split('/').pop().includes('.') ? relName : `${relName}.txt`;
+    const base = name.split('/').pop();
+    let res;
+    if (/\.(docx|xlsx|pptx)$/i.test(name)) {
+      // A blank Office file must be a real Office file, not text with an Office extension.
+      const ext = name.split('.').pop().toLowerCase();
+      let bytes;
+      if (ext === 'docx') {
+        const { buildDocx } = await import('../../services/desk/generators/docxFromSpec');
+        bytes = await buildDocx({ title: base.replace(/\.docx$/i, ''), header: null, blocks: [] });
+      } else if (ext === 'xlsx') {
+        const { buildSheetWorkbook } = await import('../../services/desk/generators/xlsxWriters');
+        bytes = await buildSheetWorkbook({ title: base, sheets: [{ name: 'Sheet1', columns: [], rows: [] }] });
+      } else {
+        const { buildPptx } = await import('../../services/desk/generators/pptxFromSpec');
+        bytes = await buildPptx({ title: base.replace(/\.pptx$/i, ''), slides: [] });
+      }
+      res = await writeFileToDirectory(workspace.handle, name, bytes, undefined, { overwrite: false });
+    } else {
+      res = await writeFileToDirectory(workspace.handle, name, '', 'text/plain', { overwrite: false });
+    }
+    await refreshFiles();
+    return res;
+  };
+
   const handleCreateNewFile = async (e) => {
     e.preventDefault();
     if (!newFileName.trim()) return;
-    const name = newFileName.trim().includes('.') ? newFileName.trim() : `${newFileName.trim()}.txt`;
     try {
-      if (/\.(docx|xlsx|pptx)$/i.test(name)) {
-        // A blank Office file must be a real Office file, not text with an Office extension.
-        const ext = name.split('.').pop().toLowerCase();
-        let bytes;
-        if (ext === 'docx') {
-          const { buildDocx } = await import('../../services/desk/generators/docxFromSpec');
-          bytes = await buildDocx({ title: name.replace(/\.docx$/i, ''), header: null, blocks: [] });
-        } else if (ext === 'xlsx') {
-          const { buildSheetWorkbook } = await import('../../services/desk/generators/xlsxWriters');
-          bytes = await buildSheetWorkbook({ title: name, sheets: [{ name: 'Sheet1', columns: [], rows: [] }] });
-        } else {
-          const { buildPptx } = await import('../../services/desk/generators/pptxFromSpec');
-          bytes = await buildPptx({ title: name.replace(/\.pptx$/i, ''), slides: [] });
-        }
-        await writeFileToDirectory(workspace.handle, name, bytes, undefined, { overwrite: false });
-      } else {
-        await writeFileToDirectory(workspace.handle, name, '', 'text/plain', { overwrite: false });
-      }
-      await refreshFiles();
+      await createFileAt(newFileName.trim());
     } catch (err) {
       flash(`Could not create file: ${err.message}`);
     }
     setNewFileName('');
     setIsCreatingFile(false);
+  };
+
+  // ── Right-click menu (rename, new folder, pin, show in File Explorer, delete, and more) ──
+  const [menu, setMenu] = useState(null); // { item | null (the open folder), x, y }
+  const [dialog, setDialogState] = useState(null); // { kind, item, parent, back }
+  // A dialog opened from the menu returns focus to the row or "more" button the menu came from.
+  const setDialog = (d) => {
+    if (d) { setDialogState({ ...d, back: menu?.back }); return; }
+    const back = dialog?.back;
+    setDialogState(null);
+    if (back && back !== document.body) requestAnimationFrame(() => { if (document.contains(back)) back.focus?.(); });
+  };
+  const rootPath = workspace?.rootPath;
+  const [pinsVersion, setPinsVersion] = useState(0);
+  const pins = useMemo(() => (pinsVersion >= 0 ? loadPins(rootPath) : []), [rootPath, pinsVersion]);
+  const updatePins = (next) => { savePins(rootPath, next); setPinsVersion((n) => n + 1); };
+  const treeFiles = workspace?.files;
+  const byPath = useMemo(() => indexTree(treeFiles || []), [treeFiles]);
+  const onDesk = workspace?.handle?.kind === 'electron';
+  // Records and Lessons in the KaTuro folder are used by the KaTuro App; they keep their names.
+  const isMainFolder = (item) => Boolean(workspace?.handle?.katuroHome) && (item.path === 'Records' || item.path === 'Lessons');
+  const isFolderItem = (item) => item.kind === 'directory' || Boolean(item.children);
+
+  const openMenu = (item, x, y, keyboard = false) => setMenu({ item, x, y, keyboard, back: document.activeElement });
+  const closeMenu = useCallback((restoreFocus) => {
+    setMenu((m) => {
+      // Escape: keyboard users land back where they were (the "more" button), not at the top of the page.
+      const back = m?.back;
+      if (restoreFocus === true && back && back !== document.body && document.contains(back)) requestAnimationFrame(() => back.focus?.());
+      return null;
+    });
+  }, []);
+
+  const revealPath = async (relPath) => {
+    try {
+      if (relPath) await revealInFolder(workspace.handle, relPath);
+      else await openInDefaultApp(workspace.handle, '');
+    } catch (err) {
+      flash(`Could not show it: ${err.message}`);
+    }
+  };
+
+  const copyPath = async (relPath) => {
+    const full = absolutePath(workspace.handle, relPath) || relPath;
+    try {
+      await navigator.clipboard.writeText(full);
+      flash('Location copied');
+    } catch {
+      flash(full);
+    }
+  };
+
+  const expandTo = (relPath) => {
+    const parts = relPath.split('/');
+    setExpanded((prev) => {
+      const next = { ...prev };
+      for (let i = 1; i <= parts.length; i++) next[parts.slice(0, i).join('/')] = true;
+      return next;
+    });
+  };
+
+  const confirmDialog = async (name) => {
+    const { kind, item, parent } = dialog;
+    if (kind === 'rename') {
+      const newPath = await renameInWorkspace(workspace.handle, item.path, name);
+      useDeskStore.getState().pathMoved(item.path, newPath);
+      updatePins(movePins(pins, item.path, newPath));
+      await refreshFiles();
+      flash(`Renamed to ${name}`);
+    } else if (kind === 'delete') {
+      await trashInWorkspace(workspace.handle, item.path);
+      useDeskStore.getState().pathMoved(item.path, null);
+      updatePins(movePins(pins, item.path, null));
+      await refreshFiles();
+      flash(`${item.name} is in the Recycle Bin`);
+    } else if (kind === 'newFolder') {
+      const rel = parent ? `${parent}/${checkName(name)}` : checkName(name);
+      await createDirectoryInWorkspace(workspace.handle, rel);
+      await refreshFiles();
+      expandTo(rel);
+    } else if (kind === 'newFile') {
+      const rel = parent ? `${parent}/${checkName(name)}` : checkName(name);
+      const res = await createFileAt(rel);
+      if (parent) expandTo(parent);
+      if (res?.path) flash(`Made ${res.path.split('/').pop()}`);
+    }
+    setDialog(null);
+  };
+
+  const menuItems = (item) => {
+    if (!item) {
+      return [
+        { id: 'newFolder', label: 'New folder', icon: FolderPlus, onSelect: () => setDialog({ kind: 'newFolder', item: null, parent: '' }) },
+        { id: 'newFile', label: 'New file', icon: FilePlus, onSelect: () => setDialog({ kind: 'newFile', item: null, parent: '' }) },
+        { id: 'refresh', label: 'Refresh', icon: RefreshCw, onSelect: handleRefresh },
+        ...(onDesk ? [{ id: 'show', label: 'Open in File Explorer', icon: FolderSearch, onSelect: () => revealPath('') }] : []),
+      ];
+    }
+    const folder = isFolderItem(item);
+    const locked = isMainFolder(item);
+    const lockedHint = 'Records and Lessons keep their names: the KaTuro App uses them.';
+    const isPinned = pins.includes(item.path);
+    return [
+      ...(folder
+        ? [
+            { id: 'newFolder', label: 'New folder inside', icon: FolderPlus, onSelect: () => setDialog({ kind: 'newFolder', item, parent: item.path }) },
+            { id: 'newFile', label: 'New file inside', icon: FilePlus, onSelect: () => setDialog({ kind: 'newFile', item, parent: item.path }) },
+          ]
+        : [
+            { id: 'preview', label: 'Preview', icon: Eye, onSelect: () => openPreview(item) },
+            ...(onDesk ? [{ id: 'open', label: 'Open in its app', icon: ExternalLink, onSelect: () => handleOpenExternal(item) }] : []),
+            {
+              id: 'attach',
+              label: attachedPaths.includes(item.path) ? 'Remove from chat' : 'Attach to chat',
+              icon: Paperclip,
+              onSelect: () => toggleAttachment(item.path),
+            },
+          ]),
+      { separator: true },
+      ...(onDesk ? [{ id: 'rename', label: 'Rename', icon: Pencil, disabled: locked, hint: locked ? lockedHint : '', onSelect: () => setDialog({ kind: 'rename', item }) }] : []),
+      { id: 'pin', label: isPinned ? 'Unpin' : 'Pin to top', icon: isPinned ? PinOff : Pin, onSelect: () => updatePins(togglePin(pins, item.path)) },
+      ...(onDesk
+        ? [
+            { id: 'show', label: 'Show in File Explorer', icon: FolderSearch, onSelect: () => revealPath(item.path) },
+            { id: 'copy', label: 'Copy location', icon: Copy, onSelect: () => copyPath(item.path) },
+            { separator: true },
+            { id: 'delete', label: 'Delete…', icon: Trash2, danger: true, disabled: locked, hint: locked ? lockedHint : '', onSelect: () => setDialog({ kind: 'delete', item }) },
+          ]
+        : []),
+    ];
+  };
+
+  const pinnedItems = pins.map((p) => byPath.get(p)).filter(Boolean);
+  const goToPin = (item) => {
+    if (isFolderItem(item)) {
+      expandTo(item.path);
+      setSearchQuery('');
+      requestAnimationFrame(() => {
+        const el = [...document.querySelectorAll('[data-path]')].find((n) => n.getAttribute('data-path') === item.path);
+        el?.scrollIntoView({ block: 'nearest' });
+      });
+    } else {
+      openPreview(item);
+    }
   };
 
   const handleCreateNewFolder = async (e) => {
@@ -260,7 +459,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
     }
   };
 
-  const rawItems = useMemo(() => workspace?.files || [], [workspace?.files]);
+  const rawItems = useMemo(() => treeFiles || [], [treeFiles]);
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return null;
@@ -277,6 +476,8 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
     onOpen: openPreview,
     onAttach: toggleAttachment,
     onOpenExternal: handleOpenExternal,
+    onMenu: openMenu,
+    pinned: pins,
   };
 
   return (
@@ -330,7 +531,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
                   : `${fileCount} files · stays on this PC`}
             </p>
           </div>
-          {isElectron && workspace?.name !== 'KaTuro' && (
+          {isElectron && !workspace?.handle?.katuroHome && (
             <button
               onClick={handleOpenHome}
               disabled={isOpeningFolder}
@@ -445,7 +646,35 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
       )}
 
       {/* File & Folder Tree */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs">
+      <div
+        className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar text-xs"
+        onContextMenu={(e) => {
+          if (!workspace?.handle) return;
+          e.preventDefault();
+          openMenu(null, e.clientX, e.clientY);
+        }}
+      >
+        {pinnedItems.length > 0 && !searchResults && (
+          <div className="mb-1.5 pb-1.5 border-b border-[#2b3e32]" data-tour="pinned">
+            <div className="text-[9.5px] uppercase font-bold tracking-wider text-[#799583] px-1.5 py-0.5 flex items-center gap-1">
+              <Pin size={9} /> Pinned
+            </div>
+            {pinnedItems.map((item) => (
+              <div
+                key={`pin-${item.path}`}
+                onClick={() => goToPin(item)}
+                onDoubleClick={() => !isFolderItem(item) && handleOpenExternal(item)}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openMenu(item, e.clientX, e.clientY); }}
+                title={item.path}
+                className="group flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded cursor-pointer text-[11px] text-[#c6d6cb] hover:bg-[#223328] transition"
+              >
+                {isFolderItem(item) ? <Folder size={13} className="text-amber-400 flex-shrink-0" /> : getFileIcon(item.name)}
+                <span className="truncate flex-1 min-w-0">{item.name}</span>
+                {moreButton(item, openMenu)}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="text-[9.5px] uppercase font-bold tracking-wider text-[#799583] px-1.5 py-0.5 flex items-center justify-between">
           <span>Explorer</span>
           {attachedPaths.length > 0 ? (
@@ -453,7 +682,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
               <Paperclip size={9} /> {attachedPaths.length} attached
             </span>
           ) : (
-            <span className="text-[8.5px] font-normal normal-case opacity-75">tick to attach</span>
+            <span className="text-[8.5px] font-normal normal-case opacity-75">right-click for more</span>
           )}
         </div>
 
@@ -477,6 +706,26 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
           rawItems.map((item) => <TreeNode key={item.path} item={item} depth={0} {...nodeProps} />)
         )}
       </div>
+
+      {menu && (
+        <ExplorerContextMenu
+          x={menu.x}
+          y={menu.y}
+          keyboard={menu.keyboard}
+          title={menu.item ? menu.item.name : workspace?.name}
+          items={menuItems(menu.item)}
+          onClose={closeMenu}
+        />
+      )}
+      {dialog && (
+        <ExplorerDialog
+          kind={dialog.kind}
+          item={dialog.item}
+          parentLabel={dialog.kind === 'newFolder' || dialog.kind === 'newFile' ? [workspace?.name, ...(dialog.parent ? dialog.parent.split('/') : [])].join(' / ') : ''}
+          onCancel={() => setDialog(null)}
+          onConfirm={confirmDialog}
+        />
+      )}
 
       {/* Account & Plan (Bottom Bar) */}
       <div className="p-2.5 bg-[#141f17] border-t border-[#2d3e33] space-y-2">

@@ -462,6 +462,8 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
 
   return {
     status,
+    /** Why the KaTuro folder may not move to `dest` (phoneAccess.homePlaceProblem), or null. */
+    homePlaceProblem: (dest) => access.homePlaceProblem(dest, { shared: store.shared, ...guard }),
     /** Starts listening on the LAN (port 47821 if free, any free port otherwise). */
     start(wanted = PREFERRED_PORT) {
       if (server) return Promise.resolve(status());

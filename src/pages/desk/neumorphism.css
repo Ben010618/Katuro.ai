@@ -279,3 +279,11 @@
 .kt-neu button.kt-phone-cta.kt-phone-cta svg { color: #ffffff; }
 .kt-neu button.kt-phone-cta.kt-phone-cta:hover { background-color: #065f46; }
 .kt-neu button.kt-phone-cta.kt-phone-cta:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+
+/* Explorer right-click menu: a raised card; the item under the mouse or keyboard is pressed in. */
+.kt-neu .kt-explorer-menu { background-color: var(--neu-bg); box-shadow: var(--neu-raised); }
+.kt-neu .kt-explorer-menu [role='menuitem']:is(:hover, :focus):not(:disabled) { background-color: var(--neu-hover); box-shadow: var(--neu-inset-sm); }
+.kt-neu .kt-explorer-menu .text-red-400 { color: var(--neu-red-text); }
+/* A red (delete) button keeps white text, also inside the sidebar. */
+.kt-neu .bg-red-600.text-white { color: #ffffff; }
+.kt-neu .hover\:bg-red-700:hover { background-color: #b91c1c; }

@@ -34,14 +34,15 @@ describe('which KaTuroDesk tour to show', () => {
     const v119 = WHATS_NEW.find((n) => n.version === '1.19.0').steps;
     expect(latestWhatsNew('1.19.0')).toEqual(v119);
     expect(latestWhatsNew('1.19.3')).toEqual(v119);
-    expect(latestWhatsNew('1.20.4')).toEqual(WHATS_NEW[0].steps);
+    expect(latestWhatsNew('1.20.4')).toEqual(WHATS_NEW.find((n) => n.version === '1.20.0').steps);
+    expect(latestWhatsNew('1.21.0').some((s) => /right-click/i.test(s.body))).toBe(true);
     expect(latestWhatsNew('')).toEqual(WHATS_NEW[0].steps);
     expect(latestWhatsNew('1.0.0')).toEqual([]);
   });
 
   it('the phone step is in both tours, and every step has a title and text', () => {
     expect(FIRST_RUN.some((s) => s.target === 'phone')).toBe(true);
-    expect(WHATS_NEW[0].steps[0].target).toBe('phone');
+    expect(WHATS_NEW.find((n) => n.version === '1.19.0').steps[0].target).toBe('phone');
     for (const s of [...FIRST_RUN, ...WHATS_NEW.flatMap((n) => n.steps)]) {
       expect(s.title).toBeTruthy();
       expect(s.body).toBeTruthy();

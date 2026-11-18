@@ -177,7 +177,7 @@ async function openFolder(selectedPath) {
     path: resolved,
     name: path.basename(resolved),
     // The KaTuro folder: class records in its Records are edited in place (localFileSystem.editsInPlace).
-    isHome: defaultFolders.isHomeFolder(resolved, app.getPath('documents')),
+    isHome: defaultFolders.isHomeFolder(resolved, homePath()),
     files: await readDirectoryRecursive(resolved),
   };
 }
@@ -382,9 +382,25 @@ ipcMain.handle('dialog:selectFolder', async () => {
   return openFolder(result.filePaths[0]);
 });
 
-// The KaTuro home folder (Documents\KaTuro with Records and Lessons), see defaultFolders.cjs.
+// The KaTuro home folder (Desktop\Katuro Teaching Assistant with Records and Lessons, or
+// wherever the teacher moved it), see defaultFolders.cjs.
+const homeSettingsFile = () => path.join(app.getPath('userData'), 'katuro-home.json');
+let homeDir = null;
+function homePath() {
+  if (!homeDir) {
+    homeDir = defaultFolders.chooseHome({ settingsFile: homeSettingsFile(), desktopDir: app.getPath('desktop'), documentsDir: app.getPath('documents') });
+  }
+  return homeDir;
+}
+const ensureHome = () => defaultFolders.ensureHomeFolder(homePath());
+let homeMoving = false;
+// Phone requests wait while the KaTuro folder moves, so nothing is written into the old place.
+const homeForPhone = () => {
+  if (homeMoving) throw Object.assign(new Error('Your KaTuro folder is being moved on the computer. Try again in a minute.'), { code: 'FOLDER_MOVING' });
+  return ensureHome();
+};
 async function openHomeFolder() {
-  return openFolder(defaultFolders.ensureHomeFolder(app.getPath('documents')));
+  return openFolder(ensureHome());
 }
 
 // Startup: the folder from last time; on a first run (or if that folder is gone), the
@@ -394,7 +410,7 @@ ipcMain.handle('workspace:reopenLast', async () => {
     const { path: lastPath } = JSON.parse(fs.readFileSync(lastFolderFile(), 'utf-8'));
     if (lastPath && fs.existsSync(lastPath) && fs.statSync(lastPath).isDirectory()) {
       // Records and Lessons come back if the teacher deleted them from the home folder.
-      if (defaultFolders.isHomeFolder(lastPath, app.getPath('documents'))) return openHomeFolder();
+      if (defaultFolders.isHomeFolder(lastPath, homePath())) return openHomeFolder();
       return openFolder(lastPath);
     }
   } catch (e) {}
@@ -457,6 +473,85 @@ ipcMain.handle('shell:openPath', async (_, filePath) => {
 ipcMain.handle('shell:showItemInFolder', async (_, filePath) => {
   shell.showItemInFolder(resolveInsideRoot(filePath));
   return { success: true };
+});
+
+// Explorer right-click. The KaTuro folder, its Records and Lessons, and the open folder itself
+// are never renamed or deleted here (defaultFolders.isProtectedPath).
+const isProtected = (target) => defaultFolders.isProtectedPath(target, { home: homePath(), roots: [...allowedRoots] });
+ipcMain.handle('fs:rename', async (e, filePath, newName) => {
+  if (!fromMainWindow(e)) throw new Error('Not allowed');
+  const target = resolveInsideRoot(filePath);
+  if (isProtected(target)) throw new Error('This folder cannot be renamed. KaTuroDesk and the KaTuro App use it.');
+  const name = defaultFolders.cleanName(newName);
+  const dest = resolveInsideRoot(path.join(path.dirname(target), name));
+  if (dest === target) return { success: true, path: target };
+  // A new letter case of the same name is fine; any other existing name is not overwritten.
+  if (!defaultFolders.samePath(dest, target) && fs.existsSync(dest)) throw new Error(`There is already something named "${name}" here.`);
+  try {
+    await fs.promises.rename(target, dest);
+  } catch (err) {
+    if (['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw new Error('It is open in another program (Word, Excel...). Close it and try again.');
+    throw err;
+  }
+  return { success: true, path: dest };
+});
+ipcMain.handle('fs:trash', async (e, filePath) => {
+  if (!fromMainWindow(e)) throw new Error('Not allowed');
+  const target = resolveInsideRoot(filePath);
+  if (isProtected(target)) throw new Error('This folder cannot be deleted. KaTuroDesk and the KaTuro App use it.');
+  if (!fs.existsSync(target)) return { success: true };
+  try {
+    await shell.trashItem(target);
+  } catch (err) {
+    throw new Error('Windows could not move it to the Recycle Bin. Close it if it is open in another program, then try again.');
+  }
+  return { success: true };
+});
+
+// Settings → Documents → KaTuro folder location.
+ipcMain.handle('home:info', async (e) => {
+  if (!fromMainWindow(e)) return null;
+  return { path: ensureHome() };
+});
+ipcMain.handle('home:show', async (e) => {
+  if (!fromMainWindow(e)) return false;
+  const err = await shell.openPath(ensureHome());
+  return !err;
+});
+ipcMain.handle('home:move', async (e) => {
+  if (!fromMainWindow(e)) return { canceled: true };
+  if (homeMoving || backupRunning) return { ok: false, error: 'Wait for the backup or the other move to finish.' };
+  const from = homePath();
+  const pick = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose where your KaTuro folder goes',
+    properties: ['openDirectory', 'createDirectory'],
+    defaultPath: path.dirname(from),
+  });
+  if (pick.canceled || !pick.filePaths.length) return { canceled: true };
+  if (homeMoving || backupRunning) return { ok: false, error: 'Wait for the backup or the other move to finish.' };
+  const problem = linkService?.homePlaceProblem(path.join(pick.filePaths[0], path.basename(from)));
+  if (problem) return { ok: false, code: 'NOT_ALLOWED', error: problem };
+  homeMoving = true;
+  try {
+    const to = await defaultFolders.moveHome(from, pick.filePaths[0]);
+    // The files have moved: from here on the new place is home, even if saving the setting fails.
+    homeDir = to;
+    let warning = '';
+    try { defaultFolders.saveHome(homeSettingsFile(), to); } catch { warning = 'KaTuroDesk could not save the new place; it may look for the folder in the old place next time.'; }
+    ensureHome();
+    // The old place is gone: drop it (and folders inside it) from what the window may reach,
+    // and point "last folder" at the new place.
+    for (const root of [...allowedRoots]) if (defaultFolders.isInsideFolder(root, from)) allowedRoots.delete(root);
+    try {
+      const { path: last } = JSON.parse(fs.readFileSync(lastFolderFile(), 'utf-8'));
+      if (last && defaultFolders.isInsideFolder(last, from)) fs.writeFileSync(lastFolderFile(), JSON.stringify({ path: path.join(to, path.relative(from, last)) }));
+    } catch { /* none saved */ }
+    return { ok: true, from, path: to, warning };
+  } catch (err) {
+    return { ok: false, error: err.message, code: err.code || 'ERROR' };
+  } finally {
+    homeMoving = false;
+  }
 });
 
 // iPhone photos (HEIC/HEIF) -> JPEG bytes. The decoder is bundled in vendor/heic.cjs
@@ -894,14 +989,14 @@ ipcMain.handle('link:reply', (e, id, res = {}) => {
 });
 // The KaTuro folder for the phone requests, without changing the folder the teacher has open.
 ipcMain.handle('workspace:homeRoot', async () => {
-  const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
+  const home = homeForPhone();
   allowedRoots.add(path.resolve(home));
   return home;
 });
 function startLinkService() {
   const { safeStorage } = require('electron');
   linkService = require('./linkService.cjs').createLinkService({
-    home: () => defaultFolders.ensureHomeFolder(app.getPath('documents')),
+    home: () => homeForPhone(),
     storeFile: path.join(app.getPath('userData'), 'linked-phones.json'),
     // Phone keys are saved with Windows DPAPI; without it no phone can be linked.
     protect: {
@@ -984,6 +1079,7 @@ let backupRunning = false;
 ipcMain.handle('backup:run', async (e) => {
   if (!fromMainWindow(e)) return { canceled: true };
   if (backupRunning) return { ok: false, code: 'RUNNING', error: 'A backup is already running. Wait for it to finish.' };
+  if (homeMoving) return { ok: false, code: 'RUNNING', error: 'Your KaTuro folder is being moved. Wait for it to finish.' };
   backupRunning = true;
   try {
     const last = readBackupInfo();
@@ -993,8 +1089,9 @@ ipcMain.handle('backup:run', async (e) => {
       ...(last?.dest && fs.existsSync(last.dest) ? { defaultPath: last.dest } : {}),
     });
     if (pick.canceled || !pick.filePaths.length) return { canceled: true };
+    if (homeMoving) return { ok: false, code: 'RUNNING', error: 'Your KaTuro folder is being moved. Wait for it to finish.' };
     const dest = pick.filePaths[0];
-    const home = defaultFolders.ensureHomeFolder(app.getPath('documents'));
+    const home = ensureHome();
     const res = await folderBackup.backupFolder({ home, dest, onProgress: (p) => sendToWindow('backup:progress', p) });
     const info = { at: new Date().toISOString(), dest, path: res.path, files: res.files, bytes: res.bytes };
     try { fs.writeFileSync(backupInfoFile(), JSON.stringify(info, null, 2)); } catch { /* the backup itself is done */ }
