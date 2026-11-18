@@ -42,7 +42,9 @@ export function parseClassRecordFileName(pathOrName) {
 }
 
 /** True for a file directly or deeper inside Records/ (any letter case). */
-export const isInRecords = (path) => /^records\//i.test(String(path || '').replace(/\\/g, '/').replace(/^\/+/, ''));
+const isInTop = (folder) => (path) => String(path || '').replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase().startsWith(`${folder.toLowerCase()}/`);
+export const isInRecords = isInTop(RECORDS_DIR);
+export const isInLessons = isInTop(LESSONS_DIR);
 
 /** True when the folder tree is the KaTuro home: Records and Lessons at its top. */
 export function isKaturoHome(tree = []) {

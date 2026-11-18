@@ -61,6 +61,16 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.23.0',
+    steps: [
+      {
+        target: 'folder',
+        title: 'Your files, always backed up',
+        body: 'Before KaTuro changes a file in Lessons or Records, it saves a backup copy in KaTuro Backups, then updates your file itself: no extra "(KaTuro edit)" copies to keep track of.',
+      },
+    ],
+  },
+  {
     version: '1.22.0',
     steps: [
       {

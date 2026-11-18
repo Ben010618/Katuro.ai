@@ -8,9 +8,8 @@
  *
  * All paths passed in are workspace-relative and use forward slashes.
  */
-import { parseClassRecordFileName, isInRecords } from './desk/records/classRecords.js';
+import { isInRecords, isInLessons } from './desk/records/classRecords.js';
 import { sha256Hex } from '../utils/bytes.js';
-import { isAttendanceFile } from './desk/records/attendance.js';
 
 export const isFileSystemAccessSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
@@ -258,9 +257,11 @@ export async function readFileBytes(dirHandle, fileOrPath) {
 }
 
 // ── Safe-edit SOP ────────────────────────────────────────────────
-// KaTuroDesk never modifies a teacher's original file:
-//   1. the original is backed up to "KaTuro Backups/<date>/<same folders>/"
-//   2. edits go into a working clone next to it: "<name> (KaTuro edit).<ext>"
+// Before KaTuroDesk changes a teacher's file, a copy of it is always saved first:
+//   1. the backup goes to "KaTuro Backups/<date>/<same folders>/<name> (backup <time>).<ext>"
+//   2. files in Lessons and Records of the KaTuro folder are then changed themselves (decided
+//      with the teacher 2026-11-18: one file to keep track of, the backup keeps the original);
+//      files anywhere else get the changes in a working clone: "<name> (KaTuro edit).<ext>"
 //   3. before a clone is changed again, its current version is backed up too
 export const BACKUPS_ROOT = 'KaTuro Backups';
 export const WORKING_COPY_SUFFIX = ' (KaTuro edit)';
@@ -300,21 +301,18 @@ export async function backupFile(dirHandle, relPath, now = new Date()) {
 }
 
 /**
- * KaTuro class records are edited IN PLACE (one file per class and subject, decided with the
- * teacher 2026-11-16), with a backup in KaTuro Backups first, every time. Only when:
- *   - the open folder is the KaTuro folder (handle.katuroHome), and
- *   - the file is a class record in Records named "Grade 7 - Rizal - Science.xlsx"
- *     (.xlsx only: an .xlsm's macros would not survive every writer), not an attendance file.
- * Everything else (the teacher's own folders and files) gets the "(KaTuro edit)" working copy.
+ * Files in Lessons and Records of the KaTuro folder are edited IN PLACE, with a backup in
+ * KaTuro Backups first, every time. Not:
+ *   - an .xlsm (its macros would not survive every writer): it gets the working copy;
+ *   - a "(KaTuro edit)" clone left by an earlier version: work continues in it as before.
+ * Files in the teacher's other folders get the "(KaTuro edit)" working copy.
  */
 export const editsInPlace = (relPath, dirHandle) => {
   const p = cleanRelPath(relPath);
   return Boolean(dirHandle?.katuroHome)
-    && isInRecords(p)
-    && /\.xlsx$/i.test(p)
-    && workingCopyPath(p) !== p
-    && !isAttendanceFile(p)
-    && Boolean(parseClassRecordFileName(p));
+    && (isInRecords(p) || isInLessons(p))
+    && !/\.xlsm$/i.test(p)
+    && workingCopyPath(p) !== p;
 };
 
 /** Windows refuses to write a file that is open in Excel (EBUSY / EPERM). */
@@ -345,7 +343,7 @@ export async function saveWorkingCopy(dirHandle, originalPath, bytes, mimeType =
     } catch (err) {
       if (isFileOpenError(err)) {
         const name = original.split('/').pop();
-        throw Object.assign(new Error(`${name} is open in Excel. Close it on the computer, then try again. (A backup was already made; nothing was changed.)`), { code: 'FILE_OPEN' });
+        throw Object.assign(new Error(`${name} is open in another program (Word, Excel or PowerPoint). Close it on the computer, then try again. (A backup was already made; nothing was changed.)`), { code: 'FILE_OPEN' });
       }
       throw err;
     }

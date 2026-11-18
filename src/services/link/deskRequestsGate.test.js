@@ -12,7 +12,7 @@ import { readDocument } from '../desk/readers/index.js';
 import { readClassRecord } from '../desk/records/recordSheet.js';
 import { applyEdits } from '../desk/docmap/index.js';
 import { attendancePathFor, newAttendanceWorkbook, writeAttendance, readAttendance } from '../desk/records/attendance.js';
-import { createVirtualWorkspace, readFileBytes, saveWorkingCopy, sha256Hex } from '../localFileSystem.js';
+import { createVirtualWorkspace, readFileBytes, saveWorkingCopy, sha256Hex, fileExists, flattenFileTree, readDirectoryRecursively } from '../localFileSystem.js';
 import { createDeskRequestHandler } from './deskRequests.js';
 
 const LEARNERS = [
@@ -55,19 +55,39 @@ describe('review gate fixes (KaTuroDesk side)', () => {
     expect((await ask('class', { path: RECORD })).scores.ww1).toEqual({ '136512340002': 'Absent' });
   });
 
-  it("a teacher's own workbook in Records gets the (KaTuro edit) copy, and later recordings continue in it", async () => {
+  it("a teacher's own workbook in Records is recorded into itself, with a backup each time", async () => {
     const ws = await home();
     const OWN = 'Records/My ECR Science 7.xlsx';
     ws.handle.saveVirtualFile(OWN, await ecr());
     const ask = createDeskRequestHandler({ handle: ws.handle });
     const r1 = await ask('record', { id: 'o1', path: OWN, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] });
-    expect(r1.savedTo).toBe('Records/My ECR Science 7 (KaTuro edit).xlsx');
+    expect(r1.savedTo).toBe(OWN);
     await ask('record', { id: 'o2', path: OWN, column: 'ww2', hps: 10, scores: [{ lrn: '136512340001', score: 9 }] });
     const cls = await ask('class', { path: OWN });
     expect([cls.scores.ww1, cls.scores.ww2]).toEqual([{ '136512340001': 18 }, { '136512340001': 9 }]);
-    // The original is untouched; the copy is not listed as a second class.
-    expect((await parse(await readFileBytes(ws.handle, OWN))).scores.ww1).toEqual({});
+    // No second copy beside it; the file as it was before each recording is in KaTuro Backups.
+    expect(await fileExists(ws.handle, 'Records/My ECR Science 7 (KaTuro edit).xlsx')).toBe(false);
+    const backups = flattenFileTree(await readDirectoryRecursively(ws.handle)).filter((f) => f.path.startsWith('KaTuro Backups/') && f.path.includes('My ECR Science 7 (backup'));
+    expect(backups.length).toBe(2);
+    const before = await Promise.all(backups.map(async (b) => (await parse(await readFileBytes(ws.handle, b.path))).scores.ww1));
+    expect(before).toContainEqual({}); // the file as it was before the first recording
     expect((await ask('classes')).classes.map((c) => c.path).sort()).toEqual([OWN, RECORD].sort());
+  });
+
+  it('an earlier "(KaTuro edit)" copy keeps the latest scores: recordings continue in it', async () => {
+    const ws = await home();
+    const OWN = 'Records/My ECR Science 7.xlsx';
+    const COPY = 'Records/My ECR Science 7 (KaTuro edit).xlsx';
+    ws.handle.saveVirtualFile(OWN, await ecr());
+    ws.handle.saveVirtualFile(COPY, await ecr());
+    const ask = createDeskRequestHandler({ handle: ws.handle });
+    // WW1 then WW2 from the phone: both land in the copy (made by an older KaTuroDesk), together.
+    await ask('record', { id: 'c0', path: OWN, column: 'ww1', hps: 20, scores: [{ lrn: '136512340001', score: 18 }] });
+    const r = await ask('record', { id: 'c1', path: OWN, column: 'ww2', hps: 10, scores: [{ lrn: '136512340001', score: 9 }] });
+    expect(r.savedTo).toBe(COPY);
+    const copy = (await parse(await readFileBytes(ws.handle, COPY))).scores;
+    expect([copy.ww1, copy.ww2]).toEqual([{ '136512340001': 18 }, { '136512340001': 9 }]);
+    expect((await parse(await readFileBytes(ws.handle, OWN))).scores.ww2).toEqual({});
   });
 
   it('the same KaTuro-named record outside the KaTuro folder is never edited in place', async () => {

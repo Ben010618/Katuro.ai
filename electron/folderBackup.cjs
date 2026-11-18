@@ -99,4 +99,4 @@ async function renameWithRetry(from, to, tries = 5) {
   }
 }
 
-module.exports = { backupFolder, backupName };
+module.exports = { backupFolder, backupName, renameWithRetry };

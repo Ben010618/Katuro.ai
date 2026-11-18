@@ -9,8 +9,8 @@
  *
  * Edits are never written directly: tools return a pending "changes" artifact.
  * The teacher reviews it in the Canvas; applying follows the safe-edit SOP
- * (original backed up, working copy "<name> (KaTuro edit)" edited; class records in Records are
- * edited in place after the backup, see localFileSystem.saveWorkingCopy).
+ * (a backup first; files in Lessons and Records are then edited in place, files elsewhere in a
+ * working copy "<name> (KaTuro edit)", see localFileSystem.saveWorkingCopy).
  */
 
 import { recognizeMap, harvestNames } from '../understand/recognize.js';
@@ -242,7 +242,7 @@ export const UNDERSTAND_TOOLS = {
 
   transfer_data: {
     label: 'Transfer data',
-    description: "Copy data from one school paper into ANOTHER paper's own template without changing its formatting: e.g. attendance typed in a Word doc → the school's SF2 Excel; scores from a CSV/photo → the teacher's class record; LRN/sex from the SF1 → a masterlist. Learners are matched by LRN/name (spelling-tolerant), columns by date/day/header. Produces a change preview for the teacher to approve; the original target is backed up and a working copy is edited. Target must be .xlsx or .docx.",
+    description: "Copy data from one school paper into ANOTHER paper's own template without changing its formatting: e.g. attendance typed in a Word doc → the school's SF2 Excel; scores from a CSV/photo → the teacher's class record; LRN/sex from the SF1 → a masterlist. Learners are matched by LRN/name (spelling-tolerant), columns by date/day/header. Produces a change preview for the teacher to approve; a backup of the target is saved first; then the target itself is changed (Lessons, Records) or a working copy (other folders). Target must be .xlsx or .docx.",
     args: '{ "sourcePath": string, "targetPath": string, "instructions"?: string, "overwrite"?: boolean }',
     async run({ sourcePath, targetPath, instructions = '', overwrite = false }, ctx, report) {
       if (!EDITABLE.test(targetPath)) throw new Error('I can type data into Excel (.xlsx) and Word (.docx) files. Please choose one of those as the target.');
@@ -329,7 +329,7 @@ export const UNDERSTAND_TOOLS = {
 
   voice_encode_scores: {
     label: 'Encode scores by voice',
-    description: "Open the voice score-encoding panel for the teacher's OWN class record or score sheet (Excel or Word). The teacher reads names and scores aloud (or only the scores, going down the list); KaTuro matches each one to the learner list in that file and shows them for checking before anything is written (review, then Apply: original backed up, working copy edited). Use when the teacher wants to encode, enter, record or type scores by voice, by speaking or by dictating.",
+    description: "Open the voice score-encoding panel for the teacher's OWN class record or score sheet (Excel or Word). The teacher reads names and scores aloud (or only the scores, going down the list); KaTuro matches each one to the learner list in that file and shows them for checking before anything is written (review, then Apply: a backup first, then the file itself in Lessons/Records, a working copy elsewhere). Use when the teacher wants to encode, enter, record or type scores by voice, by speaking or by dictating.",
     args: '{ "targetPath": string, "column"?: string (header or column letter of the score column, only if the teacher said it) }',
     async run({ targetPath: chosenPath, column }, ctx, report) {
       if (!EDITABLE.test(chosenPath || '')) throw new Error('Voice encoding fills an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
@@ -421,7 +421,7 @@ export const UNDERSTAND_TOOLS = {
 
   record_quiz_scores: {
     label: 'Record bubble quiz scores',
-    description: "Put the checked scores of a bubble-sheet quiz KaTuro made (its \"KaTuro bubble quiz.json\", checked in the Bubble quiz panel) into the teacher's OWN class record or score sheet (Excel or Word). Learners are matched by LRN, then by name; the teacher chooses the column and reviews every change before Apply (original backed up, working copy edited). Learners without a sheet are left blank.",
+    description: "Put the checked scores of a bubble-sheet quiz KaTuro made (its \"KaTuro bubble quiz.json\", checked in the Bubble quiz panel) into the teacher's OWN class record or score sheet (Excel or Word). Learners are matched by LRN, then by name; the teacher chooses the column and reviews every change before Apply (a backup first, then the file itself in Lessons/Records, a working copy elsewhere). Learners without a sheet are left blank.",
     args: '{ "quizPath": string, "targetPath": string, "column"?: string (header or column letter, only if the teacher said it) }',
     async run({ quizPath, targetPath: chosenPath, column }, ctx, report) {
       if (!EDITABLE.test(chosenPath || '')) throw new Error('Scores can be recorded into an Excel (.xlsx) or Word (.docx) class record or score sheet. Please choose one of those.');
@@ -500,7 +500,7 @@ export const UNDERSTAND_TOOLS = {
 
   edit_file: {
     label: 'Edit file',
-    description: 'Make specific changes inside an existing Word or Excel file while keeping its exact formatting: e.g. "change the school year to 2026-2027", "fill the remarks column: Passed if grade ≥ 75", "put my name as adviser", "correct Juan\'s LRN". Only the needed cells/paragraphs change. Produces a change preview for approval; original backed up, working copy edited.',
+    description: 'Make specific changes inside an existing Word or Excel file while keeping its exact formatting: e.g. "change the school year to 2026-2027", "fill the remarks column: Passed if grade ≥ 75", "put my name as adviser", "correct Juan\'s LRN". Only the needed cells/paragraphs change. Produces a change preview for approval; a backup is saved first, then the file itself is changed (Lessons, Records) or a working copy (elsewhere).',
     args: '{ "path": string, "instructions": string }',
     async run({ path, instructions = '' }, ctx, report) {
       if (!EDITABLE.test(path)) throw new Error('I can edit Excel (.xlsx) and Word (.docx) files in place. For other files, ask me to create a new document instead.');

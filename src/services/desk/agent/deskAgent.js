@@ -333,14 +333,14 @@ export async function runDeskAgentTurn({
       createdFiles.push(file);
       return file;
     },
-    /** Safe-edit SOP for changes to an EXISTING teacher file (backup + working clone). */
+    /** Safe-edit SOP for changes to an EXISTING teacher file: a backup first, then the file itself (Lessons, Records) or a working clone. */
     async saveWorkingCopy(originalPath, bytes, format) {
       if (!handle) throw new Error('Open a classroom folder first so I can save files.');
       const ext = originalPath.split('.').pop().toLowerCase();
       const baseHash = lastRead.has(originalPath) ? await lastRead.get(originalPath) : null;
       const res = await saveWorkingCopy(handle, originalPath, bytes, MIME_BY_EXT[ext] || 'application/octet-stream', new Date(), { baseHash });
       if (res.inPlace) lastRead.set(originalPath, sha256Hex(bytes).catch(() => null));
-      const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? 0, backups: res.backups, originalPath };
+      const file = { path: res.path, name: res.name, format: format || ext, size: bytes?.byteLength ?? 0, backups: res.backups, originalPath, inPlace: res.inPlace };
       createdFiles.push(file);
       return file;
     },

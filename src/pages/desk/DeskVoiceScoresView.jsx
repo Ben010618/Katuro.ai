@@ -278,7 +278,7 @@ export default function DeskVoiceScoresView({ art }) {
           </button>
         </div>
         {!result.ok && scoredCount > 0 && <p className="text-[11px] text-red-700">{result.problems.join(' ')}</p>}
-        <p className="flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> Nothing is written until you Apply. Your original file is backed up and a working copy is edited.</p>
+        <p className="flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> Nothing is written until you Apply. A backup of the file is always made first (KaTuro Backups).</p>
       </div>
     </div>
   );

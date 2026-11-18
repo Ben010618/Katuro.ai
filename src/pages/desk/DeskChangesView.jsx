@@ -58,7 +58,7 @@ export default function DeskChangesView({ art }) {
       {d.status === 'applied' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-[11px] text-emerald-900 space-y-0.5">
           <p className="font-bold flex items-center gap-1"><Check size={13} /> {d.appliedCount} change(s) saved to {d.savedPath?.split('/').pop()}</p>
-          <p className="flex items-center gap-1"><ShieldCheck size={12} /> Your original {d.targetPath?.split('/').pop()} was not changed. Backup: {d.backups?.[0] || 'KaTuro Backups'}</p>
+          <p className="flex items-center gap-1"><ShieldCheck size={12} /> {d.savedPath === d.targetPath ? `A backup of the file as it was is in ${d.backups?.[0] || 'KaTuro Backups'}.` : `Your original ${d.targetPath?.split('/').pop()} was not changed. Backup: ${d.backups?.[0] || 'KaTuro Backups'}`}</p>
           {d.skipped?.length > 0 && <p className="text-amber-800">{d.skipped.length} skipped (e.g. {d.skipped.slice(0, 3).map((s) => `${s.cell || s.id}: ${s.reason}`).join(', ')}).</p>}
         </div>
       )}
@@ -178,7 +178,7 @@ export default function DeskChangesView({ art }) {
         <p className="text-[10px] text-gray-500 flex items-center gap-1">
           <ShieldCheck size={11} className="text-emerald-700" />{' '}
           {editsInPlace(d.targetPath || '', workspace?.handle)
-            ? <>A backup of your class record is saved in KaTuro Backups first; then the changes go straight into “{d.targetPath.split('/').pop()}”.</>
+            ? <>A backup copy is saved in KaTuro Backups first; then the changes go straight into “{d.targetPath.split('/').pop()}”.</>
             : <>Your original file stays untouched: it is backed up, and the changes go into “{d.targetPath?.split('/').pop().replace(/(\.[^.]+)$/, ' (KaTuro edit)$1')}”.</>}
         </p>
       )}

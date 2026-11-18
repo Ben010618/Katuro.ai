@@ -136,7 +136,8 @@ async function readDirectoryRecursive(dirPath, relativeRoot = '', counter = { n:
     const items = await fs.promises.readdir(dirPath, { withFileTypes: true });
     for (const item of items) {
       if (counter.n >= MAX_TREE_ENTRIES) break;
-      if (IGNORED_NAMES.has(item.name) || item.name.startsWith('~$')) continue;
+      // ~$ = Office lock files; .katuro-tmp = a save that was cut off (fs:writeFile writes those first).
+      if (IGNORED_NAMES.has(item.name) || item.name.startsWith('~$') || item.name.endsWith('.katuro-tmp')) continue;
       const fullPath = path.join(dirPath, item.name);
       const relPath = relativeRoot ? `${relativeRoot}/${item.name}` : item.name;
       counter.n += 1;
@@ -441,7 +442,16 @@ ipcMain.handle('fs:readBinary', async (_, filePath) => {
 ipcMain.handle('fs:writeFile', async (_, filePath, content) => {
   const target = resolveInsideRoot(filePath);
   await fs.promises.mkdir(path.dirname(target), { recursive: true });
-  await fs.promises.writeFile(target, toBuffer(content));
+  // Written beside it first, then swapped in: a power cut or a full drive never leaves the
+  // teacher's file half-written. A file open in Word/Excel refuses the swap (EBUSY/EPERM).
+  const temp = `${target}.katuro-tmp`;
+  try {
+    await fs.promises.writeFile(temp, toBuffer(content));
+    await folderBackup.renameWithRetry(temp, target);
+  } catch (err) {
+    await fs.promises.rm(temp, { force: true }).catch(() => {});
+    throw err;
+  }
   // Files received in Messages are marked as downloaded from the internet (Windows
   // Zone.Identifier), so Office opens them in Protected View, like a browser download.
   if (process.platform === 'win32' && target.split(path.sep).includes('KaTuro Messages')) {

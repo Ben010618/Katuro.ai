@@ -38,19 +38,25 @@ describe('class record file names', () => {
     expect(() => classRecordFileName({ gradeLevel: '7', section: '', subject: 'Math' })).toThrow(/section/);
   });
 
-  it('only KaTuro class records in the KaTuro folder are edited in place; everything else gets a copy', () => {
+  it('files in Lessons and Records of the KaTuro folder are edited in place (after a backup); everything else gets a copy', () => {
     const home = { katuroHome: true };
-    expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', home)).toBe(true);
-    expect(editsInPlace('Records/SY 2025-2026/Grade 7 - Rizal - Science.xlsx', home)).toBe(true);
+    for (const p of [
+      'Records/Grade 7 - Rizal - Science.xlsx',
+      'Records/SY 2025-2026/Grade 7 - Rizal - Science.xlsx',
+      'Records/SF2 October.xlsx',
+      'Records/Attendance/Grade 7 - Rizal - Science.xlsx',
+      'Lessons/Week 2/Photosynthesis.docx',
+      'Lessons/Cells.pptx',
+      'Lessons/Module 1.pdf',
+    ]) expect(editsInPlace(p, home)).toBe(true);
     // Another folder the teacher opened (e.g. D:\School\Records\…): never in place.
     expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', { katuroHome: false })).toBe(false);
     expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsx', undefined)).toBe(false);
-    // Not a class record, macros, attendance, a working copy, outside Records.
-    expect(editsInPlace('Records/SF2 October.xlsx', home)).toBe(false);
+    // Macros, an earlier working copy, Templates and the teacher's other folders.
     expect(editsInPlace('Records/Grade 7 - Rizal - Science.xlsm', home)).toBe(false);
-    expect(editsInPlace('Records/Attendance/Grade 7 - Rizal - Science.xlsx', home)).toBe(false);
     expect(editsInPlace('Records/Grade 7 - Rizal - Science (KaTuro edit).xlsx', home)).toBe(false);
-    expect(editsInPlace('Lessons/Grade 7 - Rizal - Science.xlsx', home)).toBe(false);
+    expect(editsInPlace('Templates/Lesson Plan.docx', home)).toBe(false);
+    expect(editsInPlace('Seminars/Report.docx', home)).toBe(false);
   });
 
   it('reads a class back from its file name', () => {

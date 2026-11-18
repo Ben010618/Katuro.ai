@@ -8,7 +8,7 @@ const sel = 'border border-gray-300 rounded bg-white px-1 py-0.5 text-[11px]';
 
 /**
  * Page setup for the teacher's OWN Word file: paper, margins, one font and text size.
- * Runs the "format to DepEd" tool on a working copy; the original is backed up, never changed.
+ * Runs the "format to DepEd" tool: a backup first, then the file itself (Lessons, Records) or a working copy.
  */
 export default function DeskWordPageSetup({ path }) {
   const { user, profile } = useAuth();
@@ -56,9 +56,9 @@ export default function DeskWordPageSetup({ path }) {
           <option value="">Text size: keep</option>
           {[10, 11, 12, 13, 14].map((v) => <option key={v} value={v}>{v} pt</option>)}
         </select>
-        <button type="button" onClick={apply} disabled={busy} className="rounded bg-[#2d6a4f] px-2.5 py-1 font-semibold text-white hover:bg-[#235841] disabled:opacity-40">{busy ? 'Working…' : 'Make a formatted copy'}</button>
+        <button type="button" onClick={apply} disabled={busy} className="rounded bg-[#2d6a4f] px-2.5 py-1 font-semibold text-white hover:bg-[#235841] disabled:opacity-40">{busy ? 'Working…' : 'Apply the format'}</button>
       </div>
-      <p className="mt-1.5 flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> Saved as a "(KaTuro edit)" copy; your original is backed up and not changed. The words stay the same.</p>
+      <p className="mt-1.5 flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> A backup is made first (KaTuro Backups). Files in Lessons and Records are then changed directly; files elsewhere get a "(KaTuro edit)" copy. The words stay the same.</p>
       {error && <p className="mt-1 text-red-700" role="alert">{error}</p>}
     </details>
   );

@@ -64,6 +64,14 @@ const DOC_TYPE_GUIDES = {
   other: 'Any other DepEd/teacher document. Choose a sensible structure.',
 };
 
+/** One sentence for a summary after ctx.saveWorkingCopy: where the backup is, and what changed. */
+function savedNote(file, originalName) {
+  const where = file?.backups?.[0] ? file.backups[0].split('/').slice(0, -1).join('/') : 'KaTuro Backups';
+  return file?.inPlace
+    ? `A backup of ${originalName} as it was before is in ${where}.`
+    : `The original ${originalName} was backed up (${where}) and not changed.`;
+}
+
 function slug(s, max = 60) {
   return String(s || 'KaTuro')
     .replace(/[\\/:*?"<>|]+/g, ' ')
@@ -973,7 +981,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   encode_scores: {
     label: 'Type scores into my file',
-    description: "Type scores from a source (score sheet, extracted table, or analysis) into the teacher's OWN existing Excel file (e.g. their e-Class Record) by matching learner names, keeping all their formatting and formulas. Safe-edit SOP: the original is backed up to KaTuro Backups and the scores go into a working copy named <name> (KaTuro edit).xlsx beside it; the original is never changed.",
+    description: "Type scores from a source (score sheet, extracted table, or analysis) into the teacher's OWN existing Excel file (e.g. their e-Class Record) by matching learner names, keeping all their formatting and formulas. Safe-edit SOP: a backup of the file is always saved in KaTuro Backups first; a file in Lessons or Records is then changed itself, a file elsewhere gets the scores in a working copy <name> (KaTuro edit).xlsx.",
     args: '{ "sourcePath": string, "targetPath": string, "targetColumn": string (column letter or header text, e.g. "F" or "WW3"), "sheetName"?: string, "nameColumn"?: string, "startRow"?: number, "overwrite"?: boolean }',
     async run({ sourcePath, targetPath, targetColumn, sheetName, nameColumn, startRow, overwrite = false }, ctx, report) {
       if (!targetColumn) throw new Error('Tell me which column to fill (e.g. "column F" or "WW3").');
@@ -1042,7 +1050,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   edit_slides: {
     label: 'Edit slides',
-    description: "Edit the teacher's OWN PowerPoint deck (.pptx) in place: fix spelling and grammar (fixTypos), change the words as the teacher says (instructions, e.g. \"update the dates to SY 2026-2027\", \"change Quarter to Term\"), and/or restyle it to a school template deck (templatePath: its colours, fonts and background). Layout, pictures and formatting stay. Shows every change; saves an edited copy; the original is backed up and not changed.",
+    description: "Edit the teacher's OWN PowerPoint deck (.pptx) in place: fix spelling and grammar (fixTypos), change the words as the teacher says (instructions, e.g. \"update the dates to SY 2026-2027\", \"change Quarter to Term\"), and/or restyle it to a school template deck (templatePath: its colours, fonts and background). Layout, pictures and formatting stay. Shows every change. A backup is saved first; then the deck itself is changed (Lessons, Records) or an edited copy (other folders).",
     args: '{ "path": string, "fixTypos"?: boolean, "instructions"?: string, "templatePath"?: string }',
     async run({ path, fixTypos = false, instructions = '', templatePath }, ctx, report) {
       if (!path || !/\.pptx$/i.test(path)) throw needsInfo(path && /\.ppt$/i.test(path) ? 'This is an old .ppt file. Open it in PowerPoint and Save As .pptx first, then ask me again.' : 'Which PowerPoint deck (.pptx) should I edit?');
@@ -1108,7 +1116,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const file = await ctx.saveWorkingCopy(path, bytes, 'pptx');
       const spec = rows.length ? normalizeSheetSpec({ title: `Slide changes — ${fileName}`, sheets: [{ name: 'Changes', columns: [{ header: 'Where' }, { header: 'Before' }, { header: 'After' }], rows }] }) : null;
       return {
-        summary: `Edited ${file.name}: ${done.join('; ')}. Layout, pictures and formatting were kept. Please look through the slides before presenting. The original ${fileName} was backed up and not changed.`,
+        summary: `Edited ${file.name}: ${done.join('; ')}. Layout, pictures and formatting were kept. Please look through the slides before presenting. ${savedNote(file, fileName)}`,
         artifacts: [spec ? { type: 'sheet', title: spec.title, subtitle: `${rows.length} change(s)`, spec, files: [file], editable: false } : { type: 'files', title: 'Edited deck', subtitle: file.name, files: [file] }],
       };
     },
@@ -1451,7 +1459,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   deped_format_docx: {
     label: 'DepEd format',
-    description: "Put the teacher's OWN Word file in the school print format in one step: paper (the teacher's default paper unless they name one), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (the teacher's default paper, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. Saves an edited copy; the original is backed up and not changed.",
+    description: "Put the teacher's OWN Word file in the school print format in one step: paper (the teacher's default paper unless they name one), margins, one font for the whole document (and the body text size when asked), with tables and pictures fitted to the page; optionally the DepEd letterhead (letterhead: true) and the signature block from the teacher profile (signatures: true, or signers given by the teacher). Text and content are not changed. Defaults are KaTuroDesk's DepEd layout (the teacher's default paper, Arial, 0.5\" top/bottom and 0.6\" left/right margins) unless the teacher says otherwise. A backup is saved first; then the file itself is changed (Lessons, Records) or an edited copy (other folders).",
     args: '{ "path": string, "paper"?: "long" | "a4" | "letter" | "legal", "margins"?: number | { "top"?: number, "right"?: number, "bottom"?: number, "left"?: number }, "font"?: string, "size"?: number, "letterhead"?: boolean, "signatures"?: boolean, "signers"?: [{ "label": string, "name": string, "role"?: string }] }',
     async run({ path, paper = getDefaultPaper(), margins, font, size, letterhead = false, signatures = false, signers }, ctx, report) {
       if (!path || !/\.docx$/i.test(path)) throw needsInfo(path && /\.doc$/i.test(path) ? 'This is an old .doc file. Open it in Word and Save As .docx first, then ask me again.' : 'Which Word file (.docx) should I format?');
@@ -1472,7 +1480,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const fileName = String(path).split('/').pop();
       const usedHouse = [!font && 'font', !Object.keys(m).length && 'margins'].filter(Boolean);
       return {
-        summary: `Formatted ${file.name}: ${res.changes.join('; ')}.${res.notes.length ? ` Note: ${res.notes.join('; ')}.` : ''}${usedHouse.length ? ` The ${usedHouse.join(' and ')} follow KaTuroDesk's DepEd layout; tell me if your school uses others (e.g. "1 inch margins, Bookman Old Style 12").` : ''} The text itself was not changed. The original ${fileName} was backed up and not changed.`,
+        summary: `Formatted ${file.name}: ${res.changes.join('; ')}.${res.notes.length ? ` Note: ${res.notes.join('; ')}.` : ''}${usedHouse.length ? ` The ${usedHouse.join(' and ')} follow KaTuroDesk's DepEd layout; tell me if your school uses others (e.g. "1 inch margins, Bookman Old Style 12").` : ''} The text itself was not changed. ${savedNote(file, fileName)}`,
         artifacts: [{ type: 'files', title: 'Formatted document', subtitle: file.name, files: [file] }],
       };
     },
@@ -1480,7 +1488,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   add_formula_columns: {
     label: 'Add formula columns',
-    description: "Add computed columns to the teacher's OWN Excel grade sheet as real formulas that update when grades change: Remarks (Passed when the grade is 75 or above, DO 15), Descriptor (Advancing/Benchmarking/Connecting/Developing/Emerging), Rank (highest = 1, ties share a rank), and counts of learners passed/failed under the table. Uses the Final Grade / General Average / Quarterly Grade column unless the teacher names one (gradeColumn: heading or column letter). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",
+    description: "Add computed columns to the teacher's OWN Excel grade sheet as real formulas that update when grades change: Remarks (Passed when the grade is 75 or above, DO 15), Descriptor (Advancing/Benchmarking/Connecting/Developing/Emerging), Rank (highest = 1, ties share a rank), and counts of learners passed/failed under the table. Uses the Final Grade / General Average / Quarterly Grade column unless the teacher names one (gradeColumn: heading or column letter). A backup is saved first; then the file itself is changed (Lessons, Records) or an edited copy (other folders). Done by code; nothing is sent to the AI.",
     args: '{ "path": string, "columns": ["remarks" | "descriptor" | "rank" | "counts"], "gradeColumn"?: string, "sheet"?: string, "replace"?: boolean }',
     async run({ path, columns = ['remarks'], gradeColumn, sheet, replace = false }, ctx, report) {
       if (!path || !/\.xlsx$|\.xlsm$/i.test(path)) throw needsInfo(path && /\.(xls|csv)$/i.test(path) ? 'Formulas can only be added to an .xlsx file. Open it in Excel and Save As .xlsx first, then ask me again.' : 'Which Excel grade sheet (.xlsx) should I add the columns to?');
@@ -1512,7 +1520,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         sheets: [{ name: loc.ws.name.slice(0, 31), columns: [{ header: 'Learner' }, { header: loc.gradeHeader }, ...res.added.map((a) => ({ header: a.header }))], rows }],
       });
       return {
-        summary: `Added to ${file.name} (sheet "${loc.ws.name}", ${n} learner(s), using ${loc.gradeHeader} in column ${loc.ws.getRow(loc.headerRow).getCell(loc.gradeCol).address.replace(/\d+$/, '')}): ${parts.join('; ')}. These are formulas, so they update when you change a grade. Passing mark ${PASSING} (DO 15 s. 2026).${res.blanks ? ` ${res.blanks} learner(s) have no grade yet; their cells stay empty until you type one.` : ''}${res.checks ? ` ${res.checks} grade(s) are not numbers (like INC); they show "Check".` : ''} The original ${fileName} was backed up and not changed. Done by code; nothing was sent to the AI.`,
+        summary: `Added to ${file.name} (sheet "${loc.ws.name}", ${n} learner(s), using ${loc.gradeHeader} in column ${loc.ws.getRow(loc.headerRow).getCell(loc.gradeCol).address.replace(/\d+$/, '')}): ${parts.join('; ')}. These are formulas, so they update when you change a grade. Passing mark ${PASSING} (DO 15 s. 2026).${res.blanks ? ` ${res.blanks} learner(s) have no grade yet; their cells stay empty until you type one.` : ''}${res.checks ? ` ${res.checks} grade(s) are not numbers (like INC); they show "Check".` : ''} ${savedNote(file, fileName)} Done by code; nothing was sent to the AI.`,
         artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${n} learner(s)`, spec, files: [file], editable: false }],
       };
     },
@@ -1520,7 +1528,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   place_signature: {
     label: 'Place my e-signature',
-    description: "Place the teacher's OWN saved e-signature (Settings > E-signature) above the teacher's OWN name on the signature lines of a Word (.docx) or PDF file (e.g. under \"Prepared by:\"). It never signs above anyone else's name. Always asks the teacher to confirm first. Saves a signed copy; the original is backed up and not changed.",
+    description: "Place the teacher's OWN saved e-signature (Settings > E-signature) above the teacher's OWN name on the signature lines of a Word (.docx) or PDF file (e.g. under \"Prepared by:\"). It never signs above anyone else's name. Always asks the teacher to confirm first. A backup is saved first; then the file itself is signed (Lessons, Records) or a signed copy (other folders).",
     args: '{ "path": string, "widthInches"?: number }',
     async run({ path, widthInches }, ctx, report) {
       const ext = String(path || '').split('.').pop().toLowerCase();
@@ -1551,7 +1559,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       }
       const file = await ctx.saveWorkingCopy(path, res.bytes, ext);
       return {
-        summary: `Signed ${file.name}: your e-signature is above your name in ${res.placed} place${res.placed > 1 ? 's' : ''}${res.pages?.length ? ` (page${res.pages.length > 1 ? 's' : ''} ${res.pages.join(', ')})` : ''}. Please check it before you send or print it. The original ${fileName} was backed up and not changed.`,
+        summary: `Signed ${file.name}: your e-signature is above your name in ${res.placed} place${res.placed > 1 ? 's' : ''}${res.pages?.length ? ` (page${res.pages.length > 1 ? 's' : ''} ${res.pages.join(', ')})` : ''}. Please check it before you send or print it. ${savedNote(file, fileName)}`,
         artifacts: [{ type: 'files', title: 'Signed copy', subtitle: file.name, files: [file] }],
       };
     },
@@ -1559,7 +1567,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   pdf_page_tools: {
     label: 'PDF page tools',
-    description: "Change the pages of a PDF in one go: remove pages, put pages in a new order, turn pages (90/180/270), add page numbers, a watermark such as \"DRAFT\" or \"SAMPLE\", or a logo image from the folder on every page. Pages are given as \"1,3-5\", \"all\", \"odd\", \"even\" or \"last\" (original page numbers). Saves an edited copy; the original is backed up and not changed. Done by code; nothing is sent to the AI.",
+    description: "Change the pages of a PDF in one go: remove pages, put pages in a new order, turn pages (90/180/270), add page numbers, a watermark such as \"DRAFT\" or \"SAMPLE\", or a logo image from the folder on every page. Pages are given as \"1,3-5\", \"all\", \"odd\", \"even\" or \"last\" (original page numbers). A backup is saved first; then the file itself is changed (Lessons, Records) or an edited copy (other folders). Done by code; nothing is sent to the AI.",
     args: '{ "path": string, "remove"?: string, "order"?: string, "rotate"?: { "pages": string, "degrees": 90 | 180 | 270 }, "pageNumbers"?: { "position"?: "bottom-center" | "bottom-right" | "top-right", "format"?: "Page {n} of {total}" | "{n}", "start"?: number }, "watermark"?: string, "logoPath"?: string, "logoPosition"?: "top-left" | "top-right" | "top-center", "logoWidthInches"?: number }',
     async run({ path, remove, order, rotate, pageNumbers, watermark, logoPath, logoPosition, logoWidthInches }, ctx, report) {
       if (!path || !/\.pdf$/i.test(path)) throw needsInfo('Which PDF should I work on?');
@@ -1624,7 +1632,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       }
       const file = await ctx.saveWorkingCopy(path, res.bytes, 'pdf');
       return {
-        summary: `Made ${file.name} (${res.pages} page${res.pages > 1 ? 's' : ''}): ${res.done.join('; ')}.${covered.length ? ` Warning: the logo covers some text on page${covered.length > 1 ? 's' : ''} ${covered.join(', ')}; ask me to put it at the top right or top center, or make it smaller.` : ''} The original ${fileName} was backed up and not changed.`,
+        summary: `Made ${file.name} (${res.pages} page${res.pages > 1 ? 's' : ''}): ${res.done.join('; ')}.${covered.length ? ` Warning: the logo covers some text on page${covered.length > 1 ? 's' : ''} ${covered.join(', ')}; ask me to put it at the top right or top center, or make it smaller.` : ''} ${savedNote(file, fileName)}`,
         artifacts: [{ type: 'files', title: 'PDF pages', subtitle: res.done.join('; '), files: [file] }],
       };
     },
@@ -1719,7 +1727,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   fill_pdf_form: {
     label: 'Fill PDF form',
-    description: "Fill a PDF form: fillable PDFs (form fields, check boxes, choices) and flat PDFs (blanks like \"Name: ______\"), including scanned forms (the blanks are found by reading the page). Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves a filled copy; the original is backed up and not changed.",
+    description: "Fill a PDF form: fillable PDFs (form fields, check boxes, choices) and flat PDFs (blanks like \"Name: ______\"), including scanned forms (the blanks are found by reading the page). Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. A backup is saved first; then the form itself is filled (Lessons, Records) or a filled copy (other folders).",
     args: '{ "path": string, "values"?: { "<label in the form>": "<value>" }, "sourcePaths"?: [string], "instructions"?: string }',
     async run({ path, values = {}, sourcePaths = [], instructions = '' }, ctx, report) {
       if (!path || !/\.pdf$/i.test(path)) throw needsInfo('Which PDF form should I fill?');
@@ -1798,7 +1806,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       });
       const kindNote = scan.kind === 'fillable' ? 'Its form fields were filled, so you can still edit them in a PDF reader.' : scan.kind === 'scanned' ? 'This is a scanned form: I found the blanks by reading the page, so please check that each value sits in the right place before printing.' : 'The values were written on the blank lines.';
       return {
-        summary: `Filled ${done} of ${fields.length} blank(s) in ${file.name}. ${kindNote}${left.length ? ` Left blank (tell me what to put): ${left.map((f) => f.label).join(', ')}.` : ''}${res.skipped.length ? ` Not filled: ${res.skipped.map((s) => `${s.label} (${s.why})`).join('; ')}.` : ''}${Object.values(from).includes("today's date") ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''} The original ${fileName} was backed up and not changed.`,
+        summary: `Filled ${done} of ${fields.length} blank(s) in ${file.name}. ${kindNote}${left.length ? ` Left blank (tell me what to put): ${left.map((f) => f.label).join(', ')}.` : ''}${res.skipped.length ? ` Not filled: ${res.skipped.map((s) => `${s.label} (${s.why})`).join('; ')}.` : ''}${Object.values(from).includes("today's date") ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''} ${savedNote(file, fileName)}`,
         artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${done} of ${fields.length} filled`, spec, files: [file], editable: false }],
       };
     },
@@ -1806,7 +1814,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
   fill_word_form: {
     label: 'Fill Word form',
-    description: "Fill the teacher's OWN Word form that has ordinary blanks, no {{placeholders}}: lines like \"Name: ______\", \"Date: ......\", a label alone on its line (\"Section:\"), signature lines with a caption under them, and empty table cells next to a label. Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or the source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. Saves an edited copy; the original is backed up and not changed.",
+    description: "Fill the teacher's OWN Word form that has ordinary blanks, no {{placeholders}}: lines like \"Name: ______\", \"Date: ......\", a label alone on its line (\"Section:\"), signature lines with a caption under them, and empty table cells next to a label. Values come from what the teacher says (values), the teacher profile (teacher name, school, school ID, district, division, region, position, school year, today's date), or the source files (sourcePaths, read by AI; every value is checked against the files). Blanks with no known value are left blank and listed. A backup is saved first; then the file itself is changed (Lessons, Records) or an edited copy (other folders).",
     args: '{ "path": string, "values"?: { "<label in the form>": "<value>" }, "sourcePaths"?: [string], "instructions"?: string }',
     async run({ path, values = {}, sourcePaths = [], instructions = '' }, ctx, report) {
       if (!path || !/\.docx$/i.test(path)) throw needsInfo('Which Word form (.docx) should I fill?');
@@ -1859,7 +1867,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const usedToday = Object.values(from).includes("today's date");
       const fromPhoto = fields.filter((f) => /photo/.test(from[f.id] || '')).map((f) => f.label);
       return {
-        summary: `Filled ${fields.length - blank.length} of ${fields.length} blank(s) in ${file.name}.${blank.length ? ` Left blank (tell me what to put): ${blank.map((f) => f.label).join(', ')}.` : ''}${usedToday ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''}${fromPhoto.length ? ` Read from a photo/scan, please check: ${fromPhoto.join(', ')}.` : ''} The original ${fileName} was backed up and not changed.`,
+        summary: `Filled ${fields.length - blank.length} of ${fields.length} blank(s) in ${file.name}.${blank.length ? ` Left blank (tell me what to put): ${blank.map((f) => f.label).join(', ')}.` : ''}${usedToday ? ' I used today\'s date for "Date"; tell me if it should be another date.' : ''}${fromPhoto.length ? ` Read from a photo/scan, please check: ${fromPhoto.join(', ')}.` : ''} ${savedNote(file, fileName)}`,
         artifacts: [{ type: 'sheet', title: spec.title, subtitle: `${fields.length - blank.length} of ${fields.length} filled`, spec, files: [file], editable: false }],
       };
     },
