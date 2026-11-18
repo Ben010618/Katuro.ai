@@ -57,6 +57,49 @@ export function reminderNotifications(reminders = [], now = Date.now()) {
     .slice(0, 60);
 }
 
+// ── Class alerts: a notification before each class in My classes (KaTuroDesk) ──
+const CLASS_PREFIX = 'c';
+const CLASS_ALERT_KEY = 'katuro-class-alert-v1';
+export const CLASS_ALERT_OPTIONS = [0, 5, 10, 15, 30, 60];
+export const DEFAULT_CLASS_ALERT = 15;
+
+/** Minutes before each class the phone rings (0 = off). Chosen on the phone (Today tab). */
+export function classAlertMinutes() {
+  try {
+    const raw = localStorage.getItem(CLASS_ALERT_KEY);
+    const v = Number(raw);
+    return raw !== null && CLASS_ALERT_OPTIONS.includes(v) ? v : DEFAULT_CLASS_ALERT;
+  } catch {
+    return DEFAULT_CLASS_ALERT;
+  }
+}
+export function setClassAlertMinutes(min) {
+  try { localStorage.setItem(CLASS_ALERT_KEY, JSON.stringify(CLASS_ALERT_OPTIONS.includes(min) ? min : DEFAULT_CLASS_ALERT)); } catch { /* storage blocked */ }
+}
+
+/**
+ * The classes in KaTuroDesk's schedule (days: [{ date, items: [{ kind: 'class', time, title, detail }] }])
+ * → the notifications `minutes` before each one (future only).
+ */
+export function classNotifications(days = [], minutes = DEFAULT_CLASS_ALERT, now = Date.now()) {
+  if (!minutes) return [];
+  const out = [];
+  for (const d of days || []) {
+    for (const it of d.items || []) {
+      if (it.kind !== 'class' || !/^\d{2}:\d{2}$/.test(it.time || '')) continue;
+      const at = new Date(`${d.date}T${it.time}:00`).getTime() - minutes * 60000;
+      if (!Number.isFinite(at) || at <= now) continue;
+      out.push({
+        id: idFor(`${CLASS_PREFIX}|${d.date}|${it.time}|${it.title}|${minutes}`),
+        title: `${it.title} ${before(minutes)}`,
+        body: `Class at ${clock(it.time)}${it.detail ? ` · ${it.detail}` : ''}`,
+        at: new Date(at),
+      });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
 const loadIds = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { return []; } };
 const saveIds = (ids) => { try { localStorage.setItem(STORE, JSON.stringify(ids)); } catch { /* full */ } };
 
@@ -95,17 +138,28 @@ async function allowNotifications() {
 }
 
 /**
- * Replaces the reminders scheduled on the phone with these (from KaTuroDesk).
- * → { scheduled: number, exact: boolean } (0 off the phone app, or when notifications are not allowed)
+ * Replaces the reminders and class alerts scheduled on the phone with these (from KaTuroDesk).
+ *   classes: the schedule's days (classNotifications), alerted classAlertMinutes() before
+ * → { scheduled: number, classes: number, exact: boolean } (0 off the phone app, or when notifications are not allowed)
  */
-export async function syncReminders(reminders, now = Date.now()) {
-  if (!bridge()) return { scheduled: 0, exact: false };
-  const wanted = reminderNotifications(reminders, now);
+// One change at a time: two overlapping changes could leave alerts no one can cancel.
+let syncing = Promise.resolve();
+export function syncReminders(reminders, options) {
+  const run = () => syncNow(reminders, options);
+  syncing = syncing.then(run, run);
+  return syncing;
+}
+
+async function syncNow(reminders, { days = [], now = Date.now() } = {}) {
+  if (!bridge()) return { scheduled: 0, classes: 0, exact: false };
+  const classAlerts = classNotifications(days, classAlertMinutes(), now);
+  // Android keeps up to 500 alarms per app; the soonest 120 are plenty for two weeks.
+  const wanted = [...reminderNotifications(reminders, now), ...classAlerts].sort((a, b) => a.at - b.at).slice(0, 120);
   const old = loadIds();
   try {
     if (old.length) await call('cancel', { notifications: old.map((id) => ({ id })) });
     saveIds([]);
-    if (!wanted.length || !(await allowNotifications())) return { scheduled: 0, exact: false };
+    if (!wanted.length || !(await allowNotifications())) return { scheduled: 0, classes: 0, exact: false };
     const exact = await exactReminders();
     await call('schedule', {
       notifications: wanted.map((n) => ({
@@ -113,15 +167,15 @@ export async function syncReminders(reminders, now = Date.now()) {
         title: n.title,
         body: n.body,
         schedule: { at: n.at.toISOString(), allowWhileIdle: true },
-        extra: { kind: 'reminder' },
+        extra: { kind: classAlerts.includes(n) ? 'class' : 'reminder' },
         // false = no Settings page pops up; Android may ring a few minutes late while asleep.
         isExactNotification: exact,
       })),
     });
     saveIds(wanted.map((n) => n.id));
-    return { scheduled: wanted.length, exact };
+    return { scheduled: wanted.length, classes: wanted.filter((n) => classAlerts.includes(n)).length, exact };
   } catch {
-    return { scheduled: 0, exact: false };
+    return { scheduled: 0, classes: 0, exact: false };
   }
 }
 

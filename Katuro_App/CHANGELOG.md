@@ -4,6 +4,13 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.4.0
+Class alerts and faster bubble sheet checking.
+- Class alerts: your phone rings before each class in your KaTuroDesk schedule (15 minutes before, or choose 5, 10, 30, 60 or Off on the Today tab).
+- Scan sheets: hold the phone over each bubble sheet and it reads them one after another by itself, with a beep and the learner's score. No shutter button.
+- Scan the answer key: shade one sheet as the key and scan it instead of typing.
+- The scores still go to your E-Class Record in Records after your review.
+
 ## v1.3.0
 Linking with your computer is quick.
 - Point the camera at the code and it links at once: a smaller code, a sharper camera, the fastest way to your computer.

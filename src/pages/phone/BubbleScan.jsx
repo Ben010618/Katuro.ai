@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, CheckCircle2, Images, Loader2, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, Images, Loader2, ScanLine, Trash2 } from 'lucide-react';
+import BubbleLiveScan from './BubbleLiveScan';
 import { CHOICE_SETS } from '../../services/desk/bubble/layout';
 import { layoutOf, readKey, sheetFromRead, reviewSheets, finalScores } from '../../services/desk/bubble/quiz';
 
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
 
 /**
- * Bubble sheets on the phone: choose a bubble quiz KaTuroDesk made, take photos of the
- * answered sheets, and the phone checks them (same reader as KaTuroDesk, no internet).
+ * Bubble sheets on the phone: choose a bubble quiz KaTuroDesk made, scan the answered sheets
+ * with the live camera (or take photos), and the phone checks them (same reader as KaTuroDesk, no internet).
  * Unclear marks, unknown sheets and repeated photos are settled here. The scores then fill
  * the score list (matched by LRN) for the usual review before recording.
  */
@@ -21,6 +22,7 @@ export default function BubbleScan({ client, cls, onScores }) {
   const [decisions, setDecisions] = useState({});
   const [reading, setReading] = useState('');
   const count = useRef(0); // photos read so far: every photo gets its own number, batch after batch
+  const [live, setLive] = useState(null); // null | 'sheets' | 'key': the live camera scanner
 
   useEffect(() => {
     let alive = true;
@@ -97,6 +99,10 @@ export default function BubbleScan({ client, cls, onScores }) {
         <Card className="space-y-2">
           <p className="text-sm font-bold text-gray-900">{quiz.title}: answer key</p>
           <p className="text-xs text-gray-600">Type the {quiz.items} correct answers in order ({CHOICE_SETS[quiz.choices].join(', ')}), e.g. ABCDA… Spaces and numbers are fine.</p>
+          <button type="button" onClick={() => setLive('key')} className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-3 text-sm font-semibold text-emerald-800">
+            <ScanLine size={18} /> Scan a sheet shaded as the key
+          </button>
+          <p className="text-xs text-gray-500">Or type it:</p>
           <textarea value={keyText} onChange={(e) => setKeyText(e.target.value.toUpperCase())} rows={3} className="w-full rounded-lg border border-gray-300 p-2 font-mono text-base" />
           <button
             type="button"
@@ -109,6 +115,14 @@ export default function BubbleScan({ client, cls, onScores }) {
           >Use this key</button>
           {error && <p className="text-sm text-red-700">{error}</p>}
         </Card>
+        {live === 'key' && (
+          <BubbleLiveScan
+            quiz={quiz}
+            mode="key"
+            onKey={(k) => { setKeyText(k.join('')); setError(''); setLive(null); }}
+            onClose={() => setLive(null)}
+          />
+        )}
       </div>
     );
   }
@@ -122,8 +136,11 @@ export default function BubbleScan({ client, cls, onScores }) {
     <div className="p-3 space-y-3 pb-28">
       <Card className="space-y-2">
         <p className="text-sm font-bold text-gray-900">{quiz.title} · {quiz.items} items</p>
+        <button type="button" onClick={() => setLive('sheets')} disabled={Boolean(reading)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3.5 text-base font-bold text-white disabled:opacity-50">
+          <ScanLine size={20} /> Scan sheets
+        </button>
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex items-center justify-center gap-2 rounded-lg bg-emerald-700 py-3 text-sm font-semibold text-white">
+          <label className="flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 py-3 text-sm font-semibold text-emerald-800">
             <Camera size={18} /> Take a photo
             <input type="file" accept="image/*" capture="environment" className="hidden" disabled={Boolean(reading)} onChange={addPhotos} />
           </label>
@@ -132,7 +149,7 @@ export default function BubbleScan({ client, cls, onScores }) {
             <input type="file" accept="image/*" multiple className="hidden" disabled={Boolean(reading)} onChange={addPhotos} />
           </label>
         </div>
-        <p className="text-[11px] text-gray-500">One sheet per photo, the whole sheet with its four black corner squares in view, on a plain light surface.</p>
+        <p className="text-[11px] text-gray-500">Scan sheets reads one sheet after another by itself: hold the phone over each sheet, all four black corner squares in view, on a plain light surface. It beeps when a sheet is read.</p>
         {reading && <p className="flex items-center gap-2 text-sm text-gray-700"><Loader2 size={16} className="animate-spin" /> {reading}</p>}
       </Card>
 
@@ -185,6 +202,19 @@ export default function BubbleScan({ client, cls, onScores }) {
             <CheckCircle2 size={18} /> Use {scored.length - notInClass.length} score{scored.length - notInClass.length === 1 ? '' : 's'}
           </button>
         </div>
+      )}
+      {live === 'sheets' && (
+        <BubbleLiveScan
+          quiz={quiz}
+          answerKey={key}
+          taken={Object.entries(sheets).filter(([photo, x]) => x.ok && x.number && !decisions[photo]?.skip).map(([, x]) => x.number)}
+          onSheet={(sheet) => {
+            count.current += 1;
+            const id = `Scan ${String(count.current).padStart(3, '0')}`;
+            setSheets((all) => ({ ...all, [id]: sheet }));
+          }}
+          onClose={() => setLive(null)}
+        />
       )}
     </div>
   );

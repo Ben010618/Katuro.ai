@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BellRing, BookOpen, CalendarDays, Check, Flag, Loader2, Plus, RefreshCw, Timer, Trash2, X } from 'lucide-react';
 import { REMIND_OPTIONS } from '../desk/calendar/reminders';
-import { syncReminders, canNotify, allowExactReminders } from '../../services/link/phoneReminders';
+import { syncReminders, canNotify, allowExactReminders, classAlertMinutes, setClassAlertMinutes, CLASS_ALERT_OPTIONS } from '../../services/link/phoneReminders';
 import { isoDay, addDays, clock } from '../../utils/dates';
 
 const CACHE = 'katuro-phone-schedule-v1';
@@ -58,6 +58,7 @@ export default function PhoneToday({ client, online }) {
   const [adding, setAdding] = useState(false);
   const [rang, setRang] = useState(null); // { scheduled, exact } reminders on the phone
   const [tick, setTick] = useState(0);
+  const [alertMin, setAlertMin] = useState(() => classAlertMinutes());
 
   const refresh = useCallback(() => { setLoading(true); setTick((t) => t + 1); }, []);
 
@@ -68,22 +69,37 @@ export default function PhoneToday({ client, online }) {
         const from = isoDay();
         const r = await client.request('schedule', { from, to: addDays(isoDay(), 13) });
         if (!alive || client.closed) return;
-        const v = { ...r, at: new Date().toISOString() };
+        const { reminders } = await client.request('reminders');
+        if (!alive || client.closed) return;
+        // Kept with the reminders, so class alerts can be set again with no Wi-Fi.
+        const v = { ...r, reminders, at: new Date().toISOString() };
         saveCache(v);
         setData(v);
         setError('');
-        const { reminders } = await client.request('reminders');
-        if (!alive || client.closed) return;
-        const res = await syncReminders(reminders);
+        const res = await syncReminders(reminders, { days: r.days });
         if (alive) setRang(res);
       } catch (err) {
         if (alive) setError(err.code === 'UNREACHABLE' ? '' : err.message);
+        // KaTuroDesk out of reach: the alerts come from the saved copy of the schedule.
+        // A copy saved by an older KaTuro App has no reminders: then nothing is changed.
+        const saved = loadCache();
+        if (alive && saved?.days && Array.isArray(saved.reminders)) {
+          const res = await syncReminders(saved.reminders, { days: saved.days });
+          if (alive) setRang(res);
+        }
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
   }, [client, tick, online]);
+
+  const changeAlert = async (min) => {
+    setClassAlertMinutes(min);
+    setAlertMin(min);
+    const saved = data || loadCache();
+    if (saved?.days && Array.isArray(saved.reminders)) setRang(await syncReminders(saved.reminders, { days: saved.days }));
+  };
 
   const act = async (op, id) => {
     try {
@@ -107,6 +123,18 @@ export default function PhoneToday({ client, online }) {
       </div>
       {data && online === false && <p className="text-xs text-amber-800">Saved copy · {new Date(data.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}
       {error && <Card><p className="text-sm text-red-700">{error}</p></Card>}
+      {canNotify() && (
+        <label className="nm flex items-center gap-3 rounded-3xl px-4 py-3">
+          <BellRing size={18} className="flex-shrink-0 text-emerald-700" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Class alerts</span>
+            <span className="block text-xs text-gray-500">{alertMin ? `Rings ${alertMin} minutes before each class` : 'Off'}{rang?.classes ? ` · ${rang.classes} set` : ''}</span>
+          </span>
+          <select aria-label="Class alerts" value={alertMin} onChange={(e) => changeAlert(Number(e.target.value))} className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm">
+            {CLASS_ALERT_OPTIONS.map((m) => <option key={m} value={m}>{m ? `${m} min before` : 'Off'}</option>)}
+          </select>
+        </label>
+      )}
       {canNotify() && rang?.scheduled > 0 && (
         <div className="px-1 text-xs text-emerald-800">
           <p className="flex items-center gap-1"><BellRing size={13} /> {rang.scheduled} reminder{rang.scheduled > 1 ? 's' : ''} on</p>
