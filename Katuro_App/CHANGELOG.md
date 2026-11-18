@@ -4,6 +4,14 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.5.0
+A fresh look, the chat first, and the camera one tap away.
+- A new welcome animation after you sign in.
+- The app opens on the chat with your assistant. Your profile photo is at the top and beside your messages.
+- Camera button at the top and beside the chat box: check bubble sheets, or take photos of test papers, lesson materials, documents or activities.
+- Photos go to KaTuroDesk into Lessons › Phone Photos, sorted by kind. Away from the Wi-Fi they wait on the phone and go by themselves when you are back.
+- The KaTuro logo is a little smaller on the sign-in screen and at the bottom.
+
 ## v1.4.0
 Class alerts and faster bubble sheet checking.
 - Class alerts: your phone rings before each class in your KaTuroDesk schedule (15 minutes before, or choose 5, 10, 30, 60 or Off on the Today tab).

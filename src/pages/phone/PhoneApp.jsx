@@ -1,13 +1,17 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, Menu, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Camera, CalendarDays, ChevronRight, ClipboardList, FileText, Folder, MessagesSquare, FolderOpen, Laptop, Loader2, Menu, RefreshCw, ShieldCheck } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { teacherInfo } from '../../services/teacherInfo';
 import { parseLinkQr, pairWithDesk, createLinkClient } from '../../services/link/linkClient';
 import { loadLink, saveLink } from '../../services/link/linkStore';
 import { forgetPhoneData, unsentOnPhone } from '../../services/link/phoneData';
-import { canAdd } from '../../services/link/phoneFiles';
+import { canAdd, outboxCount, sendOutbox } from '../../services/link/phoneFiles';
+import AvatarImage from '../../components/AvatarImage';
+import PhoneIntro from './PhoneIntro';
+import { justSignedIn, clearJustSignedIn } from '../../services/link/phoneIntro';
+import PhoneCamera from './PhoneCamera';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
 import ScoresFlow from './ScoresFlow';
@@ -192,11 +196,16 @@ export default function PhoneApp() {
   };
   // Found KaTuroDesk again at its new Wi-Fi address (published under this account) once per link.
   const searched = useRef('');
-  const [tab, setTab] = useState('today'); // today | scores | assistant | messages | files
+  // The chat is the first screen; Today is opened (hidden) too, so the phone's reminders and
+  // class alerts are set every time the app starts.
+  const [tab, setTab] = useState('assistant'); // today | scores | assistant | messages | files
   const [version, setVersion] = useState(0); // bumped after files are sent or kept
   const [shared, setShared] = useState(null); // files shared from another app
   const [sharedNote, setSharedNote] = useState('');
-  const [visited, setVisited] = useState(() => new Set(['today'])); // tabs stay mounted once opened (typed scores, a running Assistant turn)
+  const [visited, setVisited] = useState(() => new Set(['today', 'assistant'])); // tabs stay mounted once opened (typed scores, a running Assistant turn)
+  const [intro, setIntro] = useState(() => justSignedIn()); // the welcome right after signing in
+  const endIntro = useCallback(() => { clearJustSignedIn(); setIntro(false); }, []);
+  const [camera, setCamera] = useState(false);
   const bump = useCallback(() => setVersion((v) => v + 1), []);
 
   // Share → KaTuro from another app: on start, and while the app is open.
@@ -246,6 +255,28 @@ export default function PhoneApp() {
     if (closing.current?.client === client) clearTimeout(closing.current.timer);
     return () => { if (client) closing.current = { client, timer: setTimeout(() => client.close(), 0) }; };
   }, [client]);
+  // Photos and files waiting on the phone go to KaTuroDesk by themselves once it can be reached:
+  // tried when the app starts or comes back to the front, and every 30 s while any are waiting.
+  useEffect(() => {
+    if (!client) return undefined;
+    let alive = true;
+    const tryNow = async () => {
+      if (!alive || document.hidden || !(await outboxCount().catch(() => 0))) return;
+      try {
+        await client.hello();
+        if (!alive) return;
+        setOnline(true);
+        const r = await sendOutbox(client);
+        if (alive && r.sent.length) bump();
+      } catch (err) {
+        if (alive && err.code === 'UNREACHABLE') setOnline(false);
+      }
+    };
+    tryNow();
+    const timer = setInterval(tryNow, 30000);
+    document.addEventListener('visibilitychange', tryNow);
+    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', tryNow); };
+  }, [client, bump]);
 
   /**
    * The one way the teacher's data leaves the phone: close the link, let the screens close,
@@ -389,6 +420,7 @@ export default function PhoneApp() {
           )}
           <header className="flex items-center justify-between px-5 pb-2 pt-5">
             <div className="flex min-w-0 items-center gap-2.5">
+              <AvatarImage photoURL={profile?.photoURL || user?.photoURL} alt="" className="nm-sm h-10 w-10 flex-shrink-0 rounded-full object-cover" />
               <p className="truncate text-xl font-semibold">{firstName ? `Hi, ${firstName}` : 'KaTuro'}</p>
               {link && (
                 <span
@@ -398,7 +430,10 @@ export default function PhoneApp() {
                 />
               )}
             </div>
-            <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="nm-sm nm-press grid h-11 w-11 place-items-center rounded-full"><Menu size={20} /></button>
+            <span className="flex items-center gap-2">
+              {client && <button type="button" onClick={() => setCamera(true)} aria-label="Camera: take a photo or scan" className="nm-accent nm-press grid h-11 w-11 place-items-center rounded-full"><Camera size={20} /></button>}
+              <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="nm-sm nm-press grid h-11 w-11 place-items-center rounded-full"><Menu size={20} /></button>
+            </span>
           </header>
 
           {!link ? (
@@ -423,7 +458,7 @@ export default function PhoneApp() {
               )}
               {client && visited.has('today') && <div hidden={tab !== 'today'}><PhoneToday client={client} online={online} /></div>}
               {client && visited.has('scores') && <div hidden={tab !== 'scores'}><ScoresFlow client={client} online={online} /></div>}
-              {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go({ file: i })} /></div>}
+              {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go({ file: i })} onCamera={() => setCamera(true)} /></div>}
               {visited.has('messages') && (
                 <div hidden={tab !== 'messages'}>
                   <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
@@ -463,14 +498,16 @@ export default function PhoneApp() {
                     <span key={id} aria-hidden="true" />
                   )))}
                   {/* The KaTuro logo, big and in the middle: opens the Assistant. */}
-                  <button type="button" onClick={() => openTab('assistant')} aria-pressed={tab === 'assistant'} aria-label="KaTuro Assistant" className="kt-logo-btn absolute -top-12 left-1/2 -translate-x-1/2">
-                    <img src={KT_LOGO} alt="" className="kt-logo h-[104px] w-[104px]" />
+                  <button type="button" onClick={() => openTab('assistant')} aria-pressed={tab === 'assistant'} aria-label="KaTuro Assistant" className="kt-logo-btn absolute -top-10 left-1/2 -translate-x-1/2">
+                    <img src={KT_LOGO} alt="" className="kt-logo h-[94px] w-[94px]" />
                   </button>
                 </div>
               </nav>
             </>
           )}
       </div>
+      {camera && client && !pinScreen && <PhoneCamera client={client} onClose={() => setCamera(false)} onBubbleSheets={() => openTab('scores')} onSent={bump} />}
+      {intro && <PhoneIntro name={firstName} onDone={endIntro} />}
     </div>
   );
 }

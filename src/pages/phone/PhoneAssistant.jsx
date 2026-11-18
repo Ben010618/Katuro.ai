@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileText, Loader2, Play, Send, Square, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { Camera, FileText, Loader2, Play, Send, Square, Trash2, Volume2, VolumeX } from 'lucide-react';
+import AvatarImage from '../../components/AvatarImage';
 import { PERSONAS, getPersona } from '../../services/desk/personas';
 import { KaTuroAIAvatar } from '../desk/DeskAvatar';
 import DeskFormattedText from '../desk/DeskFormattedText';
@@ -35,7 +36,7 @@ async function askCloud({ prompt, persona, user, profile }) {
 }
 
 /** Phase 4: the teacher talks with Matt / Luna / Grey / Lola Carmen; the work runs on KaTuroDesk. */
-export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
+export default function PhoneAssistant({ client, user, profile, onOpenFile, onCamera }) {
   const [prefs, setPrefs] = useState(() => read(PREFS_KEY, { persona: 'matt', speak: false }));
   const [chat, setChat] = useState(() => read(CHAT_KEY, []));
   const [text, setText] = useState('');
@@ -45,6 +46,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
   const inputRef = useRef(null);
   const persona = getPersona(prefs.persona);
   const salutation = (profile?.firstName || '').trim() || 'Teacher';
+  const myPhoto = profile?.photoURL || user?.photoURL;
 
   useEffect(() => { write(CHAT_KEY, chat.slice(-KEEP)); endRef.current?.scrollIntoView({ block: 'end' }); }, [chat]);
   useEffect(() => { write(PREFS_KEY, prefs); }, [prefs]);
@@ -119,7 +121,10 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
           </div>
         )}
         {chat.map((m, i) => (m.role === 'user' ? (
-          <div key={m.at + '-' + i} className="flex justify-end"><p className="max-w-[85%] rounded-2xl rounded-br-sm bg-emerald-700 px-3.5 py-2 text-sm text-white whitespace-pre-wrap">{m.content}</p></div>
+          <div key={m.at + '-' + i} className="flex justify-end gap-2">
+            <p className="max-w-[80%] rounded-2xl rounded-br-sm bg-emerald-700 px-3.5 py-2 text-sm text-white whitespace-pre-wrap">{m.content}</p>
+            <AvatarImage photoURL={myPhoto} alt="" className="mt-1 h-7 w-7 flex-shrink-0 self-end rounded-full object-cover" />
+          </div>
         ) : (
           <div key={m.at + '-' + i} className="flex gap-2">
             <KaTuroAIAvatar persona={m.persona || prefs.persona} size={28} className="flex-shrink-0 mt-1" />
@@ -151,6 +156,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile }) {
 
       <div className="nm fixed inset-x-3 bottom-[108px] z-20 rounded-3xl p-2" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex items-end gap-2">
+          {onCamera && <button type="button" onClick={onCamera} aria-label="Camera: take a photo or scan" className="nm-sm nm-press flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-emerald-700"><Camera size={20} /></button>}
           <textarea
             ref={inputRef}
             rows={1}

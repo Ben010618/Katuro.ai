@@ -5,6 +5,7 @@ import { auth } from '../../firebase';
 import { SIGNUP_URL } from '../../services/emailCode';
 import { authErrorText } from '../../utils/authError';
 import { KT_LOGO } from './phoneLogo';
+import { markJustSignedIn, clearJustSignedIn } from '../../services/link/phoneIntro';
 import './phone.css';
 
 /**
@@ -25,8 +26,10 @@ export default function PhoneSignIn() {
     setBusy(true);
     setError('');
     try {
+      markJustSignedIn();
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (err) {
+      clearJustSignedIn();
       setError(authErrorText(err, 'Could not sign in. Try again.'));
     } finally {
       setBusy(false);
@@ -36,7 +39,7 @@ export default function PhoneSignIn() {
   return (
     <div className="kt-phone flex flex-col items-center px-8" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <button type="button" onClick={() => emailRef.current?.focus()} aria-label="KaTuro" className="kt-logo-btn mt-[10vh]">
-        <img src={KT_LOGO} alt="" className="kt-logo h-60 w-60" />
+        <img src={KT_LOGO} alt="" className="kt-logo h-[216px] w-[216px]" />
       </button>
 
       <form onSubmit={submit} className="mt-6 w-full max-w-sm space-y-5">

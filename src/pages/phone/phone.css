@@ -83,3 +83,35 @@
 .kt-phone input::placeholder,
 .kt-phone textarea::placeholder { color: var(--nm-muted); }
 .kt-phone .text-gray-500 { color: var(--nm-muted); }
+
+/* ── The welcome after signing in (PhoneIntro.jsx): ten seconds, then the chat ── */
+.kt-phone .kt-intro { background: var(--nm-bg); overflow: hidden; }
+.kt-phone .kt-intro-aurora {
+  position: absolute; inset: -30%;
+  background:
+    radial-gradient(40% 35% at 30% 30%, rgba(52, 211, 153, 0.28), transparent 70%),
+    radial-gradient(35% 30% at 72% 65%, rgba(242, 183, 5, 0.2), transparent 70%),
+    radial-gradient(45% 40% at 50% 90%, rgba(29, 107, 72, 0.18), transparent 70%);
+  filter: blur(18px);
+  animation: kt-aurora 10s ease-in-out infinite alternate;
+}
+.kt-phone .kt-intro-ring { stroke-dasharray: 100; stroke-dashoffset: 100; animation-name: kt-fill; animation-timing-function: cubic-bezier(0.45, 0.05, 0.25, 1); animation-fill-mode: forwards; filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.6)); }
+.kt-phone .kt-intro-logo { filter: drop-shadow(6px 10px 14px rgba(120, 135, 126, 0.5)); animation: kt-float 3.2s ease-in-out infinite, kt-pop 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.kt-phone .kt-intro-pulse { box-shadow: var(--nm-raised); animation: kt-pulse 2.4s ease-out infinite; }
+.kt-phone .kt-intro-orbit { animation: kt-spin 6s linear infinite; }
+.kt-phone .kt-intro-orbit span { position: absolute; left: 50%; top: 0; width: 10px; height: 10px; margin-left: -5px; border-radius: 9999px; background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.9); transform-origin: 5px 132px; }
+.kt-phone .kt-intro-orbit span:nth-child(2) { background: #f2b705; box-shadow: 0 0 10px rgba(242, 183, 5, 0.9); transform: rotate(120deg); width: 7px; height: 7px; }
+.kt-phone .kt-intro-orbit span:nth-child(3) { background: #1d6b48; transform: rotate(240deg); width: 8px; height: 8px; }
+.kt-phone .kt-intro-hello { animation: kt-rise 0.9s 0.3s ease-out both; }
+.kt-phone .kt-intro-step { animation: kt-rise 0.5s ease-out both; }
+@keyframes kt-fill { to { stroke-dashoffset: 0; } }
+@keyframes kt-spin { to { transform: rotate(360deg); } }
+@keyframes kt-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes kt-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes kt-pulse { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
+@keyframes kt-rise { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes kt-aurora { from { transform: rotate(0deg) scale(1); } to { transform: rotate(25deg) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .kt-phone :is(.kt-intro-aurora, .kt-intro-logo, .kt-intro-pulse, .kt-intro-orbit, .kt-intro-hello, .kt-intro-step) { animation: none; }
+  .kt-phone .kt-intro-ring { animation-timing-function: linear; }
+}

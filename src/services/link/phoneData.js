@@ -5,7 +5,7 @@
  */
 import { forgetLink } from './linkStore.js';
 import { forgetCachedClasses, queuedRecordings } from './scoreEntry.js';
-import { forgetPhoneFiles, outbox } from './phoneFiles.js';
+import { forgetPhoneFiles, outboxCount } from './phoneFiles.js';
 import { syncReminders } from './phoneReminders.js';
 import { forgetPin } from './appLock.js';
 
@@ -18,8 +18,8 @@ const PHONE_DATA_KEYS = [
 
 /** What would be lost (not yet sent to KaTuroDesk). → { recordings, files } */
 export async function unsentOnPhone() {
-  const files = await outbox().catch(() => []);
-  return { recordings: queuedRecordings().length, files: files.length };
+  const files = await outboxCount().catch(() => 0);
+  return { recordings: queuedRecordings().length, files };
 }
 
 /** Clears the link, class lists, waiting recordings and files, kept files, schedule, chat and reminders. */

@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Camera, CheckCircle2, CloudOff, FileUp, FolderOpen, HardDriveDownload, Loader2, Plus, ScanText, Trash2, X } from 'lucide-react';
-import { canAdd, folderLabel, keptFiles, outbox, sendOutbox, dropFromOutbox, sendOrKeep, shrinkPhoto, pagesToPdf, stampName } from '../../services/link/phoneFiles';
+import { canAdd, folderLabel, keptFiles, outbox, sendOutbox, dropFromOutbox, sendOrKeep, shrinkPhoto, pagesToPdf, stampName, sendFiles as sendAll, MAX_SEND } from '../../services/link/phoneFiles';
 import { formatBytes } from '../../utils/bytes';
 
 const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
-const MAX_SEND = 25 * 1024 * 1024;
 
 /** Files kept on this phone (open without KaTuroDesk). Shown at the top of the Files tab. */
 export function KeptList({ onOpen, version }) {
@@ -73,32 +72,6 @@ export function OutboxBanner({ client, onSent, version }) {
   );
 }
 
-/** Sends files (photos made smaller first) to `folder`, one by one. → [{ name, ok, queued?, error? }] */
-async function sendAll(client, folder, files, onProgress) {
-  const out = [];
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    onProgress(`Sending ${i + 1} of ${files.length}…`);
-    try {
-      const isPhoto = /^image\/(jpeg|png|webp|heic|heif)/i.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name);
-      let name = f.name || stampName('File', 'bin');
-      let bytes;
-      if (isPhoto) {
-        bytes = await shrinkPhoto(f);
-        name = /^image\.|^IMG|^\d|^photo/i.test(name) || !name.includes('.') ? stampName('Photo', 'jpg') : name.replace(/\.[^.]+$/, '.jpg');
-      } else {
-        if (f.size > MAX_SEND) { out.push({ name, ok: false, error: 'too big to send (up to 25 MB)' }); continue; }
-        bytes = new Uint8Array(await f.arrayBuffer());
-      }
-      const r = await sendOrKeep(client, { folder, name, bytes });
-      out.push({ name: r.sent?.name || name, ok: true, queued: Boolean(r.queued) });
-    } catch (err) {
-      out.push({ name: f.name, ok: false, error: err.message });
-    }
-  }
-  onProgress('');
-  return out;
-}
 
 function Results({ results }) {
   if (!results?.length) return null;

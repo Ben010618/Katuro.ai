@@ -68,6 +68,8 @@ export async function outbox() {
   const all = (await run(OUTBOX, 'readonly', (s) => s.getAll())) || [];
   return all.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
 }
+/** How many files wait to be sent (without reading them). */
+export const outboxCount = () => run(OUTBOX, 'readonly', (s) => s.count());
 const removeFromOutbox = (id) => run(OUTBOX, 'readwrite', (s) => s.delete(id));
 
 /**
@@ -112,6 +114,41 @@ export async function sendOrKeep(client, { folder, name, bytes }) {
 }
 
 // ── Photos and scans ──
+export const MAX_SEND = 25 * 1024 * 1024;
+
+/**
+ * Sends files (photos made smaller first) to `folder`, one by one: at once, or kept on this
+ * phone (the outbox) until KaTuroDesk can be reached. A refused file is reported, the rest go on.
+ *   prefix: name photos "<prefix> 2026-11-18 141502.jpg" (the camera); otherwise their own names
+ * → [{ name, ok, queued?, error? }]
+ */
+export async function sendFiles(client, folder, files, onProgress = () => {}, { prefix = '' } = {}) {
+  const out = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    onProgress(`Sending ${i + 1} of ${files.length}…`);
+    try {
+      const isPhoto = /^image\/(jpeg|png|webp|heic|heif)/i.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name);
+      let name = f.name || stampName('File', 'bin');
+      let bytes;
+      if (isPhoto) {
+        bytes = await shrinkPhoto(f);
+        if (prefix) name = stampName(prefix, 'jpg');
+        else name = /^image\.|^IMG|^\d|^photo/i.test(name) || !name.includes('.') ? stampName('Photo', 'jpg') : name.replace(/\.[^.]+$/, '.jpg');
+      } else {
+        if (f.size > MAX_SEND) { out.push({ name, ok: false, error: 'too big to send (up to 25 MB)' }); continue; }
+        bytes = new Uint8Array(await f.arrayBuffer());
+      }
+      const r = await sendOrKeep(client, { folder, name, bytes });
+      out.push({ name: r.sent?.name || name, ok: true, queued: Boolean(r.queued) });
+    } catch (err) {
+      out.push({ name: f.name, ok: false, error: err.message, code: err.code });
+    }
+  }
+  onProgress('');
+  return out;
+}
+
 const pad = (n) => String(n).padStart(2, '0');
 /** "Photo 2026-11-16 1432.jpg" */
 export function stampName(prefix, ext, d = new Date()) {
