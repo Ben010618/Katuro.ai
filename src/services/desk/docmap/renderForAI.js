@@ -57,7 +57,9 @@ function renderTable(t, opts, indent = '') {
     const nonEmpty = row.filter((c) => c.text.trim() !== '');
     const parts = nonEmpty.slice(0, opts.maxCellsPerRow).map((c) => `${c.id.slice(c.id.lastIndexOf('.') + 1)}:${clip(c.text, 60)}`);
     if (nonEmpty.length > opts.maxCellsPerRow) parts.push(`… +${nonEmpty.length - opts.maxCellsPerRow} cells`);
-    const out = [`${indent}[${t.id}.r${ri}] ${parts.join(' | ') || '(empty)'}`];
+    // Rows with empty cells say how many cells they have (a template's model row is often empty).
+    const count = nonEmpty.length < row.length ? ` (${row.length} cell${row.length === 1 ? '' : 's'})` : '';
+    const out = [`${indent}[${t.id}.r${ri}] ${parts.join(' | ') || '(empty)'}${count}`];
     for (const c of row) for (const nt of c.tables || []) out.push(renderTable(nt, opts, `${indent}  `));
     return out.join('\n');
   };

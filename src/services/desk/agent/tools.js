@@ -2429,6 +2429,7 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
 
 export {
   documentSpecToText,
+  gatherSourceText,
   base64ToBytes,
   slug,
   extractTableWithAI,

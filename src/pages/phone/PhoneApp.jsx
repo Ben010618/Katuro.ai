@@ -27,7 +27,7 @@ import './phone.css';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
 
-const MAIN = ['Records', 'Lessons'];
+const MAIN = ['Records', 'Lessons', 'Templates'];
 // The bottom bar; the Assistant is the KaTuro logo in the middle.
 const TABS = [['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'KaTuro Assistant', null], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]];
 

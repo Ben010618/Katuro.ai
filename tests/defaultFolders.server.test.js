@@ -26,11 +26,11 @@ describe('KaTuro home folder', () => {
     return { desktopDir, documentsDir, settingsFile: path.join(tmp, 'userData', 'katuro-home.json') };
   };
 
-  it('a new install puts Records and Lessons on the Desktop, in Katuro Teaching Assistant', () => {
+  it('a new install puts Records, Lessons and Templates on the Desktop, in Katuro Teaching Assistant', () => {
     const env = fresh();
     const home = folders.ensureHomeFolder(folders.chooseHome(env));
     expect(home).toBe(path.join(env.desktopDir, 'Katuro Teaching Assistant'));
-    expect(fs.readdirSync(home).sort()).toEqual(['Lessons', 'Records']);
+    expect(fs.readdirSync(home).sort()).toEqual(['Lessons', 'Records', 'Templates']);
     // The choice is saved: the next start uses the same place.
     expect(JSON.parse(fs.readFileSync(env.settingsFile, 'utf-8')).path).toBe(home);
     expect(folders.chooseHome({ ...env, desktopDir: path.join(tmp, 'Elsewhere') })).toBe(home);
@@ -62,7 +62,7 @@ describe('KaTuro home folder', () => {
 
     folders.ensureHomeFolder(folders.chooseHome(env));
 
-    expect(fs.readdirSync(home).sort()).toEqual(['Lessons', 'Records', 'Seminars']);
+    expect(fs.readdirSync(home).sort()).toEqual(['Lessons', 'Records', 'Seminars', 'Templates']);
     expect(fs.readFileSync(path.join(home, 'Records', 'Grade 7 - Rizal.xlsx'), 'utf-8')).toBe('class record');
   });
 
@@ -105,6 +105,7 @@ describe('Explorer rename and delete guard', () => {
   it('never renames or deletes the home folder, Records, Lessons, the open folder, or a folder holding them', () => {
     expect(folders.isProtectedPath(home, opts)).toBe(true);
     expect(folders.isProtectedPath(path.join(home, 'Records'), opts)).toBe(true);
+    expect(folders.isProtectedPath(path.join(home, 'Templates'), opts)).toBe(true);
     expect(folders.isProtectedPath(path.join(home, 'lessons'), opts)).toBe(process.platform === 'win32');
     expect(folders.isProtectedPath(path.resolve('/kt/Desktop'), opts)).toBe(true);
     expect(folders.isProtectedPath(path.resolve('/kt/USB'), { home, roots: [path.resolve('/kt/USB')] })).toBe(true);

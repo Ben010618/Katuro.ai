@@ -382,7 +382,7 @@ ipcMain.handle('dialog:selectFolder', async () => {
   return openFolder(result.filePaths[0]);
 });
 
-// The KaTuro home folder (Desktop\Katuro Teaching Assistant with Records and Lessons, or
+// The KaTuro home folder (Desktop\Katuro Teaching Assistant with Records, Lessons and Templates, or
 // wherever the teacher moved it), see defaultFolders.cjs.
 const homeSettingsFile = () => path.join(app.getPath('userData'), 'katuro-home.json');
 let homeDir = null;
@@ -409,7 +409,7 @@ ipcMain.handle('workspace:reopenLast', async () => {
   try {
     const { path: lastPath } = JSON.parse(fs.readFileSync(lastFolderFile(), 'utf-8'));
     if (lastPath && fs.existsSync(lastPath) && fs.statSync(lastPath).isDirectory()) {
-      // Records and Lessons come back if the teacher deleted them from the home folder.
+      // Records, Lessons and Templates come back if the teacher deleted them from the home folder.
       if (defaultFolders.isHomeFolder(lastPath, homePath())) return openHomeFolder();
       return openFolder(lastPath);
     }
@@ -475,7 +475,7 @@ ipcMain.handle('shell:showItemInFolder', async (_, filePath) => {
   return { success: true };
 });
 
-// Explorer right-click. The KaTuro folder, its Records and Lessons, and the open folder itself
+// Explorer right-click. The KaTuro folder, its Records, Lessons and Templates, and the open folder itself
 // are never renamed or deleted here (defaultFolders.isProtectedPath).
 const isProtected = (target) => defaultFolders.isProtectedPath(target, { home: homePath(), roots: [...allowedRoots] });
 ipcMain.handle('fs:rename', async (e, filePath, newName) => {

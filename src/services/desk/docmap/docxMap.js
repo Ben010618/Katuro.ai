@@ -48,7 +48,8 @@ const TR = new Set(['tr']);
 const TC = new Set(['tc']);
 
 function walkTable(xml, tbl, id) {
-  const rows = blockChildren(tbl, TR).map((tr, ri) => blockChildren(tr, TC).map((tc, ci) => {
+  const rowNodes = blockChildren(tbl, TR);
+  const rows = rowNodes.map((tr, ri) => blockChildren(tr, TC).map((tc, ci) => {
     const cellId = `${id}.r${ri}.c${ci}`;
     const tcPr = kid(tc, 'tcPr');
     const gs = Number(getAttr(kid(tcPr, 'gridSpan'), 'val'));
@@ -68,7 +69,7 @@ function walkTable(xml, tbl, id) {
     };
   }));
   const text = rows.map((r) => r.map((c) => c.text.replace(/\n/g, ' ')).join('\t')).join('\n');
-  return { id, type: 'table', rows, text, node: tbl };
+  return { id, type: 'table', rows, rowNodes, text, node: tbl };
 }
 
 // Blocks of a body / cell / header, with nodes attached (used by the patcher).
@@ -93,6 +94,8 @@ export function indexBlocks(blocks, out = new Map()) {
   for (const b of blocks) {
     out.set(b.id, { kind: b.type, block: b });
     if (b.type === 'table') {
+      // Rows by id (t0.r3) for the template filler (docxTemplate.js), which repeats or removes them.
+      b.rows.forEach((row, ri) => out.set(`${b.id}.r${ri}`, { kind: 'row', block: { id: `${b.id}.r${ri}`, cells: row, node: b.rowNodes?.[ri] } }));
       for (const row of b.rows) {
         for (const cell of row) {
           out.set(cell.id, { kind: 'cell', block: cell });

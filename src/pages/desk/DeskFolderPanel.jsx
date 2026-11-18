@@ -25,6 +25,7 @@ import {
   Copy,
   FilePlus,
   Eye,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useDeskStore } from '../../store/deskStore';
 import {
@@ -38,6 +39,7 @@ import {
   renameInWorkspace,
   trashInWorkspace,
   absolutePath,
+  readFileBytes,
 } from '../../services/localFileSystem';
 import { ExplorerContextMenu, ExplorerDialog } from './ExplorerMenu';
 import { loadPins, savePins, togglePin, movePins, indexTree } from './explorerPins';
@@ -296,8 +298,8 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
   const treeFiles = workspace?.files;
   const byPath = useMemo(() => indexTree(treeFiles || []), [treeFiles]);
   const onDesk = workspace?.handle?.kind === 'electron';
-  // Records and Lessons in the KaTuro folder are used by the KaTuro App; they keep their names.
-  const isMainFolder = (item) => Boolean(workspace?.handle?.katuroHome) && (item.path === 'Records' || item.path === 'Lessons');
+  // Records, Lessons and Templates in the KaTuro folder are used by KaTuroDesk and the KaTuro App; they keep their names.
+  const isMainFolder = (item) => Boolean(workspace?.handle?.katuroHome) && ['Records', 'Lessons', 'Templates'].includes(item.path);
   const isFolderItem = (item) => item.kind === 'directory' || Boolean(item.children);
 
   const openMenu = (item, x, y, keyboard = false) => setMenu({ item, x, y, keyboard, back: document.activeElement });
@@ -316,6 +318,18 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
       else await openInDefaultApp(workspace.handle, '');
     } catch (err) {
       flash(`Could not show it: ${err.message}`);
+    }
+  };
+
+  const saveAsTemplate = async (item) => {
+    try {
+      const bytes = await readFileBytes(workspace.handle, item.path);
+      const res = await writeFileToDirectory(workspace.handle, `Templates/${item.name}`, bytes, undefined, { overwrite: false });
+      await refreshFiles();
+      expandTo('Templates');
+      flash(`Saved in Templates as ${res.name}. Ask me to make a new one from it.`);
+    } catch (err) {
+      flash(`Could not save the template: ${err.message}`);
     }
   };
 
@@ -377,7 +391,7 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
     }
     const folder = isFolderItem(item);
     const locked = isMainFolder(item);
-    const lockedHint = 'Records and Lessons keep their names: the KaTuro App uses them.';
+    const lockedHint = 'Records, Lessons and Templates keep their names: KaTuroDesk and the KaTuro App use them.';
     const isPinned = pins.includes(item.path);
     return [
       ...(folder
@@ -394,6 +408,10 @@ export default function DeskFolderPanel({ user, profile, plan, onCollapse, onOpe
               icon: Paperclip,
               onSelect: () => toggleAttachment(item.path),
             },
+            // A Word file becomes a template: KaTuroDesk makes new documents from copies of it.
+            ...(workspace?.handle?.katuroHome && /\.docx$/i.test(item.name) && !item.path.startsWith('Templates/')
+              ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate, onSelect: () => saveAsTemplate(item) }]
+              : []),
           ]),
       { separator: true },
       ...(onDesk ? [{ id: 'rename', label: 'Rename', icon: Pencil, disabled: locked, hint: locked ? lockedHint : '', onSelect: () => setDialog({ kind: 'rename', item }) }] : []),

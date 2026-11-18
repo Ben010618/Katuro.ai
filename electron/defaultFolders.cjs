@@ -4,8 +4,10 @@
  *   Desktop\Katuro Teaching Assistant\
  *     Records\   Excel class records for every class the teacher handles
  *     Lessons\   PDFs, Word, PowerPoint and other learning materials
+ *     Templates\ the teacher's own Word layouts (lesson plan, project proposal…): KaTuroDesk
+ *                makes new documents from copies of them, keeping their exact formatting
  *
- * Records and Lessons are the two main folders KaTuroDesk and the KaTuro App work on
+ * Records, Lessons and Templates are the main folders KaTuroDesk and the KaTuro App work on
  * together. Teachers can add more folders, and can move the whole home folder anywhere
  * (Settings → Documents → KaTuro folder location). The chosen place is saved in a small
  * settings file in the app's data folder.
@@ -22,7 +24,7 @@ const path = require('path');
 
 const HOME_NAME = 'Katuro Teaching Assistant';
 const LEGACY_NAME = 'KaTuro';
-const MAIN_FOLDERS = Object.freeze(['Records', 'Lessons']);
+const MAIN_FOLDERS = Object.freeze(['Records', 'Lessons', 'Templates']);
 
 const samePath = (a, b) => {
   const x = path.resolve(a);
@@ -108,7 +110,7 @@ function isHomeFolder(dir, home) {
 
 /**
  * Folders that are never renamed or deleted from KaTuroDesk: the home folder (and anything
- * holding it), its Records and Lessons, and the folder that is open (`roots`).
+ * holding it), its Records, Lessons and Templates, and the folder that is open (`roots`).
  */
 function isProtectedPath(target, { home, roots = [] }) {
   if (home && isInsideFolder(home, target)) return true;

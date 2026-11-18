@@ -51,14 +51,26 @@ function isComplex(p) {
   return hasDesc(p, COMPLEX);
 }
 
+/** Copied XML must not repeat Word's unique paragraph ids (w14:paraId / w14:textId). */
+export const stripParaIds = (s) => s.replace(/\s+[\w.-]+:(paraId|textId)\s*=\s*("[^"]*"|'[^']*')/g, '');
+
+/** The part an address belongs to: 'h1:p3' → 'h1:' (header 1), 'p3' → '' (the document). */
+export const partPrefixOf = (id) => /^([hf]\d+:)/.exec(id)?.[1] || '';
+
+/** Address prefix → part path in the zip ('' = document, 'h1:' = header 1, 'f1:' = footer 1…). */
+export async function docxPartsByPrefix(zip) {
+  const { mainPath, headers, footers } = await loadDocxParts(zip);
+  return new Map([['', mainPath], ...[...headers, ...footers].map((h) => [h.prefix, h.part])]);
+}
+
 /** New XML for paragraph `p` holding `text`; null when the paragraph is complex. */
-function setParagraphXml(xml, p, text, { clone = false } = {}) {
+export function setParagraphXml(xml, p, text, { clone = false } = {}) {
   if (isComplex(p)) return null;
   const P = pfx(p);
   let tag = openTag(xml, p);
   if (p.selfClosing) tag = tag.replace(/\s*\/>$/, '>');
   // Clones must not duplicate Word's unique paragraph ids.
-  if (clone) tag = tag.replace(/\s+[\w.-]+:(paraId|textId)\s*=\s*("[^"]*"|'[^']*')/g, '');
+  if (clone) tag = stripParaIds(tag);
   let pPr = '';
   const before = [];
   const after = [];
@@ -75,7 +87,7 @@ function setParagraphXml(xml, p, text, { clone = false } = {}) {
 }
 
 /** New XML for cell `tc`: first paragraph keeps pPr/rPr, extra lines clone it. */
-function setCellXml(xml, tc, text) {
+export function setCellXml(xml, tc, text) {
   if (kids(tc, 'tbl').length || kids(tc, 'sdt').length || kids(tc, 'customXml').length) return null;
   const ps = kids(tc, 'p');
   if (ps.some(isComplex)) return null;
@@ -146,8 +158,7 @@ function findReplaceInParagraph(xml, p, find, replace, splices) {
  */
 export async function applyDocxEdits(bytes, edits) {
   const zip = await loadZip(bytes);
-  const { mainPath, headers, footers } = await loadDocxParts(zip);
-  const partByPrefix = new Map([['', mainPath], ...[...headers, ...footers].map((h) => [h.prefix, h.part])]);
+  const partByPrefix = await docxPartsByPrefix(zip);
   const cache = new Map();
   const getXml = async (path) => {
     if (!cache.has(path)) {
@@ -156,10 +167,7 @@ export async function applyDocxEdits(bytes, edits) {
     }
     return cache.get(path).xml;
   };
-  const prefixOf = (id) => {
-    const m = /^([hf]\d+:)/.exec(id);
-    return m ? m[1] : '';
-  };
+  const prefixOf = partPrefixOf;
   const applied = [];
   const skipped = [];
 

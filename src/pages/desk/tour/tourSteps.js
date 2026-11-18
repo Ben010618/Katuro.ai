@@ -61,6 +61,16 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.22.0',
+    steps: [
+      {
+        target: 'folder',
+        title: 'New: your Templates folder',
+        body: 'Put your own Word templates here (lesson plan, project proposal…), or right-click a Word file → Save as template. Then ask: "Make a lesson plan on photosynthesis using my template." The new file keeps the template\'s margins, fonts and layout.',
+      },
+    ],
+  },
+  {
     version: '1.21.0',
     steps: [
       {
