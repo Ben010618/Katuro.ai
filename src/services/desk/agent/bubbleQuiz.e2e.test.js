@@ -91,7 +91,7 @@ describe('bubble quiz tools', () => {
     const res = await run(workspace, 'record_quiz_scores', { quizPath: `${folder}/${QUIZ_FILE}`, targetPath: 'Records/G7 Class Record.xlsx' });
     const art = res.artifacts.find((a) => a.type === 'voice_scores');
     expect(art, res.content).toBeTruthy();
-    expect(art.data.fromQuiz).toEqual({ title: 'Quiz 1', items: 5 });
+    expect(art.data.fromQuiz).toEqual({ title: 'Quiz 1', items: 5, quizPath: `${folder}/${QUIZ_FILE}` });
     expect(art.data.maxScore).toBe('5');
     // Learner Three (row 1) by LRN: 4; Learner One (row 2) by LRN: 5; Learner Two (row 3) by name
     // (the item the teacher settled as B is wrong): 4. The deleted photo (Transferee Five) does not count.
@@ -106,7 +106,7 @@ describe('bubble quiz tools', () => {
     const session = { ...art.data.session, issues: [] }; // the teacher dismisses the question
     const result = buildScorePlan({ learners: art.data.learners, column: art.data.columns.find((c) => c.key === 'ww1'), kind: art.data.kind, session, maxScore: 5 });
     expect(result.ok).toBe(true);
-    const changes = { ...scoreChangesArtifact(result.plan, { targetPath: art.data.targetPath, kind: art.data.kind, columnLabel: 'WW1' }), id: 'c1' };
+    const changes = { ...scoreChangesArtifact(result.plan, { targetPath: art.data.targetPath, kind: art.data.kind, columnLabel: 'WW1', quizPath: art.data.fromQuiz.quizPath }), id: 'c1' };
     useDeskStore.setState({ workspace, artifacts: [changes], activeArtifact: null });
     const saved = await useDeskStore.getState().applyPendingChanges('c1');
     // Not a KaTuro class record ("Grade - Section - Subject.xlsx" in the KaTuro folder), so the
@@ -117,6 +117,10 @@ describe('bubble quiz tools', () => {
     await wb.xlsx.load(await readFileBytes(workspace.handle, saved.path));
     const ws = wb.getWorksheet('Sheet1');
     expect([2, 3, 4, 5].map((r) => [ws.getCell(`C${r}`).value, ws.getCell(`D${r}`).value])).toEqual([[4, 7], [5, 8], [4, null], [null, null]]);
+    // Recorded on KaTuroDesk: the test is marked recorded, like the phone's testRecorded (the rest kept).
+    const manifest = JSON.parse(new TextDecoder().decode(await readFileBytes(workspace.handle, `${folder}/${QUIZ_FILE}`)));
+    expect(manifest.recordedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(manifest.setId).toBe(quiz.setId);
   });
 
   it('refuses to record while something on the photos is still unclear', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createScanSession } from './scanSession.js';
+import { createScanSession, createIdentifier } from './scanSession.js';
 import { sheetCode } from './layout.js';
 
 const quiz = { setId: 'ABC234', items: 3, learners: [{ n: 1 }, { n: 2 }] };
@@ -77,5 +77,25 @@ describe('live bubble-sheet scanner', () => {
     const u = createScanSession(quiz, { mode: 'key' });
     u.feed(read(0, 'B?-'));
     expect(u.feed(read(0, 'B?-'))).toEqual({ status: 'unclear', items: [2, 3] });
+  });
+});
+
+describe('auto mode: the first sheet names its test', () => {
+  it('starts one lookup for a KaTuro code; other QR codes are ignored', () => {
+    const id = createIdentifier();
+    expect(id.feed('hello')).toEqual({ status: 'identify' });
+    expect(id.feed(null)).toEqual({ status: 'identify' });
+    expect(id.feed(sheetCode('ABC234', 3))).toEqual({ status: 'finding', code: { setId: 'ABC234', number: 3 } });
+    expect(id.feed(sheetCode('ABC234', 3))).toEqual({ status: 'finding' }); // still looking: no second lookup
+    id.settle();
+    expect(id.feed(sheetCode('ABC234', 4)).code).toEqual({ setId: 'ABC234', number: 4 });
+  });
+
+  it('remembers a test KaTuroDesk does not have, and still looks up other tests', () => {
+    const id = createIdentifier();
+    id.feed(sheetCode('ZZZ999', 1));
+    id.settle('Not on KaTuroDesk.');
+    expect(id.feed(sheetCode('ZZZ999', 2))).toEqual({ status: 'unknownTest', note: 'Not on KaTuroDesk.' });
+    expect(id.feed(sheetCode('ABC234', 1)).status).toBe('finding');
   });
 });

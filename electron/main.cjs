@@ -971,6 +971,9 @@ let linkService = null;
 // the readers and writers): sent there, answered through 'link:reply'.
 const deskAsks = new Map();
 let deskAnswering = false;
+// An assistant turn that writes documents takes minutes; checkPhotos stops itself at 4 minutes
+// (deskAssistant.js) and answers with what it read, so it gets 15 s more to send that back.
+const DESK_TIMEOUT_MS = { ask: 5 * 60000, checkPhotos: 4 * 60000 + 15000 };
 function askDesk(op, args, device) {
   return new Promise((resolve, reject) => {
     if (!deskAnswering || !mainWindow || mainWindow.isDestroyed()) {
@@ -981,7 +984,7 @@ function askDesk(op, args, device) {
     const timer = setTimeout(() => {
       deskAsks.delete(id);
       reject(Object.assign(new Error('KaTuroDesk took too long to answer. Try again.'), { code: 'TIMEOUT' }));
-    }, op === 'ask' ? 5 * 60000 : 90000); // an assistant turn that writes documents takes minutes
+    }, DESK_TIMEOUT_MS[op] || 90000);
     deskAsks.set(id, { resolve, reject, timer });
     mainWindow.webContents.send('link:request', { id, op, args, device });
   });

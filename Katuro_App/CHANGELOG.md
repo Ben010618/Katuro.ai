@@ -4,6 +4,13 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.6.0
+Check test papers with the camera.
+- Camera → Check test papers: hold the phone over KaTuro bubble sheets; the app knows the test from the sheet, checks each one and shows the score.
+- Written test papers: choose the test, take a photo of each paper, and KaTuroDesk reads them for you.
+- Review the scores, then record them into your class record in one tap.
+- Needs KaTuroDesk 1.24.0.
+
 ## v1.5.0
 A fresh look, the chat first, and the camera one tap away.
 - A new welcome animation after you sign in.

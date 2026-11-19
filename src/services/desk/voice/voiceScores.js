@@ -288,7 +288,7 @@ export function buildScorePlan({ learners, column, kind, session, maxScore, abse
 }
 
 /** The pending "changes" artifact for the review screen (same shape transfer_data produces). */
-export function scoreChangesArtifact(plan, { targetPath, kind, columnLabel, now = Date.now() }) {
+export function scoreChangesArtifact(plan, { targetPath, kind, columnLabel, quizPath = null, now = Date.now() }) {
   const s = plan.stats;
   const subtitle = `${s.cellsToChange} score(s) to enter in ${columnLabel}${s.conflicts ? `, ${s.conflicts} already filled (kept)` : ''}. Review and tap Apply.`;
   return {
@@ -300,6 +300,7 @@ export function scoreChangesArtifact(plan, { targetPath, kind, columnLabel, now 
     subtitle,
     files: [],
     editable: false,
-    data: { targetPath, kind, ...plan, status: 'pending', operation: 'voice_scores' },
+    // quizPath: scores of a bubble quiz / test: once applied, the test is marked recorded.
+    data: { targetPath, kind, ...plan, status: 'pending', operation: 'voice_scores', ...(quizPath ? { quizPath } : {}) },
   };
 }

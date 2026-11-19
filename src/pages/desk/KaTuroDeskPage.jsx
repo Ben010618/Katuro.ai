@@ -12,6 +12,7 @@ import {
   CalendarClock,
   CalendarDays,
   GraduationCap,
+  ClipboardCheck,
   RefreshCw,
   MessageSquare,
   X,
@@ -38,6 +39,7 @@ import DeskCalendarPanel from './calendar/DeskCalendarPanel';
 import CalendarAlarms from './calendar/CalendarAlarms';
 import TeachingAssistant from './teaching/TeachingAssistant';
 import MyClassesModal from './teaching/MyClassesModal';
+import TestsModal from './bubble/TestsModal';
 import { setTalkContext } from './talkController';
 import { startWakeController } from './wakeController';
 import { prepareVoice } from '../../services/desk/voice/piperVoice';
@@ -88,6 +90,7 @@ export default function KaTuroDeskPage() {
   const [schedule, setSchedule] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showClasses, setShowClasses] = useState(false);
+  const [showTests, setShowTests] = useState(false);
   const schoolPos = calendarPosition(manilaDate());
   const calendarLabel = schoolPos
     ? (schoolPos.term ? `Term ${schoolPos.term} · ${{ opening: 'Opening Block', instructional: 'Instructional', endOfTerm: 'End-of-Term' }[schoolPos.block]}` : { betweenTerms: 'Between terms', eosyBreak: 'EOSY break' }[schoolPos.block])
@@ -255,6 +258,7 @@ export default function KaTuroDeskPage() {
       <DeskTourHost />
       <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
       <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
+      <TestsModal open={showTests} onClose={() => setShowTests(false)} onOpenCanvas={() => setShowRightPanel(true)} />
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}
@@ -362,6 +366,16 @@ export default function KaTuroDeskPage() {
           >
             <GraduationCap size={14} />
             <span className="text-[11px] font-semibold hidden sm:inline">My classes</span>
+          </button>
+
+          <button
+            data-tour="tests"
+            onClick={() => setShowTests(true)}
+            title="Tests: make a test with bubble sheets for a class, print, then check and record the scores"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <ClipboardCheck size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">Tests</span>
           </button>
 
           <button

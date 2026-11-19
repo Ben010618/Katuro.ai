@@ -4,7 +4,8 @@ import { useDeskStore } from '../../../store/deskStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { flattenFileTree, readFileBytes, writeFileToDirectory, openInDefaultApp, fileExists, BACKUPS_ROOT } from '../../../services/localFileSystem';
 import { CHOICE_SETS } from '../../../services/desk/bubble/layout';
-import { CHECK_FILE, QUIZ_FILE, PHOTOS_DIR, PHOTO_FILE, QUIZ_ROOT, layoutOf, readKey, sheetFromRead, reviewSheets, finalScores, resultsSpec } from '../../../services/desk/bubble/quiz';
+import { CHECK_FILE, QUIZ_FILE, PHOTOS_DIR, PHOTO_FILE, isTestFolderPath, fileTitle, layoutOf, readKey, sheetFromRead, reviewSheets, finalScores, resultsSpec } from '../../../services/desk/bubble/quiz';
+import { parseCheck, mergeCheck } from '../../../services/desk/bubble/tests';
 import { runChatTurn } from '../runChatTurn';
 
 const label = 'text-[10.5px] font-semibold uppercase tracking-wide text-gray-500';
@@ -36,35 +37,41 @@ export default function BubbleCheck({ quiz, folder }) {
   const files = useMemo(() => flattenFileTree(tree || []), [tree]);
   const photos = useMemo(() => files.filter((f) => f.path.startsWith(photosDir) && PHOTO_FILE.test(f.name)), [files, photosDir]);
   const recordTargets = useMemo(
-    () => files.filter((f) => RECORD_FILE.test(f.name) && !f.name.startsWith('~$') && !f.path.startsWith(`${QUIZ_ROOT}/`) && !f.path.startsWith(`${BACKUPS_ROOT}/`)).map((f) => f.path),
+    () => files.filter((f) => RECORD_FILE.test(f.name) && !f.name.startsWith('~$') && !isTestFolderPath(f.path) && !f.path.startsWith(`${BACKUPS_ROOT}/`)).map((f) => f.path),
     [files],
   );
 
-  // The saved check (what was read, the teacher's decisions) is the record of truth.
+  // The saved check (what was read, the teacher's decisions) is the record of truth. The phone
+  // can save the key into it too (testKey): read again whenever the file changes on the disk.
+  const seenKeyRef = useRef(null); // the key as last read from (or saved to) the disk
+  const checkStamp = files.find((f) => f.path === checkPath)?.lastModified || 0;
+  const readSaved = async () => {
+    try {
+      if (await fileExists(workspace?.handle, checkPath)) return parseCheck(new TextDecoder().decode(await readFileBytes(workspace.handle, checkPath)));
+    } catch { /* unreadable: start over */ }
+    return null;
+  };
   useEffect(() => {
     let alive = true;
-    (async () => {
-      let saved = emptyCheck();
-      try {
-        if (await fileExists(workspace?.handle, checkPath)) {
-          const parsed = JSON.parse(new TextDecoder().decode(await readFileBytes(workspace.handle, checkPath)));
-          if (parsed && typeof parsed === 'object') saved = { ...emptyCheck(), ...parsed };
-        }
-      } catch {
-        saved = emptyCheck();
-      }
-      if (alive) {
-        checkRef.current = saved;
-        setCheck(saved);
-        setKeyDraft(saved.keyText || '');
-      }
-    })();
+    readSaved().then((disk) => {
+      if (!alive) return;
+      const saved = { ...emptyCheck(), ...(disk || {}) };
+      const before = checkRef.current?.keyText || '';
+      checkRef.current = saved;
+      seenKeyRef.current = saved.answerKey;
+      setCheck(saved);
+      setKeyDraft((draft) => (draft === before ? saved.keyText || '' : draft)); // a key being typed is kept
+    });
     return () => { alive = false; };
-  }, [workspace?.handle, checkPath]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace?.handle, checkPath, checkStamp]);
 
   const persist = async (fn) => {
-    const next = fn(checkRef.current || emptyCheck());
+    const merged = mergeCheck(checkRef.current || emptyCheck(), await readSaved(), seenKeyRef.current);
+    if (merged.keyText !== checkRef.current?.keyText) setKeyDraft(merged.keyText || '');
+    const next = fn(merged);
     checkRef.current = next;
+    seenKeyRef.current = next.answerKey;
     setCheck(next);
     await writeFileToDirectory(workspace.handle, checkPath, JSON.stringify(next, null, 2), 'application/json');
   };
@@ -134,7 +141,7 @@ export default function BubbleCheck({ quiz, folder }) {
     try {
       const { buildSheetWorkbook } = await import('../../../services/desk/generators/xlsxWriters');
       const bytes = await buildSheetWorkbook(resultsSpec(quiz, check.answerKey, review));
-      const res = await writeFileToDirectory(workspace.handle, `${folder}/${quiz.title.replace(/[\\/:*?"<>|]+/g, '-')} - Results.xlsx`, bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { overwrite: false });
+      const res = await writeFileToDirectory(workspace.handle, `${folder}/${fileTitle(quiz.title)} - Results.xlsx`, bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { overwrite: false });
       await refreshFiles();
       setNote(`Saved ${res.path.split('/').pop()} in the quiz folder.`);
     } catch (err) {

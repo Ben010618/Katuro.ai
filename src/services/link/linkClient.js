@@ -19,13 +19,16 @@ const READ_MS = 60000;
 // Addresses kept per KaTuroDesk: each unreachable one costs a wait, so the list stays short.
 export const MAX_HOSTS = 6;
 // Requests that read or write files on KaTuroDesk can take a while on a busy laptop.
-const SLOW_OPS = new Set(['read', 'upload', 'rename', 'move', 'replace', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'schedule', 'addEvent']);
+const SLOW_OPS = new Set(['read', 'upload', 'rename', 'move', 'replace', 'classes', 'class', 'record', 'history', 'undo', 'attendance', 'attendanceGet', 'quizzes', 'quiz', 'tests', 'test', 'testKey', 'testRecorded', 'schedule', 'addEvent']);
 // File changes on KaTuroDesk: one that runs out of time may still have been done there, so it is
 // never sent again to another address of the computer (TIMEOUT, not UNREACHABLE). The teacher
 // looks first. Not uploads: an address that is not on this network also just runs out of time,
 // and a sent file never overwrites anything (at worst a "name (2)" copy), so an upload that
 // runs out of time is kept on the phone to send later, as before.
 const FILE_CHANGES = new Set(['rename', 'move', 'replace']);
+// Long work on KaTuroDesk (the AI reading test papers): running out of time is not "can't reach",
+// so it is not sent again to another address (it would start the same work twice).
+const LONG_WORK = { checkPhotos: 'KaTuroDesk took too long to check the photos. Try fewer at a time.' };
 // An assistant turn on KaTuroDesk (it may write documents) can take a few minutes.
 const ASK_MS = 5 * 60000 + 15000;
 
@@ -107,6 +110,7 @@ async function exchange({ host, port, id, key, op, args, fetchImpl, timeoutMs, r
     res = await fetchImpl(`http://${host}:${port}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: t.signal });
   } catch {
     if (t.signal.aborted && FILE_CHANGES.has(op)) throw new LinkError('KaTuroDesk took too long to answer. Look in the folder whether it was done before trying again.', 'TIMEOUT');
+    if (t.signal.aborted && LONG_WORK[op]) throw new LinkError(LONG_WORK[op], 'TIMEOUT');
     throw new LinkError(UNREACHABLE, 'UNREACHABLE');
   } finally {
     t.done();

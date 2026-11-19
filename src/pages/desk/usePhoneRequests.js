@@ -74,6 +74,7 @@ export function usePhoneRequests({ user, profile } = {}) {
           remove: (id) => useDeskStore.getState().removeCalendarEvent(id),
         },
         getWorkspace: async () => ({ handle, rootPath, name: 'KaTuro', isVirtual: false, files: await readDirectoryRecursively(handle) }),
+        getHandle: () => handle,
         getAccount: () => account.current,
         runTurn: async (options) => {
           const { runDeskAgentTurn } = await import('../../services/deskAgentAI');

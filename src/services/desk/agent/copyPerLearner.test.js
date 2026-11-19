@@ -52,6 +52,19 @@ describe('one Word copy per learner', () => {
     expect(docxText(await readFileBytes(ws.handle, 'Certificate.docx'))).toMatch(/\[Name\]/); // template unchanged
   });
 
+  it('a folder the teacher names holds everything: the combined file and every separate copy', async () => {
+    const ws = createVirtualWorkspace('Awards');
+    ws.handle.saveVirtualFile('Certificate.docx', await certificate(['CERTIFICATE', '[Name]']));
+    ws.handle.saveVirtualFile('Class List.xlsx', classList(LIST));
+    ws.files = ws.handle.getFiles();
+    const res = await run(ws, { templatePath: 'Certificate.docx', listPath: 'Class List.xlsx', outputFolder: 'Certificates' });
+    expect(res.createdFiles.length).toBeGreaterThan(1);
+    for (const f of res.createdFiles) expect(f.path.startsWith('Certificates/')).toBe(true);
+    const separate = flattenFileTree(ws.handle.getFiles()).filter((f) => /per learner\//.test(f.path));
+    expect(separate.length).toBe(3);
+    for (const f of separate) expect(f.path.startsWith('Certificates/Certificate per learner/')).toBe(true);
+  });
+
   it('a sample name in the template can stand for each learner\'s name', async () => {
     const ws = createVirtualWorkspace('Awards');
     ws.handle.saveVirtualFile('Letter.docx', await certificate(['Dear Parent of', 'JUAN DELA CRUZ', 'Please attend the meeting.']));

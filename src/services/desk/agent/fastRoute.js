@@ -39,7 +39,8 @@ const THANKS = /^(thanks?|thank\s*you|ty|salamat|maraming\s*salamat)\b[\s\S]{0,3
 /** Intent rules for short free-text requests; each needs matching files to be confident. */
 const INTENTS = [
   { route: 'voice_scores', test: /\b(by voice|using (my )?voice|voice (input|encoding)|dictat\w*|speak (the )?(scores|grades)|say the (scores|grades)|read (the )?(scores|grades) (aloud|out)|read (them|it) aloud)\b/i, needs: /\b(scores?|grades?|class record|encod\w*)\b/i },
-  { route: 'bubble_sheets', test: /\bbubble\s*(sheets?|quiz)\b/i },
+  // "Make a test on … with bubble sheets" is a whole test (make_test, via the planner), not sheets only.
+  { route: 'bubble_sheets', test: /\bbubble\s*(sheets?|quiz)\b/i, unless: /\b(make|create|write|prepare|gawa\w*)\s+(?:me\s+)?(?:(?:a|an|ng)\s+)?(?:\d+[- ]?items?\s+)?(?:test|exam|quiz)\b/i },
   { route: 'remedial', test: /\b(remedia|re-?test|intervention slip)/i, needs: /\b(item analysis|least mastered|lmc|score|quiz|test)\b/i },
   { route: 'item_analysis', test: /\b(item analysis|least mastered|\blmc\b|\bmps\b|mastery level)\b/i },
   { route: 'class_record', test: /\b(e-?class record|class record|\becr\b|transmut)/i },
@@ -74,7 +75,7 @@ export function fastRoute({ prompt, attachedPaths = [], activePath = null, perso
   if (!route) {
     // Free text: only short, single-intent requests are routed in code.
     if (text.length > 140 || /\b(and then|tapos|after that|also|pati|then)\b/i.test(text)) return null;
-    const hits = INTENTS.filter((i) => i.test.test(text) && (!i.needs || i.needs.test(text)));
+    const hits = INTENTS.filter((i) => i.test.test(text) && (!i.needs || i.needs.test(text)) && !i.unless?.test(text));
     if (hits.some((h) => h.route === 'voice_scores')) route = 'voice_scores'; // "...by voice into my class record"
     else if (hits.length !== 1 && !(hits.length === 2 && hits[0].route === 'remedial')) return null;
     else route = hits[0].route;

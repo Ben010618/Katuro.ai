@@ -29,6 +29,8 @@ import {
   readerNameFor,
   saveWorkingCopy,
   sha256Hex,
+  fileExists,
+  trashInWorkspace,
 } from '../../localFileSystem.js';
 import { queryDepEdCompetencies, DEPED_CURRICULUM_DATABASE } from '../../../data/depedMatatagCurriculum.js';
 import { getTeacherSalutationName } from '../../teacherProfileUtils.js';
@@ -122,7 +124,7 @@ export function plannerKnowledge(prompt, history = [], schoolYear = '', now = ne
 
 // Plans that change the teacher's own files, or spend a long AI generation, get a
 // "Proceed?" when the planner was only medium-sure. Simple, clear jobs just run.
-const CONFIRM_TOOLS = new Set(['edit_file', 'fill_table_from_files', 'copy_per_learner', 'fill_word_form', 'add_formula_columns', 'deped_format_docx', 'fill_pdf_form', 'edit_slides', 'organize_folder', 'transfer_data', 'encode_scores', 'fill_template', 'use_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package', 'change_calendar_event']);
+const CONFIRM_TOOLS = new Set(['make_test', 'edit_file', 'fill_table_from_files', 'copy_per_learner', 'fill_word_form', 'add_formula_columns', 'deped_format_docx', 'fill_pdf_form', 'edit_slides', 'organize_folder', 'transfer_data', 'encode_scores', 'fill_template', 'use_template', 'write_document', 'make_slides', 'make_spreadsheet', 'revise_document', 'make_remedial_package', 'change_calendar_event']);
 
 /**
  * The planner's self-check (rule 11). Missing fields mean "high", so a planner reply
@@ -349,6 +351,24 @@ export async function runDeskAgentTurn({
       const clean = cleanReply(text);
       if (clean) emit({ reply: reply ? `${reply}\n\n${clean}` : clean });
     },
+    /** True when the open folder is the KaTuro folder (Records and Lessons): tests go in Lessons/Tests. */
+    katuroHome: Boolean(handle?.katuroHome) || home,
+    /**
+     * KaTuro's own data file in a folder KaTuro just made (a test's manifest, its check file):
+     * written as is, not listed as an output for the teacher.
+     */
+    async writeData(path, content, mimeType = 'application/json', { overwrite = true } = {}) {
+      if (!handle) throw new Error('Open a classroom folder first so I can save files.');
+      return writeFileToDirectory(handle, path, content, mimeType, { overwrite });
+    },
+    /** Takes back a file this turn just saved (best effort; the desktop app moves it to the Recycle Bin). */
+    async removeOwnOutput(path) {
+      const i = createdFiles.findIndex((f) => f.path === path);
+      if (i >= 0) createdFiles.splice(i, 1);
+      await trashInWorkspace(handle, path);
+    },
+    /** True when the file is on the disk now (not only in the folder list this turn started with). */
+    exists: (path) => fileExists(handle, path),
     async makeDir(path) {
       if (!handle) throw new Error('Open a classroom folder first.');
       await createDirectoryInWorkspace(handle, path);
@@ -502,7 +522,9 @@ export async function runDeskAgentTurn({
         const folder = typeof task.args.outputFolder === 'string'
           ? task.args.outputFolder.replace(/^\/+|\/+$/g, '')
           : home && outputPlace(task.tool) !== outputFolder ? outputPlace(task.tool) : null;
-        const taskCtx = folder ? { ...ctx, saveOutput: (n, b, f) => ctx.saveOutput(n, b, f, folder) } : ctx;
+        // A folder the tool names itself (make_test: the test's own folder) wins over the default.
+        // Tools that build sub-folders from getOutputFolder() (copy_per_learner, organize_folder) stay inside it too.
+        const taskCtx = folder ? { ...ctx, saveOutput: (n, b, f, own) => ctx.saveOutput(n, b, f, own || folder), getOutputFolder: () => folder } : ctx;
         return tool.run(task.args, taskCtx, report, deps);
       },
       {

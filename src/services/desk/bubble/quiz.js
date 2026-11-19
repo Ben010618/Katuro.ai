@@ -23,11 +23,101 @@ export const PHOTO_FILE = /\.(jpe?g|png|webp|heic|heif)$/i;
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const safeName = (s) => clean(s).replace(/[\\/:*?"<>|]+/g, '-').replace(/\.+$/, '').slice(0, 60).trim();
 
-/** The quiz's folder in the workspace. */
-export function quizFolder(quiz) {
+/** Tests made in the KaTuro folder: Lessons/Tests/<Class name>/<Test title>/ */
+export const TESTS_ROOT = 'Lessons/Tests';
+
+/**
+ * The quiz's folder in the workspace. In the KaTuro folder (home), a quiz for a class
+ * ("Grade 7 - Rizal - Science", the class record's name) goes in Lessons/Tests/<class>/<title>;
+ * anywhere else, or without a class, the old Bubble Quizzes/<title> - <section>.
+ */
+export function quizFolder(quiz, { home = false } = {}) {
+  if (home && safeName(quiz.className)) return `${TESTS_ROOT}/${safeName(quiz.className)}/${safeName(quiz.title) || 'Test'}`;
   const name = [safeName(quiz.title), safeName(quiz.section)].filter(Boolean).join(' - ');
   return `${QUIZ_ROOT}/${name || 'Quiz'}`;
 }
+
+/** The quiz title as it is used in its file names ("<title> - Bubble Sheets.pdf"). */
+export const fileTitle = (title) => String(title || '').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'Quiz';
+
+// Folders being made right now (two tests made in one turn, or a test and the panel, never share one).
+const claimed = new Set();
+
+/**
+ * A free folder for a new quiz, checked on the disk, and held until releaseQuizFolder:
+ * a second quiz with the same title (and class) gets "(2)", "(3)"…
+ *   exists(path) → Promise<boolean> (on the disk)
+ */
+export async function claimQuizFolder(quiz, { home = false, exists }) {
+  const base = quizFolder(quiz, { home });
+  for (let i = 1; i < 100; i += 1) {
+    const folder = i === 1 ? base : `${base} (${i})`;
+    if (claimed.has(folder.toLowerCase())) continue;
+    claimed.add(folder.toLowerCase());
+    let taken;
+    try {
+      taken = await exists(`${folder}/${QUIZ_FILE}`);
+    } catch (err) {
+      claimed.delete(folder.toLowerCase());
+      throw err;
+    }
+    if (!taken) return folder;
+    claimed.delete(folder.toLowerCase());
+  }
+  throw new Error('There are too many quizzes with this title. Choose another title.');
+}
+
+export const releaseQuizFolder = (folder) => { claimed.delete(String(folder || '').toLowerCase()); };
+
+/**
+ * Writes a claimed quiz folder: the bubble sheets PDF, the manifest (never over another one),
+ * the key (when given) and the Photos folder; then releases the claim.
+ *   write(path, content, mimeType, { overwrite }) → { path }
+ *   writePdf(path, bytes) → { path } (optional: e.g. saved as one of the agent's outputs)
+ *   remove(path) → Promise (optional): takes back what was written when the folder turns out to be taken
+ *   extra: more manifest fields (testPaper, answerKeyDoc)   key: ['A', …] for KaTuro check.json
+ * → { quiz: the saved manifest, folder, pdf }
+ */
+export async function writeQuizFolder({ quiz, folder, write, writePdf = null, remove = null, extra = {}, key = null }) {
+  try {
+    const { buildBubbleSheetsPdf } = await import('./sheetPdf.js');
+    const bytes = await buildBubbleSheetsPdf(quiz);
+    const pdfTarget = `${folder}/${fileTitle(quiz.title)} - Bubble Sheets.pdf`;
+    const pdf = writePdf ? await writePdf(pdfTarget, bytes) : await write(pdfTarget, bytes, 'application/pdf', { overwrite: false });
+    const saved = { ...quiz, pdfPath: pdf.path, ...extra };
+    const manifest = await write(`${folder}/${QUIZ_FILE}`, JSON.stringify(saved, null, 2), 'application/json', { overwrite: false });
+    if (manifest.path !== `${folder}/${QUIZ_FILE}`) {
+      // Another quiz took this folder: take back what was just written (best effort), keep theirs.
+      const mine = [manifest.path, pdf.path, ...Object.values(extra).filter((v) => typeof v === 'string' && v.startsWith(`${folder}/`))];
+      if (remove) for (const p of mine) await Promise.resolve().then(() => remove(p)).catch(() => {});
+      throw new Error('Another quiz was just made in the same folder. Please try again.');
+    }
+    // KaTuro's own files in the folder it now holds: written as they are (never a "(2)" copy beside an old key).
+    if (key) await write(`${folder}/${CHECK_FILE}`, JSON.stringify({ answerKey: key, keyText: key.join(''), sheets: {}, decisions: {} }, null, 2), 'application/json', { overwrite: true });
+    await write(`${folder}/${PHOTOS_DIR}/About this folder.txt`, 'Photos of the answered bubble sheets go here (from the KaTuro App, or copied in). KaTuroDesk checks them from this folder.\r\n', 'text/plain', { overwrite: true });
+    return { quiz: saved, folder, pdf };
+  } finally {
+    releaseQuizFolder(folder);
+  }
+}
+
+/** The Bubble quiz panel (Canvas) for a saved quiz, at a step: 'photos' | 'check' | 'print'. */
+export function bubbleQuizArtifact(quiz, folder, stage = 'photos') {
+  return {
+    type: 'bubble_quiz',
+    title: `Bubble quiz: ${quiz.title}`,
+    subtitle: `${quiz.learners.length} learners, ${quiz.items} items`,
+    files: [],
+    editable: false,
+    data: { stage, folder, quiz },
+  };
+}
+
+/** True for a file inside a quiz/test folder made by KaTuro (new or old place). */
+export const isTestFolderPath = (path) => {
+  const p = String(path || '').replace(/\\/g, '/').toLowerCase();
+  return p.startsWith(`${QUIZ_ROOT.toLowerCase()}/`) || p.startsWith(`${TESTS_ROOT.toLowerCase()}/`);
+};
 
 /**
  * A new quiz from the teacher's settings.
@@ -65,6 +155,9 @@ export function newQuiz(setup, { now = new Date(), random = Math.random } = {}) 
       blanks,
       learners: learners.map((l, i) => ({ n: i + 1, name: clean(l.name), lrn: clean(l.lrn).replace(/\s/g, '') })),
       ...(setup.listPath ? { listPath: setup.listPath } : {}),
+      // A Test (Lessons/Tests): its class, and where its scores are recorded.
+      ...(clean(setup.className) ? { className: clean(setup.className) } : {}),
+      ...(setup.recordPath ? { recordPath: setup.recordPath, column: setup.column || null, columnLabel: setup.columnLabel || null } : {}),
       createdAt: now.toISOString(),
       answerKey: null,
     },
@@ -87,15 +180,21 @@ export function parseQuiz(text) {
 
 export const layoutOf = (quiz) => sheetLayout(quiz);
 
+/** What is wrong with a key (letters) for this quiz, or null when it fits. */
+export function keyProblem(key, quiz) {
+  const letters = CHOICE_SETS[quiz.choices] || CHOICE_SETS[4];
+  const bad = key.map((k, i) => (letters.includes(k) ? null : i + 1)).filter(Boolean);
+  if (bad.length) return `Item${bad.length > 1 ? 's' : ''} ${bad.slice(0, 5).join(', ')} in the key ${bad.length > 1 ? 'are' : 'is'} not one of ${letters.join(', ')}.`;
+  if (key.length !== quiz.items) return `The key has ${key.length} answers, but the quiz has ${quiz.items} items.`;
+  return null;
+}
+
 /** The teacher's typed key, checked against this quiz. → { key } or { error } */
 export function readKey(text, quiz) {
   const { key, error } = parseAnswerKey(text);
   if (error) return { error: `The answer key: ${error}.` };
-  const letters = CHOICE_SETS[quiz.choices];
-  const bad = key.map((k, i) => (letters.includes(k) ? null : i + 1)).filter(Boolean);
-  if (bad.length) return { error: `Item${bad.length > 1 ? 's' : ''} ${bad.slice(0, 5).join(', ')} in the key ${bad.length > 1 ? 'are' : 'is'} not one of ${letters.join(', ')}.` };
-  if (key.length !== quiz.items) return { error: `The key has ${key.length} answers, but the quiz has ${quiz.items} items.` };
-  return { key };
+  const problem = keyProblem(key, quiz);
+  return problem ? { error: problem } : { key };
 }
 
 /**

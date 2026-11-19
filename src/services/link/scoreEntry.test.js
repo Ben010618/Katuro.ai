@@ -65,6 +65,14 @@ describe('recordings kept on the phone while KaTuroDesk is off', () => {
     expect(queuedRecordings()[0].error).toMatch(/already have a score/);
   });
 
+  it('a queued recording of a Test also tells KaTuroDesk the test is recorded', async () => {
+    queueRecording({ ...item, id: 'q2', testPath: 'Lessons/Tests/A/Quiz 3/KaTuro bubble quiz.json' });
+    const calls = [];
+    await sendQueued({ request: async (op, args) => { calls.push([op, args.path]); if (op === 'testRecorded') throw Object.assign(new Error('old'), { code: 'UNKNOWN_OP' }); return { ok: true }; } });
+    expect(calls).toEqual([['record', item.path], ['testRecorded', 'Lessons/Tests/A/Quiz 3/KaTuro bubble quiz.json']]);
+    expect(queuedRecordings()).toEqual([]);
+  });
+
   it('class lists are kept for typing offline', () => {
     cacheClass('Records/A.xlsx', CLS);
     expect(cachedClasses().classes['Records/A.xlsx'].learners).toHaveLength(3);

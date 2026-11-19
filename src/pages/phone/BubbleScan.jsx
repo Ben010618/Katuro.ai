@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, CheckCircle2, Images, Loader2, ScanLine, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, Images, Loader2, ScanLine } from 'lucide-react';
 import BubbleLiveScan from './BubbleLiveScan';
-import { CHOICE_SETS } from '../../services/desk/bubble/layout';
-import { layoutOf, readKey, sheetFromRead, reviewSheets, finalScores } from '../../services/desk/bubble/quiz';
-
-const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
+import { BubbleRows, Card, KeyTyping } from './ScoreParts';
+import { layoutOf, sheetFromRead, reviewSheets, finalScores } from '../../services/desk/bubble/quiz';
 
 /**
  * Bubble sheets on the phone: choose a bubble quiz KaTuroDesk made, scan the answered sheets
@@ -74,7 +72,6 @@ export default function BubbleScan({ client, cls, onScores }) {
 
   const review = useMemo(() => (quiz ? reviewSheets(quiz, key, sheets, decisions) : null), [quiz, key, sheets, decisions]);
   const decide = (photo, change) => setDecisions((d) => ({ ...d, [photo]: { ...(d[photo] || {}), ...change, answers: { ...(d[photo]?.answers || {}), ...(change.answers || {}) } } }));
-  const learnerName = (n) => quiz?.learners.find((l) => l.n === n)?.name || '';
 
   if (error && !quiz) return <div className="p-3"><Card><p className="text-sm text-red-700">{error}</p></Card></div>;
   if (!quiz) {
@@ -98,22 +95,11 @@ export default function BubbleScan({ client, cls, onScores }) {
       <div className="p-3 space-y-3">
         <Card className="space-y-2">
           <p className="text-sm font-bold text-gray-900">{quiz.title}: answer key</p>
-          <p className="text-xs text-gray-600">Type the {quiz.items} correct answers in order ({CHOICE_SETS[quiz.choices].join(', ')}), e.g. ABCDA… Spaces and numbers are fine.</p>
           <button type="button" onClick={() => setLive('key')} className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-3 text-sm font-semibold text-emerald-800">
             <ScanLine size={18} /> Scan a sheet shaded as the key
           </button>
           <p className="text-xs text-gray-500">Or type it:</p>
-          <textarea value={keyText} onChange={(e) => setKeyText(e.target.value.toUpperCase())} rows={3} className="w-full rounded-lg border border-gray-300 p-2 font-mono text-base" />
-          <button
-            type="button"
-            onClick={() => {
-              const r = readKey(keyText, quiz);
-              if (r.error) setError(r.error);
-              else { setError(''); setKey(r.key); }
-            }}
-            className="w-full rounded-xl bg-emerald-700 py-3 font-bold text-white"
-          >Use this key</button>
-          {error && <p className="text-sm text-red-700">{error}</p>}
+          <KeyTyping quiz={quiz} value={keyText} onChange={setKeyText} onKey={(k) => { setError(''); setKey(k); }} />
         </Card>
         {live === 'key' && (
           <BubbleLiveScan
@@ -153,41 +139,7 @@ export default function BubbleScan({ client, cls, onScores }) {
         {reading && <p className="flex items-center gap-2 text-sm text-gray-700"><Loader2 size={16} className="animate-spin" /> {reading}</p>}
       </Card>
 
-      {review?.rows.map((r) => (
-        <Card key={r.photo} className={r.issues.length ? 'border border-amber-200' : ''}>
-          <div className="flex items-center gap-2">
-            {r.skipped ? <span className="text-sm text-gray-400 flex-1">{r.photo}: left out</span> : (
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-semibold text-gray-900 truncate">{r.learner ? learnerName(r.learner) : r.photo}</span>
-                {Number.isFinite(r.score) && <span className="block text-xs text-emerald-800">{r.score} / {quiz.items}</span>}
-              </span>
-            )}
-            {!r.skipped && <button type="button" onClick={() => decide(r.photo, { skip: true })} aria-label={`Leave out ${r.photo}`} className="p-1.5 text-gray-400"><Trash2 size={16} /></button>}
-          </div>
-          {r.issues.map((iss) => (
-            <div key={`${iss.kind}-${iss.item || ''}`} className="mt-2 text-sm text-amber-900">
-              {iss.kind === 'item' ? (
-                <div>
-                  <p>Item {iss.item}: {iss.note}. Choose the answer:</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {[...CHOICE_SETS[quiz.choices], ''].map((letter) => (
-                      <button key={letter || 'blank'} type="button" onClick={() => decide(r.photo, { answers: { [iss.item]: letter } })} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold">{letter || 'No answer'}</button>
-                    ))}
-                  </div>
-                </div>
-              ) : iss.kind === 'learner' ? (
-                <div>
-                  <p>{iss.note}</p>
-                  <select aria-label="Learner" defaultValue="" onChange={(e) => decide(r.photo, { learner: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2">
-                    <option value="" disabled>Choose the learner</option>
-                    {quiz.learners.map((l) => <option key={l.n} value={l.n}>{l.name}</option>)}
-                  </select>
-                </div>
-              ) : <p>{iss.note}</p>}
-            </div>
-          ))}
-        </Card>
-      ))}
+      {review && <BubbleRows quiz={quiz} review={review} onDecide={decide} />}
 
       {review && review.rows.length > 0 && (
         <div className="kt-covers-nav fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 p-3 space-y-1" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>

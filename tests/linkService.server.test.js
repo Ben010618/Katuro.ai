@@ -178,6 +178,35 @@ describe('phone link', () => {
     expect(asked.map((a) => [a[0], a[2]])).toEqual([['classes', "Ma'am Ana's phone"], ['record', "Ma'am Ana's phone"]]);
   });
 
+  it("Tests requests follow the phone's level for the test's folder (Lessons)", async () => {
+    const asked = [];
+    const T = 'Lessons/Tests/Grade 7 - Rizal - Science/Quiz 1/KaTuro bubble quiz.json';
+    await setup({
+      askDesk: async (op) => {
+        asked.push(op);
+        if (op === 'tests') return { tests: [{ path: T }, { path: 'Records/Old/KaTuro bubble quiz.json' }] };
+        if (op === 'quizzes') return { quizzes: [{ path: T }, { path: 'Records/Old/KaTuro bubble quiz.json' }] };
+        return { ok: true };
+      },
+    });
+    const client = createLinkClient((await pairPhone()).link);
+    const [id] = service.status().devices.map((d) => d.id);
+    service.setAccess(id, 'home:records', 'hidden');
+    expect(await client.request('tests')).toEqual({ tests: [{ path: T }] });
+    expect(await client.request('quizzes')).toEqual({ quizzes: [{ path: T }] });
+    await expect(client.request('quiz', { path: 'Records/Old/KaTuro bubble quiz.json' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(await client.request('testKey', { path: T, key: ['A'] })).toEqual({ ok: true });
+    await expect(client.request('checkPhotos', { path: T, photos: ['../secret.txt'] })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    service.setAccess(id, 'home:lessons', 'view');
+    expect(await client.request('test', { path: T })).toEqual({ ok: true });
+    await expect(client.request('testRecorded', { path: T })).rejects.toMatchObject({ code: 'NOT_ALLOWED' });
+    service.setAccess(id, 'home:lessons', 'hidden');
+    expect(await client.request('tests')).toEqual({ tests: [] });
+    await expect(client.request('test', { path: T })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(client.request('quiz', { path: T })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(asked).toEqual(['tests', 'quizzes', 'testKey', 'test', 'tests']);
+  });
+
   it('a phone can send files where KaTuroDesk allows it (Lessons by default), never over an existing file, and never programs', async () => {
     const { home } = await setup();
     const client = createLinkClient((await pairPhone()).link);

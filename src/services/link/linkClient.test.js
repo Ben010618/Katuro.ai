@@ -34,6 +34,13 @@ describe('a file change that runs out of time', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it('test papers still being checked when time runs out are not sent to the other address', async () => {
+    const calls = [];
+    const client = createLinkClient(LINK, { fetchImpl: hanging(calls) });
+    await expect(client.request('checkPhotos', { path: 'x', photos: [] }, { timeoutMs: 30 })).rejects.toMatchObject({ code: 'TIMEOUT', message: expect.stringMatching(/Try fewer at a time/) });
+    expect(calls).toHaveLength(1);
+  });
+
   it('a read that runs out of time still tries the next address', async () => {
     const calls = [];
     const client = createLinkClient(LINK, { fetchImpl: hanging(calls) });

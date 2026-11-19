@@ -106,6 +106,8 @@ async function sendQueuedOnce(client) {
         ? await client.request(item.op, { ...item.args, id: item.id })
         : await client.request('record', { id: item.id, path: item.path, column: item.column, hps: item.hps, scores: item.scores, overwrite: Boolean(item.overwrite) });
       removeQueued(item.id);
+      // Scores of a Test: KaTuroDesk notes the test as recorded (an older KaTuroDesk does not know this: fine).
+      if (item.testPath) await client.request('testRecorded', { path: item.testPath }, { timeoutMs: 8000 }).catch(() => {});
       sent.push({ item, result });
     } catch (err) {
       if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING' || err.code === 'CLOSED') return { sent, failed, unreachable: true };
@@ -126,4 +128,21 @@ export function cacheClass(path, cls) {
   const c = cachedClasses();
   write(CACHE_KEY, { ...c, classes: { ...c.classes, [path]: { ...cls, cachedAt: new Date().toISOString() } } });
 }
+/**
+ * One class record from KaTuroDesk (kept on the phone), or the copy kept on the phone when
+ * KaTuroDesk can't be reached. → { cls, fromPhone } ; throws when neither is there.
+ */
+export async function loadClass(client, path) {
+  try {
+    const cls = await client.request('class', { path });
+    cacheClass(path, cls);
+    return { cls, fromPhone: false };
+  } catch (err) {
+    const kept = cachedClasses().classes[path];
+    if (err.code === 'UNREACHABLE' && kept) return { cls: kept, fromPhone: true };
+    if (err.code === 'UNREACHABLE') throw Object.assign(new Error("KaTuroDesk can't be reached, and this class is not saved on the phone yet. Open it once while connected."), { code: 'UNREACHABLE' });
+    throw err;
+  }
+}
+
 export const forgetCachedClasses = () => { try { localStorage.removeItem(CACHE_KEY); } catch { /* nothing kept */ } };

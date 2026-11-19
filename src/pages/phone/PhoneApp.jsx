@@ -12,6 +12,7 @@ import AvatarImage from '../../components/AvatarImage';
 import PhoneIntro from './PhoneIntro';
 import { justSignedIn, clearJustSignedIn } from '../../services/link/phoneIntro';
 import PhoneCamera from './PhoneCamera';
+import TestCheck from './TestCheck';
 import QrScanner from './QrScanner';
 import PhoneFileView from './PhoneFileView';
 import ScoresFlow from './ScoresFlow';
@@ -206,6 +207,7 @@ export default function PhoneApp() {
   const [intro, setIntro] = useState(() => justSignedIn()); // the welcome right after signing in
   const endIntro = useCallback(() => { clearJustSignedIn(); setIntro(false); }, []);
   const [camera, setCamera] = useState(false);
+  const [testCheck, setTestCheck] = useState(null); // null | 'bubble' | 'papers' (Check test papers)
   const bump = useCallback(() => setVersion((v) => v + 1), []);
 
   // Share → KaTuro from another app: on start, and while the app is open.
@@ -284,6 +286,8 @@ export default function PhoneApp() {
    */
   const wipe = useCallback(async () => {
     clientRef.current?.close();
+    setTestCheck(null);
+    setCamera(false);
     setLink(null);
     setPath('');
     setFile(null);
@@ -506,7 +510,13 @@ export default function PhoneApp() {
             </>
           )}
       </div>
-      {camera && client && !pinScreen && <PhoneCamera client={client} onClose={() => setCamera(false)} onBubbleSheets={() => openTab('scores')} onSent={bump} />}
+      {camera && client && !pinScreen && <PhoneCamera client={client} onClose={() => setCamera(false)} onCheckTests={setTestCheck} onSent={bump} />}
+      {/* Checking a test stays open (hidden) under the PIN screen, so nothing reviewed is lost. */}
+      {testCheck && client && (
+        <div hidden={pinScreen} inert={pinScreen}>
+          <TestCheck client={client} kind={testCheck} paused={pinScreen} onClose={() => setTestCheck(null)} onSent={bump} />
+        </div>
+      )}
       {intro && <PhoneIntro name={firstName} onDone={endIntro} />}
     </div>
   );

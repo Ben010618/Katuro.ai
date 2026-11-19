@@ -337,6 +337,9 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
   }
 
   const LOCAL_OPS = new Set(['hello', 'list', 'read', 'upload', 'rename', 'move', 'replace']);
+  // Tests and bubble quizzes live in folders (Lessons/Tests/…, Bubble Quizzes/…): the phone's level there applies.
+  const TEST_OPS = { quiz: 'view', test: 'view', testKey: 'add', testRecorded: 'add', checkPhotos: 'view' };
+  const LIST_OPS = { tests: 'tests', quizzes: 'quizzes' };
   async function handle(op, args, device) {
     if (op === 'hello') {
       return { deskId: store.deskId, deskName, version: VERSION, port, addresses: addresses().map((a) => a.address), phone: device.name };
@@ -347,6 +350,16 @@ function createLinkService({ home, storeFile, protect, deskName = 'KaTuroDesk', 
     if (op === 'rename') return rename(args, device);
     if (op === 'move') return move(args, device);
     if (op === 'replace') return replace(args, device);
+    if (askDesk && TEST_OPS[op]) {
+      place(args?.path, device, TEST_OPS[op]);
+      if (op === 'checkPhotos') for (const photo of Array.isArray(args?.photos) ? args.photos : []) place(photo, device, 'view');
+    }
+    if (askDesk && LIST_OPS[op]) {
+      const res = await askDesk(op, args || {}, { id: device.id, name: device.name });
+      const visible = (p) => { try { place(p, device, 'view'); return true; } catch { return false; } };
+      const key = LIST_OPS[op];
+      return { ...res, [key]: (Array.isArray(res?.[key]) ? res[key] : []).filter((t) => visible(t.path)) };
+    }
     if (askDesk && typeof op === 'string' && !LOCAL_OPS.has(op)) return askDesk(op, args || {}, { id: device.id, name: device.name });
     throw Object.assign(new Error('KaTuroDesk does not know that request. Update KaTuroDesk.'), { code: 'UNKNOWN_OP' });
   }

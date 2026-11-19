@@ -1135,17 +1135,8 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       if (!photos.length) throw needsInfo(folder ? `I found no photos (JPEG, PNG or HEIC) directly inside "${folder}". Which folder has the answer sheet photos?` : 'Which folder (or photos) has the answer sheets?');
       if (photos.length > 120) throw needsInfo(`That is ${photos.length} photos. I can check up to 120 sheets at a time; split them into smaller folders.`);
 
-      const toB64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return typeof btoa === 'function' ? btoa(s) : globalThis.Buffer.from(s, 'binary').toString('base64'); };
-      const photoParts = async (p) => {
-        let bytes = await ctx.readBytes(p);
-        let mime = /\.png$/i.test(p) ? 'image/png' : 'image/jpeg';
-        if (/\.(heic|heif)$/i.test(p)) {
-          bytes = await ctx.heicToJpeg(bytes);
-          if (!bytes) throw new Error(`${p.split('/').pop()} is an iPhone photo (HEIC). Converting it needs the KaTuroDesk desktop app.`);
-          mime = 'image/jpeg';
-        }
-        return visionPartsFor({ needsVision: true, vision: { mimeType: mime, base64: toB64(bytes) } }, async () => bytes);
-      };
+      const { photoParts: partsOf, readAnswerPhotos, sheetNote } = await import('./answerPhotos.js');
+      const photoParts = (p) => partsOf(ctx, p);
 
       // 1. The answer key (typed, a file, or a photo of the key).
       let keyText = answerKey || '';
@@ -1175,50 +1166,15 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
         roster = P.mergeLearners(...(parsed.sheets || []).map((s) => P.learnersFromRows(s.rows || []).learners)).map((l) => l.name);
         if (!roster.length) throw needsInfo(`I could not find the learners in ${listPath.split('/').pop()}. It needs a heading row with a names column.`);
       }
-      const { matchLearnerName } = await import('../generators/fillTemplates.js');
 
       // 3. Read each sheet (AI), score it (code).
-      const results = [];
-      const failed = [];
-      let next = 0;
-      const worker = async () => {
-        while (next < photos.length) {
-          const i = next;
-          next += 1;
-          const p = photos[i];
-          report(`Reading sheet ${i + 1} of ${photos.length}…`);
-          try {
-            const read = await ctx.llm({
-              system: `You read learners' answer sheets for a Filipino DepEd teacher. Copy exactly what the learner marked or wrote; never correct it or guess.\n${GROUNDING_RULES}`,
-              parts: await photoParts(p),
-              prompt: `This photo is one learner's answer sheet for a ${key.length}-item test. Return ONLY JSON {"name": "<the learner's name as written, or empty>", "answers": {"1": "<answer>", ...}} for items 1 to ${key.length}. Use the letter marked/shaded/encircled or the word written; "" when the item is left blank; "?" when it is unclear, erased, or has two answers.`,
-              json: true,
-              maxTokens: 2500,
-            });
-            const s = A.scoreSheet(read, key);
-            const name = String(read?.name || '').trim();
-            let matched = '';
-            if (roster.length && name) {
-              const best = roster.map((r) => ({ r, score: matchLearnerName(name, r) })).sort((a, b) => b.score - a.score)[0];
-              if (best && best.score >= 0.8) matched = best.r;
-            }
-            results[i] = { file: p.split('/').pop(), name, matched, ...s };
-          } catch (err) {
-            failed.push(`${p.split('/').pop()} (${err?.message || 'could not be read'})`);
-          }
-        }
-      };
-      await Promise.all([worker(), worker(), worker()]);
+      const { results, failed: failedReads } = await readAnswerPhotos({ photos, key, roster, ctx, report });
+      const failed = failedReads.map((f) => `${f.file} (${f.error})`);
       const done = results.filter(Boolean);
       if (!done.length) throw new Error(`None of the ${photos.length} photos could be read. ${failed.slice(0, 2).join('; ')}`);
 
       // 4. Results workbook: Scores + Responses (1/0 per item, for item analysis).
-      const checkNote = (r) => [
-        !r.name && 'no name read',
-        roster.length && r.name && !r.matched && 'name not in the class list',
-        r.unclear.length && `unclear: item${r.unclear.length > 1 ? 's' : ''} ${r.unclear.join(', ')}`,
-        r.blank.length && `blank: ${r.blank.join(', ')}`,
-      ].filter(Boolean).join('; ');
+      const checkNote = (r) => sheetNote(r, { hasRoster: roster.length > 0 });
       const label = (r) => r.matched || r.name || `(no name) ${r.file}`;
       const spec = normalizeSheetSpec({
         title: title || 'Answer sheet results',

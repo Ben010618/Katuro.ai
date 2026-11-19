@@ -121,7 +121,7 @@ export default function DeskVoiceScoresView({ art }) {
 
   const review = () => {
     if (!result.ok) return;
-    const changes = scoreChangesArtifact(result.plan, { targetPath: d.targetPath, kind: d.kind, columnLabel: column.header || column.key });
+    const changes = scoreChangesArtifact(result.plan, { targetPath: d.targetPath, kind: d.kind, columnLabel: column.header || column.key, quizPath: d.fromQuiz?.quizPath });
     addArtifacts([changes]);
     setActiveArtifact(changes);
   };

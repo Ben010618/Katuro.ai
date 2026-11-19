@@ -48,6 +48,11 @@ describe('fastRoute', () => {
     expect(route('check my bubble quiz', ['Bubble Quizzes/Quiz 1/KaTuro bubble quiz.json']).tasks[0].args).toEqual({ quizPath: 'Bubble Quizzes/Quiz 1/KaTuro bubble quiz.json' });
     expect(route('bubble sheets please', ['photo.jpg'])).toBeNull();
     expect(route('bubble sheets please', ['a.xlsx', 'b.xlsx'])).toBeNull();
+    // A whole test (questions + sheets) goes to the planner (make_test); sheets for a test stay here.
+    expect(route('Make a 20-item test on mixtures with bubble sheets', ['Records/Grade 7 - Rizal - Science.xlsx'])).toBeNull();
+    expect(route('create a quiz about cells, bubble sheets too', ['Records/G7.xlsx'])).toBeNull();
+    expect(route('make bubble sheets for my test on Friday', ['Records/G7.xlsx']).tasks[0].tool).toBe('bubble_quiz');
+    expect(route('make a bubble quiz for this class', ['Records/G7.xlsx']).tasks[0].tool).toBe('bubble_quiz');
   });
 
   it('builds dependent remedial tasks per file', () => {

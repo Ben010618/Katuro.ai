@@ -8,6 +8,10 @@
  *   record  { id, path, column, hps, scores, overwrite } → writes one task's scores
  *   quizzes                 → bubble quizzes in the KaTuro folder
  *   quiz    { path }        → one quiz and its answer key (the phone checks the sheets itself)
+ *   tests                   → every Test (Lessons/Tests/<class>/<title>, and old Bubble Quizzes), newest first
+ *   test    { path }        → one Test: { quiz, answerKey, test }
+ *   testKey { path, key }   → saves the answer key in the test's KaTuro check.json
+ *   testRecorded { path }   → marks the test as recorded (manifest recordedAt)
  *
  * Writing: a backup in KaTuro Backups first, every time, then the scores go straight into the
  * class record (one file per class; localFileSystem.saveWorkingCopy edits Records in place).
@@ -18,8 +22,9 @@
 import { readDocument } from '../desk/readers/index.js';
 import { applyEdits } from '../desk/docmap/index.js';
 import { readClassRecord, planRecord } from '../desk/records/recordSheet.js';
-import { isInRecords, parseClassRecordFileName } from '../desk/records/classRecords.js';
+import { isInRecords, parseClassRecordFileName, classNameOfRecord } from '../desk/records/classRecords.js';
 import { QUIZ_FILE, CHECK_FILE, parseQuiz } from '../desk/bubble/quiz.js';
+import { listTests, testSummary, checkPathOf, folderOf, photosOf, validateKey, withKey, loadTest, markTestRecorded } from '../desk/bubble/tests.js';
 import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError, writeFileToDirectory, fileExists, backupFile, sha256Hex } from '../localFileSystem.js';
 import { attendancePathFor, isAttendanceFile, newAttendanceWorkbook, readAttendance, writeAttendance, MARKS } from '../desk/records/attendance.js';
 
@@ -107,10 +112,10 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
 
   const summary = (f, record) => {
     const cls = parseClassRecordFileName(f.name);
-    if (record.error) return { path: f.path, name: f.name.replace(RECORD_FILE, ''), ...(cls || {}), ready: false, problems: [record.error], learnerCount: 0 };
+    if (record.error) return { path: f.path, name: classNameOfRecord(f.name), ...(cls || {}), ready: false, problems: [record.error], learnerCount: 0 };
     return {
       path: f.path,
-      name: f.name.replace(RECORD_FILE, ''),
+      name: classNameOfRecord(f.name),
       ...(cls || {}),
       ready: record.ready,
       problems: record.problems.slice(0, 5).map((p) => p.detail),
@@ -125,7 +130,7 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
         const bytes = await readFileBytes(handle, f.source);
         out.push(summary(f, readClassRecord(await readDocument({ bytes, name: f.source.split('/').pop() }))));
       } catch {
-        out.push({ path: f.path, name: f.name.replace(RECORD_FILE, ''), ready: false, problems: ['This file could not be read. It may be open in Excel or damaged.'], learnerCount: 0 });
+        out.push({ path: f.path, name: classNameOfRecord(f.name), ready: false, problems: ['This file could not be read. It may be open in Excel or damaged.'], learnerCount: 0 });
       }
     }
     return { classes: out };
@@ -172,7 +177,7 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
         at: now(),
         device: device?.name || 'Phone',
         path: file.path,
-        class: file.name.replace(RECORD_FILE, ''),
+        class: classNameOfRecord(file.name),
         column: col.key,
         columnLabel: col.label,
         hps: plan.hpsSet ? { before: col.hps, after: plan.hps } : null,
@@ -184,7 +189,7 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     }
     const result = {
       ok: true,
-      class: file.name.replace(RECORD_FILE, ''),
+      class: classNameOfRecord(file.name),
       column: plan.column.label,
       hps: plan.hps,
       written: plan.written.length,
@@ -257,7 +262,7 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     const clean = Object.fromEntries(Object.entries(marks || {}).filter(([lrn, m]) => known.has(lrn) && MARKS.includes(String(m).toUpperCase())));
     if (!Object.keys(clean).length) throw new RequestError('Mark at least one learner.', 'INVALID');
     const learners = rec.learners.map(({ lrn, name }) => ({ lrn, name }));
-    const start = exists ? await readFileBytes(handle, attPath) : await newAttendanceWorkbook({ title: file.name.replace(RECORD_FILE, ''), learners });
+    const start = exists ? await readFileBytes(handle, attPath) : await newAttendanceWorkbook({ title: classNameOfRecord(file.name), learners });
     const out = await writeAttendance(start, { date, marks: clean, learners });
     try {
       // KaTuro's own attendance file: backed up, then updated in place (never a copy).
@@ -289,15 +294,50 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
     return { quizzes: out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) };
   }
 
-  async function oneQuiz({ path }) {
-    const quiz = parseQuiz(new TextDecoder().decode(await readFileBytes(handle, String(path || ''))));
-    if (!quiz) throw new RequestError('That bubble quiz could not be read.', 'NOT_FOUND');
-    let answerKey = null;
+  // ── Tests (a quiz folder that knows its class, key, record file and column) ──
+  const readText = async (p) => new TextDecoder().decode(await readFileBytes(handle, p));
+  const loadOne = async (path) => {
     try {
-      const check = JSON.parse(new TextDecoder().decode(await readFileBytes(handle, `${path.split('/').slice(0, -1).join('/')}/${CHECK_FILE}`)));
-      if (Array.isArray(check?.answerKey) && check.answerKey.length === quiz.items) answerKey = check.answerKey;
-    } catch { /* no key saved yet */ }
+      return await loadTest({ path, readText });
+    } catch (err) {
+      throw new RequestError(err.message, err.code || 'NOT_FOUND');
+    }
+  };
+
+  /** The older request (older phones): the quiz and its key. */
+  async function oneQuiz({ path } = {}) {
+    const { quiz, answerKey } = await loadOne(path);
     return { quiz, answerKey };
+  }
+
+  async function tests() {
+    const files = await allFiles();
+    return { tests: (await listTests({ paths: files.map((f) => f.path), readText })).map((x) => x.test) };
+  }
+
+  async function oneTest({ path } = {}) {
+    const { quiz, check, answerKey } = await loadOne(path);
+    const paths = (await allFiles()).map((f) => f.path);
+    return { quiz, answerKey, test: testSummary({ path, quiz, check, photos: photosOf(folderOf(path), paths).length }) };
+  }
+
+  async function testKey({ path, key } = {}) {
+    const { quiz, check } = await loadOne(path);
+    const res = validateKey(quiz, key);
+    if (res.error) throw new RequestError(res.error, 'INVALID');
+    await writeFileToDirectory(handle, checkPathOf(path), JSON.stringify(withKey(check, res.key), null, 2), 'application/json');
+    onWrote(checkPathOf(path));
+    return { ok: true };
+  }
+
+  async function testRecorded({ path } = {}) {
+    try {
+      await markTestRecorded({ path, readText, write: (p, text) => writeFileToDirectory(handle, p, text, 'application/json'), now: new Date(now()) });
+    } catch (err) {
+      throw err.code ? new RequestError(err.message, err.code) : err;
+    }
+    onWrote(path);
+    return { ok: true };
   }
 
   // Writes go one at a time (two phones, or a recording and an undo, never mix).
@@ -318,6 +358,10 @@ export function createDeskRequestHandler({ handle, applied = memoryAppliedStore(
       case 'attendance': return serial(() => attendance(args));
       case 'quizzes': return quizzes();
       case 'quiz': return oneQuiz(args);
+      case 'tests': return tests();
+      case 'test': return oneTest(args);
+      case 'testKey': return serial(() => testKey(args));
+      case 'testRecorded': return serial(() => testRecorded(args));
       default: throw new RequestError('KaTuroDesk does not know that request. Update KaTuroDesk.', 'UNKNOWN_OP');
     }
   };

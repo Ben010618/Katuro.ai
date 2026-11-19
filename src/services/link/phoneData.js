@@ -8,12 +8,14 @@ import { forgetCachedClasses, queuedRecordings } from './scoreEntry.js';
 import { forgetPhoneFiles, outboxCount } from './phoneFiles.js';
 import { syncReminders } from './phoneReminders.js';
 import { forgetPin } from './appLock.js';
+import { TESTS_CACHE_KEY } from './phoneTests.js';
 
 // localStorage keys with the teacher's data (learner names, scores, schedule, chat).
 const PHONE_DATA_KEYS = [
   'katuro-score-queue-v1',
   'katuro-phone-schedule-v1',
   'katuro-phone-chat-v1',
+  TESTS_CACHE_KEY, // the tests list (titles, classes)
 ];
 
 /** What would be lost (not yet sent to KaTuroDesk). → { recordings, files } */

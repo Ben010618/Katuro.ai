@@ -1,22 +1,15 @@
 import { useMemo, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useDeskStore } from '../../../store/deskStore';
-import { writeFileToDirectory, fileExists } from '../../../services/localFileSystem';
+import { writeFileToDirectory, fileExists, trashInWorkspace } from '../../../services/localFileSystem';
 import { BUBBLE_PAPERS, PER_PAGE, capacities, paperCount } from '../../../services/desk/bubble/layout';
-import { newQuiz, quizFolder, QUIZ_FILE, PHOTOS_DIR } from '../../../services/desk/bubble/quiz';
+import { newQuiz, claimQuizFolder, writeQuizFolder } from '../../../services/desk/bubble/quiz';
+import { testClassRecord } from '../../../services/desk/bubble/tests';
+import { classNameOfRecord } from '../../../services/desk/records/classRecords';
 
 const label = 'text-[10.5px] font-semibold uppercase tracking-wide text-gray-500';
 const box = { padding: '4px 6px', fontSize: 12, borderRadius: 6 };
 const seg = (on) => `rounded-md border px-2.5 py-1 text-[11px] font-medium ${on ? 'border-emerald-600 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} disabled:cursor-not-allowed disabled:opacity-40`;
-
-/** Folder for a new quiz; a second quiz with the same title and section gets "(2)", "(3)"… */
-async function freeFolder(handle, base) {
-  for (let i = 1; i < 100; i += 1) {
-    const folder = i === 1 ? base : `${base} (${i})`;
-    if (!(await fileExists(handle, `${folder}/${QUIZ_FILE}`))) return folder;
-  }
-  return `${base} (${Date.now()})`;
-}
 
 /** Step 1: check the learners, choose the settings, make the sheets (PDF + quiz file). */
 export default function BubbleSetup({ art, save }) {
@@ -38,22 +31,19 @@ export default function BubbleSetup({ art, save }) {
       setProblems(['Open your classroom folder first.']);
       return;
     }
-    const res = newQuiz({ ...s, learners, listPath: d.listPath });
+    // In the KaTuro folder, sheets made from a class record are a Test of that class.
+    const home = Boolean(workspace.handle.katuroHome);
+    const classRecord = testClassRecord(d.listPath, { home });
+    const res = newQuiz({ ...s, learners, listPath: d.listPath, ...(classRecord ? { className: classNameOfRecord(classRecord), recordPath: classRecord } : {}) });
     if (!res.ok) {
       setProblems(res.problems);
       return;
     }
     setBusy(true);
     try {
-      const { buildBubbleSheetsPdf } = await import('../../../services/desk/bubble/sheetPdf');
-      const quiz = res.quiz;
-      const folder = await freeFolder(workspace.handle, quizFolder(quiz));
-      const pdfPath = `${folder}/${quiz.title.replace(/[\\/:*?"<>|]+/g, '-')} - Bubble Sheets.pdf`;
-      const pdf = await buildBubbleSheetsPdf(quiz);
-      await writeFileToDirectory(workspace.handle, pdfPath, pdf, 'application/pdf');
-      const saved = { ...quiz, pdfPath };
-      await writeFileToDirectory(workspace.handle, `${folder}/${QUIZ_FILE}`, JSON.stringify(saved, null, 2), 'application/json');
-      await writeFileToDirectory(workspace.handle, `${folder}/${PHOTOS_DIR}/About this folder.txt`, 'Photos of the answered bubble sheets go here (from the phone, or copied in). KaTuroDesk checks them from this folder.\r\n', 'text/plain');
+      const handle = workspace.handle;
+      const folder = await claimQuizFolder(res.quiz, { home, exists: (p) => fileExists(handle, p) });
+      const { quiz: saved } = await writeQuizFolder({ quiz: res.quiz, folder, write: (p, content, mime, opts) => writeFileToDirectory(handle, p, content, mime, opts), remove: (p) => trashInWorkspace(handle, p) });
       await refreshFiles();
       save(() => ({ stage: 'print', quiz: saved, folder }));
     } catch (err) {
@@ -149,7 +139,7 @@ export default function BubbleSetup({ art, save }) {
           </button>
         </div>
         {problems.length > 0 && <p className="text-[11px] text-red-700" role="alert">{problems.join(' ')}</p>}
-        <p className="flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> Saved in a new folder under Bubble Quizzes. Your class list is not changed.</p>
+        <p className="flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> Saved in a new folder under {testClassRecord(d.listPath, { home: Boolean(workspace?.handle?.katuroHome) }) ? 'Lessons/Tests' : 'Bubble Quizzes'}. Your class list is not changed.</p>
       </div>
     </div>
   );

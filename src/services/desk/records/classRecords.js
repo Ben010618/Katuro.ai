@@ -33,9 +33,21 @@ export function classRecordFileName({ gradeLevel, section, subject } = {}) {
   return `${parts.join(' - ')}.xlsx`;
 }
 
+/** "Records/Grade 7 - Rizal - Science.xlsx" → "Grade 7 - Rizal - Science" (the class's name). */
+export const classNameOfRecord = (pathOrName) => String(pathOrName || '').split('/').pop().replace(/\.(xlsx|xlsm)$/i, '');
+
+/**
+ * A class record the teacher records into: an Excel file in Records, not an Excel lock file,
+ * not KaTuro's own outputs, not an attendance file.
+ */
+export function isClassRecordPath(path) {
+  const p = String(path || '').replace(/\\/g, '/');
+  return isInRecords(p) && /\.(xlsx|xlsm)$/i.test(p) && !p.split('/').pop().startsWith('~$') && !/\/KaTuro Outputs\//i.test(p) && !/\/Attendance\//i.test(p);
+}
+
 /** "Records/Grade 7 - Rizal - Science.xlsx" → { gradeLevel: 'Grade 7', section: 'Rizal', subject: 'Science' }, else null. */
 export function parseClassRecordFileName(pathOrName) {
-  const name = String(pathOrName || '').split('/').pop().replace(/\.(xlsx|xlsm)$/i, '');
+  const name = classNameOfRecord(pathOrName);
   const parts = name.split(' - ').map((p) => p.trim());
   if (parts.length !== 3 || parts.some((p) => !p)) return null;
   return { gradeLevel: parts[0], section: parts[1], subject: parts[2] };

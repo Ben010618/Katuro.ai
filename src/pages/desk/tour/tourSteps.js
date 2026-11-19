@@ -61,6 +61,16 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.24.0',
+    steps: [
+      {
+        target: 'folder',
+        title: 'New: Tests, all in one place',
+        body: 'Click Tests (top bar) → New test: choose the class, the topic, the number of items and the record column. KaTuro makes the test paper, the answer key and the bubble sheets in Lessons › Tests. Print, then check the papers with the KaTuro App camera: the scores go to your class record after your review.',
+      },
+    ],
+  },
+  {
     version: '1.23.0',
     steps: [
       {

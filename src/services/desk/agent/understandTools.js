@@ -389,7 +389,7 @@ export const UNDERSTAND_TOOLS = {
         const folder = quizPath.split('/').slice(0, -1).join('/');
         return {
           summary: `${quiz.title}: ${quiz.learners.length} learners, ${quiz.items} items. Take the photos with your phone, then check them in the Canvas.`,
-          artifacts: [{ type: 'bubble_quiz', title: `Bubble quiz: ${quiz.title}`, subtitle: `${quiz.learners.length} learners, ${quiz.items} items`, files: [], editable: false, data: { stage: 'photos', folder, quiz } }],
+          artifacts: [B.bubbleQuizArtifact(quiz, folder, 'photos')],
         };
       }
       if (!listPath) throw new Error('Which class list should I use for the names? Attach your class list (Excel, Word, CSV or PDF), or open a quiz KaTuro made before.');
@@ -487,7 +487,7 @@ export const UNDERSTAND_TOOLS = {
             learners: table.learners.map((l) => ({ name: l.name, values: l.values, cells: l.cells })),
             columns,
             columnKey: pre?.key || '',
-            fromQuiz: { title: quiz.title, items: quiz.items },
+            fromQuiz: { title: quiz.title, items: quiz.items, quizPath },
             session,
             maxScore: String(quiz.items),
             maxFromFile: false,

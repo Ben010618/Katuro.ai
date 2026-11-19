@@ -14,13 +14,14 @@ const PHOTO_KINDS = [
 ];
 
 /**
- * The camera, one tap away (top of the app and beside the chat box). The teacher says what the
- * photo is for; it goes to KaTuroDesk into Lessons › Phone Photos › <kind>: at once, or it stays
- * on this phone (the outbox) and goes by itself as soon as the phone is on the same Wi-Fi.
- * Bubble sheets are checked instead (Scores → the class → Fill from bubble sheets).
+ * The camera, one tap away (top of the app and beside the chat box). First: "Check test papers"
+ * (KaTuro bubble sheets, or other papers: TestCheck.jsx). Below, other photos: the teacher says
+ * what the photo is for; it goes to KaTuroDesk into Lessons › Phone Photos › <kind>: at once, or
+ * it stays on this phone (the outbox) and goes by itself as soon as the phone is on the same Wi-Fi.
  */
-export default function PhoneCamera({ client, onClose, onBubbleSheets, onSent }) {
+export default function PhoneCamera({ client, onClose, onCheckTests, onSent }) {
   const [kind, setKind] = useState(null);
+  const [checking, setChecking] = useState(false); // "What are you checking?"
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState([]); // sendFiles results: { name, ok, queued?, error? }
   const [error, setError] = useState('');
@@ -58,17 +59,32 @@ export default function PhoneCamera({ client, onClose, onBubbleSheets, onSent })
     <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={busy ? undefined : onClose} role="presentation">
       <div role="dialog" aria-modal="true" aria-label="Camera" onClick={(e) => e.stopPropagation()} className="nm w-full rounded-t-3xl p-5 space-y-3" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-2 text-base font-semibold"><Camera size={20} className="text-emerald-700" /> {kind ? kind.label : 'What is the photo for?'}</p>
+          <p className="flex items-center gap-2 text-base font-semibold"><Camera size={20} className="text-emerald-700" /> {kind ? kind.label : checking ? 'What are you checking?' : 'Camera'}</p>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" className="p-1"><X size={22} /></button>
         </div>
         <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={take} />
 
-        {!kind && (
+        {!kind && checking && (
           <>
-            <button type="button" onClick={() => { onClose(); onBubbleSheets(); }} className="nm-accent nm-press flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left">
+            <button type="button" autoFocus onClick={() => { onClose(); onCheckTests('bubble'); }} className="nm-accent nm-press flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left">
               <ScanLine size={22} className="flex-shrink-0" />
-              <span><span className="block text-sm font-semibold">Check bubble sheets</span><span className="block text-xs opacity-90">Scan them; the scores go to your class record</span></span>
+              <span><span className="block text-base font-semibold">KaTuro bubble sheets</span><span className="block text-xs opacity-90">Scan them; KaTuro knows the test from the sheet</span></span>
             </button>
+            <button type="button" onClick={() => { onClose(); onCheckTests('papers'); }} className="nm-sm nm-press flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left">
+              <FileText size={22} className="flex-shrink-0 text-emerald-700" />
+              <span><span className="block text-base font-medium">Other test papers</span><span className="nm-muted block text-xs">Written, or not KaTuro sheets</span></span>
+            </button>
+            <button type="button" onClick={() => setChecking(false)} className="nm-muted w-full py-2 text-sm font-medium">Back</button>
+          </>
+        )}
+
+        {!kind && !checking && (
+          <>
+            <button type="button" onClick={() => setChecking(true)} className="nm-accent nm-press flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left">
+              <ClipboardCheck size={22} className="flex-shrink-0" />
+              <span><span className="block text-base font-semibold">Check test papers</span><span className="block text-xs opacity-90">Scan or photograph them; the scores go to your class record</span></span>
+            </button>
+            <p className="nm-muted px-1 pt-1 text-xs font-semibold uppercase tracking-wide">Other photos</p>
             {PHOTO_KINDS.map((k) => (
               <button key={k.id} type="button" onClick={() => pick(k)} className="nm-sm nm-press flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left">
                 <k.icon size={20} className="flex-shrink-0 text-emerald-700" />

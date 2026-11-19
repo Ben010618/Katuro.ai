@@ -403,6 +403,19 @@ export const useDeskStore = create(
           data: { ...art.data, status: 'applied', appliedCount: result.applied.length, skipped: result.skipped, backups: saved.backups, savedPath: saved.path },
           subtitle: `${result.applied.length} change(s) saved to ${saved.name}${result.skipped.length ? `; ${result.skipped.length} skipped` : ''}`,
         });
+        // Scores of a test (bubble quiz): the test is now recorded (shown on KaTuroDesk and the phone).
+        if (art.data.quizPath && result.applied.length) {
+          try {
+            const { markTestRecorded } = await import('../services/desk/bubble/tests.js');
+            await markTestRecorded({
+              path: art.data.quizPath,
+              readText: async (p) => new TextDecoder().decode(await readFileBytes(workspace.handle, p)),
+              write: (p, text) => writeFileToDirectory(workspace.handle, p, text, 'application/json'),
+            });
+          } catch (err) {
+            console.warn('The test could not be marked as recorded:', err);
+          }
+        }
         await refreshFiles();
         return { ...saved, applied: result.applied, skipped: result.skipped };
       },

@@ -22,7 +22,38 @@ export const SCAN_STATUS = {
   otherQuiz: 'This sheet is from another quiz.',
   unclear: 'Some items are unclear on the key sheet. Shade them fully, or type the key instead.',
   key: 'Answer key read.',
+  identify: 'Point the camera at a learner’s bubble sheet: KaTuro finds its test from the code.',
+  finding: 'A KaTuro sheet. Finding its test…',
+  unknownTest: 'This sheet is from a test this KaTuroDesk does not have.',
 };
+
+/**
+ * Auto mode (no quiz chosen first): the QR code of the first KaTuro sheet seen names the test.
+ * One lookup at a time; a test KaTuroDesk does not have is remembered, so the same sheet in view
+ * does not ask again.
+ *   feed(qrText) → { status: 'identify' } (no KaTuro code) | { status: 'finding', code? } (code only
+ *                  when a lookup should start) | { status: 'unknownTest', note }
+ *   settle(note?) the lookup ended; a note = that test is not there (said again for its sheets);
+ *                 no note (found, or a lookup that failed for now) = it may be looked up again
+ */
+export function createIdentifier() {
+  const refused = new Map(); // setId → why
+  let pending = null;
+  return {
+    feed(text) {
+      if (pending) return { status: 'finding' };
+      const code = parseSheetCode(text);
+      if (!code) return { status: 'identify' };
+      if (refused.has(code.setId)) return { status: 'unknownTest', note: refused.get(code.setId) };
+      pending = code.setId;
+      return { status: 'finding', code };
+    },
+    settle(note) {
+      if (pending && note) refused.set(pending, note);
+      pending = null;
+    },
+  };
+}
 
 const answersOf = (res) => Object.keys(res.answers || {}).sort((a, b) => a - b).map((k) => res.answers[k]).join('');
 const signature = (res) => `${res.code || '-'}|${answersOf(res)}`;

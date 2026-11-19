@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ChevronRight, ClipboardList, CloudOff, Loader2, RefreshCw, RotateCcw, ScanLine, Send, UserCheck } from 'lucide-react';
-import { checkEntries, classGroups, newId, queueRecording, queuedRecordings, sendQueued, cacheClassList, cacheClass, cachedClasses } from '../../services/link/scoreEntry';
+import { ArrowLeft, Camera, ChevronRight, CloudOff, Loader2, ScanLine, UserCheck } from 'lucide-react';
+import { classGroups, queuedRecordings, sendQueued, loadClass } from '../../services/link/scoreEntry';
 import BubbleScan from './BubbleScan';
 import { SnapScores, AttendanceScreen, RecentRecordings } from './PhoneCapture';
+import { Card, ClassList, ColumnGrid, RecordDone, RecordReview } from './ScoreParts';
 
-const COMPONENT_TITLE = { ww: 'Written Work', pt: 'Performance Tasks', qa: 'Quarterly Assessment' };
 
 function Bar({ title, onBack, right }) {
   return (
@@ -16,7 +16,6 @@ function Bar({ title, onBack, right }) {
   );
 }
 
-const Card = ({ children, className = '' }) => <div className={`rounded-xl bg-white p-4 shadow-sm ${className}`}>{children}</div>;
 
 /** Waiting recordings banner + "Send now". */
 function QueueBanner({ client, onChange }) {
@@ -53,60 +52,8 @@ function QueueBanner({ client, onChange }) {
   );
 }
 
-/** Step 1: the class records in Records. */
-function ClassList({ client, online, onPick }) {
-  const [state, setState] = useState(() => {
-    const c = cachedClasses();
-    return { loading: true, list: c.list || [], fromPhone: Boolean(c.list) };
-  });
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    client.request('classes').then((r) => {
-      if (!alive) return;
-      cacheClassList(r.classes);
-      setState({ loading: false, list: r.classes, fromPhone: false });
-    }).catch((err) => alive && setState((s) => ({ ...s, loading: false, error: err.code === 'UNREACHABLE' ? '' : err.message })));
-    return () => { alive = false; };
-  }, [client, tick, online]);
-
-  return (
-    <div className="space-y-4 px-5 py-3">
-      <div className="flex items-center justify-between">
-        <p className="nm-muted text-sm font-medium">Classes</p>
-        <button type="button" onClick={() => { setState((s) => ({ ...s, loading: true })); setTick((t) => t + 1); }} className="nm-sm nm-press nm-muted grid h-10 w-10 place-items-center rounded-full" aria-label="Refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button>
-      </div>
-      {state.fromPhone && !state.loading && <p className="text-xs text-amber-800">Saved on this phone · scores send when KaTuroDesk is back</p>}
-      {state.error && <Card><p className="text-sm text-red-700">{state.error}</p></Card>}
-      {!state.loading && !state.list.length && (
-        <div className="py-10 text-center">
-          <p className="text-sm font-medium">No class records yet</p>
-          <p className="nm-muted mt-1 text-xs">Set one up on KaTuroDesk</p>
-        </div>
-      )}
-      <ul className="space-y-4">
-        {state.list.map((c) => (
-          <li key={c.path}>
-            <button type="button" disabled={!c.ready} onClick={() => onPick(c)} className="nm nm-press flex w-full items-center gap-4 rounded-3xl px-5 py-4 text-left disabled:opacity-90">
-              <ClipboardList size={24} className={c.ready ? 'nm-green' : 'nm-muted'} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{c.name}</span>
-                {c.ready
-                  ? <span className="nm-muted block text-xs">{c.learnerCount} learners</span>
-                  : <span className="block text-xs text-amber-800">Not ready: {c.problems?.[0]}</span>}
-              </span>
-              {c.ready && <ChevronRight size={18} className="text-gray-400" />}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 /** Step 2: which task (WW 1…, PT 1…, QA). */
 function ColumnList({ cls, client, onPick, onAttendance, onChanged }) {
-  const total = cls.learners.length;
   return (
     <div className="p-3 space-y-4">
       <button type="button" onClick={onAttendance} className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3.5 text-left shadow-sm">
@@ -114,26 +61,7 @@ function ColumnList({ cls, client, onPick, onAttendance, onChanged }) {
         <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Take attendance</span><span className="block text-xs text-gray-500">Tap P, L, A or E for each learner</span></span>
         <ChevronRight size={18} className="text-gray-400" />
       </button>
-      {['ww', 'pt', 'qa'].map((k) => {
-        const cols = cls.columns.filter((c) => c.component === k);
-        if (!cols.length) return null;
-        return (
-          <section key={k}>
-            <p className="px-1 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">{COMPONENT_TITLE[k]}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {cols.map((c) => {
-                const done = c.filled >= total && total > 0;
-                return (
-                  <button key={c.key} type="button" onClick={() => onPick(c)} className={`rounded-xl px-3 py-3 text-left shadow-sm ${done ? 'bg-emerald-50 border border-emerald-200' : 'bg-white'}`}>
-                    <span className="block text-sm font-bold text-gray-900">{c.label}</span>
-                    <span className="block text-[11px] text-gray-500">{c.hps ? `out of ${c.hps}` : 'not used yet'}{c.filled ? ` · ${c.filled}/${total}` : ''}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <ColumnGrid cls={cls} onPick={onPick} />
       <RecentRecordings client={client} cls={cls} onChanged={onChanged} />
     </div>
   );
@@ -199,111 +127,6 @@ function Entry({ cls, column, initial, onReview, onBubble, onSnap }) {
   );
 }
 
-/** Step 4: check, then send (or keep on the phone). */
-function Review({ cls, column, entry, client, onBack, onDone }) {
-  const check = checkEntries(cls, column.key, entry.hps, entry.values);
-  const [replace, setReplace] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const needsYes = check.changes.length > 0;
-
-  const send = async () => {
-    setBusy(true);
-    setError('');
-    const item = { id: newId(), path: cls.path, className: cls.name, column: column.key, columnLabel: column.label, hps: Number(entry.hps), scores: check.scores, overwrite: replace };
-    try {
-      const result = await client.request('record', item);
-      onDone({ result, id: item.id });
-    } catch (err) {
-      if (err.code === 'UNREACHABLE' || err.code === 'DESK_STARTING') {
-        queueRecording(item);
-        onDone({ queued: true });
-      } else {
-        setError(err.message);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="p-3 space-y-3">
-      <Card>
-        <p className="text-sm text-gray-600">{cls.name}</p>
-        <p className="text-lg font-bold text-gray-900">{column.label} · out of {entry.hps || '?'}</p>
-        <p className="text-sm text-gray-700 mt-1">{check.scores.length} score{check.scores.length === 1 ? '' : 's'} to record{check.absent.length ? ` · ${check.absent.length} absent` : ''}</p>
-      </Card>
-      {check.invalid.length > 0 && (
-        <Card className="border border-red-200 bg-red-50">
-          <p className="text-sm font-semibold text-red-800 flex items-center gap-2"><AlertTriangle size={16} /> Fix these first</p>
-          <ul className="mt-1 text-sm text-red-800">{check.invalid.map((x) => <li key={x.lrn || 'hps'}>{x.name ? `${x.name}: "${x.text}" ${x.why}` : x.why}</li>)}</ul>
-        </Card>
-      )}
-      {needsYes && (
-        <Card className="border border-amber-200 bg-amber-50">
-          <p className="text-sm font-semibold text-amber-900">These learners already have a score in {column.label}</p>
-          <ul className="mt-1 text-sm text-amber-900">{check.changes.map((c) => <li key={c.lrn}>{c.name}: {c.before} → {c.after}</li>)}</ul>
-          <label className="mt-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
-            <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} className="h-5 w-5" /> Replace these scores
-          </label>
-        </Card>
-      )}
-      {check.missing.length > 0 && (
-        <Card>
-          <p className="text-sm font-semibold text-gray-900">No score yet ({check.missing.length})</p>
-          <p className="text-sm text-gray-600">{check.missing.map((l) => l.name).join('; ')}</p>
-        </Card>
-      )}
-      {error && <Card className="border border-red-200 bg-red-50"><p className="text-sm text-red-800">{error}</p></Card>}
-      <div className="flex gap-2">
-        <button type="button" onClick={onBack} className="flex-1 rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-800">Edit</button>
-        <button type="button" onClick={send} disabled={busy || !check.ready || (needsYes && !replace)} className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 font-bold text-white disabled:opacity-50">
-          {busy ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />} Record in KaTuroDesk
-        </button>
-      </div>
-      <p className="text-[11px] text-gray-500">KaTuroDesk saves a backup of {cls.name} in KaTuro Backups first, then writes the scores into it.</p>
-    </div>
-  );
-}
-
-function Done({ outcome, column, client, onAnother, onClasses, onUndone }) {
-  const r = outcome.result;
-  const [undo, setUndo] = useState('');
-  const undoIt = async () => {
-    try {
-      await client.request('undo', { id: outcome.id });
-      setUndo('Undone: the scores are back to how they were.');
-      onUndone?.();
-    } catch (err) {
-      setUndo(err.message);
-    }
-  };
-  return (
-    <div className="p-3 space-y-3">
-      <Card className="text-center space-y-2">
-        {outcome.queued ? <CloudOff size={40} className="mx-auto text-amber-600" /> : <CheckCircle2 size={40} className="mx-auto text-emerald-600" />}
-        <p className="text-lg font-bold text-gray-900">{outcome.queued ? 'Saved on this phone' : 'Recorded'}</p>
-        <p className="text-sm text-gray-600">
-          {outcome.queued
-            ? "KaTuroDesk can't be reached right now. The scores are kept on this phone and sent when it is reachable (open the Scores tab, or tap Send now)."
-            : `${r.written} score${r.written === 1 ? '' : 's'} recorded in ${r.class}, ${r.column}${r.unchanged ? ` (${r.unchanged} already there)` : ''}.`}
-        </p>
-        {r?.skipped?.length > 0 && <p className="text-sm text-amber-800">{r.skipped.length} cell(s) hold formulas and were left as they are: {r.skipped.join(', ')}.</p>}
-      </Card>
-      {r?.missing?.length > 0 && (
-        <Card>
-          <p className="text-sm font-semibold text-gray-900">Missing papers for {column.label} ({r.missing.length})</p>
-          <ul className="mt-1 text-sm text-gray-700 list-disc pl-5">{r.missing.map((m) => <li key={m.lrn}>{m.name}</li>)}</ul>
-        </Card>
-      )}
-      {r?.written > 0 && outcome.id && !undo && <button type="button" onClick={undoIt} className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-800"><RotateCcw size={16} /> Undo this recording</button>}
-      {undo && <p className="text-center text-sm text-gray-700">{undo}</p>}
-      <button type="button" onClick={onAnother} className="w-full rounded-xl bg-emerald-700 py-3 font-bold text-white">Record another task</button>
-      <button type="button" onClick={onClasses} className="w-full rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-800">Choose another class</button>
-    </div>
-  );
-}
-
 /** Phase 2: record one task's scores into a class record on KaTuroDesk. */
 export default function ScoresFlow({ client, online }) {
   const [cls, setCls] = useState(null);
@@ -318,19 +141,12 @@ export default function ScoresFlow({ client, online }) {
     setError('');
     setLoading(summary.name);
     try {
-      const full = await client.request('class', { path: summary.path });
+      const { cls: full } = await loadClass(client, summary.path);
       if (client.closed) return;
-      cacheClass(summary.path, full);
       setCls(full);
       setStep('columns');
     } catch (err) {
-      const kept = cachedClasses().classes[summary.path];
-      if (err.code === 'UNREACHABLE' && kept) {
-        setCls(kept);
-        setStep('columns');
-      } else {
-        setError(err.code === 'UNREACHABLE' ? "KaTuroDesk can't be reached, and this class is not saved on the phone yet. Open it once while connected." : err.message);
-      }
+      setError(err.message);
     } finally {
       setLoading('');
     }
@@ -338,9 +154,8 @@ export default function ScoresFlow({ client, online }) {
 
   const refreshClass = async () => {
     try {
-      const full = await client.request('class', { path: cls.path });
-      if (client.closed) return;
-      cacheClass(cls.path, full);
+      const { cls: full, fromPhone } = await loadClass(client, cls.path);
+      if (client.closed || fromPhone) return;
       setCls(full);
     } catch { /* keep what we have */ }
   };
@@ -411,12 +226,19 @@ export default function ScoresFlow({ client, online }) {
     return (
       <div>
         <Bar title="Check before recording" onBack={() => setStep('entry')} />
-        <Review cls={cls} column={column} entry={entry} client={client} onBack={() => setStep('entry')} onDone={(o) => { setOutcome(o); setStep('done'); if (o.result) refreshClass(); }} />
+        <div className="p-3"><RecordReview cls={cls} column={column} entry={entry} client={client} onBack={() => setStep('entry')} onDone={(o) => { setOutcome(o); setStep('done'); if (o.result) refreshClass(); }} /></div>
       </div>
     );
   }
   if (step === 'done' && outcome && column) {
-    return <Done outcome={outcome} column={column} client={client} onUndone={refreshClass} onAnother={() => { setColumn(null); setEntry(null); setStep('columns'); }} onClasses={() => { setCls(null); setStep('classes'); }} />;
+    return (
+      <div className="p-3">
+        <RecordDone outcome={outcome} column={column} client={client} onUndone={refreshClass}>
+          <button type="button" onClick={() => { setColumn(null); setEntry(null); setStep('columns'); }} className="w-full rounded-xl bg-emerald-700 py-3 font-bold text-white">Record another task</button>
+          <button type="button" onClick={() => { setCls(null); setStep('classes'); }} className="w-full rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-800">Choose another class</button>
+        </RecordDone>
+      </div>
+    );
   }
   return (
     <div>
