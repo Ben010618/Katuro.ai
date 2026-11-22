@@ -4,6 +4,7 @@ import AvatarImage from '../../components/AvatarImage';
 import { PERSONAS, getPersona } from '../../services/desk/personas';
 import { KaTuroAIAvatar } from '../desk/DeskAvatar';
 import DeskFormattedText from '../desk/DeskFormattedText';
+import { useBoxHeight } from './phoneLayout';
 
 const CHAT_KEY = 'katuro-phone-chat-v1';
 const PREFS_KEY = 'katuro-phone-assistant-v1';
@@ -44,6 +45,8 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile, onCa
   const [speaking, setSpeaking] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
+  // The chat box's height: the last message always scrolls clear of it.
+  const [boxRef, boxH] = useBoxHeight();
   const persona = getPersona(prefs.persona);
   const salutation = (profile?.firstName || '').trim() || 'Teacher';
   const myPhoto = profile?.photoURL || user?.photoURL;
@@ -93,7 +96,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile, onCa
   };
 
   return (
-    <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 170px)' }}>
+    <div className="flex flex-col" style={{ minHeight: 'calc(100dvh - 10.625rem)' }}>
       <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
         {Object.values(PERSONAS).map((p) => (
@@ -108,7 +111,7 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile, onCa
         {chat.length > 0 && <button type="button" onClick={() => { if (window.confirm('Clear this conversation on the phone?')) setChat([]); }} aria-label="Clear the conversation" className="p-2 text-gray-400"><Trash2 size={18} /></button>}
       </div>
 
-      <div className="flex-1 space-y-3 p-3 pb-52">
+      <div className="flex-1 space-y-3 p-3" style={{ paddingBottom: `calc(${boxH}px + 4.75rem)` }}>
         {!chat.length && (
           <div className="space-y-5 px-2 pt-6 text-center">
             <div className="flex justify-center"><KaTuroAIAvatar persona={prefs.persona} size={64} /></div>
@@ -154,8 +157,8 @@ export default function PhoneAssistant({ client, user, profile, onOpenFile, onCa
         <div ref={endRef} />
       </div>
 
-      <div className="nm fixed inset-x-3 bottom-[108px] z-20 rounded-3xl p-2" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex items-end gap-2">
+      <div ref={boxRef} className="kt-chatbar fixed inset-x-0 bottom-16 z-20 px-3 pb-[2.75rem] pt-2" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="nm mx-auto flex max-w-[41rem] items-end gap-2 rounded-3xl p-2">
           {onCamera && <button type="button" onClick={onCamera} aria-label="Camera: take a photo or scan" className="nm-sm nm-press flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-emerald-700"><Camera size={20} /></button>}
           <textarea
             ref={inputRef}

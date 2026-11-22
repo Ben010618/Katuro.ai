@@ -39,7 +39,7 @@ function AddEntry({ client, date, onClose, onAdded }) {
     }
     setBusy(false);
   };
-  const input = 'w-full rounded-2xl border border-gray-300 px-4 py-3 text-base';
+  const input = 'w-full min-w-0 rounded-2xl border border-gray-300 px-4 py-3 text-base';
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={busy ? undefined : onClose} role="presentation">
       <div role="dialog" aria-modal="true" aria-label="Add to my calendar" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Escape' && !busy) onClose(); }} className="nm w-full space-y-4 rounded-t-3xl p-5" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
@@ -48,9 +48,9 @@ function AddEntry({ client, date, onClose, onAdded }) {
           <button type="button" onClick={onClose} aria-label="Close" className="p-1"><X size={22} /></button>
         </div>
         <input ref={titleRef} aria-label="What" placeholder="What? (e.g. Parent meeting)" value={form.title} onChange={set('title')} className={input} />
-        <div className="grid grid-cols-2 gap-3">
-          <label className="space-y-1"><span className="nm-muted px-1 text-xs">Date</span><input type="date" value={form.date} onChange={set('date')} className={input} /></label>
-          <label className="space-y-1"><span className="nm-muted px-1 text-xs">Time</span><input type="time" value={form.time} onChange={set('time')} className={input} /></label>
+        <div className="flex flex-wrap gap-3">
+          <label className="block min-w-[9.5rem] flex-1 space-y-1"><span className="nm-muted px-1 text-xs">Date</span><input type="date" value={form.date} onChange={set('date')} className={input} /></label>
+          <label className="block min-w-[8rem] flex-1 space-y-1"><span className="nm-muted px-1 text-xs">Time</span><input type="time" value={form.time} onChange={set('time')} className={input} /></label>
         </div>
         <div className="space-y-2">
           <p className="nm-muted flex items-center gap-1.5 px-1 text-xs"><BellRing size={13} /> {form.time ? 'Remind me' : 'Choose a time to be reminded'}</p>
@@ -181,13 +181,13 @@ export default function PhoneToday({ client, online }) {
 
   const monthTitle = new Date(view.year, view.month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   return (
-    <div className="space-y-5 px-5 py-3 pb-28">
+    <div className="space-y-5 px-4 py-3 min-[400px]:px-5">
       {/* The month */}
       <section className="nm rounded-3xl p-4" aria-label={`Calendar, ${monthTitle}`}>
         <div className="mb-3 flex items-center justify-between">
           <button type="button" onClick={() => go(-1)} aria-label="Previous month" className="nm-sm nm-press grid h-10 w-10 place-items-center rounded-full"><ChevronLeft size={20} /></button>
-          <div className="text-center">
-            <p className="text-lg font-semibold" aria-live="polite">{monthTitle}</p>
+          <div className="min-w-0 flex-1 px-2 text-center">
+            <p className="text-base font-semibold leading-snug min-[400px]:text-lg" aria-live="polite">{monthTitle}</p>
             {selected !== today && <button type="button" onClick={goToday} className="nm-green text-xs font-semibold">Today</button>}
           </div>
           <button type="button" onClick={() => go(1)} aria-label="Next month" className="nm-sm nm-press grid h-10 w-10 place-items-center rounded-full"><ChevronRight size={20} /></button>
@@ -239,9 +239,10 @@ export default function PhoneToday({ client, online }) {
 
       {/* The chosen day */}
       <section aria-label="The chosen day">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <p className={`text-sm font-semibold ${selected === today ? 'nm-green' : ''}`}>{selected === today ? 'Today · ' : ''}{dateLabel(selected, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-          <button type="button" onClick={refresh} aria-label="Refresh" className="nm-sm nm-press nm-muted grid h-9 w-9 place-items-center rounded-full"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
+        <div className="mb-3 flex items-center gap-2 px-1">
+          <p className={`min-w-0 flex-1 text-sm font-semibold ${selected === today ? 'nm-green' : ''}`}>{selected === today ? 'Today · ' : ''}{dateLabel(selected, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <button ref={fabRef} type="button" onClick={() => setAdding(true)} aria-label={`Add an event on ${dateLabel(selected, { month: 'long', day: 'numeric' })}`} className="nm-accent nm-press flex h-9 flex-shrink-0 items-center gap-1 rounded-full pl-2.5 pr-3.5 text-sm font-semibold"><Plus size={17} /> Add</button>
+          <button type="button" onClick={refresh} aria-label="Refresh" className="nm-sm nm-press nm-muted grid h-9 w-9 flex-shrink-0 place-items-center rounded-full"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
         </div>
         {online === false && !monthMissing && <p className="px-1 pb-2 text-xs text-amber-800">Saved copy: changes need KaTuroDesk on the same Wi-Fi.</p>}
         {error && <p role="alert" className="px-1 pb-2 text-sm text-red-700">{error}</p>}
@@ -298,9 +299,6 @@ export default function PhoneToday({ client, online }) {
         </section>
       )}
 
-      <button ref={fabRef} type="button" onClick={() => setAdding(true)} aria-label={`Add an event on ${dateLabel(selected, { month: 'long', day: 'numeric' })}`} className="nm-accent nm-press fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
-        <Plus size={28} />
-      </button>
       {adding && <AddEntry client={client} date={selected} onClose={() => { setAdding(false); requestAnimationFrame(() => fabRef.current?.focus()); }} onAdded={refresh} />}
     </div>
   );

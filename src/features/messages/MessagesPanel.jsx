@@ -16,6 +16,7 @@ import {
   setChatMuted, fileProblem, fileExtension, formatBytes, linkDomain, FILE_ACCEPT, FILE_KINDS,
 } from '../../services/messages/chatService';
 import { useChats } from './chatStore';
+import { fpx } from './fontScale';
 import AvatarImage from '../../components/AvatarImage';
 
 const C = {
@@ -25,13 +26,14 @@ const C = {
   text: 'var(--kt-text-primary, #262119)',
   muted: 'var(--kt-text-secondary, #6E6455)',
   green: '#2d6a4f',
+  greenInk: 'var(--kt-green-ink, #2d6a4f)', // green as text: lighter on a dark theme
   greenDark: '#1a3d2b',
   red: '#b91c1c',
 };
-const btn = { display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
+const btn = { display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: fpx(12.5), fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
 const btnPrimary = { ...btn, background: C.green, color: '#fff' };
 const btnGhost = { ...btn, background: 'transparent', color: C.text, border: `1px solid ${C.border}` };
-const input = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', fontSize: 13, borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', color: '#262119', fontFamily: 'inherit' };
+const input = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', fontSize: fpx(13), borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', color: '#262119', fontFamily: 'inherit' };
 
 const ms = (t) => (t?.toMillis ? t.toMillis() : (t instanceof Date ? t.getTime() : 0));
 function when(t) {
@@ -54,7 +56,7 @@ function Modal({ title, onClose, children, width = 460 }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: width, maxHeight: '85vh', overflow: 'auto', background: C.card, color: C.text, borderRadius: 14, border: `1px solid ${C.border}`, padding: 18, boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: fpx(15), fontWeight: 800 }}>{title}</h3>
           <button onClick={onClose} title="Close" style={{ ...btn, padding: 4, background: 'transparent', color: C.muted }}><X size={16} /></button>
         </div>
         {children}
@@ -104,12 +106,12 @@ function UsernameForm({ uid, current = '', onDone, onCancel }) {
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <label style={{ fontSize: 12, fontWeight: 700, color: C.muted }} htmlFor="kt-username">Username</label>
+      <label style={{ fontSize: fpx(12), fontWeight: 700, color: C.muted }} htmlFor="kt-username">Username</label>
       <div style={{ position: 'relative' }}>
         <AtSign size={14} style={{ position: 'absolute', left: 10, top: 11, color: '#6E6455' }} />
         <input id="kt-username" autoFocus value={value} onChange={(e) => { setValue(e.target.value); setServerError(''); }} placeholder="e.g. ben.cuvinar" maxLength={21} style={{ ...input, paddingLeft: 30 }} />
       </div>
-      <p style={{ margin: 0, fontSize: 12, minHeight: 16, color: status.state === 'bad' ? C.red : status.state === 'ok' ? C.green : C.muted }}>
+      <p style={{ margin: 0, fontSize: fpx(12), minHeight: 16, color: status.state === 'bad' ? C.red : status.state === 'ok' ? C.greenInk : C.muted }}>
         {status.text || '3 to 20 letters, numbers, dots or underscores. Teachers find you by it.'}
       </p>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -131,7 +133,7 @@ function ConfirmAction({ icon, label, question, confirmLabel, busy, onConfirm })
     return <button type="button" disabled={busy} onClick={() => setAsking(true)} style={{ ...btnGhost, justifyContent: 'center', color: C.red }}>{icon} {label}</button>;
   }
   return (
-    <div role="alertdialog" aria-label={label} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 10, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div role="alertdialog" aria-label={label} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 10, fontSize: fpx(12), display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span>{question}</span>
       <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <button type="button" onClick={() => setAsking(false)} style={btnGhost}>Cancel</button>
@@ -163,12 +165,12 @@ function ColleaguePicker({ me, multiple, exclude = [], onPick, selected = [], ma
         <Search size={14} style={{ position: 'absolute', left: 10, top: 11, color: '#6E6455' }} />
         <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter your contacts" style={{ ...input, paddingLeft: 30 }} />
       </div>
-      {error && <p style={{ margin: 0, fontSize: 12, color: C.red }}>{error}</p>}
+      {error && <p style={{ margin: 0, fontSize: fpx(12), color: C.red }}>{error}</p>}
       {list === null && !error ? (
-        <p style={{ margin: 0, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading contacts…</p>
+        <p style={{ margin: 0, fontSize: fpx(12), color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading contacts…</p>
       ) : (
         <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
-          {shown.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>{(list || []).length ? 'No contacts match.' : 'No contacts yet. Use New chat to find teachers by @username and invite them.'}</p>}
+          {shown.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: fpx(12), color: C.muted }}>{(list || []).length ? 'No contacts match.' : 'No contacts yet. Use New chat to find teachers by @username and invite them.'}</p>}
           {shown.map((c) => {
             const on = selected.includes(c.id);
             const full = multiple && !on && selected.length >= max;
@@ -178,8 +180,8 @@ function ColleaguePicker({ me, multiple, exclude = [], onPick, selected = [], ma
                 {multiple && <input type="checkbox" readOnly checked={on} style={{ accentColor: C.green }} />}
                 <AvatarImage photoURL={c.photoURL} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>@{c.username}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.school || 'School not set'}</span>
+                  <span style={{ display: 'block', fontSize: fpx(13), fontWeight: 700 }}>@{c.username}</span>
+                  <span style={{ display: 'block', fontSize: fpx(11), color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.school || 'School not set'}</span>
                 </span>
               </button>
             );
@@ -255,17 +257,17 @@ function PeopleSearch({ onMessage }) {
           aria-label="Search teachers by username" style={{ ...input, paddingLeft: 30 }} />
         {loading && !tooShort && query && <Loader2 size={14} className="animate-spin" style={{ position: 'absolute', right: 10, top: 11, color: '#6E6455' }} />}
       </div>
-      {error && <p style={{ margin: 0, fontSize: 12, color: C.red }}>{error}</p>}
-      {tooShort && <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Type at least {SEARCH_MIN_CHARS} characters of the username.</p>}
+      {error && <p style={{ margin: 0, fontSize: fpx(12), color: C.red }}>{error}</p>}
+      {tooShort && <p style={{ margin: 0, fontSize: fpx(12), color: C.muted }}>Type at least {SEARCH_MIN_CHARS} characters of the username.</p>}
       {suggest && (
-        <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
+        <p style={{ margin: 0, fontSize: fpx(12), color: C.muted }}>
           Did you mean{' '}
-          <button type="button" onClick={() => setQ(suggest)} style={{ border: 'none', background: 'none', padding: 0, color: C.green, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>@{suggest}</button>?
+          <button type="button" onClick={() => setQ(suggest)} style={{ border: 'none', background: 'none', padding: 0, color: C.greenInk, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: fpx(12) }}>@{suggest}</button>?
         </p>
       )}
       {shown && (
         <div role="listbox" aria-label="Matching teachers" style={{ maxHeight: 320, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-          {!results.length && !loading && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No teacher has a username like @{shown.query}.</p>}
+          {!results.length && !loading && <p style={{ margin: 0, padding: 12, fontSize: fpx(12), color: C.muted }}>No teacher has a username like @{shown.query}.</p>}
           {results.map((r) => {
             const state = states[r.uid] || r.state;
             const label = RELATION_BUTTON[state] || 'Invite';
@@ -274,12 +276,12 @@ function PeopleSearch({ onMessage }) {
               <div key={r.uid} role="option" aria-selected="false" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: `1px solid ${C.border}` }}>
                 <AvatarImage photoURL={r.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>@{r.username}</span>
-                  <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.school || 'School not set'}</span>
+                  <span style={{ display: 'block', fontSize: fpx(13), fontWeight: 700 }}>@{r.username}</span>
+                  <span style={{ display: 'block', fontSize: fpx(11.5), color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.school || 'School not set'}</span>
                 </span>
                 <button type="button" onClick={() => act(r)} disabled={busyUid === r.uid || state === 'invited'}
                   title={state === 'invited' ? 'Waiting for them to accept' : state === 'invited_me' ? 'They invited you: accept to start messaging' : undefined}
-                  style={{ ...(primary ? btnPrimary : btnGhost), padding: '5px 12px', fontSize: 12, opacity: busyUid === r.uid ? 0.6 : 1, cursor: state === 'invited' ? 'default' : 'pointer' }}>
+                  style={{ ...(primary ? btnPrimary : btnGhost), padding: '5px 12px', fontSize: fpx(12), opacity: busyUid === r.uid ? 0.6 : 1, cursor: state === 'invited' ? 'default' : 'pointer' }}>
                   {busyUid === r.uid ? <Loader2 size={12} className="animate-spin" /> : label}
                 </button>
               </div>
@@ -287,7 +289,7 @@ function PeopleSearch({ onMessage }) {
           })}
         </div>
       )}
-      <p style={{ margin: 0, fontSize: 11.5, color: C.muted }}>Invite a teacher first. You can message each other once they accept.</p>
+      <p style={{ margin: 0, fontSize: fpx(11.5), color: C.muted }}>Invite a teacher first. You can message each other once they accept.</p>
     </div>
   );
 }
@@ -357,27 +359,27 @@ function InviteBell({ me, invites, teamInvites = [], onAccepted, onJoinedTeam, o
   return (
     <span ref={boxRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button type="button" onClick={() => setOpen((v) => !v)} aria-label={count ? `${count} invite(s) waiting` : 'Invites'} title={count ? `${count} invite(s) waiting` : 'No invites'}
-        style={{ ...btn, position: 'relative', padding: '3px 6px', background: 'transparent', color: count ? C.green : C.muted }}>
+        style={{ ...btn, position: 'relative', padding: '3px 6px', background: 'transparent', color: count ? C.greenInk : C.muted }}>
         <Bell size={15} />
-        {count > 0 && <span style={{ position: 'absolute', top: -3, right: -4, minWidth: 15, height: 15, padding: '0 4px', borderRadius: 8, background: C.red, color: '#fff', fontSize: 9.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center' }}>{count > 99 ? '99+' : count}</span>}
+        {count > 0 && <span style={{ position: 'absolute', top: -3, right: -4, minWidth: '1.6em', minHeight: '1.6em', padding: '0 0.4em', borderRadius: '0.8em', background: C.red, color: '#fff', fontSize: fpx(9.5), fontWeight: 800, lineHeight: '1.6em', textAlign: 'center' }}>{count > 99 ? '99+' : count}</span>}
       </button>
       {open && (
         <div role="dialog" aria-label="Invites" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 30, width: 320, maxWidth: '86vw', background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.18)', color: C.text }}>
-          <p style={{ margin: 0, padding: '10px 12px', fontSize: 12.5, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>Invites</p>
-          {!count && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No invites right now.</p>}
+          <p style={{ margin: 0, padding: '10px 12px', fontSize: fpx(12.5), fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>Invites</p>
+          {!count && <p style={{ margin: 0, padding: 12, fontSize: fpx(12), color: C.muted }}>No invites right now.</p>}
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
             {teamInvites.map((inv) => (
               <div key={`team:${inv.cid}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(45,106,79,0.12)', color: C.green }}><Users size={16} /></span>
+                <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(45,106,79,0.12)', color: C.greenInk }}><Users size={16} /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.teamName || 'Team'}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: C.muted }}>Team invite from @{inv.fromUsername}</span>
+                  <span style={{ display: 'block', fontSize: fpx(12.5), fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.teamName || 'Team'}</span>
+                  <span style={{ display: 'block', fontSize: fpx(11), color: C.muted }}>Team invite from @{inv.fromUsername}</span>
                 </span>
                 <span style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" onClick={() => answerTeam(inv, true)} disabled={busy === `team:${inv.cid}`} style={{ ...btnPrimary, padding: '4px 10px', fontSize: 11.5 }}>
+                  <button type="button" onClick={() => answerTeam(inv, true)} disabled={busy === `team:${inv.cid}`} style={{ ...btnPrimary, padding: '4px 10px', fontSize: fpx(11.5) }}>
                     {busy === `team:${inv.cid}` ? <Loader2 size={11} className="animate-spin" /> : 'Join'}
                   </button>
-                  <button type="button" onClick={() => answerTeam(inv, false)} disabled={busy === `team:${inv.cid}`} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11.5 }}>Decline</button>
+                  <button type="button" onClick={() => answerTeam(inv, false)} disabled={busy === `team:${inv.cid}`} style={{ ...btnGhost, padding: '4px 8px', fontSize: fpx(11.5) }}>Decline</button>
                 </span>
               </div>
             ))}
@@ -385,20 +387,20 @@ function InviteBell({ me, invites, teamInvites = [], onAccepted, onJoinedTeam, o
               <div key={inv.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: `1px solid ${C.border}` }}>
                 <AvatarImage photoURL={inv.fromPhotoURL} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700 }}>@{inv.fromUsername}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.fromSchool || 'School not set'}</span>
+                  <span style={{ display: 'block', fontSize: fpx(12.5), fontWeight: 700 }}>@{inv.fromUsername}</span>
+                  <span style={{ display: 'block', fontSize: fpx(11), color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.fromSchool || 'School not set'}</span>
                 </span>
                 <span style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" onClick={() => answer(inv, true)} disabled={busy === inv.from} style={{ ...btnPrimary, padding: '4px 10px', fontSize: 11.5 }}>
+                  <button type="button" onClick={() => answer(inv, true)} disabled={busy === inv.from} style={{ ...btnPrimary, padding: '4px 10px', fontSize: fpx(11.5) }}>
                     {busy === inv.from ? <Loader2 size={11} className="animate-spin" /> : 'Accept'}
                   </button>
-                  <button type="button" onClick={() => answer(inv, false)} disabled={busy === inv.from} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11.5 }}>Decline</button>
-                  <button type="button" onClick={() => answer(inv, false, true)} disabled={busy === inv.from} title="Decline and block" aria-label={`Block @${inv.fromUsername}`} style={{ ...btnGhost, padding: '4px 6px', fontSize: 11.5, color: C.red }}><Ban size={12} /></button>
+                  <button type="button" onClick={() => answer(inv, false)} disabled={busy === inv.from} style={{ ...btnGhost, padding: '4px 8px', fontSize: fpx(11.5) }}>Decline</button>
+                  <button type="button" onClick={() => answer(inv, false, true)} disabled={busy === inv.from} title="Decline and block" aria-label={`Block @${inv.fromUsername}`} style={{ ...btnGhost, padding: '4px 6px', fontSize: fpx(11.5), color: C.red }}><Ban size={12} /></button>
                 </span>
               </div>
             ))}
           </div>
-          {error && <p style={{ margin: 0, padding: '8px 12px', fontSize: 12, color: C.red }}>{error}</p>}
+          {error && <p style={{ margin: 0, padding: '8px 12px', fontSize: fpx(12), color: C.red }}>{error}</p>}
         </div>
       )}
     </span>
@@ -454,16 +456,16 @@ function TeamInfo({ me, chat, members, blocked = new Set(), onClose, onLeft }) {
           <button type="submit" style={btnGhost} disabled={busy || !name.trim() || name.trim() === chat.conv?.name}>Rename</button>
         </form>
       )}
-      <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: C.muted }}>{members.length} member{members.length === 1 ? '' : 's'}</p>
+      <p style={{ margin: '0 0 6px', fontSize: fpx(12), fontWeight: 700, color: C.muted }}>{members.length} member{members.length === 1 ? '' : 's'}</p>
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 12 }}>
         {members.map((m) => (
           <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${C.border}` }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fpx(13) }}>
               <strong>{cards[m.uid]?.displayName || (m.uid === me.uid ? me.displayName : 'Teacher')}</strong>
               {m.uid === me.uid && <span style={{ color: C.muted }}> (you)</span>}
-              {cards[m.uid]?.username && <span style={{ display: 'block', fontSize: 11, color: C.muted }}>@{cards[m.uid].username}</span>}
+              {cards[m.uid]?.username && <span style={{ display: 'block', fontSize: fpx(11), color: C.muted }}>@{cards[m.uid].username}</span>}
             </span>
-            {m.role === 'admin' && <span style={{ fontSize: 10, fontWeight: 800, color: C.green, border: `1px solid ${C.green}`, borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>}
+            {m.role === 'admin' && <span style={{ fontSize: fpx(10), fontWeight: 800, color: C.greenInk, border: `1px solid ${C.green}`, borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>}
             {m.uid !== me.uid && (
               <button type="button" disabled={busy} title={blocked.has(m.uid) ? 'Unblock this teacher' : 'Block: they cannot message you one-to-one or invite you'}
                 onClick={() => run(() => (blocked.has(m.uid) ? unblockTeacher(me.uid, m.uid) : blockTeacher(me.uid, m.uid)))}
@@ -479,13 +481,13 @@ function TeamInfo({ me, chat, members, blocked = new Set(), onClose, onLeft }) {
       </div>
       {invited.length > 0 && (
         <>
-          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: C.muted }}>Invited, waiting for an answer ({invited.length})</p>
+          <p style={{ margin: '0 0 6px', fontSize: fpx(12), fontWeight: 700, color: C.muted }}>Invited, waiting for an answer ({invited.length})</p>
           <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 12 }}>
             {invited.map((i) => (
               <div key={i.uid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: fpx(13) }}>
                   <strong>{cards[i.uid]?.displayName || 'Teacher'}</strong>
-                  {cards[i.uid]?.username && <span style={{ display: 'block', fontSize: 11, color: C.muted }}>@{cards[i.uid].username}</span>}
+                  {cards[i.uid]?.username && <span style={{ display: 'block', fontSize: fpx(11), color: C.muted }}>@{cards[i.uid].username}</span>}
                 </span>
                 {iAmAdmin && (
                   <button type="button" disabled={busy} onClick={() => run(() => cancelTeamInvite(chat.cid, i.uid))} style={{ ...btn, padding: '4px 8px', background: 'transparent', color: C.red }}>Cancel invite</button>
@@ -497,16 +499,16 @@ function TeamInfo({ me, chat, members, blocked = new Set(), onClose, onLeft }) {
       )}
       {iAmAdmin && (adding ? (
         <>
-          <p style={{ margin: '0 0 6px', fontSize: 11.5, color: C.muted }}>They join when they accept the invite.</p>
+          <p style={{ margin: '0 0 6px', fontSize: fpx(11.5), color: C.muted }}>They join when they accept the invite.</p>
           <ColleaguePicker me={me} exclude={[...members.map((m) => m.uid), ...invited.map((i) => i.uid)]} onPick={(c) => run(async () => { await inviteToTeam(me, chat.cid, chat.conv?.name || '', c.id); setAdding(false); })} />
         </>
       ) : (
         <button type="button" onClick={() => setAdding(true)} disabled={members.length + invited.length >= MAX_TEAM_MEMBERS} style={{ ...btnGhost, marginBottom: 12 }}><Plus size={13} /> Invite a teacher</button>
       ))}
-      {error && <p style={{ margin: '8px 0', fontSize: 12, color: C.red }}>{error}</p>}
+      {error && <p style={{ margin: '8px 0', fontSize: fpx(12), color: C.red }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         {confirmLeave ? (
-          <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: fpx(12) }}>
             Leave this team?
             <button type="button" disabled={busy} onClick={() => run(async () => { await leaveTeam(me, chat.cid, members); onLeft(); })} style={{ ...btn, background: C.red, color: '#fff' }}>Leave</button>
             <button type="button" onClick={() => setConfirmLeave(false)} style={btnGhost}>Stay</button>
@@ -597,19 +599,19 @@ function FileIcon({ name }) {
   const ext = fileExtension(name);
   const label = ext === 'pdf' ? 'PDF' : ext.startsWith('doc') ? 'DOC' : ext.startsWith('xls') ? 'XLS' : ext.startsWith('ppt') ? 'PPT' : 'FILE';
   const color = ext === 'pdf' ? '#b91c1c' : ext.startsWith('doc') ? '#1d4ed8' : ext.startsWith('xls') ? '#15803d' : ext.startsWith('ppt') ? '#c2410c' : '#6E6455';
-  return <span style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, color, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{label}</span>;
+  return <span style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, color, fontSize: fpx(10), fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{label}</span>;
 }
 
 function FileCard({ cid, attachment, deskFiles, setError, mine }) {
   const act = useFileActions(cid, deskFiles, setError);
   const a = attachment;
-  const link = { ...btn, padding: '3px 8px', fontSize: 11, background: 'transparent', color: mine ? '#fff' : C.green, border: `1px solid ${mine ? 'rgba(255,255,255,0.5)' : C.border}` };
+  const link = { ...btn, padding: '3px 8px', fontSize: fpx(11), background: 'transparent', color: mine ? '#fff' : C.greenInk, border: `1px solid ${mine ? 'rgba(255,255,255,0.5)' : C.border}` };
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 220 }}>
       <FileIcon name={a.name} />
       <div style={{ minWidth: 0, flex: 1 }}>
-        <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={a.name}>{a.name}</p>
-        <p style={{ margin: '1px 0 5px', fontSize: 11, opacity: 0.8 }}>{fileExtension(a.name).toUpperCase()} · {formatBytes(a.size)}</p>
+        <p style={{ margin: 0, fontSize: fpx(12.5), fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={a.name}>{a.name}</p>
+        <p style={{ margin: '1px 0 5px', fontSize: fpx(11), opacity: 0.8 }}>{fileExtension(a.name).toUpperCase()} · {formatBytes(a.size)}</p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={link} disabled={Boolean(act.busy)} onClick={() => act.open(a)}>{act.busy === `open-${a.assetId}` ? 'Opening…' : 'Open'}</button>
           {deskFiles
@@ -623,7 +625,7 @@ function FileCard({ cid, attachment, deskFiles, setError, mine }) {
 
 function ImageThumb({ cid, attachment, onOpen, size = 220 }) {
   const { url, error } = useBlobUrl(cid, attachment);
-  if (error) return <span style={{ fontSize: 11, opacity: 0.8 }}>Image unavailable ({error})</span>;
+  if (error) return <span style={{ fontSize: fpx(11), opacity: 0.8 }}>Image unavailable ({error})</span>;
   if (!url) return <span style={{ display: 'inline-flex', width: size, height: Math.round(size * 0.66), alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.06)', borderRadius: 8 }}><Loader2 size={16} className="animate-spin" /></span>;
   return (
     <button onClick={() => onOpen(attachment)} title={attachment.name} style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'zoom-in', display: 'block' }}>
@@ -649,7 +651,7 @@ function Lightbox({ cid, attachment, deskFiles, onClose }) {
           : <button style={btnPrimary} onClick={() => act.download(attachment)}>{act.busy ? 'Downloading…' : 'Download'}</button>}
         <button style={{ ...btnGhost, color: '#fff', borderColor: 'rgba(255,255,255,0.4)' }} onClick={onClose}><X size={14} /> Close</button>
       </div>
-      {msg && <p onClick={(e) => e.stopPropagation()} style={{ margin: 0, color: '#fff', fontSize: 12 }}>{msg}</p>}
+      {msg && <p onClick={(e) => e.stopPropagation()} style={{ margin: 0, color: '#fff', fontSize: fpx(12) }}>{msg}</p>}
       {error && <p style={{ color: '#fff' }}>{error}</p>}
       {url ? <img onClick={(e) => e.stopPropagation()} src={url} alt={attachment.name} style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 8 }} /> : !error && <Loader2 size={24} color="#fff" className="animate-spin" />}
     </div>
@@ -665,13 +667,13 @@ function FolderPicker({ deskFiles, onPick, onClose }) {
     <Modal title="Send a file from your folder" onClose={onClose} width={560}>
       <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter files" style={{ ...input, marginBottom: 8 }} />
       <div style={{ maxHeight: 340, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
-        {!shown.length && <p style={{ margin: 0, padding: 12, fontSize: 12, color: C.muted }}>No Word, Excel, PowerPoint, PDF or image files in your folder.</p>}
+        {!shown.length && <p style={{ margin: 0, padding: 12, fontSize: fpx(12), color: C.muted }}>No Word, Excel, PowerPoint, PDF or image files in your folder.</p>}
         {shown.map((f) => (
           <button key={f.path} onClick={() => onPick(f)} style={{ display: 'flex', width: '100%', gap: 10, alignItems: 'center', textAlign: 'left', padding: '8px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
             <FileIcon name={f.name} />
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700 }}>{f.name}</span>
-              <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.path}{f.size ? ` · ${formatBytes(f.size)}` : ''}</span>
+              <span style={{ display: 'block', fontSize: fpx(12.5), fontWeight: 700 }}>{f.name}</span>
+              <span style={{ display: 'block', fontSize: fpx(11), color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.path}{f.size ? ` · ${formatBytes(f.size)}` : ''}</span>
             </span>
           </button>
         ))}
@@ -702,18 +704,18 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
   };
 
   const tabBtn = (id, label) => (
-    <button key={id} onClick={() => { setTab(id); setCount(30); setItems([]); }} style={{ ...btn, flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: 12, background: tab === id ? C.green : 'transparent', color: tab === id ? '#fff' : C.text, border: `1px solid ${tab === id ? C.green : C.border}` }}>{label}</button>
+    <button key={id} onClick={() => { setTab(id); setCount(30); setItems([]); }} style={{ ...btn, flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: fpx(12), background: tab === id ? C.green : 'transparent', color: tab === id ? '#fff' : C.text, border: `1px solid ${tab === id ? C.green : C.border}` }}>{label}</button>
   );
 
   return (
     <div className="kt-msg-info" style={{ borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', minHeight: 0, background: C.card }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: `1px solid ${C.border}` }}>
-        <strong style={{ fontSize: 13 }}>Chat info</strong>
+        <strong style={{ fontSize: fpx(13) }}>Chat info</strong>
         <button onClick={onClose} title="Close chat info" style={{ ...btn, padding: 4, background: 'transparent', color: C.muted }}><X size={15} /></button>
       </div>
       <div style={{ padding: 12, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}><ChatTitle chat={chat} me={me} /></p>
-        {chat.type === 'dm' && other && <p style={{ margin: 0, fontSize: 11.5, color: C.muted }}>@{other.username}{other.school ? ` · ${other.school}` : ''}</p>}
+        <p style={{ margin: 0, fontSize: fpx(14), fontWeight: 800 }}><ChatTitle chat={chat} me={me} /></p>
+        {chat.type === 'dm' && other && <p style={{ margin: 0, fontSize: fpx(11.5), color: C.muted }}>@{other.username}{other.school ? ` · ${other.school}` : ''}</p>}
         {chat.type === 'team' && (
           <button onClick={onTeamSettings} style={{ ...btnGhost, justifyContent: 'center' }}><Users size={13} /> Members ({members.length}) and team settings</button>
         )}
@@ -741,9 +743,9 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
         {tabBtn('files', 'Files')}
         {tabBtn('links', 'Links')}
       </div>
-      {error && <p style={{ margin: '0 12px 6px', fontSize: 12, color: C.red }}>{error}</p>}
+      {error && <p style={{ margin: '0 12px 6px', fontSize: fpx(12), color: C.red }}>{error}</p>}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
-        {!items.length && <p style={{ fontSize: 12, color: C.muted }}>{tab === 'media' ? 'No photos shared yet.' : tab === 'files' ? 'No files shared yet.' : 'No links shared yet.'}</p>}
+        {!items.length && <p style={{ fontSize: fpx(12), color: C.muted }}>{tab === 'media' ? 'No photos shared yet.' : tab === 'files' ? 'No files shared yet.' : 'No links shared yet.'}</p>}
         {tab === 'media' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
             {items.map((m) => <ImageThumb key={m.id} cid={chat.cid} attachment={{ ...m, assetId: m.id }} onOpen={onOpenImage} size={92} />)}
@@ -752,17 +754,17 @@ function ChatInfoPanel({ me, chat, members, blocked, deskFiles, onClose, onOpenI
         {tab === 'files' && items.map((f) => (
           <div key={f.id} style={{ padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
             <FileCard cid={chat.cid} attachment={{ ...f, assetId: f.id }} deskFiles={deskFiles} setError={setError} />
-            <p style={{ margin: '4px 0 0 46px', fontSize: 10.5, color: C.muted }}>{f.senderName} · {when(f.createdAt)}</p>
+            <p style={{ margin: '4px 0 0 46px', fontSize: fpx(10.5), color: C.muted }}>{f.senderName} · {when(f.createdAt)}</p>
           </div>
         ))}
         {tab === 'links' && items.map((l) => (
           <a key={l.id} href={l.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 0', borderBottom: `1px solid ${C.border}`, textDecoration: 'none', color: C.text }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><ExternalLink size={12} /> {linkDomain(l.url) || 'Link'}</span>
-            <span style={{ display: 'block', fontSize: 11, color: C.muted, wordBreak: 'break-all' }}>{l.url}</span>
-            <span style={{ display: 'block', fontSize: 10.5, color: C.muted }}>{l.senderName} · {when(l.createdAt)}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: fpx(12.5), fontWeight: 700 }}><ExternalLink size={12} /> {linkDomain(l.url) || 'Link'}</span>
+            <span style={{ display: 'block', fontSize: fpx(11), color: C.muted, wordBreak: 'break-all' }}>{l.url}</span>
+            <span style={{ display: 'block', fontSize: fpx(10.5), color: C.muted }}>{l.senderName} · {when(l.createdAt)}</span>
           </a>
         ))}
-        {hasMore && <button onClick={() => setCount((n) => n + 30)} style={{ ...btnGhost, width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 11 }}>Show more</button>}
+        {hasMore && <button onClick={() => setCount((n) => n + 30)} style={{ ...btnGhost, width: '100%', justifyContent: 'center', marginTop: 8, fontSize: fpx(11) }}>Show more</button>}
       </div>
     </div>
   );
@@ -880,38 +882,38 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
         onDrop={(e) => { e.preventDefault(); setDragging(false); if (!composerLocked) sendFile(e.dataTransfer?.files?.[0]); }}
       >
         {dragging && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(45,106,79,0.12)', border: `2px dashed ${C.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: C.green, pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(45,106,79,0.12)', border: `2px dashed ${C.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fpx(13), fontWeight: 700, color: C.greenInk, pointerEvents: 'none' }}>
             Drop a file to send it (Word, Excel, PowerPoint, PDF, images · up to 25 MB)
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: `1px solid ${C.border}` }}>
           <button onClick={onBack} className="kt-msg-back" title="Back to chats" style={{ ...btn, padding: 4, background: 'transparent', color: C.text }}><ArrowLeft size={16} /></button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><ChatTitle chat={chat} me={me} /></p>
-            {chat.type === 'team' && <p style={{ margin: 0, fontSize: 11, color: C.muted }}>Team · {members.length} member{members.length === 1 ? '' : 's'}</p>}
+            <p style={{ margin: 0, fontSize: fpx(14), fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><ChatTitle chat={chat} me={me} /></p>
+            {chat.type === 'team' && <p style={{ margin: 0, fontSize: fpx(11), color: C.muted }}>Team · {members.length} member{members.length === 1 ? '' : 's'}</p>}
           </div>
           <button onClick={() => setShowInfo((v) => !v)} title="Chat info: media, files and links" style={{ ...btnGhost, background: showInfo ? 'rgba(45,106,79,0.12)' : 'transparent' }}><Info size={13} /> Chat info</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {hasMore && <button onClick={() => setCount((n) => n + 50)} style={{ ...btnGhost, alignSelf: 'center', fontSize: 11 }}>Load earlier messages</button>}
-          {messages.length === 0 && !error && <p style={{ margin: 'auto', fontSize: 12, color: C.muted }}>No messages yet. Say hello.</p>}
+          {hasMore && <button onClick={() => setCount((n) => n + 50)} style={{ ...btnGhost, alignSelf: 'center', fontSize: fpx(11) }}>Load earlier messages</button>}
+          {messages.length === 0 && !error && <p style={{ margin: 'auto', fontSize: fpx(12), color: C.muted }}>No messages yet. Say hello.</p>}
           {messages.map((m) => {
             const mine = m.senderUid === me.uid;
             const a = !m.deleted ? m.attachment : null;
             return (
               <div key={m.id} className="kt-msg-row" style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
                 <div style={{ maxWidth: '78%', minWidth: 0 }}>
-                  {!mine && chat.type === 'team' && <p style={{ margin: '0 0 2px 4px', fontSize: 11, fontWeight: 700, color: C.muted }}>{m.senderName}</p>}
+                  {!mine && chat.type === 'team' && <p style={{ margin: '0 0 2px 4px', fontSize: fpx(11), fontWeight: 700, color: C.muted }}>{m.senderName}</p>}
                   {a?.kind === 'image' ? (
                     <ImageThumb cid={cid} attachment={a} onOpen={setLightbox} />
                   ) : (
-                    <div style={{ background: mine ? C.green : 'rgba(0,0,0,0.06)', color: mine ? '#fff' : C.text, borderRadius: 12, padding: '7px 11px', fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontStyle: m.deleted ? 'italic' : 'normal', opacity: m.deleted ? 0.7 : 1 }}>
+                    <div style={{ background: mine ? C.green : 'rgba(0,0,0,0.06)', color: mine ? '#fff' : C.text, borderRadius: 12, padding: '7px 11px', fontSize: fpx(13), lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontStyle: m.deleted ? 'italic' : 'normal', opacity: m.deleted ? 0.7 : 1 }}>
                       {m.deleted ? 'Message deleted' : a ? <FileCard cid={cid} attachment={a} deskFiles={deskFiles} setError={setError} mine={mine} /> : <Linkified text={m.text} />}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'center', margin: '2px 4px 0' }}>
-                    <span style={{ fontSize: 10, color: C.muted }}>{when(m.createdAt)}</span>
+                    <span style={{ fontSize: fpx(10), color: C.muted }}>{when(m.createdAt)}</span>
                     {!m.deleted && (mine ? (
                       <button className="kt-msg-action" title={a ? 'Delete message and file' : 'Delete message'} onClick={() => deleteMyMessage(cid, m.id).catch((e) => setError(e?.message || 'Could not delete.'))} style={{ ...btn, padding: 0, background: 'transparent', color: C.muted }}><Trash2 size={11} /></button>
                     ) : (
@@ -925,20 +927,20 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
           <div ref={endRef} />
         </div>
 
-        {error && <p style={{ margin: 0, padding: '6px 14px', fontSize: 12, color: error.startsWith('Saved to your folder') ? C.green : C.red }}>{error}</p>}
+        {error && <p style={{ margin: 0, padding: '6px 14px', fontSize: fpx(12), color: error.startsWith('Saved to your folder') ? C.greenInk : C.red }}>{error}</p>}
         {upload && (
-          <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+          <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: fpx(12) }}>
             <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {(upload.progress || 0) >= 1 ? `Processing ${upload.name}…` : `Sending ${upload.name}… ${Math.round((upload.progress || 0) * 100)}%`}
             </span>
             <span style={{ width: 120, height: 6, borderRadius: 6, background: 'rgba(0,0,0,0.1)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${Math.round((upload.progress || 0) * 100)}%`, background: C.green }} /></span>
             {(upload.progress || 0) < 1 && (
-              <button onClick={() => upload.cancel()} style={{ ...btn, padding: '2px 8px', fontSize: 11, background: 'transparent', color: C.red, border: `1px solid ${C.border}` }}>Cancel</button>
+              <button onClick={() => upload.cancel()} style={{ ...btn, padding: '2px 8px', fontSize: fpx(11), background: 'transparent', color: C.red, border: `1px solid ${C.border}` }}>Cancel</button>
             )}
           </div>
         )}
         {composerLocked ? (
-          <div style={{ padding: 12, borderTop: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ padding: 12, borderTop: `1px solid ${C.border}`, fontSize: fpx(12.5), color: C.muted, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
             You blocked this teacher. Unblock them in Chat info to send messages.
           </div>
         ) : (
@@ -959,7 +961,7 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
             </button>
           </div>
         )}
-        {text.length > MAX_MESSAGE_LENGTH - 300 && <p style={{ margin: '0 0 6px 14px', fontSize: 11, color: C.muted }}>{text.length} / {MAX_MESSAGE_LENGTH}</p>}
+        {text.length > MAX_MESSAGE_LENGTH - 300 && <p style={{ margin: '0 0 6px 14px', fontSize: fpx(11), color: C.muted }}>{text.length} / {MAX_MESSAGE_LENGTH}</p>}
       </div>
 
       {showInfo && (
@@ -974,12 +976,12 @@ function Thread({ me, chat, blocked, deskFiles, onBack, onLeft }) {
         <Modal title="Report message" onClose={() => setReporting(null)}>
           {reportDone ? (
             <>
-              <p style={{ margin: '0 0 12px', fontSize: 13 }}>Thank you. The kaTuro admin will review it.</p>
+              <p style={{ margin: '0 0 12px', fontSize: fpx(13) }}>Thank you. The kaTuro admin will review it.</p>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button onClick={() => setReporting(null)} style={btnPrimary}>Done</button></div>
             </>
           ) : (
             <>
-              <p style={{ margin: '0 0 8px', fontSize: 12, color: C.muted }}>“{String(reporting.text || reporting.attachment?.name || '').slice(0, 200)}”</p>
+              <p style={{ margin: '0 0 8px', fontSize: fpx(12), color: C.muted }}>“{String(reporting.text || reporting.attachment?.name || '').slice(0, 200)}”</p>
               <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 500))} rows={3} placeholder="What is wrong with this message? (optional)" style={{ ...input, resize: 'vertical' }} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
                 <button onClick={() => setReporting(null)} style={btnGhost}>Cancel</button>
@@ -1038,19 +1040,19 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
   if (loadError && me === undefined) {
     return (
       <div style={{ maxWidth: 440, margin: '30px auto', padding: 20, background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, textAlign: 'center' }}>
-        <p style={{ margin: '0 0 12px', fontSize: 13 }}>{loadError}</p>
+        <p style={{ margin: '0 0 12px', fontSize: fpx(13) }}>{loadError}</p>
         <button onClick={() => { setLoadError(''); setAttempt((n) => n + 1); }} style={btnPrimary}>Try again</button>
       </div>
     );
   }
   if (me === undefined) {
-    return <div style={{ padding: 40, textAlign: 'center', color: C.muted, fontSize: 13 }}><Loader2 size={18} className="animate-spin" style={{ display: 'inline' }} /> Opening Messages…</div>;
+    return <div style={{ padding: 40, textAlign: 'center', color: C.muted, fontSize: fpx(13) }}><Loader2 size={18} className="animate-spin" style={{ display: 'inline' }} /> Opening Messages…</div>;
   }
   if (me === null) {
     return (
       <div style={{ maxWidth: 440, margin: '30px auto', padding: 20, background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14 }}>
-        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800 }}>Choose your username</h2>
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>Teachers find and invite you by your username. Each username belongs to one teacher only.</p>
+        <h2 style={{ margin: '0 0 6px', fontSize: fpx(17), fontWeight: 800 }}>Choose your username</h2>
+        <p style={{ margin: '0 0 14px', fontSize: fpx(13), color: C.muted }}>Teachers find and invite you by your username. Each username belongs to one teacher only.</p>
         <UsernameForm uid={uid} onDone={(entry) => setMe(entry)} />
       </div>
     );
@@ -1115,11 +1117,11 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
         }
       `}</style>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: fpx(11.5), color: C.muted, flexWrap: 'wrap' }}>
         <Info size={13} />
         <span style={{ flex: 1, minWidth: 200 }}>The kaTuro admin can view messages for safety and child protection. Keep messages professional.</span>
         <InviteBell me={me} invites={invites} teamInvites={teamInvites} openSignal={bellSignal} onAccepted={(fromUid) => startDm({ id: fromUid })} onJoinedTeam={(cid) => setOpenCid(cid)} />
-        <button onClick={() => setDialog('username')} style={{ ...btn, padding: '2px 6px', background: 'transparent', color: C.green }}>@{me.username}</button>
+        <button onClick={() => setDialog('username')} style={{ ...btn, padding: '2px 6px', background: 'transparent', color: C.greenInk }}>@{me.username}</button>
       </div>
 
       <div className={`kt-msg-layout${openChat ? ' has-open' : ''}`}>
@@ -1135,24 +1137,24 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
             </div>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {!ready && <p style={{ padding: 14, fontSize: 12, color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading chats…</p>}
-            {error && <p style={{ padding: 14, fontSize: 12, color: C.red }}>{error}</p>}
-            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: 12, color: C.muted }}>{chats.some((c) => !c.hidden) ? 'No chats match.' : 'No chats yet. Use New chat to find a teacher by @username and invite them.'}</p>}
+            {!ready && <p style={{ padding: 14, fontSize: fpx(12), color: C.muted }}><Loader2 size={12} className="animate-spin" style={{ display: 'inline' }} /> Loading chats…</p>}
+            {error && <p style={{ padding: 14, fontSize: fpx(12), color: C.red }}>{error}</p>}
+            {ready && !visible.length && !error && <p style={{ padding: 14, fontSize: fpx(12), color: C.muted }}>{chats.some((c) => !c.hidden) ? 'No chats match.' : 'No chats yet. Use New chat to find a teacher by @username and invite them.'}</p>}
             {visible.map((c) => (
               <button key={c.cid} onClick={() => setOpenCid(c.cid)}
                 style={{ display: 'flex', width: '100%', gap: 8, textAlign: 'left', padding: '10px 12px', border: 'none', borderBottom: `1px solid ${C.border}`, background: c.cid === openCid ? 'rgba(45,106,79,0.12)' : 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: c.unread ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><ChatTitle chat={c} me={me} /></span>
-                    {c.type === 'team' && <span style={{ fontSize: 9, fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: '0 4px' }}>TEAM</span>}
+                    <span style={{ fontSize: fpx(13), fontWeight: c.unread ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><ChatTitle chat={c} me={me} /></span>
+                    {c.type === 'team' && <span style={{ fontSize: fpx(9), fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: '0 4px' }}>TEAM</span>}
                     {c.muted && <BellOff size={11} color="#6E6455" aria-label="Muted" />}
                   </span>
-                  <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ display: 'block', fontSize: fpx(11.5), color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {c.conv?.lastMessage ? `${c.conv.lastMessage.senderUid === me.uid ? 'You' : c.conv.lastMessage.senderName}: ${c.conv.lastMessage.text}` : 'No messages yet'}
                   </span>
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <span style={{ fontSize: 10, color: C.muted }}>{when(c.conv?.lastMessageAt)}</span>
+                  <span style={{ fontSize: fpx(10), color: C.muted }}>{when(c.conv?.lastMessageAt)}</span>
                   {c.unread && <span title={c.muted ? 'Unread (muted)' : 'Unread'} style={{ width: 9, height: 9, borderRadius: 9, background: c.muted ? '#9ca3af' : C.green }} />}
                 </span>
               </button>
@@ -1164,7 +1166,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
           {openChat ? (
             <Thread key={openChat.cid} me={me} chat={openChat} blocked={blocked} deskFiles={deskFiles} onBack={() => setOpenCid(null)} onLeft={() => setOpenCid(null)} />
           ) : (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, padding: 20, textAlign: 'center' }}>
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: fpx(13), padding: 20, textAlign: 'center' }}>
               {dialogError || 'Select a chat, or start a new one.'}
             </div>
           )}
@@ -1179,7 +1181,7 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
       {dialog === 'dm' && (
         <Modal title="Find a teacher" onClose={() => setDialog(null)}>
           <PeopleSearch onMessage={(card) => !busy && startDm(card)} />
-          {dialogError && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.red }}>{dialogError}</p>}
+          {dialogError && <p style={{ margin: '8px 0 0', fontSize: fpx(12), color: C.red }}>{dialogError}</p>}
         </Modal>
       )}
       {dialog === 'team' && (
@@ -1187,9 +1189,9 @@ export default function MessagesPanel({ user, onOpenChatChange, deskFiles = null
           <input value={teamName} onChange={(e) => setTeamName(e.target.value)} maxLength={60} placeholder="Team name, e.g. Grade 7 Science Teachers" style={{ ...input, marginBottom: 10 }} />
           <ColleaguePicker me={me} multiple selected={teamPick}
             onPick={(card) => setTeamPick((p) => (p.includes(card.id) ? p.filter((x) => x !== card.id) : [...p, card.id]))} />
-          {dialogError && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.red }}>{dialogError}</p>}
+          {dialogError && <p style={{ margin: '8px 0 0', fontSize: fpx(12), color: C.red }}>{dialogError}</p>}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-            <span style={{ fontSize: 12, color: C.muted }}>{teamPick.length} selected</span>
+            <span style={{ fontSize: fpx(12), color: C.muted }}>{teamPick.length} selected</span>
             <button onClick={makeTeam} disabled={busy || !teamName.trim()} style={{ ...btnPrimary, opacity: busy || !teamName.trim() ? 0.5 : 1 }}>
               {busy && <Loader2 size={13} className="animate-spin" />} Create team
             </button>

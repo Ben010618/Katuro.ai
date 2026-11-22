@@ -28,6 +28,8 @@ import { hasPin, shouldLock } from '../../services/link/appLock';
 import { canUpdate, checkForUpdate, checkQuietly, installUpdate, installedVersion } from '../../services/link/appUpdate';
 import { publishedDesk, withPublishedAddresses } from '../../services/link/findDesk';
 import { KT_LOGO } from './phoneLogo';
+import PhoneSettings from './PhoneSettings';
+import { useTopOffset } from './phoneLayout';
 import './phone.css';
 
 const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel'));
@@ -35,6 +37,18 @@ const MessagesPanel = lazy(() => import('../../features/messages/MessagesPanel')
 const MAIN = ['Records', 'Lessons', 'Templates'];
 // The bottom bar; the Assistant is the KaTuro logo in the middle.
 const TABS = [['today', 'Today', CalendarDays], ['scores', 'Scores', ClipboardList], ['assistant', 'KaTuro Assistant', null], ['messages', 'Messages', MessagesSquare], ['files', 'Files', FolderOpen]];
+
+/** Messages fills the screen down to just above the bottom bar and the logo over it. */
+function MessagesArea({ user }) {
+  const [ref, top] = useTopOffset();
+  return (
+    <div ref={ref} className="px-3 pt-2">
+      <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
+        <MessagesPanel user={user} height={`max(14rem, calc(100dvh - ${top}px - 7.5rem - env(safe-area-inset-bottom)))`} />
+      </Suspense>
+    </div>
+  );
+}
 
 const day = (ms) => (ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
@@ -120,7 +134,7 @@ function FolderList({ client, path, onOpen, onError, onLoaded }) {
                   ? (main ? <FolderOpen size={26} className="nm-green flex-shrink-0" /> : <Folder size={22} className={`${i.outside ? 'text-sky-700' : 'text-amber-600'} flex-shrink-0`} />)
                   : <FileText size={22} className="nm-muted flex-shrink-0" />}
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate ${main ? 'text-base font-semibold' : 'text-sm font-medium'}`}>{i.name}</span>
+                  <span className={`line-clamp-2 break-words ${main ? 'text-base font-semibold' : 'text-sm font-medium'}`}>{i.name}</span>
                   {i.kind === 'file' && <span className="nm-muted block text-xs">{formatBytes(i.size)} · {day(i.lastModified)}</span>}
                 </span>
                 <ChevronRight size={18} className="nm-muted flex-shrink-0" />
@@ -169,6 +183,7 @@ export default function PhoneApp() {
   const [appVersion, setAppVersion] = useState('');
   const [updateState, setUpdateState] = useState({});
   const [menuNote, setMenuNote] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     if (!canUpdate()) return undefined;
     let alive = true;
@@ -408,6 +423,7 @@ export default function PhoneApp() {
           version={appVersion}
           linked={Boolean(link)}
           onClose={() => setMenuOpen(false)}
+          onSettings={() => { setMenuOpen(false); setSettingsOpen(true); }}
           onCheckUpdate={checkNow}
           onChangePin={() => { setMenuOpen(false); setSettingPin(true); }}
           onUnlink={() => { setMenuOpen(false); unlink(); }}
@@ -415,8 +431,9 @@ export default function PhoneApp() {
         />
       )}
       {menuOpen && menuNote && !pinScreen && <p className="fixed inset-x-6 bottom-6 z-[55] rounded-2xl bg-gray-900/90 px-4 py-3 text-center text-sm text-white" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>{menuNote}</p>}
+      {settingsOpen && !pinScreen && <PhoneSettings onClose={() => setSettingsOpen(false)} />}
       {update && !pinScreen && <UpdateSheet update={update} state={updateState} onUpdate={runUpdate} onClose={() => { setUpdate(null); setUpdateState({}); }} />}
-      <div hidden={pinScreen} inert={pinScreen}>
+      <div className="kt-col" hidden={pinScreen} inert={pinScreen}>
           {file && client && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-[#eef2ef]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
               <PhoneFileView entry={file} client={client} onBack={() => window.history.back()} onKeptChange={bump} onChanged={(note) => { setFilesNote(note); bump(); window.history.back(); }} />
@@ -425,7 +442,7 @@ export default function PhoneApp() {
           <header className="flex items-center justify-between px-5 pb-2 pt-5">
             <div className="flex min-w-0 items-center gap-2.5">
               <AvatarImage photoURL={profile?.photoURL || user?.photoURL} alt="" className="nm-sm h-10 w-10 flex-shrink-0 rounded-full object-cover" />
-              <p className="truncate text-xl font-semibold">{firstName ? `Hi, ${firstName}` : 'KaTuro'}</p>
+              <p className="min-w-0 truncate text-lg font-semibold min-[400px]:text-xl">{firstName ? `Hi, ${firstName}` : 'KaTuro'}</p>
               {link && (
                 <span
                   role="img"
@@ -434,7 +451,7 @@ export default function PhoneApp() {
                 />
               )}
             </div>
-            <span className="flex items-center gap-2">
+            <span className="ml-3 flex flex-shrink-0 items-center gap-2">
               {client && <button type="button" onClick={() => setCamera(true)} aria-label="Camera: take a photo or scan" className="nm-accent nm-press grid h-11 w-11 place-items-center rounded-full"><Camera size={20} /></button>}
               <button type="button" onClick={() => { setMenuNote(''); setMenuOpen(true); }} aria-label="Menu" className="nm-sm nm-press grid h-11 w-11 place-items-center rounded-full"><Menu size={20} /></button>
             </span>
@@ -464,11 +481,7 @@ export default function PhoneApp() {
               {client && visited.has('scores') && <div hidden={tab !== 'scores'}><ScoresFlow client={client} online={online} /></div>}
               {client && visited.has('assistant') && <div hidden={tab !== 'assistant'}><PhoneAssistant client={client} user={user} profile={profile} onOpenFile={(i) => go({ file: i })} onCamera={() => setCamera(true)} /></div>}
               {visited.has('messages') && (
-                <div hidden={tab !== 'messages'}>
-                  <Suspense fallback={<p className="flex items-center gap-2 p-4 text-sm text-gray-600"><Loader2 size={16} className="animate-spin" /> Opening Messages…</p>}>
-                    <div className="bg-white"><MessagesPanel user={user} height={`calc(100vh - ${online === false ? 290 : 230}px - env(safe-area-inset-top) - env(safe-area-inset-bottom))`} /></div>
-                  </Suspense>
-                </div>
+                <div hidden={tab !== 'messages'}><MessagesArea user={user} /></div>
               )}
               {sharedNote && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">{sharedNote}</p>}
               {tab === 'files' && listing && listing.access === undefined && <p className="nm-in mx-5 mt-3 rounded-2xl px-4 py-3 text-xs text-amber-800">Update KaTuroDesk on your computer to 1.18.0 to send and change files from this phone.</p>}
@@ -490,7 +503,7 @@ export default function PhoneApp() {
                   }}
                 />
               )}
-              <div className="h-28" />
+              <div className={tab === 'files' ? 'h-40' : 'h-28'} />
               <nav className="kt-nav fixed inset-x-0 bottom-0 z-20" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 <div className="relative grid h-16 grid-cols-5 items-center">
                   {TABS.map(([id, label, Icon]) => (Icon ? (
@@ -502,8 +515,8 @@ export default function PhoneApp() {
                     <span key={id} aria-hidden="true" />
                   )))}
                   {/* The KaTuro logo, big and in the middle: opens the Assistant. */}
-                  <button type="button" onClick={() => openTab('assistant')} aria-pressed={tab === 'assistant'} aria-label="KaTuro Assistant" className="kt-logo-btn absolute -top-10 left-1/2 -translate-x-1/2">
-                    <img src={KT_LOGO} alt="" className="kt-logo h-[94px] w-[94px]" />
+                  <button type="button" onClick={() => openTab('assistant')} aria-pressed={tab === 'assistant'} aria-label="KaTuro Assistant" className="kt-logo-btn absolute bottom-3 left-1/2 -translate-x-1/2">
+                    <img src={KT_LOGO} alt="" className="kt-logo kt-nav-logo" />
                   </button>
                 </div>
               </nav>

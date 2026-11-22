@@ -7,7 +7,11 @@ import { reloadForNewVersion } from './utils/staleChunk.js'
 import { installGlobalErrorReporter } from './utils/globalErrorReporter.js'
 import { reportAIError } from './services/db.js'
 import { auth } from './firebase.js'
-import { isWeb, getPlatform } from './services/platform.js'
+import { isWeb, isMobile, getPlatform } from './services/platform.js'
+import { startPhoneLook } from './services/link/phoneLook.js'
+
+// The KaTuro App's text size and light/dark look (Menu → Settings), before the first screen.
+if (isMobile()) startPhoneLook()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

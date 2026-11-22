@@ -69,7 +69,8 @@
   --kt-duration:         0.15s;
 }
 
-[data-dark="true"] {
+[data-dark="true"],
+[data-phone-dark="true"] {
   /* Text tokens for dark surfaces (light mode uses each fallback colour). */
   --kt-chalkboard-ink:   #8FD3A9;
   --kt-green-primary-ink:#8FD3A9;

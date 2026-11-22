@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Delete, Download, KeyRound, Loader2, LogOut, RefreshCw, Unlink, UserX } from 'lucide-react';
+import { Delete, Download, KeyRound, Loader2, LogOut, RefreshCw, Settings, Unlink, UserX } from 'lucide-react';
 import { checkPin, setPin, validPin } from '../../services/link/appLock';
 import { KT_LOGO } from './phoneLogo';
 
@@ -51,7 +51,8 @@ export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
   };
 
   return (
-    <div className="kt-phone fixed inset-0 z-[60] flex flex-col items-center justify-center px-6" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="kt-phone fixed inset-0 z-[60] overflow-y-auto px-6" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex min-h-full flex-col items-center justify-center py-6">
       <img src={KT_LOGO} alt="" className="kt-logo mb-2 h-32 w-32" />
       <p className="text-lg font-semibold">{title}</p>
       <div className="my-6 flex gap-3" aria-label={`${pin.length} digits typed`}>
@@ -69,18 +70,20 @@ export function LockScreen({ mode, onDone, onForgot, onLockedOut, onCancel }) {
       {setting && !first && <p className="nm-muted mt-6 text-xs">4 to 6 numbers</p>}
       {!setting && <button type="button" onClick={onForgot} className="nm-muted mt-8 text-sm">Forgot PIN? <span className="nm-green font-semibold">Sign out</span></button>}
       {setting && onCancel && <button type="button" onClick={onCancel} className="nm-muted mt-6 text-sm">Cancel</button>}
+      </div>
     </div>
   );
 }
 
 /** The app menu (top right): version, updates, PIN, account. */
-export function PhoneMenu({ version, linked, onClose, onCheckUpdate, onChangePin, onUnlink, onSignOut }) {
+export function PhoneMenu({ version, linked, onClose, onSettings, onCheckUpdate, onChangePin, onUnlink, onSignOut }) {
   const [deleteInfo, setDeleteInfo] = useState(false);
-  const row = 'nm-press flex w-full items-center gap-4 rounded-2xl px-4 py-4 text-left text-[15px] font-medium';
+  const row = 'nm-press flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-left text-[15px] font-medium';
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/30" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full rounded-t-2xl bg-white px-4 pt-3" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-gray-300" />
+        <button type="button" onClick={onSettings} className={row}><Settings size={20} className="nm-green" /> <span className="min-w-0 flex-1">Settings<span className="nm-muted block text-xs font-normal">Text size, display size, dark mode</span></span></button>
         <button type="button" onClick={onCheckUpdate} className={row}><RefreshCw size={20} className="nm-green" /> Updates</button>
         {linked && <button type="button" onClick={onChangePin} className={row}><KeyRound size={20} className="nm-green" /> Change PIN</button>}
         {linked && <button type="button" onClick={onUnlink} className={row}><Unlink size={20} className="nm-muted" /> Unlink computer</button>}

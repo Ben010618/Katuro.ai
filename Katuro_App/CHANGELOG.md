@@ -4,6 +4,13 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.8.0
+Settings: bigger text and dark mode.
+- Menu → Settings: choose the text size (Small to Largest) and the display size (makes text, buttons and spacing larger).
+- Dark mode: Light, Dark, or Like my phone.
+- The app fits every phone: nothing covers anything else on small screens, with large text, or on tablets and phones turned sideways.
+- Today: the Add button now sits next to the day, so it no longer covers your events.
+
 ## v1.7.0
 A real calendar on the Today tab.
 - A month calendar: tap a day to see its classes, events and school activities; swipe or use the arrows to change month.

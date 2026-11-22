@@ -19,15 +19,32 @@
   --nm-ink: #26332c;
   --nm-muted: #5f6b64;
   --nm-accent: #187349;
+  --nm-green-ink: #187349; /* green used as text */
+  --nm-nav-shadow: 0 -8px 22px rgba(163, 177, 168, 0.35);
   --nm-raised: 8px 8px 18px var(--nm-dark), -8px -8px 18px var(--nm-light);
   --nm-raised-sm: 4px 4px 10px var(--nm-dark), -4px -4px 10px var(--nm-light);
   --nm-inset: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
   --nm-accent-shadow: 5px 5px 14px rgba(24, 115, 73, 0.32), -5px -5px 12px var(--nm-light);
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--nm-bg);
   color: var(--nm-ink);
   -webkit-tap-highlight-color: transparent;
+  /* Text size (Menu → Settings, phoneLook.js): every text size scales by --kt-fs. */
+  --text-xs: calc(0.75rem * var(--kt-fs, 1));
+  --text-sm: calc(0.875rem * var(--kt-fs, 1));
+  --text-base: calc(1rem * var(--kt-fs, 1));
+  --text-lg: calc(1.125rem * var(--kt-fs, 1));
+  --text-xl: calc(1.25rem * var(--kt-fs, 1));
+  --text-2xl: calc(1.5rem * var(--kt-fs, 1));
+  --text-3xl: calc(1.875rem * var(--kt-fs, 1));
+  font-size: calc(0.90625rem * var(--kt-fs, 1));
+  overflow-wrap: anywhere;
 }
+.kt-phone .text-\[10px\] { font-size: calc(0.625rem * var(--kt-fs, 1)); }
+.kt-phone .text-\[11px\] { font-size: calc(0.6875rem * var(--kt-fs, 1)); }
+.kt-phone .text-\[13px\] { font-size: calc(0.8125rem * var(--kt-fs, 1)); }
+.kt-phone .text-\[15px\] { font-size: calc(0.9375rem * var(--kt-fs, 1)); }
 .kt-phone :is(h1, h2, h3) { font-family: inherit; }
 
 .kt-phone .nm { background: var(--nm-bg); box-shadow: var(--nm-raised); }
@@ -38,7 +55,7 @@
 .kt-phone .nm-accent { background: var(--nm-accent); color: #fff; box-shadow: var(--nm-accent-shadow); }
 .kt-phone .nm-muted { color: var(--nm-muted); }
 .kt-phone .nm-ink { color: var(--nm-ink); }
-.kt-phone .nm-green { color: var(--nm-accent); }
+.kt-phone .nm-green { color: var(--nm-green-ink); }
 
 /* The logo: no box around it, it floats over the surface. */
 .kt-phone .kt-logo { filter: drop-shadow(5px 7px 9px rgba(120, 135, 126, 0.45)); transition: transform 0.18s ease, filter 0.18s ease; }
@@ -49,7 +66,17 @@
    screen shows its own bottom bar (.kt-covers-nav: Review scores, Send…), the tab bar steps away
    so the logo does not peek over it. */
 .kt-phone:has(.kt-covers-nav:not([hidden] *)) .kt-nav { display: none; }
-.kt-phone .kt-nav { background: var(--nm-bg); box-shadow: 0 -8px 22px rgba(163, 177, 168, 0.35); border-radius: 26px 26px 0 0; }
+.kt-phone .kt-nav { background: var(--nm-bg); box-shadow: var(--nm-nav-shadow); border-radius: 26px 26px 0 0; }
+
+/* Bottom sheets never grow past the top of the screen (large text, small phones): they scroll,
+   and some of the dimmed screen above stays to tap for closing. */
+.kt-phone .fixed.inset-0.items-end > * { max-height: calc(100dvh - 2.5rem); overflow-y: auto; overscroll-behavior: contain; }
+
+/* The Assistant's chat box stands on a solid strip down to the bar (no chat peeks out between them). */
+.kt-phone .kt-chatbar { background: var(--nm-bg); }
+
+/* The logo in the bar: as large as fits between the tabs beside it (narrow phones, large display size). */
+.kt-phone .kt-nav-logo { display: block; width: min(5.875rem, calc(40vw - 3.25rem)); height: auto; aspect-ratio: 1; }
 
 /* ── The screens' utility classes, in the same look ── */
 .kt-phone .bg-white,
@@ -70,7 +97,7 @@
 .kt-phone button.border-gray-300:active:not(:disabled) { box-shadow: var(--nm-inset); }
 .kt-phone .bg-emerald-700 { background-color: var(--nm-accent); box-shadow: var(--nm-accent-shadow); }
 .kt-phone .bg-emerald-700:disabled { box-shadow: none; }
-.kt-phone .fixed.border-t { box-shadow: 0 -8px 22px rgba(163, 177, 168, 0.35); border-radius: 22px 22px 0 0; }
+.kt-phone .fixed.border-t { box-shadow: var(--nm-nav-shadow); border-radius: 22px 22px 0 0; }
 .kt-phone .rounded-t-2xl { border-radius: 28px 28px 0 0; }
 .kt-phone :is(input, textarea, select):not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']) {
   background-color: var(--nm-bg);
@@ -83,6 +110,51 @@
 .kt-phone input::placeholder,
 .kt-phone textarea::placeholder { color: var(--nm-muted); }
 .kt-phone .text-gray-500 { color: var(--nm-muted); }
+
+/* ── Big screens (tablets, foldables, a phone turned sideways): one comfortable column ── */
+.kt-phone .kt-col { width: 100%; max-width: 42rem; margin-inline: auto; }
+@media (min-width: 40rem) {
+  /* Bottom sheets and full-screen pages keep their content in the middle. */
+  .kt-phone .fixed.inset-0.items-end > *,
+  .kt-phone .fixed.inset-0.overflow-y-auto > * { max-width: 42rem; margin-inline: auto; }
+  .kt-phone .fixed.inset-0.items-end { justify-content: center; }
+  .kt-phone .kt-covers-nav { padding-inline: max(1rem, calc((100% - 42rem) / 2)); }
+  .kt-phone .kt-nav > div { max-width: 42rem; margin-inline: auto; }
+}
+
+/* ── Dark (Menu → Settings → Dark, or like the phone): the same soft surfaces, at night ── */
+:root[data-phone-dark='true'] .kt-phone {
+  --nm-bg: #1a201d;
+  --nm-dark: rgba(0, 0, 0, 0.6);
+  --nm-light: rgba(255, 255, 255, 0.05);
+  --nm-ink: #e5ece7;
+  --nm-muted: #a3b0a8;
+  --nm-accent: #1f8a57;
+  --nm-green-ink: #74d6a6;
+  --nm-accent-shadow: 5px 5px 14px rgba(0, 0, 0, 0.55), -5px -5px 12px var(--nm-light);
+  --nm-nav-shadow: 0 -8px 22px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+:root[data-phone-dark='true'] .kt-phone .kt-logo { filter: drop-shadow(4px 6px 10px rgba(0, 0, 0, 0.6)); }
+:root[data-phone-dark='true'] .kt-phone :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-black) { color: var(--nm-ink); }
+:root[data-phone-dark='true'] .kt-phone :is(.text-gray-600, .text-gray-500, .text-gray-400) { color: var(--nm-muted); }
+:root[data-phone-dark='true'] .kt-phone :is(.text-amber-900, .text-amber-800, .text-amber-700, .text-amber-600) { color: #f2c66d; }
+:root[data-phone-dark='true'] .kt-phone :is(.text-red-800, .text-red-700, .text-red-600) { color: #f4a196; }
+:root[data-phone-dark='true'] .kt-phone :is(.text-emerald-900, .text-emerald-800, .text-emerald-700, .text-emerald-600) { color: var(--nm-green-ink); }
+:root[data-phone-dark='true'] .kt-phone .text-sky-700 { color: #7cc8f0; }
+/* White text on a green button or bubble stays white. */
+:root[data-phone-dark='true'] .kt-phone :is(.bg-emerald-700, .bg-emerald-600, .nm-accent) :is(.text-gray-900, .text-emerald-900) { color: #fff; }
+:root[data-phone-dark='true'] .kt-phone :is(.bg-gray-50, .bg-gray-100) { background-color: rgba(255, 255, 255, 0.07); }
+:root[data-phone-dark='true'] .kt-phone :is(.bg-gray-200, .bg-gray-300) { background-color: rgba(255, 255, 255, 0.14); }
+:root[data-phone-dark='true'] .kt-phone .bg-emerald-50 { background-color: rgba(52, 211, 153, 0.12); }
+:root[data-phone-dark='true'] .kt-phone .bg-amber-50 { background-color: rgba(245, 158, 11, 0.14); }
+:root[data-phone-dark='true'] .kt-phone .bg-red-50 { background-color: rgba(239, 68, 68, 0.15); }
+:root[data-phone-dark='true'] .kt-phone :is(.border-emerald-200, .border-emerald-300, .border-emerald-400) { border-color: rgba(116, 214, 166, 0.35); }
+:root[data-phone-dark='true'] .kt-phone :is(.border-amber-200, .border-amber-300) { border-color: rgba(242, 198, 109, 0.4); }
+:root[data-phone-dark='true'] .kt-phone .border-red-200 { border-color: rgba(244, 161, 150, 0.4); }
+:root[data-phone-dark='true'] .kt-phone .divide-gray-100 > :not(:last-child) { border-color: rgba(255, 255, 255, 0.08); }
+:root[data-phone-dark='true'] .kt-phone :is(input, textarea, select) { color: var(--nm-ink); }
+:root[data-phone-dark='true'] .kt-phone select option { background: #1a201d; color: var(--nm-ink); }
 
 /* ── The welcome after signing in (PhoneIntro.jsx): ten seconds, then the chat ── */
 .kt-phone .kt-intro { background: var(--nm-bg); overflow: hidden; }
