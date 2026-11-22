@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { shiftMonth as moveMonth } from '../../../utils/dates';
 import { X, ChevronLeft, ChevronRight, Plus, Bell, BellOff, Trash2, Pencil, CalendarDays } from 'lucide-react';
 import { useDeskStore } from '../../../store/deskStore';
 import { CALENDARS, calendarPosition, manilaDate } from '../../../services/desk/knowledge/schoolCalendar';
@@ -102,8 +103,8 @@ export default function DeskCalendarPanel({ onClose }) {
   const upcoming = upcomingActivities(today, 14).filter((u) => u.activity.kind !== 'block').slice(0, 8);
 
   const shiftMonth = (delta) => setView(({ y, m }) => {
-    const d = new Date(y, m - 1 + delta, 1);
-    return { y: d.getFullYear(), m: d.getMonth() + 1 };
+    const next = moveMonth({ year: y, month: m }, delta);
+    return { y: next.year, m: next.month };
   });
   const goToday = () => { setView({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }); setSelected(today); };
 

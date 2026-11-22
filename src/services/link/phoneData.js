@@ -9,6 +9,7 @@ import { forgetPhoneFiles, outboxCount } from './phoneFiles.js';
 import { syncReminders } from './phoneReminders.js';
 import { forgetPin } from './appLock.js';
 import { TESTS_CACHE_KEY } from './phoneTests.js';
+import { CALENDAR_CACHE_KEY } from './phoneCalendar.js';
 
 // localStorage keys with the teacher's data (learner names, scores, schedule, chat).
 const PHONE_DATA_KEYS = [
@@ -16,6 +17,7 @@ const PHONE_DATA_KEYS = [
   'katuro-phone-schedule-v1',
   'katuro-phone-chat-v1',
   TESTS_CACHE_KEY, // the tests list (titles, classes)
+  CALENDAR_CACHE_KEY, // the months seen in the calendar
 ];
 
 /** What would be lost (not yet sent to KaTuroDesk). → { recordings, files } */

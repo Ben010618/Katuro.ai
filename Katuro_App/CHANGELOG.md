@@ -4,6 +4,13 @@ Numbering: **vMAJOR.MINOR.PATCH**. Fixes raise the last number (v1.0.1), new fea
 middle one (v1.1.0), big changes the first (v2.0.0). The notes under each version are what
 teachers see in the app when the update is offered.
 
+## v1.7.0
+A real calendar on the Today tab.
+- A month calendar: tap a day to see its classes, events and school activities; swipe or use the arrows to change month.
+- Tap + (or an empty day) to add an event on that day, with a time and a reminder in one tap (5 minutes to 1 day before).
+- Reminders and class alerts now ring like an alarm: sound, vibration, and on the lock screen.
+- Months you opened are kept on the phone for when you are away from the Wi-Fi.
+
 ## v1.6.0
 Check test papers with the camera.
 - Camera → Check test papers: hold the phone over KaTuro bubble sheets; the app knows the test from the sheet, checks each one and shows the score.

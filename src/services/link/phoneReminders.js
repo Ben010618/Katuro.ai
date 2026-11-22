@@ -137,6 +137,28 @@ async function allowNotifications() {
   }
 }
 
+// Reminders and class alerts ring like an alarm: their own high-priority Android channel
+// (sound, vibration, shown on the lock screen and as a heads-up), made once.
+// Android keeps a channel's first settings (the teacher may change them in Settings): to change
+// its importance, sound or vibration later, use a NEW id (e.g. 'katuro-alarms-2').
+export const ALARM_CHANNEL = 'katuro-alarms';
+let channelReady = null;
+function ensureAlarmChannel() {
+  if (!channelReady) {
+    channelReady = call('createChannel', {
+      id: ALARM_CHANNEL,
+      name: 'Reminders and class alerts',
+      description: 'Your calendar reminders and alerts before each class',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      lights: true,
+      lightColor: '#187349',
+    }).then(() => true, () => { channelReady = null; return false; });
+  }
+  return channelReady;
+}
+
 /**
  * Replaces the reminders and class alerts scheduled on the phone with these (from KaTuroDesk).
  *   classes: the schedule's days (classNotifications), alerted classAlertMinutes() before
@@ -161,6 +183,7 @@ async function syncNow(reminders, { days = [], now = Date.now() } = {}) {
     saveIds([]);
     if (!wanted.length || !(await allowNotifications())) return { scheduled: 0, classes: 0, exact: false };
     const exact = await exactReminders();
+    const alarm = await ensureAlarmChannel();
     await call('schedule', {
       notifications: wanted.map((n) => ({
         id: n.id,
@@ -168,6 +191,7 @@ async function syncNow(reminders, { days = [], now = Date.now() } = {}) {
         body: n.body,
         schedule: { at: n.at.toISOString(), allowWhileIdle: true },
         extra: { kind: classAlerts.includes(n) ? 'class' : 'reminder' },
+        ...(alarm ? { channelId: ALARM_CHANNEL } : {}),
         // false = no Settings page pops up; Android may ring a few minutes late while asleep.
         isExactNotification: exact,
       })),
