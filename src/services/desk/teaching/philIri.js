@@ -166,6 +166,20 @@ const SUB = {
 };
 // A percent or a level is computed by KaTuro, never read as the score or the count.
 const DERIVED = /%|percent|porsiyento|level|antas/i;
+// "Learner Reference No." (LRN) and other ID columns are not the learner's name.
+const NOT_NAME = /\blrn\b|reference|\bno\.?\s*$|\bnumber\b|\bid\b|school|section|grade/i;
+// Reading time split over two columns: Minutes | Seconds.
+const MIN_COL = /^(min|mins|minutes?|minuto)\b\.?/i;
+const SEC_COL = /^(sec|secs|seconds?|segundo)\b\.?/i;
+// A group heading that is itself a reading term (not a section like Pre-test or Filipino).
+const isReadingTerm = (s) => [HEADERS.miscues, HEADERS.correct, HEADERS.rate, HEADERS.time, HEADERS.words, HEADERS.questions].some((re) => re.test(s)) || /reading|pagbasa/i.test(s);
+const squash = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** The learner-name heading in a row: a plain name heading first, never an LRN/ID column. */
+function nameColumn(cells) {
+  const ok = cells.map((v, i) => (v && HEADERS.name.test(v) && !NOT_NAME.test(v) ? i : -1)).filter((i) => i >= 0);
+  return ok.find((i) => /name|pangalan/i.test(cells[i])) ?? ok[0] ?? -1;
+}
 
 /**
  * Finds the reading columns in a sheet (rows of cell values). Two heading rows are read
@@ -176,10 +190,10 @@ const DERIVED = /%|percent|porsiyento|level|antas/i;
  * → { headerRow, cols: { name, words?, miscues?, correct?, questions?, time?, rate?, timeInMinutes, breakdown: [{ key, col }] } } or null
  *   (headerRow = the last heading row; learners start below it)
  */
-export function findReadingColumns(rows = []) {
+export function findReadingColumns(rows = [], { section = '' } = {}) {
   for (let r = 0; r < Math.min(rows.length, 20); r++) {
     const main = (rows[r] || []).map(clean);
-    const nameCol = main.findIndex((v) => v && HEADERS.name.test(v));
+    const nameCol = nameColumn(main);
     if (nameCol < 0) continue;
     // The row below is a second heading row only when it has no learner name and no numbers.
     const below = (rows[r + 1] || []).map(clean);
@@ -193,9 +207,21 @@ export function findReadingColumns(rows = []) {
       else if (!sub[k]) group = '';
       cols.push({ k, own: sub[k] || main[k] || '', group: sub[k] ? group : main[k] || '' });
     }
+    // Sections: groups such as Pre-test | Post-test or English | Filipino, each with its own
+    // reading columns. One section is scored at a time, the one the teacher names; with more
+    // than one and none named, KaTuro asks (never scores the first one silently).
+    const sectionOf = (x) => (x.group !== x.own && !isReadingTerm(x.group) ? x.group : '');
+    const sections = [...new Set(cols.filter((x) => sectionOf(x) && (HEADERS.miscues.test(x.own) || HEADERS.correct.test(x.own) || MISCUE_TYPES.some((m) => m.match.test(x.own)))).map(sectionOf))];
+    let inSection = () => true;
+    if (sections.length > 1) {
+      const want = squash(section);
+      const chosen = want ? sections.find((s) => squash(s).includes(want) || want.includes(squash(s))) : undefined;
+      if (!chosen) return { headerRow: twoRows ? r + 1 : r, sections, cols: null };
+      inSection = (x) => !sectionOf(x) || sectionOf(x) === chosen;
+    }
     const used = new Set([nameCol]);
     const take = (test) => {
-      const c = cols.find((x) => x.own && !used.has(x.k) && test(x));
+      const c = cols.find((x) => x.own && !used.has(x.k) && inSection(x) && test(x));
       if (!c) return undefined;
       used.add(c.k);
       return c.k;
@@ -211,13 +237,19 @@ export function findReadingColumns(rows = []) {
     const miscues = take((x) => !DERIVED.test(x.own) && (inGroup(HEADERS.miscues)(x) ? SUB.total.test(x.own) || HEADERS.miscues.test(x.own) : HEADERS.miscues.test(x.own)));
     const correct = take((x) => !DERIVED.test(x.own) && (inGroup(HEADERS.correct)(x) ? SUB.score.test(x.own) : HEADERS.correct.test(x.own)));
     const rate = take((x) => HEADERS.rate.test(x.own));
-    const time = take((x) => HEADERS.time.test(x.own) && !HEADERS.rate.test(x.own));
+    // Minutes | Seconds in two columns are added up; otherwise one time column.
+    const minCol = cols.find((x) => !used.has(x.k) && inSection(x) && MIN_COL.test(x.own) && !HEADERS.rate.test(x.own));
+    const secCol = cols.find((x) => !used.has(x.k) && inSection(x) && SEC_COL.test(x.own));
+    const split = minCol && secCol ? { timeMin: minCol.k, timeSec: secCol.k } : null;
+    if (split) { used.add(minCol.k); used.add(secCol.k); }
+    const time = split ? undefined : take((x) => HEADERS.time.test(x.own) && !HEADERS.rate.test(x.own));
     const groupOf = (re) => cols.some((x) => x.group !== x.own && re.test(x.group));
     if (miscues === undefined && !breakdown.length && correct === undefined && !groupOf(HEADERS.miscues) && !groupOf(HEADERS.correct)) continue;
     const timeText = time === undefined ? '' : cols[time].own;
     return {
       headerRow: twoRows ? r + 1 : r,
-      cols: { name: nameCol, words, miscues, correct, questions, time, rate, timeInMinutes: /minutes?|mins?|minuto/i.test(timeText) && !/sec|segundo/i.test(timeText), breakdown },
+      section: sections.length > 1 ? cols.find((x) => inSection(x) && sectionOf(x))?.group : undefined,
+      cols: { name: nameCol, words, miscues, correct, questions, time, ...split, rate, timeInMinutes: /minutes?|mins?|minuto/i.test(timeText) && !/sec|segundo/i.test(timeText), breakdown },
     };
   }
   return null;
@@ -225,12 +257,16 @@ export function findReadingColumns(rows = []) {
 
 /**
  * Learners' reading results from a sheet.
- * `defaults` gives numbers that are the same for the whole class: { words, questions }.
- * → { readers: [{ name, words, miscues, correct, questions, seconds, row }], cols } or null
+ * `defaults` gives numbers that are the same for the whole class: { words, questions }; `section`
+ * names the part to score when the sheet has several (e.g. "post-test", "Filipino").
+ * → { readers: [{ name, words, miscues, correct, questions, seconds, row }], cols, section? }
+ *   or { readers: [], sections: [names] } when the sheet has several parts and none was named
+ *   or null when the sheet has no reading results
  */
-export function readersFromRows(rows = [], defaults = {}) {
-  const found = findReadingColumns(rows);
+export function readersFromRows(rows = [], defaults = {}, { section = '' } = {}) {
+  const found = findReadingColumns(rows, { section });
   if (!found) return null;
+  if (!found.cols) return { readers: [], sections: found.sections };
   const { headerRow, cols } = found;
   const at = (row, i) => (i === undefined ? undefined : row?.[i]);
   const readers = [];
@@ -243,7 +279,12 @@ export function readersFromRows(rows = [], defaults = {}) {
       const parts = cols.breakdown.map((b) => num(row[b.col]));
       miscues = parts.every((v) => v === null) ? null : parts.reduce((a, v) => a + (v || 0), 0);
     }
-    const time = at(row, cols.time);
+    let seconds;
+    if (cols.timeMin !== undefined) {
+      const m = num(at(row, cols.timeMin));
+      const s = num(at(row, cols.timeSec));
+      seconds = m === null && s === null ? null : (m || 0) * 60 + (s || 0) || null;
+    } else seconds = parseSeconds(at(row, cols.time), { minutes: cols.timeInMinutes });
     readers.push({
       name,
       row: r + 1,
@@ -251,9 +292,9 @@ export function readersFromRows(rows = [], defaults = {}) {
       miscues: pick(miscues, null),
       correct: pick(at(row, cols.correct), null),
       questions: pick(at(row, cols.questions), defaults.questions),
-      seconds: parseSeconds(time, { minutes: cols.timeInMinutes }),
+      seconds,
       ...(cols.rate !== undefined ? { rate: pick(at(row, cols.rate), null) } : {}),
     });
   }
-  return readers.length ? { readers, cols } : null;
+  return readers.length ? { readers, cols, ...(found.section ? { section: found.section } : {}) } : null;
 }

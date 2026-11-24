@@ -161,6 +161,39 @@ describe('reading results from a sheet', () => {
     expect(bad).toMatchObject({ wpm: null, level: 'Independent', problems: ['reading speed "fast" could not be read'] });
   });
 
+  it('Pre-test | Post-test (or English | Filipino) groups: the named part is scored, and none is picked silently', () => {
+    const rows = [
+      ['Name', 'Pre-test', null, null, 'Post-test', null, null],
+      [null, 'Miscues', 'Comprehension Score', 'Time', 'Miscues', 'Comprehension Score', 'Time'],
+      ['Cruz, Juan', 20, 2, '3:00', 2, 7, '1:40'],
+    ];
+    expect(readersFromRows(rows, { words: 100, questions: 7 })).toEqual({ readers: [], sections: ['Pre-test', 'Post-test'] });
+    const post = readersFromRows(rows, { words: 100, questions: 7 }, { section: 'post-test' });
+    expect(post.section).toBe('Post-test');
+    expect(post.readers[0]).toMatchObject({ miscues: 2, correct: 7, seconds: 100 });
+    expect(scoreReader(post.readers[0]).level).toBe('Independent');
+    const pre = readersFromRows(rows, { words: 100, questions: 7 }, { section: 'Pre-test' });
+    expect(scoreReader(pre.readers[0]).level).toBe('Frustration');
+    const lang = [['Pangalan', 'English', null, 'Filipino', null], [null, 'Miscues', 'Comprehension', 'Miscues', 'Comprehension'], ['Cruz, Juan', 1, 6, 9, 4]];
+    expect(readersFromRows(lang, { words: 100, questions: 7 }).sections).toEqual(['English', 'Filipino']);
+    expect(readersFromRows(lang, { words: 100, questions: 7 }, { section: 'Filipino' }).readers[0]).toMatchObject({ miscues: 9, correct: 4 });
+  });
+
+  it('"Learner Reference No." (LRN) is never the name column', () => {
+    const out = readersFromRows([['Learner Reference No.', 'Name of Pupil', 'Miscues', 'Comprehension'], ['123456789012', 'Cruz, Juan', 3, 6]], { words: 100, questions: 7 });
+    expect(out.cols.name).toBe(1);
+    expect(out.readers[0].name).toBe('Cruz, Juan');
+    expect(readersFromRows([['LRN', "Learner's Name", 'Miscues', 'Comprehension'], ['123456789012', 'Cruz, Juan', 3, 6]], { words: 100, questions: 7 }).readers[0].name).toBe('Cruz, Juan');
+  });
+
+  it('reading time in Minutes | Seconds columns is added up (one or two heading rows)', () => {
+    const one = readersFromRows([['Name', 'Miscues', 'Comprehension', 'Minutes', 'Seconds'], ['Cruz, Juan', 3, 6, 1, 40]], { words: 100, questions: 7 });
+    expect(one.readers[0].seconds).toBe(100);
+    expect(scoreReader(one.readers[0]).wpm).toBe(60);
+    const two = readersFromRows([['Name', 'Miscues', 'Comprehension', 'Reading Time', null], [null, null, null, 'Min', 'Sec'], ['Cruz, Juan', 3, 6, 1, 40], ['Reyes, Ana', 2, 5, 2, null]], { words: 100, questions: 7 });
+    expect(two.readers.map((r) => r.seconds)).toEqual([100, 120]);
+  });
+
   it('a learner row with text in it is never taken as a second heading row', () => {
     const out = readersFromRows([['Name', 'Miscues', null, 'Comprehension'], ['Cruz, Juan', 'n/a', 'x', 5]], { words: 100, questions: 7 });
     expect(out.readers).toHaveLength(1);

@@ -76,6 +76,27 @@ describe('reading_check (Phil-IRI, scored by code)', () => {
     expect(b.res.content).toMatch(/How many comprehension questions/);
   });
 
+  it('a sheet with Pre-test and Post-test: asks which one, then scores the one named (its name in the title)', async () => {
+    const rows = [
+      ['Name', 'Pre-test', null, 'Post-test', null],
+      [null, 'Miscues', 'Comprehension', 'Miscues', 'Comprehension'],
+      ['Cruz, Juan', 20, 2, 2, 7],
+    ];
+    const ws = folder(rows);
+    const a = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7 });
+    expect(a.res.content).toContain('has results for Pre-test and Post-test. Which one should I score?');
+    clearAnswerMemory();
+    const b = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7, test: 'post-test' });
+    expect(b.res.content).toContain('Phil-IRI reading check for 1 learner(s): 1 Independent, 0 Instructional, 0 Frustration');
+    expect(b.res.content).toMatch(/Phil-IRI Class Reading Profile — Post-test|Post-test/);
+  });
+
+  it('a sheet that only shows the levels is explained, not scored', async () => {
+    const ws = folder([['Name', 'Word Reading', 'Comprehension', 'Reading Level'], ['Cruz, Juan', 'Independent', 'Instructional', 'Instructional']]);
+    const { res } = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7 });
+    expect(res.content).toMatch(/no miscue counts or comprehension scores \(it may already show the reading levels\)/);
+  });
+
   it('a file without reading results is said plainly', async () => {
     const ws = folder([['Name', 'Quarter 1'], ['Dela Cruz, Juan', 88]]);
     const { res } = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 150, questions: 7 });
