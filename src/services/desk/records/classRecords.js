@@ -68,6 +68,7 @@ export function isKaturoHome(tree = []) {
 const RECORD_TOOLS = new Set([
   'make_class_record', 'build_report_cards', 'analyze_scores', 'check_attendance',
   'check_grade_sheets', 'check_answer_sheets', 'consolidate_files', 'record_quiz_scores',
+  'reading_check',
 ]);
 
 /**

@@ -6,8 +6,9 @@ import { TOOLS as BASE_TOOLS } from './tools.js';
 import { UNDERSTAND_TOOLS } from './understandTools.js';
 import { CALENDAR_TOOLS } from './calendarTools.js';
 import { TEST_TOOLS } from './testTools.js';
+import { READING_TOOLS } from './readingTools.js';
 
-export const TOOLS = { ...BASE_TOOLS, ...UNDERSTAND_TOOLS, ...CALENDAR_TOOLS, ...TEST_TOOLS };
+export const TOOLS = { ...BASE_TOOLS, ...UNDERSTAND_TOOLS, ...CALENDAR_TOOLS, ...TEST_TOOLS, ...READING_TOOLS };
 export const TOOL_NAMES = Object.keys(TOOLS);
 
 /** Tool catalog text for the planner prompt. */

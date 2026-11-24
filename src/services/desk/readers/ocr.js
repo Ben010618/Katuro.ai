@@ -11,17 +11,17 @@
  * FIND files, never as a source of scores or names that are written into a record.
  */
 
+import { isDesk } from '../../platform.js';
+
 export const OCR_LANGS = 'eng+tgl';
 export const MAX_OCR_PAGES = 8; // scanned PDF pages read per file
-export const OCR_IMAGE = /\.(jpe?g|png|webp|bmp|gif)$/i; // HEIC photos are not readable here
+export const OCR_IMAGE = /\.(jpe?g|png|webp)$/i; // HEIC photos are not readable here
 const IDLE_MS = 90_000; // the engine (about 40 MB of memory) is closed when not used for a while
 const JOB_MS = 60_000; // one page never blocks a search for longer than this
 const CACHE_MAX = 300;
 
-const isDesktop = () => typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.isElectron);
-
 /** Can this computer read scans by itself? (KaTuroDesk only; not the website or the phone.) */
-export const ocrAvailable = () => isDesktop();
+export const ocrAvailable = () => isDesk();
 
 /** Tidies Tesseract's text: no stray symbols-only lines, single spaces, at most one blank line. */
 export function cleanOcrText(text) {
@@ -73,6 +73,10 @@ export function createOcr(deps = {}) {
         workerBlobURL: false,
         cacheMethod: 'none', // the language files are already on this computer
         gzip: true,
+        // Without this, Tesseract ALSO throws every failed page (a corrupt or mislabelled photo)
+        // as an uncaught error, which the app would report as a crash. The job's own rejection
+        // is already handled by readOne.
+        errorHandler: () => {},
       }).catch((err) => {
         worker = null;
         throw err;
@@ -124,7 +128,7 @@ export function createOcr(deps = {}) {
    */
   function readFile({ key, kind, getBytes, mimeType = '' }) {
     if (key && cache.has(key)) return cache.get(key);
-    const run = (async () => {
+    const run = withTimeout((async () => {
       const bytes = await getBytes();
       if (kind === 'pdf') {
         const { pages, total } = await pdfPages(bytes, MAX_OCR_PAGES);
@@ -134,7 +138,7 @@ export function createOcr(deps = {}) {
       }
       const blob = typeof Blob !== 'undefined' && !(bytes instanceof Blob) ? new Blob([bytes], { type: mimeType || 'image/png' }) : bytes;
       return { pages: [{ number: 1, ...(await readOne(blob)) }], total: 1, read: 1 };
-    })();
+    })(), jobMs * (kind === 'pdf' ? MAX_OCR_PAGES + 2 : 3), 'Reading the file'); // a PDF that never renders cannot hang a search
     if (key) {
       cache.set(key, run);
       run.catch(() => cache.delete(key)); // a failed read is tried again next time
@@ -146,37 +150,18 @@ export function createOcr(deps = {}) {
   return { readFile, readOne, close, get cacheSize() { return cache.size; } };
 }
 
-/** The first `maxPages` pages of a PDF as page images (white background, about 200 dpi). */
+async function toPng(canvas) {
+  if (typeof canvas.convertToBlob === 'function') return canvas.convertToBlob({ type: 'image/png' });
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The page could not be drawn'))), 'image/png'));
+}
+
+/** The first `maxPages` pages of a PDF as PNG page images (about 200 dpi, sharp enough to read). */
 async function renderPdfPages(bytes, maxPages) {
-  const { loadPdfjs } = await import('./index.js');
-  const pdfjs = await loadPdfjs();
-  const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
-  try {
-    const pages = [];
-    const count = Math.min(doc.numPages, maxPages);
-    for (let i = 1; i <= count; i++) {
-      const page = await doc.getPage(i);
-      const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(2.8, 2200 / Math.max(base.width, base.height));
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      const context = canvas.getContext('2d');
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: context, viewport }).promise;
-      pages.push(canvas);
-      page.cleanup?.();
-    }
-    return { pages, total: doc.numPages };
-  } finally {
-    try {
-      await doc.destroy();
-    } catch {
-      // ignore
-    }
-  }
+  const { renderPdfPages: render } = await import('../agent/visionPrep.js');
+  const pages = [];
+  const done = await render(bytes, { maxPages, maxDim: 2200, maxScale: 2.8, onPage: async (canvas) => { pages.push(await toPng(canvas)); } });
+  if (!done) throw new Error('Scanned PDFs cannot be read here');
+  return { pages, total: done.total };
 }
 
 let shared = null;

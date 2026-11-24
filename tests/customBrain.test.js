@@ -83,6 +83,27 @@ describe("the teacher's own AI key (main process)", () => {
     expect(readModels('openai', { data: [{ id: 'llama3' }] }, false)).toEqual(['llama3']);
   });
 
+  it('the AI on this computer (Ollama): no key, its models listed, Gemma 4 chosen first, nothing sent elsewhere', async () => {
+    const models = { data: [{ id: 'llama3.2:3b' }, { id: 'gemma4:e2b' }, { id: 'gemma4:e4b' }, { id: 'gemma3:4b' }] };
+    expect(suggestModel('openai', readModels('openai', models, false))).toBe('gemma4:e4b');
+    expect(suggestModel('openai', ['llama3.2:3b', 'gemma4:e2b'])).toBe('gemma4:e2b');
+    expect(suggestModel('openai', ['llama3.2:3b', 'gemma3:4b'])).toBe('gemma3:4b');
+    expect(suggestModel('openai', ['qwen3:4b'])).toBe('qwen3:4b');
+
+    const { brain, fetch } = fakeBrain(async (url) => (String(url).endsWith('/models')
+      ? { ok: true, status: 200, json: async () => models }
+      : { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }));
+    const listed = await brain.models({ provider: 'openai', baseUrl: 'http://localhost:11434/v1' });
+    expect(listed).toEqual({ models: ['llama3.2:3b', 'gemma4:e2b', 'gemma4:e4b', 'gemma3:4b'], suggested: 'gemma4:e4b' });
+    brain.save({ provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'gemma4:e4b', label: 'AI on this computer (Ollama, offline)' });
+    const out = await brain.call({ contents: [{ role: 'user', parts: [{ text: 'Hi' }] }] });
+    expect(out.text).toBe('OK');
+    for (const [url, init] of fetch.mock.calls) {
+      expect(String(url)).toMatch(/^http:\/\/localhost:11434\/v1\//);
+      expect(JSON.stringify(init?.headers || {})).not.toMatch(/Authorization/i);
+    }
+  });
+
   it('the key is saved encrypted, never shown back, and used for the request', async () => {
     const { brain, fetch, file } = fakeBrain(reply(200, { choices: [{ message: { content: 'OK' } }] }));
     const s = brain.save({ provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-x', key: 'sk-proj-secret1234', label: 'OpenAI' });

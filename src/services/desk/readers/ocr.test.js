@@ -49,6 +49,9 @@ describe('ocr (reading scans on this computer)', () => {
     expect(langs).toBe(OCR_LANGS);
     expect(oem).toBe(1);
     expect(options).toMatchObject({ workerPath: 'x/worker.min.js', corePath: 'x/', langPath: 'x/lang', workerBlobURL: false, cacheMethod: 'none' });
+    // A failed page must not ALSO become an uncaught error (reported as an app crash).
+    expect(options.errorHandler).toEqual(expect.any(Function));
+    expect(() => options.errorHandler('Error attempting to read image.')).not.toThrow();
     await ocr.close();
     expect(t.made[0].terminated).toBe(true);
   });
@@ -113,5 +116,13 @@ describe('ocr (reading scans on this computer)', () => {
   it('photo types it can read (HEIC cannot be read here)', () => {
     expect(['a.jpg', 'b.JPEG', 'c.png', 'd.webp'].every((n) => OCR_IMAGE.test(n))).toBe(true);
     expect(OCR_IMAGE.test('e.heic')).toBe(false);
+  });
+
+  it('a file that never finishes (e.g. a PDF that never renders) is stopped too', async () => {
+    const t = fakeTesseract();
+    const pdfPages = () => new Promise(() => {});
+    const ocr = createOcr({ createWorker: t.createWorker, assets, pdfPages, jobMs: 5 });
+    await expect(ocr.readFile({ key: 'stuck.pdf|1|1', kind: 'pdf', getBytes: bytes })).rejects.toThrow(/took too long/);
+    expect(ocr.cacheSize).toBe(0);
   });
 });

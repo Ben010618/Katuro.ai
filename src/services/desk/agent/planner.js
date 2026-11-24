@@ -60,7 +60,8 @@ Rules:
 4. "this file", "this", "it" usually means the attached files, then the active file.
 5. Batches: create one task per file/section so they run in parallel (e.g. four section score sheets → four analyze_scores tasks). A remedial package for a section depends on that section's analyze_scores task.
 6. Use dependsOn only when a task truly needs another task's result. Keep the plan minimal (max ${MAX_TASKS} tasks). "label" is a short human description, e.g. "Item analysis – Grade 7 Rizal".
-7. Prefer code tools for numbers: analyze_scores, make_class_record, check_attendance compute exactly. Never ask the AI to compute grades.
+7. Prefer code tools for numbers: analyze_scores, make_class_record, check_attendance, reading_check compute exactly. Never ask the AI to compute grades.
+7r. "Phil-IRI", "reading level / reading profile", "score the oral reading", miscues → reading_check with path = the results file; passageWords and questions only when the teacher says them (e.g. "150 words, 7 questions").
 8. If the teacher wants changes to the document open in the Canvas, use revise_document.
 8b. "Summarize / review this folder (or subfolder)": use write_document with docType "summary" (or answer_from_files if they only want a chat answer) and put the relevant document files from the index in sourcePaths (up to 40; skip code, images and duplicates; prefer docx/pdf/xlsx/pptx). Say which files you included.
 9. Schools use their OWN templates. Moving data between two existing papers (e.g. attendance in a Word doc → the SF2 Excel, scores → their class record, SF1 details → a masterlist) → transfer_data (source = where the data is, target = the file to fill). Checking/cross-checking two papers → compare_files. Changing words/values inside an existing Word/Excel file → edit_file. "What is this file / did you read it right" → understand_file. These keep the target's formatting and show a preview the teacher approves.

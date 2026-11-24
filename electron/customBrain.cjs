@@ -164,7 +164,9 @@ function suggestModel(provider, models) {
   const prefer = {
     gemini: [/flash$/i, /flash/i, /pro/i],
     claude: [/sonnet/i, /opus/i, /haiku/i],
-    openai: [/^gpt-[\d.]+$/i, /^gpt-[\d.]+-mini$/i, /^gpt/i],
+    // A local Ollama lists the models downloaded on this computer: Gemma 4 (Apache-2.0, made to
+    // run on laptops) first, the E4B size before the smaller E2B, then any other Gemma.
+    openai: [/^gpt-[\d.]+$/i, /^gpt-[\d.]+-mini$/i, /^gpt/i, /^gemma4:e4b/i, /^gemma4:e2b/i, /^gemma4/i, /^gemma/i],
   }[provider] || [];
   for (const re of prefer) {
     const hit = byNewest(models.filter((m) => re.test(m) && !/(preview|exp|lite|nano)/i.test(m)));

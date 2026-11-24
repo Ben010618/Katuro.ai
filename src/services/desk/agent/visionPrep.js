@@ -33,37 +33,56 @@ async function canvasToJpegBase64(canvas, quality) {
   return dataUrl.slice(dataUrl.indexOf(',') + 1);
 }
 
-/** Renders every page of a short PDF to JPEG parts, or returns null to mean "send the PDF as is". */
-export async function pdfToImageParts(bytes, { maxPages = MAX_PDF_PAGES, maxDim = 1600, quality = 0.8 } = {}) {
+/**
+ * Renders a PDF's first `maxPages` pages on a white canvas (longest side up to `maxDim` px, at
+ * most `maxScale`×) and hands each to `onPage(canvas, number)` as soon as it is drawn, so only
+ * one page image is in memory at a time. With `allOrNothing`, a longer PDF renders nothing.
+ * Used by the AI's page images (below) and by reading scans on this computer (readers/ocr.js).
+ * → { total, rendered } or null when there is no canvas here (e.g. tests).
+ */
+export async function renderPdfPages(bytes, { maxPages, maxDim, maxScale = 2, allOrNothing = false, onPage }) {
   if (!makeCanvas(1, 1)) return null;
-  let doc;
+  const pdfjs = await loadPdfjs();
+  const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
   try {
-    const pdfjs = await loadPdfjs();
-    doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, verbosity: 0 }).promise;
-    if (doc.numPages > maxPages) return null; // keep every page: send the original PDF instead
-    const parts = [];
-    for (let i = 1; i <= doc.numPages; i++) {
+    const total = doc.numPages;
+    if (allOrNothing && total > maxPages) return { total, rendered: 0 };
+    const count = Math.min(total, maxPages);
+    for (let i = 1; i <= count; i++) {
       const page = await doc.getPage(i);
       const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(2, maxDim / Math.max(base.width, base.height));
-      const viewport = page.getViewport({ scale });
+      const viewport = page.getViewport({ scale: Math.min(maxScale, maxDim / Math.max(base.width, base.height)) });
       const canvas = makeCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
       const context = canvas.getContext('2d');
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: context, viewport }).promise;
-      parts.push({ inlineData: { mimeType: 'image/jpeg', data: await canvasToJpegBase64(canvas, quality) } });
       page.cleanup?.();
+      await onPage(canvas, i);
     }
-    return parts;
-  } catch {
-    return null;
+    return { total, rendered: count };
   } finally {
     try {
-      await doc?.destroy?.();
+      await doc.destroy();
     } catch {
       // ignore
     }
+  }
+}
+
+/** Renders every page of a short PDF to JPEG parts, or returns null to mean "send the PDF as is". */
+export async function pdfToImageParts(bytes, { maxPages = MAX_PDF_PAGES, maxDim = 1600, quality = 0.8 } = {}) {
+  try {
+    const parts = [];
+    const done = await renderPdfPages(bytes, {
+      maxPages,
+      maxDim,
+      allOrNothing: true, // keep every page: a longer PDF is sent as the original instead
+      onPage: async (canvas) => { parts.push({ inlineData: { mimeType: 'image/jpeg', data: await canvasToJpegBase64(canvas, quality) } }); },
+    });
+    return done && done.rendered ? parts : null;
+  } catch {
+    return null;
   }
 }
 

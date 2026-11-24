@@ -10,8 +10,14 @@ const SERVICES = [
   { id: 'groq', label: 'Groq', provider: 'openai', baseUrl: 'https://api.groq.com/openai/v1' },
   { id: 'xai', label: 'xAI', provider: 'openai', baseUrl: 'https://api.x.ai/v1' },
   { id: 'nvidia', label: 'NVIDIA', provider: 'openai', baseUrl: 'https://integrate.api.nvidia.com/v1' },
+  // Ollama (MIT) runs open models such as Gemma 4 (Apache-2.0) on this computer: no key, no
+  // internet, nothing leaves the laptop.
+  { id: 'ollama', label: 'AI on this computer (Ollama, offline)', provider: 'openai', baseUrl: 'http://localhost:11434/v1', local: true },
   { id: 'other', label: 'Other service (OpenAI-compatible)', provider: 'openai', baseUrl: '' },
 ];
+
+/** What to do when the AI on this computer does not answer. */
+const OLLAMA_HELP = 'The AI on this computer is not running. Install Ollama (free) from ollama.com, open it, and download a model once with: ollama pull gemma4:e4b (or gemma4:e2b on a laptop with 8 GB of memory). Then press "Find the AI on this computer" again.';
 
 const serviceFor = (provider, baseUrl = '', label = '') => {
   if (provider !== 'openai') return SERVICES.find((s) => s.id === provider) || null;
@@ -80,9 +86,13 @@ export default function DeskOwnKeySettings() {
     setBusy('models');
     const res = await api.models({ provider: svc.provider, baseUrl: svc.provider === 'openai' ? baseUrl.trim() : '', key: key.trim() || undefined }).catch((e) => ({ error: e.message }));
     setBusy('');
-    if (res?.error) { say(res.error, true); return; }
+    if (res?.error) { say(svc.local ? OLLAMA_HELP : res.error, true); return; }
     setModels(res.models || []);
     if (!model || !(res.models || []).includes(model)) setModel(res.suggested || '');
+    if (svc.local) {
+      say(res.models?.length ? `The AI on this computer is running with ${res.models.length} model(s); ${res.suggested || res.models[0]} is chosen. Press "Save and test".` : 'Ollama is running but has no model yet. Download one once with: ollama pull gemma4:e4b', !res.models?.length);
+      return;
+    }
     say(res.models?.length ? `Your key works. ${res.models.length} models found; choose one below.` : 'Your key works, but no models were listed. Type the model name below.');
   };
 
@@ -98,7 +108,8 @@ export default function DeskOwnKeySettings() {
     setKey('');
     const t = await api.test().catch((e) => ({ error: e.message }));
     setBusy('');
-    if (t?.error) say(`Saved, but the test request failed: ${t.error} Until it works, the KaTuro AI keeps answering.`, true);
+    if (t?.error) say(`Saved, but the test request failed: ${svc.local ? OLLAMA_HELP : t.error} Until it works, the KaTuro AI keeps answering.`, true);
+    else if (svc.local) say(enabled ? 'Saved and tested. KaTuroDesk now asks the AI on this computer first (it works offline; answers can be slower and simpler than online). The KaTuro AI answers if it ever fails.' : 'Saved and tested. It is off; tick "Use my key" to turn it on.');
     else say(enabled ? `Saved and tested. KaTuroDesk now uses your ${svc.label} key first; the KaTuro AI answers if your key ever fails.` : 'Saved and tested. Your key is off; tick "Use my key" to turn it on.');
   };
 
@@ -135,6 +146,9 @@ export default function DeskOwnKeySettings() {
         </p>
       ) : null}
 
+      {svc.local ? (
+        <p className="text-[11px] text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">No key needed: the AI runs on this computer with Ollama, so requests and file contents never leave the laptop and it works without internet. A model such as Gemma 4 needs to be downloaded once (several GB).</p>
+      ) : (
       <label className="block text-[11px] text-gray-700">
         <span className="font-semibold text-gray-800">API key</span>
         <input
@@ -147,6 +161,7 @@ export default function DeskOwnKeySettings() {
           className="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-[11px] font-mono"
         />
       </label>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label className="block text-[11px] text-gray-700">
@@ -175,7 +190,7 @@ export default function DeskOwnKeySettings() {
       </label>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={loadModels} disabled={Boolean(busy)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">{busy === 'models' ? 'Checking…' : 'Check key and list models'}</button>
+        <button type="button" onClick={loadModels} disabled={Boolean(busy)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">{busy === 'models' ? 'Checking…' : svc.local ? 'Find the AI on this computer' : 'Check key and list models'}</button>
         <button type="button" onClick={save} disabled={Boolean(busy)} className="px-3 py-1.5 rounded-lg border border-emerald-600 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-40">{busy === 'save' ? 'Saving and testing…' : 'Save and test'}</button>
         {(saved?.hasKey || saved?.provider) && <button type="button" onClick={remove} disabled={Boolean(busy)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-[11px] text-red-700 hover:bg-red-50 disabled:opacity-40">Remove key</button>}
       </div>
