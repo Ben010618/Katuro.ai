@@ -179,6 +179,23 @@ describe('reading results from a sheet', () => {
     expect(readersFromRows(lang, { words: 100, questions: 7 }, { section: 'Filipino' }).readers[0]).toMatchObject({ miscues: 9, correct: 4 });
   });
 
+  it('a named part that is not in the sheet, or a name that fits several parts, is asked about', () => {
+    const onlyPre = [['Name', 'Pre-test', null], [null, 'Miscues', 'Comprehension'], ['Cruz, Juan', 20, 2]];
+    expect(readersFromRows(onlyPre, { words: 100, questions: 7 }, { section: 'post-test' })).toEqual({ readers: [], sections: ['Pre-test'], missing: 'post-test' });
+    // One part and none named: that part, with its own name (for the title).
+    expect(readersFromRows(onlyPre, { words: 100, questions: 7 }).section).toBe('Pre-test');
+    const both = [['Name', 'Pre-test', null, 'Post-test', null], [null, 'Miscues', 'Comprehension', 'Miscues', 'Comprehension'], ['Cruz, Juan', 20, 2, 2, 7]];
+    expect(readersFromRows(both, { words: 100, questions: 7 }, { section: 'test' })).toEqual({ readers: [], sections: ['Pre-test', 'Post-test'] });
+    const eng = [['Name', 'English', null], [null, 'Miscues', 'Comprehension'], ['Cruz, Juan', 1, 6]];
+    expect(readersFromRows(eng, { words: 100, questions: 7 }, { section: 'Filipino' }).missing).toBe('Filipino');
+  });
+
+  it('"Grade & Section" is not a seconds column', () => {
+    const out = readersFromRows([['Grade & Section', 'Name', 'Miscues', 'Comprehension'], ['1', 'Cruz, Juan', 3, 6]], { words: 100, questions: 7 });
+    expect(out.cols).toMatchObject({ name: 1, time: undefined });
+    expect(out.readers[0].seconds).toBeNull();
+  });
+
   it('"Learner Reference No." (LRN) is never the name column', () => {
     const out = readersFromRows([['Learner Reference No.', 'Name of Pupil', 'Miscues', 'Comprehension'], ['123456789012', 'Cruz, Juan', 3, 6]], { words: 100, questions: 7 });
     expect(out.cols.name).toBe(1);
@@ -192,6 +209,12 @@ describe('reading results from a sheet', () => {
     expect(scoreReader(one.readers[0]).wpm).toBe(60);
     const two = readersFromRows([['Name', 'Miscues', 'Comprehension', 'Reading Time', null], [null, null, null, 'Min', 'Sec'], ['Cruz, Juan', 3, 6, 1, 40], ['Reyes, Ana', 2, 5, 2, null]], { words: 100, questions: 7 });
     expect(two.readers.map((r) => r.seconds)).toEqual([100, 120]);
+    for (const heads of [['Time (min)', 'Time (sec)'], ['Reading time (minutes)', 'Reading time (seconds)'], ['Oras (minuto)', 'Oras (segundo)']]) {
+      const out = readersFromRows([['Name', 'Miscues', 'Comprehension', ...heads], ['Cruz, Juan', 3, 6, 1, 40]], { words: 100, questions: 7 });
+      expect(out.readers[0].seconds).toBe(100);
+    }
+    // One time column in minutes stays one column.
+    expect(readersFromRows([['Name', 'Miscues', 'Comprehension', 'Time (min)'], ['Cruz, Juan', 3, 6, 2]], { words: 100, questions: 7 }).readers[0].seconds).toBe(120);
   });
 
   it('a learner row with text in it is never taken as a second heading row', () => {

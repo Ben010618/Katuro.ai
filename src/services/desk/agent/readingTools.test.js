@@ -91,6 +91,17 @@ describe('reading_check (Phil-IRI, scored by code)', () => {
     expect(b.res.content).toMatch(/Phil-IRI Class Reading Profile — Post-test|Post-test/);
   });
 
+  it('asking for a post-test on a sheet with only a pre-test: asks, never labels pre-test numbers as post-test', async () => {
+    const ws = folder([['Name', 'Pre-test', null], [null, 'Miscues', 'Comprehension'], ['Cruz, Juan', 20, 2]]);
+    const a = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7, test: 'post-test' });
+    expect(a.res.content).toContain('has no "post-test" results; it has Pre-test only. Which one should I score?');
+    clearAnswerMemory();
+    const b = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7 });
+    expect(b.res.content).toContain('1 Frustration');
+    const flat = (tree) => tree.flatMap((e) => (e.children ? flat(e.children) : [e]));
+    expect(flat(ws.handle.getFiles()).some((f) => /Pre-test\.xlsx$/.test(f.path) && /Reading_Profile/.test(f.path))).toBe(true);
+  });
+
   it('a sheet that only shows the levels is explained, not scored', async () => {
     const ws = folder([['Name', 'Word Reading', 'Comprehension', 'Reading Level'], ['Cruz, Juan', 'Independent', 'Instructional', 'Instructional']]);
     const { res } = await run(ws, { path: 'Reading/Grade 5 Rizal Phil-IRI.xlsx', passageWords: 100, questions: 7 });

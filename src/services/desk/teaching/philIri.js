@@ -156,7 +156,7 @@ const HEADERS = {
   questions: /(no\.?|number|bilang)\s*(of|ng)?\s*(mga\s*)?(comprehension\s*)?(questions?|items?|tanong)|total\s*(questions?|items?)|^(questions?|items?|tanong)$/i,
   // A reading SPEED column ("Words per minute", "Reading rate", "WPM") is not the reading time.
   rate: /per\s*min|\bwpm\b|\brate\b|speed|bilis/i,
-  time: /time|seconds?|secs?|minutes?|mins?|oras|tagal|segundo|minuto/i,
+  time: /\b(time|sec|secs|seconds?|min|mins|minutes?|oras|tagal|segundo|minuto)\b/i,
 };
 // Under a group heading, the sub-heading alone says what the column is.
 const SUB = {
@@ -169,8 +169,12 @@ const DERIVED = /%|percent|porsiyento|level|antas/i;
 // "Learner Reference No." (LRN) and other ID columns are not the learner's name.
 const NOT_NAME = /\blrn\b|reference|\bno\.?\s*$|\bnumber\b|\bid\b|school|section|grade/i;
 // Reading time split over two columns: Minutes | Seconds.
-const MIN_COL = /^(min|mins|minutes?|minuto)\b\.?/i;
-const SEC_COL = /^(sec|secs|seconds?|segundo)\b\.?/i;
+// ("Min", "Time (min)", "Reading time (minutes)" | "Sec", "Time (sec)", "Seconds"), never one
+// column marked both.
+const MIN_WORD = /\b(min|mins|minutes?|minuto)\b/i;
+const SEC_WORD = /\b(sec|secs|seconds?|segundo)\b/i;
+const MIN_COL = { test: (s) => MIN_WORD.test(s) && !SEC_WORD.test(s) };
+const SEC_COL = { test: (s) => SEC_WORD.test(s) && !MIN_WORD.test(s) };
 // A group heading that is itself a reading term (not a section like Pre-test or Filipino).
 const isReadingTerm = (s) => [HEADERS.miscues, HEADERS.correct, HEADERS.rate, HEADERS.time, HEADERS.words, HEADERS.questions].some((re) => re.test(s)) || /reading|pagbasa/i.test(s);
 const squash = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -212,11 +216,16 @@ export function findReadingColumns(rows = [], { section = '' } = {}) {
     // than one and none named, KaTuro asks (never scores the first one silently).
     const sectionOf = (x) => (x.group !== x.own && !isReadingTerm(x.group) ? x.group : '');
     const sections = [...new Set(cols.filter((x) => sectionOf(x) && (HEADERS.miscues.test(x.own) || HEADERS.correct.test(x.own) || MISCUE_TYPES.some((m) => m.match.test(x.own)))).map(sectionOf))];
+    // A part the teacher named must be in the sheet, and exactly one part may match it.
     let inSection = () => true;
-    if (sections.length > 1) {
-      const want = squash(section);
-      const chosen = want ? sections.find((s) => squash(s).includes(want) || want.includes(squash(s))) : undefined;
-      if (!chosen) return { headerRow: twoRows ? r + 1 : r, sections, cols: null };
+    let chosen;
+    const want = squash(section);
+    if (sections.length) {
+      const matches = want ? sections.filter((s) => squash(s).includes(want) || want.includes(squash(s))) : [];
+      if (matches.length === 1) chosen = matches[0];
+      else if (!want && sections.length === 1) chosen = sections[0];
+      const ask = { headerRow: twoRows ? r + 1 : r, sections, cols: null };
+      if (!chosen) return want && !matches.length ? { ...ask, missing: section } : ask;
       inSection = (x) => !sectionOf(x) || sectionOf(x) === chosen;
     }
     const used = new Set([nameCol]);
@@ -248,7 +257,7 @@ export function findReadingColumns(rows = [], { section = '' } = {}) {
     const timeText = time === undefined ? '' : cols[time].own;
     return {
       headerRow: twoRows ? r + 1 : r,
-      section: sections.length > 1 ? cols.find((x) => inSection(x) && sectionOf(x))?.group : undefined,
+      section: chosen,
       cols: { name: nameCol, words, miscues, correct, questions, time, ...split, rate, timeInMinutes: /minutes?|mins?|minuto/i.test(timeText) && !/sec|segundo/i.test(timeText), breakdown },
     };
   }
@@ -266,7 +275,7 @@ export function findReadingColumns(rows = [], { section = '' } = {}) {
 export function readersFromRows(rows = [], defaults = {}, { section = '' } = {}) {
   const found = findReadingColumns(rows, { section });
   if (!found) return null;
-  if (!found.cols) return { readers: [], sections: found.sections };
+  if (!found.cols) return { readers: [], sections: found.sections, ...(found.missing ? { missing: found.missing } : {}) };
   const { headerRow, cols } = found;
   const at = (row, i) => (i === undefined ? undefined : row?.[i]);
   const readers = [];

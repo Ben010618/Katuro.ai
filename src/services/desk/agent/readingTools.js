@@ -49,7 +49,11 @@ export const READING_TOOLS = {
         found = readersFromRows([t.columns, ...t.rows], defaults, opts);
       }
       if (!found) throw new Error(`I couldn't find reading results in ${path}. It needs a column of learner names and columns for miscues and comprehension scores.`);
-      if (found.sections) throw needsInfo(`${path.split('/').pop()} has results for ${found.sections.join(' and ')}. Which one should I score?`);
+      if (found.sections) {
+        const file = path.split('/').pop();
+        if (found.missing) throw needsInfo(`${file} has no "${found.missing}" results; it has ${found.sections.join(' and ')}${found.sections.length === 1 ? ' only' : ''}. Which one should I score?`);
+        throw needsInfo(`${file} has results for ${found.sections.join(' and ')}. Which one should I score?`);
+      }
       const { readers } = found;
       ctx.masker?.addNames?.(readers.map((r) => r.name));
       if (readers.every((r) => r.words === null)) throw needsInfo('How many words are in the passage the learners read? (Or add a "No. of words" column.)');
