@@ -92,6 +92,51 @@ describe('reading results from a sheet', () => {
     expect(found.cols).toMatchObject({ words: 1, miscues: 2, correct: 3, questions: 4, time: 5, timeInMinutes: true });
   });
 
+  it('a reading SPEED column is not taken as the reading time (it is used as the speed)', () => {
+    const rows = [['Name', 'Miscues', 'Comprehension Score', 'Reading Rate (words per minute)'], ['Cruz, Juan', 3, 6, 90]];
+    const out = readersFromRows(rows, { words: 150, questions: 7 });
+    expect(out.cols).toMatchObject({ rate: 3, time: undefined });
+    expect(out.readers[0]).toMatchObject({ seconds: null, rate: 90 });
+    expect(scoreReader(out.readers[0]).wpm).toBe(90);
+    // KaTuro's own output read again: its "Words per minute" column stays the speed.
+    const again = readersFromRows([
+      ['Learner', 'Miscues', 'Words', 'Word reading %', 'Word reading level', 'Correct answers', 'Questions', 'Comprehension %', 'Comprehension level', 'Reading level', 'Words per minute', 'Notes'],
+      ['Cruz, Juan', 3, 150, 98, 'Independent', 6, 7, 86, 'Independent', 'Independent', 90, ''],
+    ]);
+    expect(again.cols).toMatchObject({ miscues: 1, words: 2, correct: 5, questions: 6, rate: 10, time: undefined });
+    expect(scoreReader(again.readers[0])).toMatchObject({ wordPercent: 98, comprehensionPercent: 86, level: 'Independent', wpm: 90 });
+    // A real time column next to a speed column: the time wins (speed is computed).
+    const both = readersFromRows([['Name', 'Miscues', 'Comprehension', 'Time (sec)', 'WPM'], ['A', 1, 6, 100, 12]], { words: 150, questions: 7 });
+    expect(scoreReader(both.readers[0]).wpm).toBe(90);
+  });
+
+  it('"Miscues" over one column per type (two heading rows): the types are added up', () => {
+    const rows = [
+      ['Name', 'Miscues', null, null, 'Comprehension'],
+      [null, 'Mispronunciation', 'Omission', 'Substitution', 'Score'],
+      ['Cruz, Juan', 2, 1, 3, 5],
+    ];
+    const out = readersFromRows(rows, { words: 100, questions: 7 });
+    expect(out.cols).toMatchObject({ miscues: undefined, correct: 4, breakdown: [{ key: 'mispronunciation', col: 1 }, { key: 'omission', col: 2 }, { key: 'substitution', col: 3 }] });
+    expect(out.readers).toEqual([{ name: 'Cruz, Juan', row: 3, words: 100, miscues: 6, correct: 5, questions: 7, seconds: null }]);
+    expect(scoreReader({ ...out.readers[0], correct: 7 })).toMatchObject({ wordPercent: 94, level: 'Instructional' });
+    // With a Total column under the group, the Total is the count.
+    const t = readersFromRows([
+      ['Name', 'Miscues', null, null, 'Comprehension'],
+      [null, 'Omission', 'Insertion', 'Total', 'Score'],
+      ['Cruz, Juan', 1, 1, 9, 5],
+    ], { words: 100, questions: 7 });
+    expect(t.readers[0].miscues).toBe(9);
+    // A group heading with sub-columns KaTuro does not know: no count (not scored), never the first column.
+    const u = readersFromRows([['Name', 'Miscues', null, 'Comprehension'], [null, 'Type A', 'Type B', 'Score'], ['Cruz, Juan', 2, 3, 5]], { words: 100, questions: 7 });
+    expect(scoreReader(u.readers[0]).problems).toEqual(['no miscue count']);
+  });
+
+  it('a blank heading cell next to "Miscues" with the first learner below is not a heading row', () => {
+    const out = readersFromRows([['Name', 'Miscues', null, 'Comprehension'], ['Cruz, Juan', 4, 7, 5], ['Reyes, Ana', 1, 2, 6]], { words: 100, questions: 7 });
+    expect(out.readers.map((r) => [r.name, r.miscues])).toEqual([['Cruz, Juan', 4], ['Reyes, Ana', 1]]);
+  });
+
   it('a sheet without reading columns is not mistaken for one', () => {
     expect(readersFromRows([['Name', 'Quarter 1', 'Quarter 2'], ['A', 88, 90]])).toBeNull();
     expect(readersFromRows([])).toBeNull();

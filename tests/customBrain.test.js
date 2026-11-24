@@ -104,6 +104,18 @@ describe("the teacher's own AI key (main process)", () => {
     }
   });
 
+  it('switching from a saved key to the AI on this computer removes the old key (it is never sent to Ollama)', async () => {
+    const { brain, fetch, file } = fakeBrain(reply(200, { choices: [{ message: { content: 'OK' } }] }));
+    brain.save({ provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-x', key: 'sk-proj-secret1234', label: 'OpenAI' });
+    const s = brain.save({ provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'gemma4:e4b', label: 'AI on this computer (Ollama, offline)', key: null });
+    expect(s).toMatchObject({ hasKey: false, keyHint: '' });
+    expect(JSON.stringify(file())).not.toContain('enc');
+    await brain.call({ contents: [{ role: 'user', parts: [{ text: 'Hi' }] }] });
+    const [url, init] = fetch.mock.calls.at(-1);
+    expect(String(url)).toMatch(/^http:\/\/localhost:11434\/v1\//);
+    expect(JSON.stringify(init?.headers || {})).not.toMatch(/Authorization|sk-proj/);
+  });
+
   it('the key is saved encrypted, never shown back, and used for the request', async () => {
     const { brain, fetch, file } = fakeBrain(reply(200, { choices: [{ message: { content: 'OK' } }] }));
     const s = brain.save({ provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-x', key: 'sk-proj-secret1234', label: 'OpenAI' });

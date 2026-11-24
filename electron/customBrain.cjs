@@ -242,7 +242,12 @@ function createBrain(deps) {
     save(input = {}) {
       const c = config();
       const next = { ...c };
-      if (input.key !== undefined && String(input.key).trim()) {
+      // key: null = this service needs no key (the AI on this computer): an old saved key is
+      // removed, so it is never sent along.
+      if (input.key === null) {
+        next.keyEnc = '';
+        next.keyHint = '';
+      } else if (input.key !== undefined && String(input.key).trim()) {
         if (!deps.canEncrypt()) throw new Error('This computer cannot protect the key (Windows encryption is not available), so it was not saved.');
         const key = String(input.key).trim();
         next.keyEnc = deps.encrypt(key);

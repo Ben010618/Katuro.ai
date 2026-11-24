@@ -82,7 +82,7 @@ export function parseSeconds(v, { minutes = false } = {}) {
  * → { name, wordPercent, wordLevel, comprehensionPercent, comprehensionLevel, level, wpm, problems: [text] }
  *   (percents rounded to whole numbers as on the Phil-IRI forms; level null when incomplete)
  */
-export function scoreReader({ name = '', words, miscues, correct, questions, seconds } = {}) {
+export function scoreReader({ name = '', words, miscues, correct, questions, seconds, rate } = {}) {
   const problems = [];
   const w = num(words);
   const mc = num(miscues);
@@ -113,6 +113,7 @@ export function scoreReader({ name = '', words, miscues, correct, questions, sec
   }
 
   if (t !== null && t > 0 && w !== null && w > 0) out.wpm = Math.round((w / t) * 60);
+  else if (num(rate) !== null && num(rate) > 0) out.wpm = Math.round(num(rate)); // the teacher's own words-per-minute
   if (out.wordLevel && out.comprehensionLevel) out.level = lowerLevel(out.wordLevel, out.comprehensionLevel);
   return out;
 }
@@ -148,12 +149,26 @@ const HEADERS = {
   miscues: /miscue|^(total\s*)?(errors?|mali|pagkakamali)$|(no\.?|number|bilang)\s*(of|ng)?\s*(mga\s*)?(errors?|miscues?|mali|pagkakamali)/i,
   correct: /comprehension|correct\s*answers?|tamang\s*sagot|pag-?unawa|(no\.?|number|bilang)\s*(of|ng)?\s*(correct|tama)/i,
   questions: /(no\.?|number|bilang)\s*(of|ng)?\s*(mga\s*)?(comprehension\s*)?(questions?|items?|tanong)|total\s*(questions?|items?)|^(questions?|items?|tanong)$/i,
+  // A reading SPEED column ("Words per minute", "Reading rate", "WPM") is not the reading time.
+  rate: /per\s*min|\bwpm\b|\brate\b|speed|bilis/i,
   time: /time|seconds?|secs?|minutes?|mins?|oras|tagal|segundo|minuto/i,
 };
 
+/** Miscue-type columns in one heading row (skipping `used` columns). */
+function miscueColumns(cells, used = new Set()) {
+  const out = [];
+  for (const m of MISCUE_TYPES) {
+    const i = cells.findIndex((v, k) => v && !used.has(k) && m.match.test(v));
+    if (i >= 0) { used.add(i); out.push({ key: m.key, col: i }); }
+  }
+  return out;
+}
+
 /**
- * Finds the reading columns in a sheet (rows of cell values).
- * → { headerRow, cols: { name, words?, miscues?, correct?, questions?, time?, timeInMinutes, breakdown: [{ key, col }] } } or null
+ * Finds the reading columns in a sheet (rows of cell values). A heading over several columns
+ * (e.g. "Miscues" above Mispronunciation | Omission | … in the row below) is read from both rows.
+ * → { headerRow, cols: { name, words?, miscues?, correct?, questions?, time?, rate?, timeInMinutes, breakdown: [{ key, col }] } } or null
+ *   (headerRow = the last heading row; learners start below it)
  */
 export function findReadingColumns(rows = []) {
   for (let r = 0; r < Math.min(rows.length, 20); r++) {
@@ -163,20 +178,42 @@ export function findReadingColumns(rows = []) {
     const take = (re) => { const i = find(re, used); if (i >= 0) used.add(i); return i >= 0 ? i : undefined; };
     const name = take(HEADERS.name);
     if (name === undefined) continue;
-    const breakdown = [];
-    for (const m of MISCUE_TYPES) {
-      const i = find(m.match, used);
-      if (i >= 0) { used.add(i); breakdown.push({ key: m.key, col: i }); }
-    }
+    let breakdown = miscueColumns(cells, used);
     const questions = take(HEADERS.questions);
     const words = take(HEADERS.words);
-    const miscues = take(HEADERS.miscues);
+    let miscues = take(HEADERS.miscues);
     const correct = take(HEADERS.correct);
+    const rate = take(HEADERS.rate);
     const time = take(HEADERS.time);
     if (miscues === undefined && !breakdown.length && correct === undefined) continue;
+
+    let headerRow = r;
+    if (miscues !== undefined) {
+      // "Miscues" as a group heading: the cells after it are empty in this row and filled in
+      // the row below (one per miscue type, maybe a Total). Its own column is then only the
+      // first type, never the count.
+      const sub = (rows[r + 1] || []).map(clean);
+      let end = miscues + 1;
+      while (end < Math.max(cells.length, sub.length) && !cells[end] && sub[end]) end += 1;
+      const span = [];
+      for (let k = miscues; k < end; k++) span.push(k);
+      // Only a row of WORDS under the group is a second heading row; numbers mean it is the
+      // first learner (the heading simply has blank cells after it).
+      const isHeadingRow = span.length > 1 && span.some((k) => sub[k]) && span.every((k) => !sub[k] || num(sub[k]) === null);
+      if (isHeadingRow) {
+        const notInSpan = new Set(sub.map((_, k) => k).filter((k) => !span.includes(k)));
+        const total = span.find((k) => /^(total|kabuuan)\b|^(no\.?\s*of\s*)?miscues?$/i.test(sub[k]));
+        breakdown = total === undefined ? miscueColumns(sub, notInSpan) : [];
+        // Neither a Total nor known miscue types below the group: no count is taken (the
+        // learners are listed as not scored) rather than reading the first type as the total.
+        miscues = total;
+        headerRow = r + 1;
+      }
+    }
+    const timeText = time === undefined ? '' : cells[time];
     return {
-      headerRow: r,
-      cols: { name, words, miscues, correct, questions, time, timeInMinutes: time !== undefined && /minutes?|mins?|minuto/i.test(cells[time]) && !/sec|segundo/i.test(cells[time]), breakdown },
+      headerRow,
+      cols: { name, words, miscues, correct, questions, time, rate, timeInMinutes: /minutes?|mins?|minuto/i.test(timeText) && !/sec|segundo/i.test(timeText), breakdown },
     };
   }
   return null;
@@ -211,6 +248,7 @@ export function readersFromRows(rows = [], defaults = {}) {
       correct: pick(at(row, cols.correct), null),
       questions: pick(at(row, cols.questions), defaults.questions),
       seconds: parseSeconds(time, { minutes: cols.timeInMinutes }),
+      ...(cols.rate !== undefined ? { rate: pick(at(row, cols.rate), null) } : {}),
     });
   }
   return readers.length ? { readers, cols } : null;

@@ -101,7 +101,7 @@ export default function DeskOwnKeySettings() {
     if (!key.trim() && !saved?.hasKey && !(svc.provider === 'openai' && baseUrl)) { say('Paste your API key first.', true); return; }
     if (!model.trim()) { say('Choose or type a model first (use "Check key and list models").', true); return; }
     setBusy('save');
-    const s = await api.save({ provider: svc.provider, baseUrl: svc.provider === 'openai' ? baseUrl.trim() : '', model: model.trim(), label: svc.label, enabled, ...(key.trim() ? { key: key.trim() } : {}) }).catch((e) => ({ error: e.message }));
+    const s = await api.save({ provider: svc.provider, baseUrl: svc.provider === 'openai' ? baseUrl.trim() : '', model: model.trim(), label: svc.label, enabled, ...(svc.local ? { key: null } : key.trim() ? { key: key.trim() } : {}) }).catch((e) => ({ error: e.message }));
     if (s?.error) { setBusy(''); say(s.error, true); return; }
     setSaved(s);
     setOwnBrainStatus(s);
@@ -141,13 +141,13 @@ export default function DeskOwnKeySettings() {
 
       {saved?.hasKey || (saved?.provider === 'openai' && saved?.baseUrl) ? (
         <p className="text-[11px] text-emerald-800 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-          Saved: {savedService?.label || saved.label || saved.provider} key {saved.keyHint || ''}, model {saved.model || '(none)'}{saved.enabled ? '' : ' (off)'}.
+          Saved: {savedService?.label || saved.label || saved.provider}{savedService?.local ? '' : ` key ${saved.keyHint || ''}`}, model {saved.model || '(none)'}{saved.enabled ? '' : ' (off)'}.
           {last.at ? (last.ok ? ` Last answer from your key at ${timeText(last.at)}.` : ` At ${timeText(last.at)} your key failed (${last.message}), so the KaTuro AI answered.`) : ''}
         </p>
       ) : null}
 
       {svc.local ? (
-        <p className="text-[11px] text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">No key needed: the AI runs on this computer with Ollama, so requests and file contents never leave the laptop and it works without internet. A model such as Gemma 4 needs to be downloaded once (several GB).</p>
+        <p className="text-[11px] text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">No key needed: the AI runs on this computer with Ollama, so requests and file contents never leave the laptop and it works without internet. A model such as Gemma 4 needs to be downloaded once (several GB). For long requests (files, lesson plans), set the Context length in Ollama's Settings to 16k or more, or Ollama may cut them short.</p>
       ) : (
       <label className="block text-[11px] text-gray-700">
         <span className="font-semibold text-gray-800">API key</span>
