@@ -24,6 +24,17 @@ const DESK_VOICE_FILES = {
   'piper_phonemize.wasm': 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.wasm',
   'piper_phonemize.data': 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.data',
 }
+// KaTuroDesk reads scans and photos on the laptop (Tesseract, see src/services/desk/readers/ocr.js):
+// its worker, engine (the .wasm.js files hold the WebAssembly) and the English + Tagalog data.
+// Three engine builds, because Tesseract picks the fastest one this computer's CPU supports.
+const DESK_OCR_FILES = {
+  'worker.min.js': 'node_modules/tesseract.js/dist/worker.min.js',
+  'tesseract-core-relaxedsimd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+  'tesseract-core-simd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
+  'tesseract-core-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js',
+  'lang/eng.traineddata.gz': 'node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
+  'lang/tgl.traineddata.gz': 'node_modules/@tesseract.js-data/tgl/4.0.0/tgl.traineddata.gz',
+}
 export function deskVoiceAssets(mode) {
   return {
     name: 'desk-voice-assets',
@@ -32,6 +43,9 @@ export function deskVoiceAssets(mode) {
       if (mode !== 'desk') return
       for (const [name, from] of Object.entries(DESK_VOICE_FILES)) {
         this.emitFile({ type: 'asset', fileName: `desk-voice/${name}`, source: fs.readFileSync(path.resolve(from)) })
+      }
+      for (const [name, from] of Object.entries(DESK_OCR_FILES)) {
+        this.emitFile({ type: 'asset', fileName: `desk-ocr/${name}`, source: fs.readFileSync(path.resolve(from)) })
       }
     },
   }

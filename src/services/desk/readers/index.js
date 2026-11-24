@@ -388,11 +388,12 @@ function cellValue(cell) {
 
 function dateToIso(d) {
   if (Number.isNaN(d.getTime())) return null;
-  // SheetJS builds dates in local time; round to the nearest minute to absorb its tz seconds drift.
+  // SheetJS 0.20 builds dates in UTC (the cell's own wall-clock time, whatever this
+  // computer's time zone); round to the nearest minute to absorb its seconds drift.
   const t = new Date(Math.round(d.getTime() / 60000) * 60000);
   const p = (n) => String(n).padStart(2, '0');
-  const date = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`;
-  if (t.getHours() || t.getMinutes()) return `${date}T${p(t.getHours())}:${p(t.getMinutes())}`;
+  const date = `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
+  if (t.getUTCHours() || t.getUTCMinutes()) return `${date}T${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
   return date;
 }
 

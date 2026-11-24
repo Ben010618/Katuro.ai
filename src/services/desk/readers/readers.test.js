@@ -80,6 +80,19 @@ describe('readDocument', () => {
     expect(describeParsed(parsed)).toBe('Excel workbook · 2 sheets (Grade 7 - Rizal: 5 rows; Dates: 1 row)');
   });
 
+  it('reads Excel dates and times as written, whatever the time zone (a file from Excel/ExcelJS)', async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('SF2');
+    ws.addRow(['Date', 'Time in']);
+    ws.addRow([new Date(Date.UTC(2026, 5, 15)), new Date(Date.UTC(2026, 5, 15, 7, 30))]);
+    ws.addRow([new Date(Date.UTC(2026, 11, 31)), new Date(Date.UTC(2027, 0, 1, 23, 59))]);
+    const bytes = new Uint8Array(await wb.xlsx.writeBuffer());
+    const parsed = await readDocument({ bytes, name: 'sf2.xlsx' });
+    expect(parsed.sheets[0].rows[1]).toEqual(['2026-06-15', '2026-06-15T07:30']);
+    expect(parsed.sheets[0].rows[2]).toEqual(['2026-12-31', '2027-01-01T23:59']);
+  });
+
   it('caps sheet text at 500 rows per sheet', async () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(Array.from({ length: 520 }, (_, i) => [i])), 'Big');

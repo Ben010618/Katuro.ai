@@ -329,7 +329,7 @@ export const TOOLS = {
 
   search_files: {
     label: 'Search my files',
-    description: "Find which files in the classroom folder contain something (\"which file has this learner's Term 1 grades?\", \"where is the SF2 for October?\", \"files that mention the Science fair\"). Searches inside every readable file (Excel rows with their column headings, Word paragraphs and tables, PDF pages, slides, file names) by code and lists the best files with where and what was found. Learner names match in any order; Term 1 also matches Quarter 1 / Q1. Nothing is sent to the AI; no file is changed.",
+    description: "Find which files in the classroom folder contain something (\"which file has this learner's Term 1 grades?\", \"where is the SF2 for October?\", \"files that mention the Science fair\"). Searches inside every readable file (Excel rows with their column headings, Word paragraphs and tables, PDF pages, slides, file names; on this computer also the words in scanned PDFs and photos) by code and lists the best files with where and what was found. Learner names match in any order; Term 1 also matches Quarter 1 / Q1. Nothing is sent to the AI; no file is changed.",
     args: '{ "terms": [string], "query"?: string, "folder"?: string }',
     async run({ terms = [], query = '', folder }, ctx, report) {
       const S = await import('./fileSearch.js');
@@ -344,22 +344,49 @@ export const TOOLS = {
       const results = [];
       let scans = 0;
       let unreadable = 0;
+      // Scans and photos: their words are read on this computer (Tesseract, offline; nothing is
+      // sent anywhere). Up to MAX_OCR_FILES per search; each file version is read only once.
+      const O = await import('../readers/ocr.js');
+      let ocrLeft = O.ocrAvailable() && typeof ctx.readBytes === 'function' ? S.MAX_OCR_FILES : 0;
+      let ocrRead = 0;
+      // → a search hit, null (read, nothing found) or undefined (not read)
+      const ocrHit = async (f, kind) => {
+        if (ocrLeft <= 0) return undefined;
+        ocrLeft -= 1;
+        report(`Reading the words in ${String(f.path).split('/').pop()} on this computer…`);
+        try {
+          const r = await O.deskOcr().readFile({ key: `${f.path}|${f.size ?? ''}|${f.lastModified ?? ''}`, kind, getBytes: () => ctx.readBytes(f.path) });
+          ocrRead += 1;
+          return S.searchOcrText(r, f.path, patterns, kind);
+        } catch {
+          return undefined;
+        }
+      };
+      const addByName = (f) => { const hit = S.searchFile({}, f.path, patterns); if (hit) results.push({ path: f.path, ...hit }); };
       for (const [i, f] of files.entries()) {
         if (i % 10 === 0) report(`Searching ${i + 1} of ${files.length} files…`);
         let parsed;
         try { parsed = await ctx.readParsed(f.path); } catch { unreadable += 1; continue; }
-        // A scan has no text to search, but its file name still counts.
-        if (parsed?.needsVision) scans += 1;
-        const hit = S.searchFile(parsed?.needsVision ? {} : parsed || {}, f.path, patterns);
+        if (parsed?.needsVision) {
+          const hit = await ocrHit(f, 'pdf');
+          // A scan that was not read has no text to search, but its file name still counts.
+          if (hit === undefined) { scans += 1; addByName(f); } else if (hit) results.push({ path: f.path, ...hit });
+          continue;
+        }
+        const hit = S.searchFile(parsed || {}, f.path, patterns);
         if (hit) results.push({ path: f.path, ...hit });
       }
-      const photoFiles = all.filter((f) => /\.(jpe?g|png|heic|heif)$/i.test(f.path));
-      const photos = photoFiles.length;
-      for (const f of photoFiles) { const hit = S.searchFile({}, f.path, patterns); if (hit) results.push({ path: f.path, ...hit }); }
+      const photoFiles = all.filter((f) => /\.(jpe?g|png|webp|heic|heif)$/i.test(f.path));
+      let photos = 0;
+      for (const f of photoFiles) {
+        const hit = O.OCR_IMAGE.test(f.path) && (f.size || 0) <= 15 * 1024 * 1024 ? await ocrHit(f, 'image') : undefined;
+        if (hit === undefined) { photos += 1; addByName(f); } else if (hit) results.push({ path: f.path, ...hit });
+      }
       results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
       const full = results.filter((r) => r.matched.size === list.length);
       const notSearched = [scans && `${scans} scanned PDF(s)`, photos && `${photos} photo(s)`].filter(Boolean).join(' and ');
-      const tail = `${notSearched ? ` ${notSearched} could not be searched (their text is a picture).` : ''}${unreadable ? ` ${unreadable} file(s) could not be opened.` : ''} Searched ${files.length} file(s) by code; nothing was sent to the AI.`;
+      const readHere = ocrRead ? ` I read the words in ${ocrRead} scan(s)/photo(s) on this computer (printed text reads best; handwriting may be missed).` : '';
+      const tail = `${readHere}${notSearched ? ` ${notSearched} could not be searched (their text is a picture).` : ''}${unreadable ? ` ${unreadable} file(s) could not be opened.` : ''} Searched ${files.length} file(s) by code; nothing was sent to the AI.`;
       if (!results.length) return { summary: `I found no file with ${list.map((t) => `"${t}"`).join(', ')}.${tail}` };
       const show = (full.length ? full : results).slice(0, 8);
       const lines = show.map((r) => `${r.path} — ${r.hits.slice(0, 2).map((h) => `${h.where}: ${h.snippet}`).join(' / ')}`);

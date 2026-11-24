@@ -44,8 +44,9 @@
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0",
     "recharts": "^3.9.0",
+    "tesseract.js": "^7.0.0",
     "vosk-browser": "^0.0.8",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -53,6 +54,8 @@
     "@eslint/js": "^10.0.1",
     "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/tgl": "^1.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

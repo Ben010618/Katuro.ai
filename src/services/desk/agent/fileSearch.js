@@ -62,6 +62,21 @@ function unitsOf(parsed) {
   return units;
 }
 
+/** Scans/photos read on this computer per search (each takes a few seconds the first time). */
+export const MAX_OCR_FILES = 40;
+
+/**
+ * Search in the words read from a scan or photo (ocr.js readFile result).
+ * → like searchFile, with hits "scanned page N" / "photo"; null when nothing matched.
+ */
+export function searchOcrText(read, path, patterns, kind = 'pdf') {
+  const pages = (read?.pages || []).filter((p) => String(p.text || '').trim());
+  const hit = searchFile({ pages }, path, patterns);
+  if (!hit) return null;
+  const label = kind === 'pdf' ? (w) => `scanned ${w}` : () => 'photo';
+  return { ...hit, hits: hit.hits.map((h) => ({ ...h, where: label(h.where) })) };
+}
+
 /**
  * How well one file answers the terms.
  * → { matched: Set(term index), hits: [{ where, snippet, count }], score } or null

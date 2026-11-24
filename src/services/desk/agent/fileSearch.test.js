@@ -10,6 +10,27 @@ import { termsFromQuery, termPattern } from './fileSearch';
 
 vi.mock('../../geminiConfig', () => ({ callGeminiProxy: vi.fn() }));
 
+// Reading scans on this computer: a stand-in for Tesseract (off unless a test turns it on).
+const ocr = vi.hoisted(() => ({ on: false, keys: [], text: {} }));
+vi.mock('../readers/ocr.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    ...real,
+    ocrAvailable: () => ocr.on,
+    deskOcr: () => ({
+      readFile: async ({ key, kind, getBytes }) => {
+        ocr.keys.push(key);
+        const b = await getBytes();
+        if (!b?.length) throw new Error('no bytes');
+        const path = key.split('|')[0];
+        if (/Broken/.test(path)) throw new Error('unreadable');
+        const pages = (ocr.text[path] || []).map((text, i) => ({ number: i + 1, text, confidence: 80 }));
+        return { pages, total: pages.length, read: pages.length, kind };
+      },
+    }),
+  };
+});
+
 const xlsx = (sheets) => {
   const wb = XLSX.utils.book_new();
   for (const [name, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
@@ -79,6 +100,41 @@ describe('search inside every file', () => {
     clearAnswerMemory();
     const c = await run(ws, { terms: ['Quarter 1'], folder: 'Grades' });
     expect(c.res.content).toMatch(/2 file\(s\) have all of "Quarter 1"/);   // "Term 1" heading counts as Quarter 1
+  });
+
+  it('on this computer, the words in scanned PDFs and photos are read and searched too (nothing sent to the AI)', async () => {
+    const ws = await folder();
+    const blank = await PDFDocument.create();
+    blank.addPage();
+    blank.addPage();
+    ws.handle.saveVirtualFile('Scans/Quiz 1 scores.pdf', await blank.save());
+    ws.handle.saveVirtualFile('Scans/Broken scan.pdf', await blank.save());
+    ws.handle.saveVirtualFile('Photos/IMG_2.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+    ws.handle.saveVirtualFile('Photos/IMG_3.heic', new Uint8Array([1, 2, 3, 4]));
+    ws.files = ws.handle.getFiles();
+    ocr.on = true;
+    ocr.keys = [];
+    ocr.text = {
+      'Scans/Quiz 1 scores.pdf': ['QUIZ 1 - SCIENCE 5', 'Santos, Maria A. 18/20'],
+      'Photos/IMG_1.jpg': ['Bulletin: Maria Santos, Best in Science'],
+      'Photos/IMG_2.png': ['Lunch menu'],
+    };
+    try {
+      const { res, ai } = await run(ws, { terms: ['Maria Santos'] });
+      expect(ai).toBe(0);
+      expect(res.content).toContain('Scans/Quiz 1 scores.pdf — scanned page 2: Santos, Maria A. 18/20');
+      expect(res.content).toContain('Photos/IMG_1.jpg — photo: Bulletin: Maria Santos, Best in Science');
+      expect(res.content).not.toContain('IMG_2');
+      expect(res.content).toContain('I read the words in 3 scan(s)/photo(s) on this computer');
+      // The broken scan and the HEIC photo were not read: said plainly.
+      expect(res.content).toContain('1 scanned PDF(s) and 1 photo(s) could not be searched');
+      expect(res.content).toMatch(/nothing was sent to the AI/);
+      // Each file version is read with its own key (path, size, date).
+      expect(ocr.keys.some((k) => k.startsWith('Scans/Quiz 1 scores.pdf|'))).toBe(true);
+      expect(ocr.keys.some((k) => k.startsWith('Photos/IMG_3.heic'))).toBe(false);
+    } finally {
+      ocr.on = false;
+    }
   });
 
   it('nothing found, said plainly', async () => {

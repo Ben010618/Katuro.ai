@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'public']),
+  // Build output (the website/KaTuroDesk dist, the phone app's dist-mobile and its Android
+  // copy) is generated code, not ours to lint.
+  globalIgnores(['dist', 'dist-mobile', 'public', 'Katuro_App/android', 'Katuro_App/ios']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
