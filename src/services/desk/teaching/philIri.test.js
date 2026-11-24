@@ -132,6 +132,41 @@ describe('reading results from a sheet', () => {
     expect(scoreReader(u.readers[0]).problems).toEqual(['no miscue count']);
   });
 
+  it('"Comprehension" over No. of items | Score (two heading rows): the score is the score, the items are the questions', () => {
+    const rows = [
+      ['Name', 'Miscues', null, 'Comprehension', null],
+      [null, 'Omission', 'Total', 'No. of items', 'Score'],
+      ['Cruz, Juan', 1, 3, 7, 5],
+    ];
+    const out = readersFromRows(rows, { words: 100 });
+    expect(out.cols).toMatchObject({ miscues: 2, questions: 3, correct: 4 });
+    expect(out.readers[0]).toMatchObject({ miscues: 3, correct: 5, questions: 7 });
+    expect(scoreReader(out.readers[0])).toMatchObject({ wordPercent: 97, comprehensionPercent: 71, level: 'Instructional' });
+    // Score | % under Comprehension: the percent is never read as the score.
+    const p = readersFromRows([['Name', 'Miscues', 'Comprehension', null], [null, null, '%', 'Score'], ['Cruz, Juan', 3, 71, 5]], { words: 100, questions: 7 });
+    expect(p.readers[0].correct).toBe(5);
+    // Sub-columns under Comprehension that are not recognised: no score taken (not scored), never a guess.
+    const u = readersFromRows([['Name', 'Miscues', 'Comprehension', null], [null, null, 'A', 'B'], ['Cruz, Juan', 3, 7, 5]], { words: 100, questions: 7 });
+    expect(scoreReader(u.readers[0]).problems).toEqual(['no comprehension score']);
+    // A "Reading speed" group with Time | WPM under it.
+    const s = readersFromRows([['Name', 'Miscues', 'Comprehension', 'Reading speed', null], [null, null, null, 'Time', 'WPM'], ['Cruz, Juan', 3, 5, '1:40', 60]], { words: 150, questions: 7 });
+    expect(s.cols).toMatchObject({ time: 3, rate: 4 });
+    expect(scoreReader(s.readers[0]).wpm).toBe(90);
+  });
+
+  it('reading speed written as text is read; one that cannot be read is said, and the level still stands', () => {
+    expect(scoreReader({ words: 100, miscues: 1, correct: 6, questions: 7, rate: '90 wpm' }).wpm).toBe(90);
+    expect(scoreReader({ words: 100, miscues: 1, correct: 6, questions: 7, rate: '88 words per minute' }).wpm).toBe(88);
+    const bad = scoreReader({ words: 100, miscues: 1, correct: 6, questions: 7, rate: 'fast' });
+    expect(bad).toMatchObject({ wpm: null, level: 'Independent', problems: ['reading speed "fast" could not be read'] });
+  });
+
+  it('a learner row with text in it is never taken as a second heading row', () => {
+    const out = readersFromRows([['Name', 'Miscues', null, 'Comprehension'], ['Cruz, Juan', 'n/a', 'x', 5]], { words: 100, questions: 7 });
+    expect(out.readers).toHaveLength(1);
+    expect(scoreReader(out.readers[0]).problems).toEqual(['no miscue count']);
+  });
+
   it('a blank heading cell next to "Miscues" with the first learner below is not a heading row', () => {
     const out = readersFromRows([['Name', 'Miscues', null, 'Comprehension'], ['Cruz, Juan', 4, 7, 5], ['Reyes, Ana', 1, 2, 6]], { words: 100, questions: 7 });
     expect(out.readers.map((r) => [r.name, r.miscues])).toEqual([['Cruz, Juan', 4], ['Reyes, Ana', 1]]);
