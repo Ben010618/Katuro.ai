@@ -1,5 +1,5 @@
 import { Suspense, lazy, useMemo, useRef, useState } from 'react';
-import { X, Plus, Play, Pencil, Trash2, Upload, Download, Hand, Check, Wand2, Languages, Copy } from 'lucide-react';
+import { X, Plus, Play, Pencil, Trash2, Upload, Download, Hand, Check, Wand2, Languages, Copy, Home } from 'lucide-react';
 import { useDeskStore, workspaceIdOf } from '../../../store/deskStore';
 import { useRoutineStore, routinesFor } from '../../../store/routineStore';
 import { flattenFileTree, writeFileToDirectory } from '../../../services/localFileSystem';
@@ -186,6 +186,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
         initialLang={lang}
         onSave={save}
         onClose={() => setEditing(null)}
+        onExit={() => { setEditing(null); onClose(); }}
         talk={(text, draft) => talk(text, draft)}
       />
       </Suspense>
@@ -205,7 +206,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
         <div className="flex items-center gap-2 border-b border-gray-200 px-5 pb-3 pt-4">
           <h2 className="flex-1 text-sm font-bold text-gray-900">{T(lang, 'Routines: KaTuro does the repeated work for you', 'Routines: ang KaTuro ang gagawa ng paulit-ulit na trabaho')}</h2>
           <button type="button" onClick={() => setLang(lang === 'fil' ? 'en' : 'fil')} className={btn}><Languages size={12} /> {lang === 'fil' ? 'English' : 'Filipino'}</button>
-          <button type="button" onClick={onClose} aria-label={T(lang, 'Close', 'Isara')} className="rounded p-1 text-gray-500 hover:bg-gray-200"><X size={16} /></button>
+          <button type="button" onClick={onClose} className={btn} title={T(lang, 'Back to the KaTuroDesk screen', 'Bumalik sa KaTuroDesk')}><Home size={12} /> {T(lang, 'Back to KaTuroDesk', 'Bumalik sa KaTuroDesk')}</button>
         </div>
 
         <div className="flex flex-wrap gap-1 border-b border-gray-100 px-5 py-2" role="tablist">

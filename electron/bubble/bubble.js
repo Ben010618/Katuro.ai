@@ -88,6 +88,11 @@
   face.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.ktBubble.action('toggle'); } });
 
   $('close').addEventListener('click', () => window.ktBubble.action('toggle'));
+  // Hide the bubble (the head's small x, or the card's): KaTuroDesk turns it off until the teacher
+  // turns it on again (My classes > Show the floating bubble). And back to the main window.
+  $('hideHead').addEventListener('click', () => window.ktBubble.action('hide'));
+  $('hideCard').addEventListener('click', () => window.ktBubble.action('hide'));
+  $('openDesk').addEventListener('click', () => window.ktBubble.action('openApp'));
   $('stopVoice').addEventListener('click', () => window.ktBubble.action('stopVoice'));
   // Hold to talk: press, speak, let go. Letting go outside the button sends nothing.
   const talkBtn = $('talk');

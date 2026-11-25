@@ -786,6 +786,11 @@ ipcMain.on('bubble:action', (event, action = {}) => {
   if (!bubbleWindow || event.sender !== bubbleWindow.webContents) return;
   const id = String(action.id || '').slice(0, 40);
   if (id === 'openApp') showMainWindow();
+  // Hidden at once here (KaTuroDesk then remembers it, see assistantEngine 'hide').
+  if (id === 'hide') {
+    bubbleState = { ...bubbleState, visible: false, expanded: false };
+    applyBubble();
+  }
   if (id === 'toggle') {
     bubbleState = { ...bubbleState, expanded: !bubbleState.expanded };
     applyBubble();

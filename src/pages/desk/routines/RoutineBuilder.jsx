@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { X, Save, Play, LayoutList, Network, Wand2, Volume2, ArrowDown, Languages, Check } from 'lucide-react';
+import { X, Save, Play, LayoutList, Network, Wand2, Volume2, ArrowDown, ArrowLeft, Home, Languages, Check } from 'lucide-react';
 import { KIND_STYLE, cardDef, say } from '../../../services/desk/routines/catalog';
 import { checkRoutine, describeRoutine, runOrder, shelf } from '../../../services/desk/routines/routine';
 import CardNode from './CardNode';
@@ -92,7 +92,7 @@ function ListView({ draft, lang, selectedId, onSelect, statuses }) {
   );
 }
 
-function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en', talk = null }) {
+function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang = 'en', talk = null }) {
   const [draft, setDraft] = useState(() => arrange(initial));
   const [selectedId, setSelectedId] = useState(initial.cards[0]?.id || null);
   const [selectedEdge, setSelectedEdge] = useState(null);
@@ -222,10 +222,10 @@ function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en',
   }, [add, flow]);
 
   const selected = draft.cards.find((c) => c.id === selectedId) || null;
-  const close = () => {
-    if (dirty && !window.confirm(T(lang, 'Close without saving your changes?', 'Isara nang hindi sine-save ang mga binago?'))) return;
-    onClose();
-  };
+  const leaveOk = () => !dirty || window.confirm(T(lang, 'Leave without saving your changes?', 'Umalis nang hindi sine-save ang mga binago?'));
+  // Back to the list of routines, or straight back to the KaTuroDesk screen.
+  const close = () => { if (leaveOk()) onClose(); };
+  const exit = () => { if (leaveOk()) (onExit || onClose)(); };
   const save = async () => {
     const res = await onSave(draft);
     if (res?.ok) setDirty(false);
@@ -260,7 +260,8 @@ function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en',
         <button type="button" onClick={() => setTrying({ index: 0, aloud: false })} disabled={!order.length || Boolean(trying)} className={btn} title={T(lang, 'Shows each step in order. Nothing runs and no file changes.', 'Ipinapakita ang bawat hakbang. Walang tatakbo at walang file na mababago.')}><Play size={13} /> {T(lang, 'Try', 'Subukan')}</button>
         <button type="button" onClick={() => setTrying({ index: 0, aloud: true })} disabled={!order.length || Boolean(trying)} className={btn}><Volume2 size={13} /> {T(lang, 'Try aloud', 'Subukan nang malakas')}</button>
         <button type="button" onClick={save} className={primary}><Save size={13} /> {T(lang, 'Save', 'I-save')}</button>
-        <button type="button" onClick={close} aria-label={T(lang, 'Close', 'Isara')} className="rounded p-1 text-gray-500 hover:bg-gray-100"><X size={18} /></button>
+        <button type="button" onClick={close} className={btn} title={T(lang, 'Back to the list of routines', 'Bumalik sa listahan ng mga routine')}><ArrowLeft size={13} /> {T(lang, 'My routines', 'Mga routine ko')}</button>
+        <button type="button" onClick={exit} className={btn} title={T(lang, 'Back to the KaTuroDesk screen', 'Bumalik sa KaTuroDesk')}><Home size={13} /> {T(lang, 'Back to KaTuroDesk', 'Bumalik sa KaTuroDesk')}</button>
       </div>
 
       {talk ? (

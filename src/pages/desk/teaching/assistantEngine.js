@@ -280,6 +280,18 @@ export function startTeachingAssistant(getContext) {
       case 'stopVoice':
         deskSpeaker().stop();
         break;
+      case 'hide': {
+        // The teacher hid the bubble (the head's x): off until they turn it on again in My classes.
+        const name = getPersona(s.persona).name;
+        s.setTeachingSettings({ bubble: false });
+        expanded = false;
+        userOpened = false;
+        reply = '';
+        deskSpeaker().stop();
+        s.addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: `${name}'s bubble is hidden. To show it again: **My classes** → **Assistant** → **Show the floating bubble**.` });
+        pushBubble();
+        break;
+      }
       case 'talkStart':
         userOpened = true;
         expanded = true;
