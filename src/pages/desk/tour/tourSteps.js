@@ -61,6 +61,21 @@ export const FIRST_RUN = [
 // Newest first. Each version's highlights are shown once, after updating to it.
 export const WHATS_NEW = [
   {
+    version: '1.27.0',
+    steps: [
+      {
+        target: 'settings',
+        title: 'New: any window size, bigger or smaller',
+        body: 'Drag the window to any size: KaTuroDesk fits itself. Make everything bigger or smaller with Ctrl + and Ctrl − (Ctrl 0 = back to 100%), or in Settings › Screen size. KaTuroDesk remembers your choice.',
+      },
+      {
+        target: 'routines',
+        title: 'Routines: safer, and a way back',
+        body: '"Back to KaTuroDesk" is always at the top of the Routine Builder. "Ask me first" now sits right before a card that changes your class record, so you see the record and column before saying yes.',
+      },
+    ],
+  },
+  {
     version: '1.24.0',
     steps: [
       {

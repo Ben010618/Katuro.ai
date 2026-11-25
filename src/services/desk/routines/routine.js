@@ -290,7 +290,6 @@ export function parentOf(routine, cardId) {
   return routine.wires.find((w) => w.to === cardId)?.from || null;
 }
 
-
 /**
  * Every problem with a routine, in plain words (empty = ready to run).
  * → [{ cardId?, text }]
