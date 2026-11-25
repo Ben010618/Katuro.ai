@@ -1023,7 +1023,11 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       let nameCol = nameColumn;
       if (!nameCol) {
         const cols = await findWorkbookColumns(targetBytes, sheetName);
-        const hit = cols.headers.find((h) => /name|learner|pangalan|student/i.test(h.text));
+        // The learners' name column, never a "School name" / "Teacher's name" heading (KaTuro's own
+        // E-Class Record has "SCHOOL NAME:" in its header block before "LEARNERS' NAMES").
+        const notLearner = /school|teacher|adviser|principal|subject|section|division|region|district/i;
+        const names = cols.headers.filter((h) => /name|learner|pangalan|student|pupil|mag-?aaral/i.test(h.text) && !notLearner.test(h.text));
+        const hit = names.find((h) => /learner|pangalan|student|pupil|mag-?aaral/i.test(h.text)) || names[0];
         nameCol = hit ? hit.letter : 'B';
       }
       report(`Typing ${totals.learners.length} scores into ${targetPath}…`);

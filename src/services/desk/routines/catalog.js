@@ -174,6 +174,7 @@ export const CARDS = [
     help: { en: 'MPS, mastery, least mastered skills and learners below 75%, computed exactly; can also make remedial slips.', fil: 'MPS, mastery, mga kasanayang pinakamahina at mga mag-aaral na mababa sa 75%; puwede ring gumawa ng remedial slip.' },
     fields: [
       F.text('testTitle', 'Test name', 'Pangalan ng test'),
+      F.number('totalItems', 'Number of items (when the sheet has only total scores)', 'Bilang ng item (kung kabuuang iskor lang ang nasa sheet)', 1, 200),
       F.text('gradeSection', 'Grade and section', 'Baitang at seksyon'),
       F.choice('remedial', 'Also make remedial slips', 'Gumawa rin ng remedial slip', [
         { value: 'no', label: { en: 'No', fil: 'Hindi' } },
@@ -181,7 +182,7 @@ export const CARDS = [
       ], { default: 'no' }),
     ],
     toTasks: (s, input) => {
-      const first = { id: 'a', tool: 'analyze_scores', args: opt({ path: one(input), testTitle: clean(s.testTitle), gradeSection: clean(s.gradeSection) }) };
+      const first = { id: 'a', tool: 'analyze_scores', args: opt({ path: one(input), testTitle: clean(s.testTitle), totalItems: s.totalItems, gradeSection: clean(s.gradeSection) }) };
       return s.remedial === 'yes' ? [first, { id: 'b', tool: 'make_remedial_package', args: {}, dependsOn: ['a'] }] : [first];
     },
   },
@@ -230,9 +231,12 @@ export const CARDS = [
     help: { en: 'Checks photos of answer sheets against your answer key and lists the scores. The online AI reads each photo (name and answers); KaTuro scores them and flags unclear marks.', fil: 'Tsine-check ang litrato ng answer sheet gamit ang answer key mo at inililista ang iskor. Ang online AI ang nagbabasa ng bawat litrato (pangalan at sagot); ang KaTuro ang nag-iiskor at nagmamarka ng malabo.' },
     fields: [
       F.file('answerKeyPath', 'Answer key file', 'File ng answer key', /\.(docx|pdf|xlsx|csv|txt|jpe?g|png)$/i, { required: true }),
+      // The names on the papers are matched to this list, so the scores carry the names exactly
+      // as in the class record (needed to type them in).
+      F.file('listPath', 'Class list or class record (to match the names)', 'Class list o class record (para itugma ang pangalan)', SHEET),
       F.text('title', 'Test name', 'Pangalan ng test'),
     ],
-    toTasks: (s, input) => [{ tool: 'check_answer_sheets', args: opt({ ...folderArgs(input), answerKeyPath: clean(s.answerKeyPath), title: clean(s.title) }) }],
+    toTasks: (s, input) => [{ tool: 'check_answer_sheets', args: opt({ ...folderArgs(input), answerKeyPath: clean(s.answerKeyPath), listPath: clean(s.listPath), title: clean(s.title) }) }],
   },
   {
     type: 'do.typeScores', kind: 'do', icon: 'PencilLine', accepts: ['sheet'], gives: 'record', changesRecords: true,
@@ -244,6 +248,17 @@ export const CARDS = [
     ],
     toTasks: (s, input) => [{ tool: 'encode_scores', args: opt({ sourcePath: one(input), targetPath: clean(s.targetPath), targetColumn: clean(s.targetColumn) }) }],
     outputPaths: (s) => [clean(s.targetPath)],
+    // Never "done" when the scores did not all go in: no score typed is a failure, names not found
+    // in the record stop the routine there (the teacher types those or fixes the names).
+    check: (summary) => {
+      const typed = /(\d+) score\(s\) typed/.exec(summary);
+      // Names can hold full stops ("Juan P."): the list ends at "; ", at ". A backup" / ". Your original", or at the end.
+      const missing = /(\d+) name\(s\) not found: (.+?)(?:…)?(?=; |\. (?:A backup|Your original)|\.?$)/.exec(summary);
+      const hint = 'Check that the names match your class record (for photos, choose the class list on "Check answer sheets").';
+      if (typed && Number(typed[1]) === 0) return { status: 'error', summary: `No score was typed into your class record${missing ? `: ${missing[2].trim()} not found in it` : ''}. ${hint}` };
+      if (missing) return { status: 'needs_info', summary: `${typed ? typed[1] : 'Some'} score(s) typed; ${missing[1]} name(s) not found in your class record: ${missing[2].trim()}. ${hint}` };
+      return null;
+    },
   },
   {
     type: 'do.consolidate', kind: 'do', icon: 'Combine', accepts: ['folder'], gives: 'sheet', keep: SHEET,

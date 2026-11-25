@@ -29,7 +29,7 @@ export const TEMPLATES = [
     id: 'answer-sheet-photos',
     name: { en: 'New answer-sheet photos → scores', fil: 'Bagong litrato ng answer sheet → iskor' },
     about: { en: 'When photos of answer sheets arrive in a folder (from the KaTuro App or a scanner), checks them with your answer key, asks you first, then types the scores into your class record.', fil: 'Kapag may dumating na litrato ng answer sheet sa isang folder (mula sa KaTuro App o scanner), tsine-check ito gamit ang answer key mo, itatanong muna sa iyo, saka itatype ang iskor sa class record mo.' },
-    choose: { en: 'Choose the photos folder, the answer key, your class record and the column.', fil: 'Piliin ang folder ng litrato, ang answer key, ang class record mo at ang column.' },
+    choose: { en: 'Choose the photos folder, the answer key, your class record (also as the class list, so the names match) and the column.', fil: 'Piliin ang folder ng litrato, ang answer key, ang class record mo (pati bilang class list, para tumugma ang pangalan) at ang column.' },
     make: () => row([
       ['when.newFiles', { what: 'photos' }],
       ['do.checkPapers', {}],

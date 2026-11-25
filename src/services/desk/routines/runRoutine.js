@@ -170,6 +170,9 @@ async function runCard(card, def, input, run, deps) {
       const res = await withTimeout(deps.runTasks(tasks, { label: say(def.label), outputFolder }), CARD_TIMEOUT_MS, 'This card took too long and was stopped.');
       const files = res.files || [];
       if (res.status !== 'done') return { status: res.status === 'needs_info' ? 'needs_info' : 'error', summary: res.summary, files };
+      // A card can look at what its tool said (e.g. "0 score(s) typed") and refuse to call it done.
+      const checked = def.check ? def.check(String(res.summary || '')) : null;
+      if (checked) return { status: checked.status, summary: checked.summary, files };
       let output;
       if (def.passThrough) output = input;
       else if (def.outputPaths) output = { plug: def.gives, paths: def.outputPaths(s).filter(Boolean) };
