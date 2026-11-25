@@ -63,17 +63,22 @@ function folderFiles(folder) {
 /**
  * The files of a watched folder as they are on disk NOW (files copied in with Windows Explorer or
  * a scanner are seen, not only ones KaTuroDesk made). Only that folder is read.
- * → [{ path, size, lastModified }] (paths inside the open folder)
+ * → [{ path, size, lastModified }] (paths inside the open folder), or null when the folder is not
+ *   there right now (then nothing is decided this time: a missing folder is never "empty").
  */
 export async function listFolderNow(folder) {
   const ws = useDeskStore.getState().workspace;
   const handle = ws?.handle;
   if (handle?.kind === 'electron' && handle.rootPath) {
-    const sub = await readDirectoryRecursively({ kind: 'electron', rootPath: `${handle.rootPath}/${folder}` });
+    const at = `${handle.rootPath}/${folder}`;
+    const api = typeof window !== 'undefined' ? window.katuroDeskApi : null;
+    if (api?.exists && !(await api.exists(at))) return null;
+    const sub = await readDirectoryRecursively({ kind: 'electron', rootPath: at });
+    if (api?.exists && !(await api.exists(at))) return null; // gone while it was read
     return flattenFileTree(sub).map((f) => ({ path: `${folder}/${f.path}`, size: f.size, lastModified: f.lastModified }));
   }
-  if (handle?.isVirtual && handle.getFiles) return flattenFileTree(handle.getFiles());
-  return flattenFileTree(tree()); // a browser folder: as last read
+  const list = handle?.isVirtual && handle.getFiles ? handle.getFiles() : tree(); // a browser folder: as last read
+  return findDir(list, String(folder).toLowerCase()) ? flattenFileTree(list) : null;
 }
 
 /**
@@ -85,7 +90,7 @@ export async function filesForStart(routine) {
   const folder = watchedFolder(routine);
   if (!folder) return [];
   try {
-    return await listFolderNow(folder);
+    return (await listFolderNow(folder)) || flattenFileTree(tree());
   } catch {
     return flattenFileTree(tree());
   }
@@ -109,7 +114,6 @@ export function deskDeps({ user, profile, workspaceId }) {
       };
       // Wait for the teacher's own chat request, then take the 'busy' flag in the same moment it is
       // seen free (so a chat request can never slip in between). The chat waits while a card runs.
-      // (A first pause lets a chat request that was just started show itself before the check.)
       await waitForChat();
       while (useDeskStore.getState().isGenerating) await waitForChat();
       if (!deps.stillHere()) throw new Error('Another folder was opened on KaTuroDesk, so the routine stopped here.');
@@ -266,8 +270,9 @@ export function useRoutineScheduler({ user, profile }) {
             try {
               files = await listFolderNow(folder);
             } catch {
-              continue; // the folder is gone or cannot be read: nothing new
+              files = null;
             }
+            if (!files) continue; // the folder is not there right now: nothing is decided
           }
           const due = dueNow(r, useRoutineStore.getState().meta[r.id] || {}, { now: Date.now(), flatFiles: files });
           if (!due) continue;

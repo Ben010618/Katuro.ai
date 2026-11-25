@@ -17,12 +17,12 @@ describe('saved routines and runs', () => {
     const all = files(['Lessons/A/a1.jpg', 'Lessons/B/b1.jpg', 'Lessons/B/b2.jpg']);
     st.saveRoutine(watching('Lessons/A'), { workspaceId: 'ws', flatFiles: all }, 1000);
     st.setEnabled('r1', true, { flatFiles: all, now: 1000 });
-    expect(useRoutineStore.getState().meta.r1.seen).toEqual(['lessons/a/a1.jpg']);
+    expect(useRoutineStore.getState().meta.r1.seen).toEqual({ 'lessons/a/a1.jpg': '1|1' });
     // The folder is changed to B and saved: B's old photos must not fire.
     const { routine } = useRoutineStore.getState().saveRoutine({ ...useRoutineStore.getState().routines[0], cards: watching('Lessons/B').cards }, { workspaceId: 'ws', flatFiles: all }, 2000);
     expect(routine.enabled).toBe(true);
     const meta = useRoutineStore.getState().meta.r1;
-    expect(meta).toMatchObject({ enabledAt: 2000, seen: ['lessons/b/b1.jpg', 'lessons/b/b2.jpg'], pending: {} });
+    expect(meta).toMatchObject({ enabledAt: 2000, seen: { 'lessons/b/b1.jpg': '1|1', 'lessons/b/b2.jpg': '1|1' }, gone: {}, pending: {} });
     expect(dueNow(routine, meta, { now: 9e9, flatFiles: all })).toBeNull();
   });
 

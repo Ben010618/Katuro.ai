@@ -59,7 +59,7 @@ export const useRoutineStore = create(
         // time from now, and a changed watched folder (or kind of file) starts from the files in it
         // NOW (none of them fire). DepEd dates already done stay done.
         if (old && saved.enabled) {
-          set((s) => ({ meta: { ...s.meta, [saved.id]: { fired: s.meta[saved.id]?.fired || [], enabledAt: now, lastFireAt: null, seen: initialSeen(saved, flatFiles), pending: {} } } }));
+          set((s) => ({ meta: { ...s.meta, [saved.id]: { fired: s.meta[saved.id]?.fired || [], enabledAt: now, lastFireAt: null, seen: initialSeen(saved, flatFiles), gone: {}, pending: {} } } }));
         }
         return { routine: saved, dropped, problems };
       },
@@ -74,7 +74,7 @@ export const useRoutineStore = create(
         }
         set((s) => ({
           routines: s.routines.map((x) => (x.id === id ? { ...x, enabled: Boolean(on), updatedAt: now } : x)),
-          meta: on ? { ...s.meta, [id]: { enabledAt: now, lastFireAt: null, fired: [], seen: initialSeen({ ...r, enabled: true }, flatFiles), pending: {} } } : s.meta,
+          meta: on ? { ...s.meta, [id]: { enabledAt: now, lastFireAt: null, fired: [], seen: initialSeen({ ...r, enabled: true }, flatFiles), gone: {}, pending: {} } } : s.meta,
         }));
       },
 

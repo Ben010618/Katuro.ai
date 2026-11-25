@@ -206,10 +206,18 @@ describe('when a routine starts', () => {
     expect(step([], t0 + 3e7)).toBeNull();
     expect(step(edited, t0 + 4e7)).toBeNull();
     expect(step(edited, t0 + 5e7)).toBeNull();
-    expect(meta.seen).toEqual([`${P}/a.jpg`.toLowerCase(), `${P}/b.jpg`.toLowerCase()]);
+    expect(Object.keys(meta.seen).sort()).toEqual([`${P}/a.jpg`.toLowerCase(), `${P}/b.jpg`.toLowerCase()]);
+    expect(meta.gone).toEqual({});
     // The same file with other capital letters on disk is the same file (Windows).
-    expect(step([{ ...edited[1], path: edited[1].path.toUpperCase() }], t0 + 6e7)).toBeNull();
-    expect(step([{ ...edited[1], path: edited[1].path.toUpperCase() }], t0 + 7e7)).toBeNull();
+    const upper = [old[0], { ...edited[1], path: edited[1].path.toUpperCase() }];
+    expect(step(upper, t0 + 6e7)).toBeNull();
+    expect(step(upper, t0 + 7e7)).toBeNull();
+    // A REUSED name: b.jpg is deleted, then a scanner writes a new b.jpg (another size/time): it fires.
+    expect(step([old[0]], t0 + 8e7)).toBeNull();
+    const again = [old[0], { path: `${P}/b.jpg`, size: 55, lastModified: t0 + 8e7 + 5 }];
+    expect(step(again, t0 + 9e7)).toBeNull(); // first look: settling
+    expect(step(again, t0 + 9e7 + SETTLE_MS)).toMatchObject({ files: [`${P}/b.jpg`] });
+    expect(step(again, t0 + 1e8)).toBeNull();
     // 45 at once: 40 now, 5 on the next check.
     const many = Array.from({ length: 45 }, (_, i) => ({ path: `${P}/p${i}.jpg`, size: 1, lastModified: t0 }));
     meta = { enabledAt: t0, seen: [] };

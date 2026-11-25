@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { PAPER_SIZES, MARGIN_PRESETS, FONTS, getDefaultPaper } from '../../services/desk/docSpec';
 import { runChatTurn } from './runChatTurn';
+import { useDeskStore } from '../../store/deskStore';
 
 const sel = 'border border-gray-300 rounded bg-white px-1 py-0.5 text-[11px]';
 
@@ -17,6 +18,8 @@ export default function DeskWordPageSetup({ path }) {
   const [font, setFont] = useState('');
   const [size, setSize] = useState('');
   const [busy, setBusy] = useState(false);
+  // Not while KaTuroDesk is busy (a chat request or a routine card): one thing at a time.
+  const isGenerating = useDeskStore((s) => s.isGenerating);
   const [error, setError] = useState('');
 
   const apply = async () => {
@@ -56,7 +59,7 @@ export default function DeskWordPageSetup({ path }) {
           <option value="">Text size: keep</option>
           {[10, 11, 12, 13, 14].map((v) => <option key={v} value={v}>{v} pt</option>)}
         </select>
-        <button type="button" onClick={apply} disabled={busy} className="rounded bg-[#2d6a4f] px-2.5 py-1 font-semibold text-white hover:bg-[#235841] disabled:opacity-40">{busy ? 'Working…' : 'Apply the format'}</button>
+        <button type="button" onClick={apply} disabled={busy || isGenerating} className="rounded bg-[#2d6a4f] px-2.5 py-1 font-semibold text-white hover:bg-[#235841] disabled:opacity-40">{busy ? 'Working…' : 'Apply the format'}</button>
       </div>
       <p className="mt-1.5 flex items-center gap-1 text-[10.5px] text-gray-500"><ShieldCheck size={11} /> A backup is made first (KaTuro Backups). Files in Lessons and Records are then changed directly; files elsewhere get a "(KaTuro edit)" copy. The words stay the same.</p>
       {error && <p className="mt-1 text-red-700" role="alert">{error}</p>}

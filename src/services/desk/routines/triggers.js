@@ -8,10 +8,14 @@
  *   when.newFiles  new files in a folder (photos from the phone, scans), once each, after they
  *                  stop changing (a photo still being copied is not read half-written)
  *
- * meta (kept per routine): { enabledAt, lastFireAt, fired: [keys], seen: [names, lowercase], pending: { name: { sig, at } } }
- * Nothing that happened before the routine was switched on fires it. A file is new by its NAME:
- * a file edited in place (a class record, the routine's own output) is never "new" again. A new
- * file is used once two checks at least SETTLE_MS apart find it unchanged (same size and time).
+ * meta (kept per routine): { enabledAt, lastFireAt, fired: [keys], seen: { name: sig }, gone: { name: sig }, pending: { name: { sig, at } } }
+ * (name = the path in lowercase; sig = size and time.) Nothing that happened before the routine
+ * was switched on fires it.
+ *   - A file edited in place (a class record, the routine's own output) stays "seen": never new.
+ *   - A seen file missing from a check is set aside as "gone" with its sig. If it comes back with
+ *     the SAME sig it is the same old file (the folder was renamed for a moment, a sync hiccup):
+ *     not new. With another sig it is a new file with a reused name (Scan001.jpg): new.
+ *   - A new file is used once two checks at least SETTLE_MS apart find it unchanged.
  */
 
 import { computeNextRun, toDateInput } from '../schedule/schedule.js';
@@ -99,24 +103,26 @@ export function folderEntries(flatFiles, folder, match = /./) {
   const prefix = `${String(folder || '').replace(/\/+$/, '')}/`.toLowerCase();
   return (flatFiles || [])
     .filter((f) => f?.path && f.path.toLowerCase().startsWith(prefix) && !SYSTEM_DIRS.test(f.path) && match.test(f.path))
-    .map((f) => ({ path: f.path, lastModified: Number(f.lastModified) || 0, sig: `${f.path}|${f.size ?? ''}|${f.lastModified ?? ''}` }));
+    .map((f) => ({ path: f.path, lastModified: Number(f.lastModified) || 0, sig: `${f.size ?? ''}|${f.lastModified ?? ''}` }));
 }
 
 /** What a new-files When card starts from: the folder's files as they are now (none fire). */
 export function initialSeen(routine, flatFiles) {
   const card = whenCard(routine);
-  if (card?.type !== 'when.newFiles') return [];
+  if (card?.type !== 'when.newFiles') return {};
   const def = cardDef(card.type);
-  return trimSeen(folderEntries(flatFiles, card.settings.folder, def.match[card.settings.what] || /./).map((e) => keyOf(e.path)));
+  return trim(Object.fromEntries(folderEntries(flatFiles, card.settings.folder, def.match[card.settings.what] || /./).map((e) => [keyOf(e.path), e.sig])));
 }
 
 /** A file's name as remembered: the same file whatever the letter case on disk (Windows). */
 export const keyOf = (path) => String(path || '').toLowerCase();
 
-/** The remembered names, without repeats; past MAX_SEEN the OLDEST are let go. */
-function trimSeen(list) {
-  const unique = [...new Set(list)];
-  return unique.length > MAX_SEEN ? unique.slice(-MAX_SEEN) : unique;
+/** name → sig, at most MAX_SEEN (the oldest are let go). An older list of names is read as names with no sig. */
+function trim(map) {
+  const m = Array.isArray(map) ? Object.fromEntries(map.map((k) => [keyOf(k), ''])) : { ...(map && typeof map === 'object' ? map : {}) };
+  const keys = Object.keys(m);
+  if (keys.length <= MAX_SEEN) return m;
+  return Object.fromEntries(keys.slice(-MAX_SEEN).map((k) => [k, m[k]]));
 }
 
 /** The watched folder of a routine ("When new files arrive"), or ''. */
@@ -128,8 +134,15 @@ export function watchedFolder(routine) {
 /** meta with these paths counted as seen (files a run made or changed never start it again). */
 export function markSeen(meta = {}, paths = []) {
   const pending = { ...(meta.pending || {}) };
-  for (const p of paths) delete pending[keyOf(p)];
-  return { ...meta, seen: trimSeen([...(meta.seen || []), ...paths.map(keyOf)]), pending };
+  const seen = trim(meta.seen);
+  const gone = trim(meta.gone);
+  for (const p of paths) {
+    const k = keyOf(p);
+    delete pending[k];
+    delete gone[k];
+    if (!(k in seen)) seen[k] = ''; // its size and time are taken at the next check
+  }
+  return { ...meta, seen: trim(seen), gone, pending };
 }
 
 /**
@@ -160,10 +173,29 @@ export function dueNow(routine, meta = {}, { now = Date.now(), flatFiles = [] } 
 
   if (card.type === 'when.newFiles') {
     const def = cardDef(card.type);
-    const seen = new Set(meta.seen || []);
+    const seen = trim(meta.seen);
+    const gone = trim(meta.gone);
     const before = meta.pending || {};
     const entries = folderEntries(flatFiles, s.folder, def.match[s.what] || /./);
-    const fresh = entries.filter((e) => !seen.has(keyOf(e.path)));
+    const present = new Map(entries.map((e) => [keyOf(e.path), e]));
+    const nextSeen = {};
+    const nextGone = { ...gone };
+    const fresh = [];
+    for (const [k, e] of present) {
+      if (k in seen) {
+        nextSeen[k] = e.sig; // still here (edited in place or not): never new
+        continue;
+      }
+      if (k in gone) {
+        delete nextGone[k];
+        if (gone[k] === e.sig || gone[k] === '') {
+          nextSeen[k] = e.sig; // the same old file back again
+          continue;
+        }
+      }
+      fresh.push(e); // a new name, or a reused name with another file
+    }
+    for (const k of Object.keys(seen)) if (!present.has(k)) nextGone[k] = seen[k];
     // A new file is ready when an earlier check saw it exactly the same, SETTLE_MS ago or more.
     // (A file not in this check is simply not pending any more: nothing is lost if a read fails.)
     const ready = [];
@@ -177,12 +209,12 @@ export function dueNow(routine, meta = {}, { now = Date.now(), flatFiles = [] } 
     // At most 40 files per run; the rest stay ready and start the next run.
     const batch = ready.slice(0, MAX_FILES_PER_RUN);
     for (const e of batch) delete pending[keyOf(e.path)];
-    // Names are only ever added: an empty or failed read of the folder (renamed for a moment, a
-    // sync hiccup) can never make old files "new" again.
-    const nextSeen = trimSeen([...seen, ...batch.map((e) => keyOf(e.path))]);
-    const changed = batch.length || JSON.stringify(pending) !== JSON.stringify(before);
+    for (const e of batch) nextSeen[keyOf(e.path)] = e.sig;
+    const outSeen = trim(nextSeen);
+    const outGone = trim(nextGone);
+    const changed = batch.length || JSON.stringify(pending) !== JSON.stringify(before) || JSON.stringify(outSeen) !== JSON.stringify(seen) || JSON.stringify(outGone) !== JSON.stringify(gone);
     if (!changed) return null;
-    const nextMeta = { ...meta, seen: nextSeen, pending, ...(batch.length ? { lastFireAt: now } : {}) };
+    const nextMeta = { ...meta, seen: outSeen, gone: outGone, pending, ...(batch.length ? { lastFireAt: now } : {}) };
     return { trigger: batch.length ? { kind: 'newFiles', at: now, files: batch.map((e) => e.path) } : null, meta: nextMeta };
   }
   return null;

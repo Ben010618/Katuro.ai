@@ -16,7 +16,7 @@ const emptyCheck = () => ({ answerKey: null, keyText: '', sheets: {}, decisions:
 
 /** Step 3: read the photos (no AI, no internet), settle what is unclear, save and record. */
 export default function BubbleCheck({ quiz, folder }) {
-  const { workspace, refreshFiles } = useDeskStore();
+  const { workspace, refreshFiles, isGenerating } = useDeskStore(); // isGenerating: a chat request or a routine card runs
   const { user, profile } = useAuth();
   const [check, setCheck] = useState(null);
   const [keyDraft, setKeyDraft] = useState('');
@@ -294,7 +294,7 @@ export default function BubbleCheck({ quiz, folder }) {
                 <option value="">Record into which class record?</option>
                 {recordTargets.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-              <button type="button" onClick={record} disabled={!target || recording} className={`${btn} bg-[#2d6a4f] text-white hover:bg-[#235841]`}>{recording ? 'Preparing…' : 'Record scores'}</button>
+              <button type="button" onClick={record} disabled={!target || recording || isGenerating} className={`${btn} bg-[#2d6a4f] text-white hover:bg-[#235841]`}>{recording ? 'Preparing…' : 'Record scores'}</button>
             </div>
             <p className="text-[10.5px] text-gray-500">Learners are matched by LRN, then by name. You choose the column and review every change before anything is written.</p>
           </>
