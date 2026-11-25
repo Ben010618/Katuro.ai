@@ -14,8 +14,8 @@ import { checkRoutine, cleanRoutine } from '../services/desk/routines/routine.js
 import { initialSeen } from '../services/desk/routines/triggers.js';
 import { recoverRun } from '../services/desk/routines/runRoutine.js';
 
-export const MAX_RUNS = 60;
-export const MAX_ROUTINES = 50;
+const MAX_RUNS = 60;
+const MAX_ROUTINES = 50;
 
 /**
  * The runs kept: every waiting run (the teacher's to answer; a routine never starts again while
@@ -90,7 +90,11 @@ export const useRoutineStore = create(
       /** Adds or replaces a run (progress is saved after every card). */
       upsertRun: (run) => set((s) => ({ runs: keepRuns([run, ...s.runs.filter((r) => r.id !== run.id)]) })),
 
-      clearHistory: () => set((s) => ({ runs: s.runs.filter((r) => r.status === 'waiting') })),
+      /** Clears the finished runs of ONE folder's routines (runs waiting for an OK stay). */
+      clearHistory: (workspaceId) => set((s) => {
+        const ids = new Set(routinesFor(s.routines, workspaceId).map((r) => r.id));
+        return { runs: s.runs.filter((r) => r.status === 'waiting' || !ids.has(r.routineId)) };
+      }),
     }),
     {
       name: 'katuro-routines-v1',

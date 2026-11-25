@@ -4,7 +4,7 @@ import { useDeskStore, workspaceIdOf } from '../../../store/deskStore';
 import { useRoutineStore, routinesFor } from '../../../store/routineStore';
 import { flattenFileTree, writeFileToDirectory } from '../../../services/localFileSystem';
 import { cardDef, say } from '../../../services/desk/routines/catalog';
-import { checkRoutine, cleanRoutine, describeRoutine, exportRoutineText, importRoutineText, newRoutine } from '../../../services/desk/routines/routine';
+import { MAX_IMPORT_BYTES, checkRoutine, cleanRoutine, describeRoutine, exportRoutineText, importRoutineText, newRoutine } from '../../../services/desk/routines/routine';
 import { nextFireAt } from '../../../services/desk/routines/triggers';
 import { TEMPLATES, fromTemplate } from '../../../services/desk/routines/templates';
 import { talkToRoutine } from '../../../services/desk/routines/talk';
@@ -12,15 +12,13 @@ import { pilotSummary, pilotText } from '../../../services/desk/routines/pilot';
 import { formatWhen } from '../../../services/desk/schedule/schedule';
 import { callDeskLLM } from '../../../services/desk/agent/llm';
 import { SYSTEM_DIRS } from '../../../services/desk/systemFolders';
-import { STATUS_LIGHT } from './cardStyle';
+import { STATUS_LIGHT, T, primaryBtn as primary } from './cardStyle';
 import { answerRun, filesForStart, startRoutine } from './routineEngine';
 
 // The Builder (React Flow) loads only when a routine is opened, not with KaTuroDesk.
 const RoutineBuilder = lazy(() => import('./RoutineBuilder'));
 const btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
-const primary = 'inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50';
 const LANG_KEY = 'katuro-routines-lang';
-const T = (lang, en, fil) => (lang === 'fil' ? fil : en);
 const readLang = () => { try { return localStorage.getItem(LANG_KEY) === 'fil' ? 'fil' : 'en'; } catch { return 'en'; } };
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY, l); } catch { /* a convenience */ } };
 
@@ -149,6 +147,8 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
   const importFile = async (file) => {
     if (!file) return;
     try {
+      // Too big to be a routine: refused before the file is read into memory.
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('This routine file is too big to be a KaTuro routine.');
       const { routine, dropped } = importRoutineText(await file.text());
       setEditing(routine);
       say2(dropped.length ? `${T(lang, 'Opened. Left out', 'Nabuksan. Hindi isinama')}: ${dropped.slice(0, 3).join('; ')}.` : '');
@@ -319,7 +319,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
                 <pre className="mt-1 whitespace-pre-wrap font-sans text-[11px] text-emerald-900">{going}</pre>
               </div>
               {!history.length ? <p className="py-6 text-center text-xs text-gray-500">{T(lang, 'No runs yet.', 'Wala pang takbo.')}</p> : (
-                <button type="button" onClick={clearHistory} className={btn}><Trash2 size={12} /> {T(lang, 'Clear history', 'Burahin ang kasaysayan')}</button>
+                <button type="button" onClick={() => clearHistory(wsId)} className={btn}><Trash2 size={12} /> {T(lang, 'Clear history', 'Burahin ang kasaysayan')}</button>
               )}
               {history.map((run) => (
                 <div key={run.id} className="rounded-xl border border-gray-200 p-3">

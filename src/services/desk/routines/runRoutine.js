@@ -19,14 +19,12 @@
  */
 
 import { cardDef, say } from './catalog.js';
-import { checkRoutine, cleanRoutine, downstreamOf, newId, runOrder } from './routine.js';
+import { checkRoutine, cleanRoutine, clip, downstreamOf, madeBy, newId, parentOf, runOrder } from './routine.js';
 import { withTimeout } from '../../../utils/withTimeout.js';
 
-export const CARD_TIMEOUT_MS = 20 * 60 * 1000; // one card never keeps a routine busy longer
+const CARD_TIMEOUT_MS = 20 * 60 * 1000; // one card never keeps a routine busy longer
 const OK = new Set(['done', 'approved']);
 const STOPPED = new Set(['error', 'needs_info', 'skipped', 'rejected']);
-
-const clip = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 /** A new run of a routine (not started yet). trigger: { kind, at?, files?, title? } */
 export function createRun(routine, trigger = { kind: 'manual' }, now = Date.now()) {
@@ -50,16 +48,10 @@ export function createRun(routine, trigger = { kind: 'manual' }, now = Date.now(
   };
 }
 
-const parentOf = (routine, cardId) => routine.wires.find((w) => w.to === cardId)?.from || null;
-
-/** The folder a "Save in a folder" card right after this card asks for, or ''. */
+/** The folder of the "Save in a folder" card that saves this green card's files (an "Ask me first" may be between), or ''. */
 function saveFolderAfter(routine, cardId) {
-  const byId = new Map(routine.cards.map((c) => [c.id, c]));
-  for (const w of routine.wires) {
-    const next = w.from === cardId ? byId.get(w.to) : null;
-    if (next?.type === 'save.folder' && next.settings?.folder) return next.settings.folder;
-  }
-  return '';
+  const save = routine.cards.find((c) => c.type === 'save.folder' && madeBy(routine, c.id) === cardId);
+  return save?.settings?.folder || '';
 }
 
 /** What happens after "Ask me first" if the teacher approves: "Next: <card> → <record>, column <col>". */
@@ -165,6 +157,10 @@ async function runCard(card, def, input, run, deps) {
       if (def.needsFiles && !(input?.paths || []).length) return { status: 'error', summary: 'There were no files to work on.' };
       // Every green card except one that starts from nothing (a DLL) needs a file or folder.
       if (!def.accepts.includes('start') && !input?.paths?.length && !input?.folder) return { status: 'error', summary: 'The card before it gave no file to work on.' };
+      // Every file the card names must still be exactly there (never a different file with the same name).
+      for (const f of def.fields || []) {
+        if (f.kind === 'file' && s[f.key] && !deps.fileExists(s[f.key])) return { status: 'error', summary: `"${s[f.key]}" is not in your KaTuro folder any more. Choose it again on "${say(def.label)}".` };
+      }
       const tasks = def.toTasks(s, input).map((t, i) => ({ id: t.id || `t${i + 1}`, tool: t.tool, args: t.args, dependsOn: t.dependsOn || [], label: say(def.label) }));
       const outputFolder = saveFolderAfter(run.routine, card.id);
       const res = await withTimeout(deps.runTasks(tasks, { label: say(def.label), outputFolder }), CARD_TIMEOUT_MS, 'This card took too long and was stopped.');
@@ -193,8 +189,8 @@ async function runCard(card, def, input, run, deps) {
 
     case 'save': {
       if (card.type === 'save.folder') {
-        const before = parentOf(run.routine, card.id);
-        const made = (before && run.steps[before]?.files) || [];
+        const from = madeBy(run.routine, card.id);
+        const made = (from && run.steps[from]?.files) || [];
         return { status: 'done', summary: made.length ? `Saved in ${s.folder}` : 'Nothing new to save' };
       }
       if (card.type === 'save.notify') {

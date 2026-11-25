@@ -644,7 +644,7 @@ function Lightbox({ cid, attachment, deskFiles, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 12 }}>
+    <div onClick={onClose} style={{ position: 'fixed', top: 'var(--kt-titlebar, 0px)', right: 0, bottom: 0, left: 0, zIndex: 90, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 12 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 8 }}>
         {deskFiles
           ? <button style={btnPrimary} onClick={() => act.save(attachment)}>{act.busy ? 'Saving…' : 'Save to my folder'}</button>

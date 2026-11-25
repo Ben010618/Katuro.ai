@@ -4,15 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const deskApi = () => (typeof window !== 'undefined' ? window.katuroDeskApi : undefined);
 
-/** The window's width in CSS pixels (zooming in makes it "narrower"). */
-export function useViewportWidth() {
-  const [width, setWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1400));
+/** True while the window is at least this many CSS pixels wide (zooming in makes it "narrower"). */
+export function useMinWidth(px) {
+  const query = `(min-width: ${px}px)`;
+  const [wide, setWide] = useState(() => (typeof window === 'undefined' || !window.matchMedia ? true : window.matchMedia(query).matches));
   useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return width;
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(query);
+    const onChange = () => setWide(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return wide;
 }
 
 /** How big KaTuroDesk looks (1 = 100%): follows Ctrl + / −, Ctrl + wheel and Settings › Screen size. */

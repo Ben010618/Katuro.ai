@@ -136,32 +136,19 @@ service cloud.firestore {
 
     // ── KaTuro Collab: channels ────────────────────────────────────────────
     match /collabChannels/{channelId} {
-      allow read: if request.auth != null && (
-        resource.data.isPublic == true ||
-        request.auth.uid in resource.data.members
-      );
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
-        resource.data.isPublic == true ||
-        request.auth.uid in resource.data.members ||
-        resource.data.createdBy == request.auth.uid
-      );
+      // Retired: the app no longer reads or writes collab channels (only Cloud Functions, which
+      // bypass these rules). Closed so no teacher can read or post in another's channel.
+      allow read, write: if false;
       match /messages/{msgId} {
-        allow read:   if request.auth != null;
-        allow create: if request.auth != null;
-        allow update, delete: if false;
+        allow read, write: if false;
       }
     }
 
-    // ── KaTuro Collab: direct messages ────────────────────────────────────
+    // ── KaTuro Collab: direct messages (retired, closed like channels) ────
     match /collabDMs/{dmId} {
-      allow read, update: if request.auth != null &&
-        request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null;
+      allow read, write: if false;
       match /messages/{msgId} {
-        allow read:   if request.auth != null;
-        allow create: if request.auth != null;
-        allow update, delete: if false;
+        allow read, write: if false;
       }
     }
 
@@ -245,7 +232,8 @@ service cloud.firestore {
 
     match /shares_posts/{postId} {
       allow read:   if request.auth != null;
-      allow create: if request.auth != null;
+      // A teacher posts as themselves only.
+      allow create: if request.auth != null && request.resource.data.authorUid == request.auth.uid;
       // Authors can update/delete freely; anyone auth can increment reactions + commentCount
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.authorUid ||
@@ -258,7 +246,7 @@ service cloud.firestore {
 
       match /comments/{commentId} {
         allow read:   if request.auth != null;
-        allow create: if request.auth != null;
+        allow create: if request.auth != null && request.resource.data.authorUid == request.auth.uid;
         // Authors edit/delete; anyone auth can increment replyCount
         allow update: if request.auth != null && (
           request.auth.uid == resource.data.authorUid ||
@@ -270,7 +258,7 @@ service cloud.firestore {
 
         match /replies/{replyId} {
           allow read:   if request.auth != null;
-          allow create: if request.auth != null;
+          allow create: if request.auth != null && request.resource.data.authorUid == request.auth.uid;
           allow delete: if request.auth != null && (
             request.auth.uid == resource.data.authorUid || isAdmin()
           );

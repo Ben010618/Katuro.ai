@@ -66,7 +66,7 @@ function folderFiles(folder) {
  * → [{ path, size, lastModified }] (paths inside the open folder), or null when the folder is not
  *   there right now (then nothing is decided this time: a missing folder is never "empty").
  */
-export async function listFolderNow(folder) {
+async function listFolderNow(folder) {
   const ws = useDeskStore.getState().workspace;
   const handle = ws?.handle;
   if (handle?.kind === 'electron' && handle.rootPath) {
@@ -97,7 +97,7 @@ export async function filesForStart(routine) {
 }
 
 /** The real deps for runRoutine.js: one green card = one confirmed plan through the agent. */
-export function deskDeps({ user, profile, workspaceId }) {
+function deskDeps({ user, profile, workspaceId }) {
   const inflight = new Set(); // every card's work still running (also one that timed out)
   const deps = {
     now: () => Date.now(),
@@ -115,6 +115,8 @@ export function deskDeps({ user, profile, workspaceId }) {
       // Wait for the teacher's own chat request, then take the 'busy' flag in the same moment it is
       // seen free (so a chat request can never slip in between). The chat waits while a card runs.
       await waitForChat();
+      // Checked again with no await in between: a chat request can start in the moment the wait
+      // above resolves, so the flag is taken only when it is seen free right here.
       while (useDeskStore.getState().isGenerating) await waitForChat();
       if (!deps.stillHere()) throw new Error('Another folder was opened on KaTuroDesk, so the routine stopped here.');
       useDeskStore.getState().setIsGenerating(true); // set by this card, so cleared by it below
@@ -235,7 +237,7 @@ export async function answerRun(runId, approve, { user, profile, by = 'KaTuroDes
  */
 export function answerRunFromPhone(runId, approve, { user, profile, by = 'KaTuro App' } = {}) {
   const { run, routine } = waitingRun(runId);
-  if (!user) return null;
+  if (!user) throw new Error('Sign in to KaTuroDesk first, then answer again.');
   if (!beginBackgroundWork()) return null;
   const decided = decideRun(run, Boolean(approve), { by });
   useRoutineStore.getState().upsertRun(decided); // no longer waiting: a second answer is refused

@@ -117,12 +117,24 @@ describe('checking a routine', () => {
     expect(checkRoutine(r).map((p) => p.text)).toEqual(['"Find frequent absences" needs a sheet, but "A folder" gives a folder of files.']);
   });
 
-  it('a card that changes a record needs "Ask me first" before it (anywhere before it)', () => {
+  it('a card that changes a record needs "Ask me first" RIGHT before it (the teacher sees the record and column)', () => {
     const steps = [['when.manual'], ['get.sheet', { path: 'Records/scores.xlsx' }], ['do.typeScores', { targetPath: 'Records/Grade 7 - Rizal - Science.xlsx', targetColumn: 'WW3' }]];
-    expect(checkRoutine(chain(steps)).map((p) => p.text)).toEqual(['"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card before it.']);
+    expect(checkRoutine(chain(steps)).map((p) => p.text)).toEqual(['"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card right before it.']);
     const asked = chain([steps[0], steps[1], ['ask.approve', {}], steps[2]]);
     expect(checkRoutine(asked)).toEqual([]);
     expect(plugsOf(asked).get('c2')).toBe('sheet'); // Ask passes on what came in
+    // An "Ask me first" further back (before checking the photos) is not enough.
+    const early = chain([['when.newFiles', { folder: 'Photos', what: 'photos' }], ['ask.approve', { note: 'OK to check the photos?' }], ['do.checkPapers', { answerKeyPath: 'Lessons/Key.docx' }], ['do.typeScores', { targetPath: 'Records/7-A Math.xlsx', targetColumn: 'F' }]]);
+    expect(checkRoutine(early).map((p) => p.text)).toContain('"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card right before it.');
+  });
+
+  it('"Save in a folder" follows a green card (an Ask may be between), one per green card', () => {
+    const throughAsk = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['do.attendance', {}], ['ask.approve', {}], ['save.folder', { folder: 'Reports' }]]);
+    expect(checkRoutine(throughAsk)).toEqual([]);
+    const afterGet = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['save.folder', { folder: 'Reports' }]]);
+    expect(checkRoutine(afterGet).map((p) => p.text)).toEqual(['"Save in a folder" saves the files a green card makes, so put it after a green card.']);
+    const two = cleanRoutine({ cards: [{ id: 'w', type: 'when.manual' }, { id: 'g', type: 'get.sheet', settings: { path: 'Records/SF2.xlsx' } }, { id: 'd', type: 'do.attendance', settings: {} }, { id: 'a', type: 'save.folder', settings: { folder: 'A' } }, { id: 'b', type: 'save.folder', settings: { folder: 'B' } }], wires: [{ from: 'w', to: 'g' }, { from: 'g', to: 'd' }, { from: 'd', to: 'a' }, { from: 'd', to: 'b' }] }).routine;
+    expect(checkRoutine(two).map((p) => p.text)).toEqual(['"Find frequent absences" can have only one "Save in a folder" after it.']);
   });
 
   it('one When card; no loose cards, loops or two wires into one card', () => {
@@ -268,6 +280,24 @@ describe('running a routine', () => {
     expect(run.steps.c2).toMatchObject({ status: 'done', files: ['KaTuro Outputs/check_attendance.docx', 'KaTuro Outputs/check_attendance.xlsx'] });
     expect(run.outputs.c2).toEqual({ plug: 'docs', paths: ['KaTuro Outputs/check_attendance.docx', 'KaTuro Outputs/check_attendance.xlsx'] });
     expect(runSummary(run)).toBe('"Test routine" finished: 2 file(s) made or updated.');
+  });
+
+  it('"Save in a folder" after "Ask me first" really saves there, and says so', async () => {
+    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }], ['do.attendance', {}], ['ask.approve', {}], ['save.folder', { folder: 'Reports' }]]);
+    const { deps, calls } = fake();
+    const waiting = await advanceRun(createRun(r), deps);
+    expect(calls[0].opts.outputFolder).toBe('Reports');
+    const done = await advanceRun(decideRun(waiting, true), deps);
+    expect(done.steps.c4).toMatchObject({ status: 'done', summary: 'Saved in Reports' });
+  });
+
+  it('a file a card names that is gone stops the card (never a different file with the same name)', async () => {
+    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/scores.xlsx' }], ['ask.approve', {}], ['do.typeScores', { targetPath: 'Records/7-Rizal/missing Math.xlsx', targetColumn: 'F' }]]);
+    const { deps, calls } = fake();
+    const done = await advanceRun(decideRun(await advanceRun(createRun(r), deps), true), deps);
+    expect(done.status).toBe('error');
+    expect(done.steps.c3).toMatchObject({ status: 'error', summary: '"Records/7-Rizal/missing Math.xlsx" is not in your KaTuro folder any more. Choose it again on "Type scores into my class record".' });
+    expect(calls).toHaveLength(0);
   });
 
   it('"Ask me first" stops the run; yes goes on, no skips everything after it', async () => {

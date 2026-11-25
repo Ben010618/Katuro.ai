@@ -37,7 +37,11 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
   }
 
   store.addMessage({ role: 'user', content: text, attachments, ...(scheduled ? { scheduled } : {}) });
-  store.addMessage({ role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
+  // This turn updates its own reply by id: a routine's or a scheduled task's message that lands
+  // after it in the chat is never overwritten.
+  const replyId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const updateReply = (patch) => useDeskStore.getState().updateMessage(replyId, patch);
+  store.addMessage({ id: replyId, role: 'assistant', agentId: 'katuro_assistant', content: '', isThinking: true });
   store.setIsGenerating(true);
 
   try {
@@ -58,14 +62,14 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
       voice,
       autoApprove: Boolean(scheduled),
       onUpdate: ({ steps, reply }) => {
-        useDeskStore.getState().updateLastAssistantMessage({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
+        updateReply({ steps, ...(reply ? { content: reply, isThinking: false } : {}) });
         // Talking: the reply so far (talk.js speaks its first full sentence while the work runs).
         if (reply && onReply) onReply(reply);
       },
     });
 
     const s = useDeskStore.getState();
-    s.updateLastAssistantMessage({
+    updateReply({
       content: result.content, steps: result.steps, isThinking: false, artifacts: result.artifacts,
       ...(result.tools?.length ? { toolNames: result.tools } : {}),
       // One-tap answers to a question, and a plan waiting for "Proceed".
@@ -87,7 +91,7 @@ export async function runChatTurn({ text, attachments = [], user, profile, sched
     const content = err.dailyLimit || err.status === 429
       ? getPersona(persona).limitReached(salutation)
       : `Something went wrong: ${String(err.message || 'Unknown error').replace(/[.\s]+$/, '')}. Please try again.`;
-    useDeskStore.getState().updateLastAssistantMessage({ content, isThinking: false });
+    updateReply({ content, isThinking: false });
     return { status: 'error', content, files: [] };
   } finally {
     useDeskStore.getState().setIsGenerating(false);

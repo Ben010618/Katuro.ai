@@ -87,7 +87,7 @@ describe('talk to build', () => {
     expect(out.routine.cards.map((c) => c.type)).toEqual(['when.manual', 'get.sheet', 'do.typeScores']);
     expect(out.routine.cards[1].settings.path).toBe('');
     expect(out.routine.cards[2].settings).toEqual({ targetPath: 'Records/Grade 7 - Rizal - Science.xlsx', targetColumn: 'WW1' });
-    expect(out.problems.map((p) => p.text)).toEqual(expect.arrayContaining(['"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card before it.']));
+    expect(out.problems.map((p) => p.text)).toEqual(expect.arrayContaining(['"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card right before it.']));
     expect(out.message).toMatch(/Left out: an unknown card "do\.runShell"/);
   });
 

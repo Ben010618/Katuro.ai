@@ -23,7 +23,7 @@ import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
 import { BOTH_SIDE_PANELS_MIN_WIDTH, CANVAS_DEFAULT_WIDTH, CHAT_MIN_WIDTH, clampCanvasWidth, loadCanvasWidth, saveCanvasWidth } from './canvasResize';
-import { useBarFit, useDeskZoom, useViewportWidth, useWindowControlsInset } from './useDeskWindow';
+import { useBarFit, useDeskZoom, useMinWidth, useWindowControlsInset } from './useDeskWindow';
 import { useDeskStore, workspaceIdOf } from '../../store/deskStore';
 import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
@@ -116,11 +116,24 @@ export default function KaTuroDeskPage() {
   const [leftWanted, setLeftWanted] = useState(true);
   const [rightWanted, setRightWanted] = useState(true);
   const [lastSide, setLastSide] = useState('right');
-  const roomForBoth = useViewportWidth() >= BOTH_SIDE_PANELS_MIN_WIDTH;
+  const roomForBoth = useMinWidth(BOTH_SIDE_PANELS_MIN_WIDTH);
   const showLeftPanel = leftWanted && (roomForBoth || !rightWanted || lastSide === 'left');
   const showRightPanel = rightWanted && (roomForBoth || !showLeftPanel);
-  const setShowLeftPanel = useCallback((open) => { setLeftWanted(open); setLastSide(open ? 'left' : 'right'); }, []);
-  const setShowRightPanel = useCallback((open) => { setRightWanted(open); setLastSide(open ? 'right' : 'left'); }, []);
+  // Closing the one side panel a narrow window shows gives the chat the room (the other stays closed).
+  const setShowLeftPanel = useCallback((open) => {
+    setLeftWanted(open);
+    if (open) setLastSide('left');
+    else if (!roomForBoth) setRightWanted(false);
+  }, [roomForBoth]);
+  const setShowRightPanel = useCallback((open) => {
+    setRightWanted(open);
+    if (open) setLastSide('right');
+    else if (!roomForBoth) setLeftWanted(false);
+  }, [roomForBoth]);
+  // Narrow-window tab (below 768 px): 'folder' | 'chat' | 'canvas'
+  const [activeMobileTab, setActiveMobileTab] = useState('chat');
+  // Something opened a document: show the canvas (in a very narrow window, its tab).
+  const openCanvas = useCallback(() => { setShowRightPanel(true); setActiveMobileTab('canvas'); }, [setShowRightPanel]);
   const zoom = useDeskZoom();
   const windowControlsPx = useWindowControlsInset(WINDOW_CONTROLS_PX, zoom);
   // A short top bar first drops the plan badge and the phone button's words, then all labels.
@@ -196,11 +209,11 @@ export default function KaTuroDeskPage() {
     saveCanvasWidth(next);
   };
 
-  useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
+  useDeskScheduler({ user, profile, onOpenCanvas: openCanvas });
   // Routines (Routine Builder): start when their When card fires, while KaTuroDesk is open.
   useRoutineScheduler({ user, profile });
   // Talking with the persona (chat, bubble, Ctrl+Space) answers as the signed-in teacher.
-  useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: () => setShowRightPanel(true) }); }, [user, profile, setShowRightPanel]);
+  useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: openCanvas }); }, [user, profile, openCanvas]);
   // "Hello Matt": listens for the wake phrase when the teacher turned it on (desktop app only).
   useEffect(() => startWakeController(), []);
   // The persona's voice on this computer (Piper) is downloaded once and loaded ahead, only for
@@ -260,9 +273,6 @@ export default function KaTuroDeskPage() {
     return s.runs.filter((r) => r.status === 'waiting' && ids.has(r.routineId)).length;
   });
 
-  // Mobile tab state: 'folder' | 'chat' | 'canvas'
-  const [activeMobileTab, setActiveMobileTab] = useState('chat');
-
   // The desktop window's own title-bar buttons match the theme.
   useEffect(() => {
     window.katuroDeskApi?.setTitleBarColors?.(deskTheme === 'dark'
@@ -297,7 +307,7 @@ export default function KaTuroDeskPage() {
       <DeskTourHost />
       <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
       <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
-      <TestsModal open={showTests} onClose={() => setShowTests(false)} onOpenCanvas={() => setShowRightPanel(true)} />
+      <TestsModal open={showTests} onClose={() => setShowTests(false)} onOpenCanvas={openCanvas} />
       {showRoutines && (
         <Suspense fallback={null}>
           <RoutinesModal open onClose={() => setShowRoutines(false)} user={user} profile={profile} />
@@ -309,7 +319,7 @@ export default function KaTuroDeskPage() {
           onClose={() => setSchedule(null)}
           user={user}
           profile={profile}
-          onOpenCanvas={() => setShowRightPanel(true)}
+          onOpenCanvas={openCanvas}
         />
       )}
       {/* Top Studio Bar (also the window's title bar in the desktop app) */}
@@ -451,7 +461,7 @@ export default function KaTuroDeskPage() {
 
         {/* Narrow window: one panel at a time, chosen here (own row, so it never sits under the window buttons) */}
         <div className="flex md:hidden justify-center border-b border-[#2d3e33] bg-[#16211a] px-2 py-1 flex-shrink-0">
-          <div className="flex md:hidden items-center bg-[#213026] p-0.5 rounded-lg border border-[#2b3d31]">
+          <div className="flex items-center bg-[#213026] p-0.5 rounded-lg border border-[#2b3d31]">
             <button
               onClick={() => setActiveMobileTab('folder')}
               className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
@@ -514,7 +524,7 @@ export default function KaTuroDeskPage() {
             profile={profile}
             photoURL={photoURL}
             plan={plan}
-            onOpenCanvas={() => setShowRightPanel(true)}
+            onOpenCanvas={openCanvas}
             onSchedule={(draft) => setSchedule(draft)}
             onToggleLeftPanel={() => setShowLeftPanel(!showLeftPanel)}
             showLeftPanel={showLeftPanel}
@@ -592,7 +602,7 @@ export default function KaTuroDeskPage() {
                 profile={profile}
                 photoURL={photoURL}
                 plan={plan}
-                onOpenCanvas={() => setActiveMobileTab('canvas')}
+                onOpenCanvas={openCanvas}
                 onSchedule={(draft) => setSchedule(draft)}
               />
             </div>

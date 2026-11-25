@@ -99,14 +99,18 @@ describe('KaTuroDesk Zustand Store', () => {
     expect(state.privacyMode).toBe(true);
   });
 
-  it('adds messages and patches the last assistant message', () => {
-    const { addMessage, updateLastAssistantMessage } = useDeskStore.getState();
+  it('adds messages and patches one message by id (a message added after it stays as it is)', () => {
+    const { addMessage, updateMessage } = useDeskStore.getState();
     addMessage({ role: 'user', content: 'Teacher prompt for test' });
-    addMessage({ role: 'assistant', content: '', isThinking: true });
-    updateLastAssistantMessage({ content: 'Assistant finished!', steps: [{ id: 's', label: 'Step 1', status: 'done' }], isThinking: false });
-    const lastMsg = useDeskStore.getState().messages.at(-1);
-    expect(lastMsg.content).toBe('Assistant finished!');
-    expect(lastMsg.steps[0].status).toBe('done');
+    addMessage({ id: 'reply-1', role: 'assistant', content: '', isThinking: true });
+    addMessage({ role: 'assistant', content: '**Routine** finished.' });
+    updateMessage('reply-1', { content: 'Assistant finished!', steps: [{ id: 's', label: 'Step 1', status: 'done' }], isThinking: false });
+    const msgs = useDeskStore.getState().messages;
+    const reply = msgs.find((m) => m.id === 'reply-1');
+    expect(reply.content).toBe('Assistant finished!');
+    expect(reply.steps[0].status).toBe('done');
+    expect(reply.isThinking).toBe(false);
+    expect(msgs.at(-1).content).toBe('**Routine** finished.');
   });
 
   it('toggles attachments and tracks session artifacts', () => {

@@ -331,7 +331,7 @@ export const CARDS = [
   },
 ];
 
-export const CARD_BY_TYPE = Object.freeze(Object.fromEntries(CARDS.map((c) => [c.type, c])));
+const CARD_BY_TYPE = Object.freeze(Object.fromEntries(CARDS.map((c) => [c.type, c])));
 
 /** The card definition for a type, or null. */
 export const cardDef = (type) => (Object.prototype.hasOwnProperty.call(CARD_BY_TYPE, type) ? CARD_BY_TYPE[type] : null);

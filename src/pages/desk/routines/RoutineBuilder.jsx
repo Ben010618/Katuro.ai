@@ -6,9 +6,9 @@ import { KIND_STYLE, cardDef, say } from '../../../services/desk/routines/catalo
 import { checkRoutine, describeRoutine, runOrder, shelf } from '../../../services/desk/routines/routine';
 import CardNode from './CardNode';
 import CardSettings from './CardSettings';
-import { KIND_COLOR, CARD_TEXT_2, cardColors, iconColors, textColor, speak } from './cardStyle';
+import { KIND_COLOR, CARD_TEXT_2, T, cardColors, iconColors, primaryBtn as primary, textColor, speak, stopSpeaking } from './cardStyle';
 import CardIcon from './CardIcon';
-import { useViewportWidth } from '../useDeskWindow';
+import { useMinWidth } from '../useDeskWindow';
 import { addCard, arrange, canConnect, cardLine, cardSentence, connect, disconnect, removeCard, setSettings, CARD_W, CARD_H } from './routineLayout';
 
 const nodeTypes = { card: CardNode };
@@ -19,8 +19,6 @@ const START_VIEW = { x: 24, y: 40, zoom: 0.95 };
 const btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
 // Words beside a toolbar icon: hidden in a narrow window (the button's title still says it).
 const word = 'hidden md:inline';
-const primary = 'inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50';
-const T = (lang, en, fil) => (lang === 'fil' ? fil : en);
 
 /** The card shelf: tap to add after the chosen card, or drag onto the canvas. */
 function Shelf({ lang, onAdd }) {
@@ -128,6 +126,9 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
     return Object.fromEntries(order.map((c, i) => [c.id, i < trying.index ? 'done' : i === trying.index ? 'running' : 'pending']));
   }, [trying, order]);
 
+  // Closing the Builder stops "Try aloud" mid-sentence.
+  useEffect(() => stopSpeaking, []);
+
   // "Try": light the cards one by one and say what each will do. Nothing runs, nothing changes.
   useEffect(() => {
     if (!trying) return undefined;
@@ -227,9 +228,8 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
 
   const selected = draft.cards.find((c) => c.id === selectedId) || null;
   // Narrow window: the card shelf opens as a drawer, and a card's settings slide in over the canvas.
-  const width = useViewportWidth();
-  const shelfFits = width >= 1024;
-  const settingsFit = width >= 768;
+  const shelfFits = useMinWidth(1024);
+  const settingsFit = useMinWidth(768);
   const [shelfOpen, setShelfOpen] = useState(false);
   const showShelf = shelfFits || shelfOpen;
   const showSettings = settingsFit || Boolean(selected);
@@ -293,7 +293,7 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
             <Shelf lang={lang} onAdd={(t) => { add(t); if (!shelfFits) setShelfOpen(false); }} />
           </aside>
         ) : null}
-        <main className="relative min-w-0 flex-1" onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={onDrop}>
+        <main className="relative min-w-0 flex-1" onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={(e) => { onDrop(e); setShelfOpen(false); }}>
           {view === 'cards' ? (
             <ReactFlow
               nodes={nodes}

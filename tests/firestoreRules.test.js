@@ -161,4 +161,31 @@ describe.skipIf(!hasEmulator)('firestore.rules', () => {
     await assertSucceeds(getDocs(collection(asAdmin(), 'deskFeedback')));
     await assertFails(deleteDoc(doc(asAdmin(), 'deskFeedback', ref.id)));
   });
+
+  it('Shares: a teacher posts, comments and replies as themselves only', async () => {
+    const db = asTeacher();
+    const post = { authorUid: 'teacher1', caption: 'Our garden', reactions: {}, commentCount: 0 };
+    const ref = await assertSucceeds(addDoc(collection(db, 'shares_posts'), post));
+    await assertFails(addDoc(collection(db, 'shares_posts'), { ...post, authorUid: 'teacher2' }));
+    await assertFails(addDoc(collection(db, 'shares_posts'), { caption: 'no author' }));
+    const c = await assertSucceeds(addDoc(collection(db, `shares_posts/${ref.id}/comments`), { authorUid: 'teacher1', text: 'Nice', replyCount: 0 }));
+    await assertFails(addDoc(collection(db, `shares_posts/${ref.id}/comments`), { authorUid: 'teacher2', text: 'Nice' }));
+    await assertSucceeds(addDoc(collection(db, `shares_posts/${ref.id}/comments/${c.id}/replies`), { authorUid: 'teacher1', text: 'Salamat' }));
+    await assertFails(addDoc(collection(db, `shares_posts/${ref.id}/comments/${c.id}/replies`), { authorUid: 'teacher2', text: 'Salamat' }));
+  });
+
+  it('Collab channels and direct messages (retired) are closed to every teacher', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'collabChannels/ch1'), { isPublic: true, members: ['teacher1'] });
+      await setDoc(doc(ctx.firestore(), 'collabChannels/ch1/messages/m1'), { text: 'hi' });
+      await setDoc(doc(ctx.firestore(), 'collabDMs/dm1'), { participants: ['teacher1', 'teacher2'] });
+    });
+    const db = asTeacher();
+    await assertFails(getDoc(doc(db, 'collabChannels/ch1')));
+    await assertFails(getDocs(collection(db, 'collabChannels/ch1/messages')));
+    await assertFails(addDoc(collection(db, 'collabChannels/ch1/messages'), { text: 'hello' }));
+    await assertFails(setDoc(doc(db, 'collabChannels/new'), { isPublic: true, members: ['teacher1'] }));
+    await assertFails(getDoc(doc(db, 'collabDMs/dm1')));
+    await assertFails(addDoc(collection(db, 'collabDMs/dm1/messages'), { text: 'hello' }));
+  });
 });

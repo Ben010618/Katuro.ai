@@ -9,9 +9,10 @@
  * then does is decided here, by the routine the teacher built.
  */
 
+import { clip } from '../desk/routines/routine.js';
+
 export const ROUTINE_OPS = new Set(['routineInbox', 'routineDecide']);
 const RUN_ID = /^run[a-z0-9]{4,40}$/i;
-const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 class RoutineRequestError extends Error {
   constructor(message, code = 'ERROR') {

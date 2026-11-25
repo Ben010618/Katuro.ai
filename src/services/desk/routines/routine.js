@@ -17,10 +17,12 @@
 
 import { CARDS, MAX_CARDS, MAX_TEXT, cardDef, say, PLUG_LABEL } from './catalog.js';
 
-export const ROUTINE_VERSION = 1;
-export const MAX_NAME = 80;
+const ROUTINE_VERSION = 1;
+const MAX_NAME = 80;
 export const MAX_IMPORT_BYTES = 200_000;
 
+/** Text on one line, at most n characters (for summaries and previews). */
+export const clip = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const plainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 // Control characters are dropped from every text (a file cannot hide instructions in them).
@@ -229,12 +231,29 @@ export function fits(plug, def) {
   return def.accepts.includes('any') || def.accepts.includes(plug);
 }
 
-/** Cards in running order (from the When card, breadth-first). Unreached cards are left out. */
-export function runOrder(routine) {
-  const start = routine.cards.find((c) => cardDef(c.type)?.kind === 'when');
-  if (!start) return [];
+/** In words: what a card needs, and what the card before it gives (when they do not fit). */
+export function plugWords(def, plug, lang = 'en') {
+  return {
+    want: def.accepts.filter((a) => a !== 'any').map((a) => say(PLUG_LABEL[a], lang)).join(' or ') || 'something',
+    gives: plug ? say(PLUG_LABEL[plug], lang) : 'nothing',
+  };
+}
+
+/** The routine's purple "When" card, or null. */
+export const whenCard = (routine) => (routine?.cards || []).find((c) => cardDef(c.type)?.kind === 'when') || null;
+
+/** Card id → the ids of the cards right after it. */
+function nextMap(routine) {
   const next = new Map();
   for (const w of routine.wires) next.set(w.from, [...(next.get(w.from) || []), w.to]);
+  return next;
+}
+
+/** Cards in running order (from the When card, breadth-first). Unreached cards are left out. */
+export function runOrder(routine) {
+  const start = whenCard(routine);
+  if (!start) return [];
+  const next = nextMap(routine);
   const byId = new Map(routine.cards.map((c) => [c.id, c]));
   const order = [];
   const seen = new Set([start.id]);
@@ -254,8 +273,7 @@ export function runOrder(routine) {
 
 /** Every card after this one (its whole branch). */
 export function downstreamOf(routine, cardId) {
-  const next = new Map();
-  for (const w of routine.wires) next.set(w.from, [...(next.get(w.from) || []), w.to]);
+  const next = nextMap(routine);
   const out = new Set();
   const stack = [...(next.get(cardId) || [])];
   while (stack.length) {
@@ -267,16 +285,17 @@ export function downstreamOf(routine, cardId) {
   return out;
 }
 
-/** The cards before this one, nearest first. */
-export function upstreamOf(routine, cardId) {
-  const prev = new Map(routine.wires.map((w) => [w.to, w.from]));
-  const out = [];
-  let id = prev.get(cardId);
-  while (id && !out.includes(id) && out.length <= MAX_CARDS) {
-    out.push(id);
-    id = prev.get(id);
-  }
-  return out;
+/** The card right before this one (a card takes one wire in), or null. */
+export function parentOf(routine, cardId) {
+  return routine.wires.find((w) => w.to === cardId)?.from || null;
+}
+
+/** The card whose files reach this one: the card before it, past any "Ask me first" cards. */
+export function madeBy(routine, cardId) {
+  const byId = new Map(routine.cards.map((c) => [c.id, c]));
+  let id = parentOf(routine, cardId);
+  for (let hops = 0; id && byId.get(id)?.type === 'ask.approve' && hops <= MAX_CARDS; hops++) id = parentOf(routine, id);
+  return id;
 }
 
 /**
@@ -322,8 +341,8 @@ export function checkRoutine(routine, lang = 'en') {
     const from = byId.get(ins[0]);
     const plug = from ? plugs.get(from.id) : null;
     if (from && !fits(plug, def)) {
-      const want = def.accepts.filter((a) => a !== 'any').map((a) => say(PLUG_LABEL[a], lang)).join(' or ');
-      add(`${name(c)} needs ${want || 'something'}, but ${name(from)} gives ${plug ? say(PLUG_LABEL[plug], lang) : 'nothing'}.`, c.id);
+      const { want, gives } = plugWords(def, plug, lang);
+      add(`${name(c)} needs ${want}, but ${name(from)} gives ${gives}.`, c.id);
     }
   }
 
@@ -343,11 +362,26 @@ export function checkRoutine(routine, lang = 'en') {
     }
   }
 
-  // A card that changes a record needs "Ask me first" before it.
+  // A card that changes a record needs "Ask me first" RIGHT before it, so the teacher sees what
+  // will be written (and where) before saying yes.
+  const graph = { cards, wires };
   for (const c of cards) {
     if (!cardDef(c.type)?.changesRecords) continue;
-    const asked = upstreamOf({ cards, wires }, c.id).some((id) => byId.get(id)?.type === 'ask.approve');
-    if (!asked) add(`${name(c)} changes your class record, so put a yellow "Ask me first" card before it.`, c.id);
+    if (byId.get(parentOf(graph, c.id))?.type !== 'ask.approve') add(`${name(c)} changes your class record, so put a yellow "Ask me first" card right before it.`, c.id);
+  }
+
+  // "Save in a folder" saves what a green card makes (an "Ask me first" may be between them),
+  // and one green card's files go to one folder.
+  const savedFrom = new Map();
+  for (const c of cards) {
+    if (c.type !== 'save.folder' || !(incoming.get(c.id) || []).length) continue;
+    const from = byId.get(madeBy(graph, c.id));
+    if (cardDef(from?.type)?.kind !== 'do') {
+      add(`${name(c)} saves the files a green card makes, so put it after a green card.`, c.id);
+      continue;
+    }
+    if (savedFrom.has(from.id)) add(`${name(from)} can have only one "${say(cardDef('save.folder').label, lang)}" after it.`, c.id);
+    savedFrom.set(from.id, c.id);
   }
   return problems;
 }

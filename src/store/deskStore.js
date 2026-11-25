@@ -346,19 +346,6 @@ export const useDeskStore = create(
         messages: state.messages.map((m) => (m.id === id ? { ...m, ...patch } : m)),
       })),
 
-      updateLastAssistantMessage: (patch) => {
-        set((state) => {
-          const list = [...state.messages];
-          const lastIdx = list.map((m) => m.role).lastIndexOf('assistant');
-          if (lastIdx === -1) return state;
-          list[lastIdx] = {
-            ...list[lastIdx],
-            ...patch,
-          };
-          return { messages: list };
-        });
-      },
-
       setIsGenerating: (isGenerating) => set({ isGenerating }),
 
       setActiveArtifact: (artifact) => set({ activeArtifact: artifact }),

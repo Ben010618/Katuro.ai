@@ -21,10 +21,11 @@
 import { computeNextRun, toDateInput } from '../schedule/schedule.js';
 import { SCHOOL_ACTIVITIES } from '../knowledge/depedActivities.js';
 import { cardDef } from './catalog.js';
+import { whenCard } from './routine.js';
 import { SYSTEM_DIRS } from '../systemFolders.js';
 
 export const SETTLE_MS = 20_000; // a new file must be unchanged this long before it is used
-export const MAX_SEEN = 20_000; // file names remembered per routine (only files still in the folder are kept)
+const MAX_SEEN = 20_000; // file names remembered per routine (only files still in the folder are kept)
 export const MAX_FILES_PER_RUN = 40;
 
 /** The DepEd dates a When card can follow: event key → test on the calendar entry. */
@@ -70,7 +71,6 @@ export function depedFireAt(date, settings) {
   return new Date(day.y, day.mo, day.d + (Number(settings.offsetDays) || 0), Number(m[1]), Number(m[2]), 0, 0).getTime();
 }
 
-const whenCard = (routine) => (routine?.cards || []).find((c) => cardDef(c.type)?.kind === 'when') || null;
 
 /** The schedule.js form of a schedule When card. */
 export function scheduleOf(settings, enabledAt) {
@@ -99,7 +99,7 @@ export function nextFireAt(routine, meta = {}, now = Date.now()) {
 }
 
 /** Files of a folder (and its sub-folders) with their signature: [{ path, sig, lastModified }]. */
-export function folderEntries(flatFiles, folder, match = /./) {
+function folderEntries(flatFiles, folder, match = /./) {
   const prefix = `${String(folder || '').replace(/\/+$/, '')}/`.toLowerCase();
   return (flatFiles || [])
     .filter((f) => f?.path && f.path.toLowerCase().startsWith(prefix) && !SYSTEM_DIRS.test(f.path) && match.test(f.path))

@@ -17,7 +17,7 @@ const MAX_LIST = 150;
 const RELEVANT = /\.(xlsx|xlsm|xls|csv|tsv|docx|pdf|txt)$/i;
 
 /** The catalog as compact text for the AI: type, kind, plugs, fields (allowed values). */
-export function catalogForAI() {
+function catalogForAI() {
   return CARDS.map((c) => {
     const fields = c.fields.map((f) => {
       if (f.kind === 'choice') return `${f.key}: one of ${f.options.map((o) => JSON.stringify(o.value)).join('|')}`;
@@ -38,7 +38,7 @@ ${catalogForAI()}
 
 Rules:
 1. Exactly one "when" card, first. Every other card has exactly one wire coming in from a card whose "gives" it "takes" (ask.approve, save.notify take anything; ask.approve passes on what it got).
-2. Put ask.approve directly before any card that CHANGES A RECORD.
+2. Put ask.approve directly before any card that CHANGES A RECORD. save.folder comes after a "do" card (an ask.approve may be between them); at most one save.folder per "do" card.
 3. File and folder settings: use ONLY exact paths from FILES / FOLDERS. If you are not sure which file the teacher means, leave the setting "" (the teacher will choose). Never invent a path.
 4. Never invent numbers the teacher did not say (passage words, questions, columns): leave them "".
 5. At most ${MAX_CARDS} cards. Keep it as short as possible.

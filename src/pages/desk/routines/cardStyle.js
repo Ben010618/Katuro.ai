@@ -8,7 +8,7 @@ import {
   Combine, ShieldCheck, FileDown, Package, NotebookPen, Hand, FolderDown, BellRing, Workflow,
 } from 'lucide-react';
 
-export const ICONS = {
+const ICONS = {
   Play, CalendarClock, CalendarDays, FolderInput, Sheet, BookOpenCheck, FolderOpen,
   UserX, BarChart3, Calculator, FileBadge, BookOpen, ScanLine, PencilLine,
   Combine, ShieldCheck, FileDown, Package, NotebookPen, Hand, FolderDown, BellRing,
@@ -28,6 +28,10 @@ export const KIND_COLOR = {
   save: { bg: '#fff7ed', border: '#fdba74', icon: '#c2410c', chip: '#ffedd5', chipText: '#9a3412', text: '#7c2d12', edge: '#ea580c' },
 };
 export const CARD_TEXT_2 = '#4b5563'; // the second line on a card
+
+// The Routines screens' words (English / Filipino) and their main green button.
+export const T = (lang, en, fil) => (lang === 'fil' ? fil : en);
+export const primaryBtn = 'inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50';
 const kc = (kind) => KIND_COLOR[kind] || KIND_COLOR.do;
 export const cardColors = (kind) => ({ background: kc(kind).bg, borderColor: kc(kind).border });
 export const iconColors = (kind) => ({ background: kc(kind).icon, color: '#ffffff' });
@@ -46,6 +50,11 @@ export const STATUS_LIGHT = {
   needs_info: { dot: 'bg-red-500', en: 'Needs your input', fil: 'Kailangan ng sagot mo' },
   error: { dot: 'bg-red-600', en: 'Did not finish', fil: 'Hindi natapos' },
 };
+
+/** Stops anything being read aloud. */
+export function stopSpeaking() {
+  try { window.speechSynthesis?.cancel(); } catch { /* no voice on this computer */ }
+}
 
 /** Reads a sentence aloud with the computer's own voice (Filipino when the teacher chose it). */
 export function speak(text, lang = 'en') {

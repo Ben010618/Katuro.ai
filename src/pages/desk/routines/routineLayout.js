@@ -4,8 +4,8 @@
  * remove, and plain words for what each card will do.
  */
 import { graphlib, layout } from '@dagrejs/dagre';
-import { cardDef, say, PLUG_LABEL } from '../../../services/desk/routines/catalog';
-import { cleanSettings, downstreamOf, fits, newCard, plugsOf, runOrder } from '../../../services/desk/routines/routine';
+import { cardDef, say } from '../../../services/desk/routines/catalog';
+import { cleanSettings, downstreamOf, fits, newCard, plugWords, plugsOf, runOrder, whenCard } from '../../../services/desk/routines/routine';
 import { DAY_NAMES } from '../../../services/desk/schedule/schedule';
 
 export const FIL_DAYS = ['Lin', 'Lun', 'Mar', 'Miy', 'Huw', 'Biy', 'Sab'];
@@ -40,8 +40,8 @@ export function canConnect(routine, from, to, lang = 'en') {
   if (downstreamOf(routine, to).has(from)) return { ok: false, reason: 'That would make a loop.' };
   const plug = plugsOf(routine).get(from);
   if (!fits(plug, defB)) {
-    const want = defB.accepts.filter((x) => x !== 'any').map((x) => say(PLUG_LABEL[x], lang)).join(' or ');
-    return { ok: false, reason: `"${say(defB.label, lang)}" needs ${want}; this card gives ${plug ? say(PLUG_LABEL[plug], lang) : 'nothing'}.` };
+    const { want, gives } = plugWords(defB, plug, lang);
+    return { ok: false, reason: `"${say(defB.label, lang)}" needs ${want}; this card gives ${gives}.` };
   }
   return { ok: true, reason: '' };
 }
@@ -61,7 +61,7 @@ export function addCard(routine, type, afterId = null) {
   let next = { ...routine, cards: [...routine.cards, card] };
   if (def.kind === 'when') {
     // One way to start: the new When card takes the old one's place.
-    const old = routine.cards.find((c) => cardDef(c.type)?.kind === 'when');
+    const old = whenCard(routine);
     if (old) {
       next = {
         ...next,
