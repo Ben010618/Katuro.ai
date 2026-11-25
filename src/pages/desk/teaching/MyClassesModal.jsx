@@ -441,8 +441,8 @@ export default function MyClassesModal({ open, onClose }) {
   if (!open) return null;
   const tabs = [['today', 'Today'], ['classes', 'Classes'], ['lessons', 'Lessons'], ['assistant', 'Assistant']];
   return (
-    <div className="fixed inset-0 z-[55] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="My classes">
-      <div className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <div className="kt-layer z-[55] bg-black/40 flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="My classes">
+      <div className="w-full max-w-2xl max-h-full flex flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between px-5 pt-4">
           <h2 className="text-sm font-bold text-gray-900">My classes</h2>
           <button type="button" onClick={onClose} title="Close" aria-label="Close" className="p-1 rounded hover:bg-gray-200 text-gray-500"><X size={16} /></button>

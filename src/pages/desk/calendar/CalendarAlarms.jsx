@@ -49,8 +49,8 @@ export default function CalendarAlarms() {
 
   if (active) {
     return (
-      <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-        <div role="alertdialog" aria-modal="true" aria-label="Reminder" className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl p-5 text-center">
+      <div className="kt-layer z-[60] bg-black/40 flex items-center justify-center p-4">
+        <div role="alertdialog" aria-modal="true" aria-label="Reminder" className="max-h-full overflow-y-auto w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl p-5 text-center">
           <AlarmClock size={30} className="mx-auto text-emerald-700" />
           <p className="mt-2 text-[10.5px] font-bold uppercase tracking-wide text-gray-500">Reminder</p>
           <p className="mt-1 text-base font-bold text-gray-900 break-words">{active.title}</p>
@@ -72,8 +72,8 @@ export default function CalendarAlarms() {
   // Reminders that rang out, or were due while the computer was off.
   if (missed.length && !missedShown) {
     return (
-      <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-        <div role="alertdialog" aria-modal="true" aria-label="Missed reminders" className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl p-5">
+      <div className="kt-layer z-[60] bg-black/40 flex items-center justify-center p-4">
+        <div role="alertdialog" aria-modal="true" aria-label="Missed reminders" className="max-h-full overflow-y-auto w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl p-5">
           <p className="text-sm font-bold text-gray-900 flex items-center gap-2"><BellOff size={16} className="text-amber-700" /> Missed reminder{missed.length > 1 ? 's' : ''}</p>
           <ul className="mt-2 space-y-1.5 max-h-60 overflow-y-auto">
             {missed.map((ev) => (

@@ -130,7 +130,7 @@ export function ExplorerDialog({ kind, item, parentLabel, onCancel, onConfirm })
 
   const fileCount = isFolder ? flattenFileTree(item.children || []).length : 0;
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
+    <div className="kt-layer z-[70] flex items-center justify-center bg-black/40 p-2" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
       <form
         role="dialog"
         aria-modal="true"

@@ -18,6 +18,40 @@ if (!hasInstanceLock) app.quit();
 
 // Theme colors of the top studio bar, used for the window controls area.
 const TITLE_BAR = { color: '#e4ebe6', symbolColor: '#3f5046', height: 40 };
+let titleBarColors = { color: TITLE_BAR.color, symbolColor: TITLE_BAR.symbolColor };
+
+// How big KaTuroDesk looks (Ctrl + / Ctrl − / Ctrl 0, Ctrl + wheel, Settings › Screen size).
+const { cleanZoom, nextZoom, zoomKeyDirection } = require('./windowZoom.cjs');
+const zoomFile = () => path.join(app.getPath('userData'), 'zoom.json');
+let zoomFactor = 1;
+function loadZoom() {
+  try {
+    zoomFactor = cleanZoom(JSON.parse(fs.readFileSync(zoomFile(), 'utf8')).factor);
+  } catch (e) {}
+}
+// The window buttons' strip is as tall as the app's top bar at this size.
+const titleBarOverlay = () => ({ ...titleBarColors, height: Math.round(TITLE_BAR.height * zoomFactor) });
+// The smallest window still leaves the page 480 x 420 at this size (zoomed in = a bigger minimum).
+const MIN_PAGE = { width: 480, height: 420 };
+const minWindowSize = () => [Math.round(MIN_PAGE.width * Math.max(1, zoomFactor)), Math.round(MIN_PAGE.height * Math.max(1, zoomFactor))];
+function setZoom(factor) {
+  zoomFactor = cleanZoom(factor);
+  try {
+    fs.writeFileSync(zoomFile(), JSON.stringify({ factor: zoomFactor }));
+  } catch (e) {}
+  if (!mainWindow || mainWindow.isDestroyed()) return zoomFactor;
+  mainWindow.webContents.setZoomFactor(zoomFactor);
+  try {
+    if (typeof mainWindow.setTitleBarOverlay === 'function') mainWindow.setTitleBarOverlay(titleBarOverlay());
+    const [minW, minH] = minWindowSize();
+    mainWindow.setMinimumSize(minW, minH);
+    // Zooming in on a small window makes it big enough right away (not at the next resize).
+    const [w, h] = mainWindow.getSize();
+    if (!mainWindow.isMaximized() && !mainWindow.isFullScreen() && (w < minW || h < minH)) mainWindow.setSize(Math.max(w, minW), Math.max(h, minH));
+  } catch (e) {}
+  mainWindow.webContents.send('app:zoom', zoomFactor);
+  return zoomFactor;
+}
 
 // Background mode: keep running in the tray when the window is closed, so messages
 // and scheduled tasks still arrive on time. Saved on this PC. On by default (until the
@@ -253,18 +287,20 @@ function applyBackgroundSettings(next) {
 }
 
 function createWindow() {
+  loadZoom();
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1024,
-    minHeight: 700,
+    // Small windows work too: below 768 px wide KaTuroDesk shows one panel at a time.
+    minWidth: minWindowSize()[0],
+    minHeight: minWindowSize()[1],
     title: 'KaTuroDesk',
     backgroundColor: '#e4ebe6',
     icon: appIconPath(),
     // The Windows title bar is replaced by the app's own dark top bar (same theme);
     // the minimize / maximize / close buttons stay, drawn in the bar's colors.
     titleBarStyle: 'hidden',
-    titleBarOverlay: TITLE_BAR,
+    titleBarOverlay: titleBarOverlay(),
     show: !(startedHidden && backgroundSettings.keepRunning),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -318,7 +354,17 @@ function createWindow() {
     } catch (e) {}
   });
 
+  // Zoom: Ctrl + / Ctrl − / Ctrl 0 and Ctrl + mouse wheel, remembered on this PC.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const direction = zoomKeyDirection(input);
+    if (!direction) return;
+    event.preventDefault();
+    setZoom(nextZoom(zoomFactor, direction));
+  });
+  mainWindow.webContents.on('zoom-changed', (_event, direction) => setZoom(nextZoom(zoomFactor, direction)));
+
   mainWindow.webContents.on('did-finish-load', async () => {
+    mainWindow.webContents.setZoomFactor(zoomFactor);
     const statusFile = path.join(app.getPath('userData'), 'desk-status.json');
     try {
       // Allow React to mount
@@ -844,6 +890,10 @@ ipcMain.handle('app:getVersion', async () => app.getVersion());
 let firstRun = false;
 ipcMain.handle('app:firstRun', async () => firstRun);
 
+// Settings › Screen size: 'in', 'out', 'reset' or one of the sizes (0.67 to 2).
+ipcMain.handle('app:getZoom', async () => zoomFactor);
+ipcMain.handle('app:setZoom', async (_, value) => setZoom(['in', 'out', 'reset'].includes(value) ? nextZoom(zoomFactor, value) : value));
+
 // The window's title-bar buttons follow the Desk theme (light or dark neumorphic surface).
 ipcMain.handle('app:setTitleBarColors', async (event, colors = {}) => {
   const hex = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : null);
@@ -852,7 +902,8 @@ ipcMain.handle('app:setTitleBarColors', async (event, colors = {}) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || !color || !symbolColor) return { success: false };
   try {
-    if (typeof win.setTitleBarOverlay === 'function') win.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR.height });
+    if (win === mainWindow) titleBarColors = { color, symbolColor };
+    if (typeof win.setTitleBarOverlay === 'function') win.setTitleBarOverlay(win === mainWindow ? titleBarOverlay() : { color, symbolColor, height: TITLE_BAR.height });
     win.setBackgroundColor(color);
   } catch {
     return { success: false };

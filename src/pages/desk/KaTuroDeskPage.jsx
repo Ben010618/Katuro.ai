@@ -22,7 +22,8 @@ import { useAuth } from '../../hooks/useAuth';
 import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
-import { CANVAS_DEFAULT_WIDTH, CHAT_MIN_WIDTH, clampCanvasWidth, loadCanvasWidth, saveCanvasWidth } from './canvasResize';
+import { BOTH_SIDE_PANELS_MIN_WIDTH, CANVAS_DEFAULT_WIDTH, CHAT_MIN_WIDTH, clampCanvasWidth, loadCanvasWidth, saveCanvasWidth } from './canvasResize';
+import { useBarFit, useDeskZoom, useViewportWidth, useWindowControlsInset } from './useDeskWindow';
 import { useDeskStore, workspaceIdOf } from '../../store/deskStore';
 import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
@@ -60,6 +61,7 @@ const deskApi = typeof window !== 'undefined' ? window.katuroDeskApi : undefined
 // leaves room on the right for the minimize / maximize / close buttons.
 const IN_DESKTOP_WINDOW = Boolean(deskApi?.isElectron);
 const WINDOW_CONTROLS_PX = deskApi?.platform === 'darwin' ? 0 : 146;
+const TITLE_BAR_PX = 40; // the top bar (h-10) = the window's title bar overlay height (electron/main.cjs)
 
 // Message notifications (Settings > Notifications can turn them off). `target` tells
 // KaTuroDesk what to open when the notification is clicked: { cid } or { invites }.
@@ -86,6 +88,13 @@ export default function KaTuroDeskPage() {
     else startFolderIndex();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    // Full-screen layers (.kt-layer) start below the title bar strip of the desktop window.
+    if (!IN_DESKTOP_WINDOW) return undefined;
+    const root = document.documentElement;
+    root.style.setProperty('--kt-titlebar', `${TITLE_BAR_PX}px`);
+    return () => root.style.removeProperty('--kt-titlebar');
+  }, []);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState('assistant');
   const [showMessages, setShowMessages] = useState(false);
@@ -102,8 +111,24 @@ export default function KaTuroDeskPage() {
     ? (schoolPos.term ? `Term ${schoolPos.term} · ${{ opening: 'Opening Block', instructional: 'Instructional', endOfTerm: 'End-of-Term' }[schoolPos.block]}` : { betweenTerms: 'Between terms', eosyBreak: 'EOSY break' }[schoolPos.block])
     : 'Calendar';
 
-  const [showLeftPanel, setShowLeftPanel] = useState(true);
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  // What the teacher chose; a narrow window shows the chat with one side panel at a time
+  // (the one opened last), so nothing gets squeezed or cut off.
+  const [leftWanted, setLeftWanted] = useState(true);
+  const [rightWanted, setRightWanted] = useState(true);
+  const [lastSide, setLastSide] = useState('right');
+  const roomForBoth = useViewportWidth() >= BOTH_SIDE_PANELS_MIN_WIDTH;
+  const showLeftPanel = leftWanted && (roomForBoth || !rightWanted || lastSide === 'left');
+  const showRightPanel = rightWanted && (roomForBoth || !showLeftPanel);
+  const setShowLeftPanel = useCallback((open) => { setLeftWanted(open); setLastSide(open ? 'left' : 'right'); }, []);
+  const setShowRightPanel = useCallback((open) => { setRightWanted(open); setLastSide(open ? 'right' : 'left'); }, []);
+  const zoom = useDeskZoom();
+  const windowControlsPx = useWindowControlsInset(WINDOW_CONTROLS_PX, zoom);
+  // A short top bar first drops the plan badge and the phone button's words, then all labels.
+  const topBarRef = useRef(null);
+  const barFit = useBarFit(topBarRef);
+  const snugBar = barFit >= 1;
+  const compactBar = barFit >= 2;
+  const navLabel = `text-[11px] font-semibold ${compactBar ? 'hidden' : 'hidden sm:inline'}`;
 
   // Document Canvas width: drag the divider (like a VS Code split); remembered on this PC.
   const workspaceRef = useRef(null);
@@ -126,7 +151,7 @@ export default function KaTuroDeskPage() {
     const ro = new ResizeObserver(() => measureCanvasMax());
     ro.observe(ws);
     return () => ro.disconnect();
-  }, [measureCanvasMax, showLeftPanel]);
+  }, [measureCanvasMax, showLeftPanel, showRightPanel]);
   const shownCanvasWidth = clampCanvasWidth(canvasWidth, canvasMax);
 
   const startCanvasResize = (e) => {
@@ -175,7 +200,7 @@ export default function KaTuroDeskPage() {
   // Routines (Routine Builder): start when their When card fires, while KaTuroDesk is open.
   useRoutineScheduler({ user, profile });
   // Talking with the persona (chat, bubble, Ctrl+Space) answers as the signed-in teacher.
-  useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: () => setShowRightPanel(true) }); }, [user, profile]);
+  useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: () => setShowRightPanel(true) }); }, [user, profile, setShowRightPanel]);
   // "Hello Matt": listens for the wake phrase when the teacher turned it on (desktop app only).
   useEffect(() => startWakeController(), []);
   // The persona's voice on this computer (Piper) is downloaded once and loaded ahead, only for
@@ -249,8 +274,8 @@ export default function KaTuroDeskPage() {
     <div className="kt-neu flex flex-col h-screen w-full overflow-hidden bg-gray-100 font-sans" data-neu={deskTheme}>
       <DeskSettingsModal key={settingsTab} initialTab={settingsTab} open={showSettings} onClose={() => setShowSettings(false)} user={user} profile={profile} />
       {showMessages && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowMessages(false)}>
-          <div className="w-full max-w-5xl relative" style={{ height: '85vh' }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Messages">
+        <div className="kt-layer z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowMessages(false)}>
+          <div className="w-full max-w-5xl relative h-full max-h-[900px]" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Messages">
             <button
               onClick={() => setShowMessages(false)}
               title="Close Messages"
@@ -289,10 +314,11 @@ export default function KaTuroDeskPage() {
       )}
       {/* Top Studio Bar (also the window's title bar in the desktop app) */}
       <div
+        ref={topBarRef}
         className={`neu-topbar neu-zone h-10 bg-[#16211a] text-white px-3 flex items-center justify-between border-b border-[#2d3e33] flex-shrink-0 select-none ${IN_DESKTOP_WINDOW ? 'desk-titlebar' : ''}`}
-        style={IN_DESKTOP_WINDOW ? { paddingRight: WINDOW_CONTROLS_PX } : undefined}
+        style={IN_DESKTOP_WINDOW ? { paddingRight: windowControlsPx } : undefined}
       >
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${compactBar ? 'min-w-0 overflow-hidden' : 'flex-shrink-0'}`}>
           {/* Toggle Left Panel */}
           <button
             onClick={() => setShowLeftPanel(!showLeftPanel)}
@@ -302,48 +328,20 @@ export default function KaTuroDeskPage() {
             {showLeftPanel ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </button>
 
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-              <img src={ktLogo} alt="" className="w-4 h-4 object-contain" draggable={false} /> KaTuroDesk
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+            <span className="text-emerald-400 font-bold flex flex-shrink-0 items-center gap-1.5">
+              <img src={ktLogo} alt={compactBar ? 'KaTuroDesk' : ''} className="w-4 h-4 object-contain" draggable={false} />{compactBar ? null : ' KaTuroDesk'}
             </span>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-300 truncate max-w-[200px]" title={workspace?.name}>
+            {compactBar ? null : <span className="text-gray-500">/</span>}
+            <span className={`text-gray-300 truncate min-w-0 ${snugBar ? 'max-w-[140px]' : 'max-w-[200px]'}`} title={workspace?.name}>
               {workspace?.name || 'Classroom Folder'}
             </span>
           </div>
         </div>
 
-        {/* Center Mobile View Tabs */}
-        <div className="flex md:hidden items-center bg-[#213026] p-0.5 rounded-lg border border-[#2b3d31]">
-          <button
-            onClick={() => setActiveMobileTab('folder')}
-            className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
-              activeMobileTab === 'folder' ? 'bg-emerald-700 text-white' : 'text-gray-400'
-            }`}
-          >
-            Folder
-          </button>
-          <button
-            onClick={() => setActiveMobileTab('chat')}
-            className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
-              activeMobileTab === 'chat' ? 'bg-emerald-700 text-white' : 'text-gray-400'
-            }`}
-          >
-            Assistant
-          </button>
-          <button
-            onClick={() => setActiveMobileTab('canvas')}
-            className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
-              activeMobileTab === 'canvas' ? 'bg-emerald-700 text-white' : 'text-gray-400'
-            }`}
-          >
-            Canvas
-          </button>
-        </div>
-
         {/* Right side controls */}
-        <div className="flex items-center gap-2">
-          <ConnectPhoneButton onOpen={() => { setSettingsTab('phones'); setShowSettings(true); }} />
+        <div className={`flex flex-shrink-0 items-center ${snugBar ? 'gap-1' : 'gap-2'}`}>
+          <ConnectPhoneButton compact={snugBar} onOpen={() => { setSettingsTab('phones'); setShowSettings(true); }} />
           {update.state === 'ready' && (
             <button
               onClick={installUpdate}
@@ -351,7 +349,7 @@ export default function KaTuroDeskPage() {
               title={isGenerating ? 'Wait for the current request to finish, then restart.' : `Install KaTuroDesk ${update.version} now. Your files and settings stay.`}
               className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition disabled:opacity-50"
             >
-              <RefreshCw size={12} /> Restart to update
+              <RefreshCw size={12} />{compactBar ? null : ' Restart to update'}
             </button>
           )}
           {update.state === 'downloading' && (
@@ -360,7 +358,7 @@ export default function KaTuroDeskPage() {
             </span>
           )}
           <span
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${plan.plan === 'subscription' ? 'bg-[#243429] text-amber-300 border-amber-500/30' : 'bg-[#1f2b23] text-emerald-200 border-[#2d3e33]'}`}
+            className={`${snugBar ? 'hidden' : 'flex'} items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${plan.plan === 'subscription' ? 'bg-[#243429] text-amber-300 border-amber-500/30' : 'bg-[#1f2b23] text-emerald-200 border-[#2d3e33]'}`}
             title={planStatusText(plan)}
           >
             {plan.plan === 'subscription' && <BadgeCheck size={12} />}
@@ -374,7 +372,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <CalendarDays size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">{calendarLabel}</span>
+            <span className={navLabel}>{calendarLabel}</span>
           </button>
 
           <button
@@ -384,7 +382,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <GraduationCap size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">My classes</span>
+            <span className={navLabel}>My classes</span>
           </button>
 
           <button
@@ -394,7 +392,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <ClipboardCheck size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">Tests</span>
+            <span className={navLabel}>Tests</span>
           </button>
 
           <button
@@ -404,7 +402,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <Workflow size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">Routines</span>
+            <span className={navLabel}>Routines</span>
             {routinesWaiting > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center" title="Waiting for your OK">{routinesWaiting}</span>}
           </button>
 
@@ -414,7 +412,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <CalendarClock size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">Scheduled</span>
+            <span className={navLabel}>Scheduled</span>
             {activeTasks > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">{activeTasks}</span>}
           </button>
 
@@ -425,7 +423,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <MessageSquare size={14} />
-            <span className="text-[11px] font-semibold hidden sm:inline">Messages</span>
+            <span className={navLabel}>Messages</span>
             {chatState.badgeCount > 0 && <span title={chatState.inviteCount ? `${chatState.inviteCount} invite(s) to answer` : undefined} className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">{chatState.badgeCount > 99 ? '99+' : chatState.badgeCount}</span>}
           </button>
 
@@ -436,7 +434,7 @@ export default function KaTuroDeskPage() {
             className="flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
           >
             <KaTuroAIAvatar persona={persona} size={22} />
-            <span className="text-[11px] font-semibold hidden sm:inline">{getPersona(persona).name}</span>
+            <span className={navLabel}>{getPersona(persona).name}</span>
             <Settings size={14} />
           </button>
 
@@ -449,6 +447,36 @@ export default function KaTuroDeskPage() {
             {showRightPanel ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
           </button>
         </div>
+      </div>
+
+        {/* Narrow window: one panel at a time, chosen here (own row, so it never sits under the window buttons) */}
+        <div className="flex md:hidden justify-center border-b border-[#2d3e33] bg-[#16211a] px-2 py-1 flex-shrink-0">
+          <div className="flex md:hidden items-center bg-[#213026] p-0.5 rounded-lg border border-[#2b3d31]">
+            <button
+              onClick={() => setActiveMobileTab('folder')}
+              className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
+                activeMobileTab === 'folder' ? 'bg-emerald-700 text-white' : 'text-gray-400'
+              }`}
+            >
+              Folder
+            </button>
+            <button
+              onClick={() => setActiveMobileTab('chat')}
+              className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
+                activeMobileTab === 'chat' ? 'bg-emerald-700 text-white' : 'text-gray-400'
+              }`}
+            >
+              Assistant
+            </button>
+            <button
+              onClick={() => setActiveMobileTab('canvas')}
+              className={`px-2.5 py-0.5 text-[11px] rounded font-medium ${
+                activeMobileTab === 'canvas' ? 'bg-emerald-700 text-white' : 'text-gray-400'
+              }`}
+            >
+              Canvas
+            </button>
+          </div>
       </div>
 
       {/* 3-Panel Main Workspace */}

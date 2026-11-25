@@ -177,7 +177,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
 
   if (editing) {
     return (
-      <Suspense fallback={<div className="fixed inset-0 z-[60] flex items-center justify-center bg-white text-xs text-gray-600">{T(lang, 'Opening the Routine Builder…', 'Binubuksan ang Routine Builder…')}</div>}>
+      <Suspense fallback={<div className="kt-layer z-[60] flex items-center justify-center bg-white text-xs text-gray-600">{T(lang, 'Opening the Routine Builder…', 'Binubuksan ang Routine Builder…')}</div>}>
       <RoutineBuilder
         key={editing.id}
         initial={cleanRoutine(editing).routine}
@@ -201,8 +201,8 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Routines">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <div className="kt-layer z-[55] flex items-center justify-center bg-black/40 p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="Routines">
+      <div className="flex max-h-full w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
         <div className="flex items-center gap-2 border-b border-gray-200 px-5 pb-3 pt-4">
           <h2 className="flex-1 text-sm font-bold text-gray-900">{T(lang, 'Routines: KaTuro does the repeated work for you', 'Routines: ang KaTuro ang gagawa ng paulit-ulit na trabaho')}</h2>
           <button type="button" onClick={() => setLang(lang === 'fil' ? 'en' : 'fil')} className={btn}><Languages size={12} /> {lang === 'fil' ? 'English' : 'Filipino'}</button>

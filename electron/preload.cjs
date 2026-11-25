@@ -114,6 +114,13 @@ contextBridge.exposeInMainWorld('katuroDeskApi', {
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   isFirstRun: () => ipcRenderer.invoke('app:firstRun'),
   setTitleBarColors: (colors) => ipcRenderer.invoke('app:setTitleBarColors', colors),
+  getZoom: () => ipcRenderer.invoke('app:getZoom'),
+  setZoom: (value) => ipcRenderer.invoke('app:setZoom', value),
+  onZoom: (callback) => {
+    const listener = (_, factor) => callback(factor);
+    ipcRenderer.on('app:zoom', listener);
+    return () => ipcRenderer.removeListener('app:zoom', listener);
+  },
   // The teacher's own AI key: the key goes in once and never comes back out.
   brain: {
     status: () => ipcRenderer.invoke('brain:status'),

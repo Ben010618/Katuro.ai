@@ -14,6 +14,7 @@ import DeskOwnKeySettings from './DeskOwnKeySettings';
 import DeskPhoneSettings from './DeskPhoneSettings';
 import DeskHomeFolderSettings from './DeskHomeFolderSettings';
 import DeskBackupSettings from './DeskBackupSettings';
+import DeskScreenSettings from './DeskScreenSettings';
 import { startDeskTour } from './tour/tourSteps';
 
 const canLinkPhones = typeof window !== 'undefined' && Boolean(window.katuroDeskApi?.linkStatus);
@@ -58,15 +59,16 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
   }, [open, onClose]);
 
   if (!open) return null;
+  const canZoom = Boolean(typeof window !== 'undefined' && window.katuroDeskApi?.setZoom);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="kt-layer z-50 bg-black/40 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="desk-settings-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full"
       >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-[#f6f8f7]">
           <h2 id="desk-settings-title" className="text-sm font-bold text-gray-900 flex items-center gap-2">
@@ -77,8 +79,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
           </button>
         </div>
 
-        <div className="px-5 pt-3 flex gap-1 border-b border-gray-200" role="tablist">
-          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ['signature', 'E-signature'], ...(canLinkPhones ? [['phones', 'Phones']] : []), ...(canBackUp ? [['backup', 'Backup']] : []), ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : []), ...(ownKeyTab ? [['ownkey', 'AI key']] : [])].map(([id, label]) => (
+        <div className="px-3 sm:px-5 pt-3 flex flex-wrap gap-x-1 border-b border-gray-200" role="tablist">
+          {[['assistant', 'Assistant'], ['profile', 'My profile'], ['notifications', 'Notifications'], ['documents', 'Documents'], ...(canZoom ? [['screen', 'Screen size']] : []), ['signature', 'E-signature'], ...(canLinkPhones ? [['phones', 'Phones']] : []), ...(canBackUp ? [['backup', 'Backup']] : []), ...(profile?.isAdmin ? [['exam', 'Teacher exam']] : []), ...(ownKeyTab ? [['ownkey', 'AI key']] : [])].map(([id, label]) => (
             <button
               key={id}
               role="tab"
@@ -97,6 +99,8 @@ export default function DeskSettingsModal({ open, onClose, user, profile, initia
           <TeacherExamPanel />
         ) : tab === 'notifications' ? (
           <DeskNotificationSettings />
+        ) : tab === 'screen' && canZoom ? (
+          <DeskScreenSettings />
         ) : tab === 'documents' ? (
           <div className="p-5 space-y-5 overflow-y-auto">
             <DeskHomeFolderSettings />

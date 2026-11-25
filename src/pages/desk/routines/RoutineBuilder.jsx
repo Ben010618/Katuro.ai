@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { X, Save, Play, LayoutList, Network, Wand2, Volume2, ArrowDown, ArrowLeft, Home, Languages, Check } from 'lucide-react';
+import { X, Save, Play, LayoutList, Network, Wand2, Volume2, ArrowDown, ArrowLeft, Home, Languages, Check, Plus } from 'lucide-react';
 import { KIND_STYLE, cardDef, say } from '../../../services/desk/routines/catalog';
 import { checkRoutine, describeRoutine, runOrder, shelf } from '../../../services/desk/routines/routine';
 import CardNode from './CardNode';
 import CardSettings from './CardSettings';
 import { KIND_COLOR, CARD_TEXT_2, cardColors, iconColors, textColor, speak } from './cardStyle';
 import CardIcon from './CardIcon';
+import { useViewportWidth } from '../useDeskWindow';
 import { addCard, arrange, canConnect, cardLine, cardSentence, connect, disconnect, removeCard, setSettings, CARD_W, CARD_H } from './routineLayout';
 
 const nodeTypes = { card: CardNode };
@@ -16,6 +17,8 @@ const TRY_MS = 1400;
 // The canvas opens at the start of the routine (top left), at a size the cards are easy to read.
 const START_VIEW = { x: 24, y: 40, zoom: 0.95 };
 const btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
+// Words beside a toolbar icon: hidden in a narrow window (the button's title still says it).
+const word = 'hidden md:inline';
 const primary = 'inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50';
 const T = (lang, en, fil) => (lang === 'fil' ? fil : en);
 
@@ -94,7 +97,8 @@ function ListView({ draft, lang, selectedId, onSelect, statuses }) {
 
 function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang = 'en', talk = null }) {
   const [draft, setDraft] = useState(() => arrange(initial));
-  const [selectedId, setSelectedId] = useState(initial.cards[0]?.id || null);
+  // A narrow window opens on the cards; a card's settings slide in once it is chosen.
+  const [selectedId, setSelectedId] = useState(() => (window.innerWidth >= 768 ? initial.cards[0]?.id || null : null));
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [lang, setLang] = useState(initialLang);
   const [view, setView] = useState('cards');
@@ -222,6 +226,13 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
   }, [add, flow]);
 
   const selected = draft.cards.find((c) => c.id === selectedId) || null;
+  // Narrow window: the card shelf opens as a drawer, and a card's settings slide in over the canvas.
+  const width = useViewportWidth();
+  const shelfFits = width >= 1024;
+  const settingsFit = width >= 768;
+  const [shelfOpen, setShelfOpen] = useState(false);
+  const showShelf = shelfFits || shelfOpen;
+  const showSettings = settingsFit || Boolean(selected);
   const leaveOk = () => !dirty || window.confirm(T(lang, 'Leave without saving your changes?', 'Umalis nang hindi sine-save ang mga binago?'));
   // Back to the list of routines, or straight back to the KaTuroDesk screen.
   const close = () => { if (leaveOk()) onClose(); };
@@ -251,14 +262,17 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={T(lang, 'Routine Builder', 'Routine Builder')}>
+    <div className="kt-layer z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={T(lang, 'Routine Builder', 'Routine Builder')}>
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2">
         <input value={draft.name} maxLength={80} onChange={(e) => update({ ...draft, name: e.target.value })} aria-label={T(lang, 'Routine name', 'Pangalan ng routine')} className="min-w-[12rem] flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900" />
-        <button type="button" onClick={() => setLang(lang === 'fil' ? 'en' : 'fil')} className={btn} title="English / Filipino"><Languages size={13} /> {lang === 'fil' ? 'English' : 'Filipino'}</button>
-        <button type="button" onClick={() => setView(view === 'cards' ? 'list' : 'cards')} className={btn}>{view === 'cards' ? <><LayoutList size={13} /> {T(lang, 'Simple list', 'Simpleng listahan')}</> : <><Network size={13} /> {T(lang, 'Cards', 'Mga card')}</>}</button>
-        <button type="button" onClick={() => { update(arrange(draft)); setTimeout(() => flow.setViewport(START_VIEW, { duration: 200 }), 0); }} className={btn}><Wand2 size={13} /> {T(lang, 'Tidy up', 'Ayusin')}</button>
-        <button type="button" onClick={() => setTrying({ index: 0, aloud: false })} disabled={!order.length || Boolean(trying)} className={btn} title={T(lang, 'Shows each step in order. Nothing runs and no file changes.', 'Ipinapakita ang bawat hakbang. Walang tatakbo at walang file na mababago.')}><Play size={13} /> {T(lang, 'Try', 'Subukan')}</button>
-        <button type="button" onClick={() => setTrying({ index: 0, aloud: true })} disabled={!order.length || Boolean(trying)} className={btn}><Volume2 size={13} /> {T(lang, 'Try aloud', 'Subukan nang malakas')}</button>
+        {shelfFits ? null : (
+          <button type="button" onClick={() => setShelfOpen((v) => !v)} aria-expanded={shelfOpen} className={btn} title={T(lang, 'Add a card', 'Magdagdag ng card')}><Plus size={13} /> {T(lang, 'Add a card', 'Magdagdag')}</button>
+        )}
+        <button type="button" onClick={() => setLang(lang === 'fil' ? 'en' : 'fil')} className={btn} title="English / Filipino"><Languages size={13} /> <span className={word}>{lang === 'fil' ? 'English' : 'Filipino'}</span></button>
+        <button type="button" onClick={() => setView(view === 'cards' ? 'list' : 'cards')} className={btn} title={view === 'cards' ? T(lang, 'Simple list', 'Simpleng listahan') : T(lang, 'Cards', 'Mga card')}>{view === 'cards' ? <><LayoutList size={13} /> <span className={word}>{T(lang, 'Simple list', 'Simpleng listahan')}</span></> : <><Network size={13} /> <span className={word}>{T(lang, 'Cards', 'Mga card')}</span></>}</button>
+        <button type="button" onClick={() => { update(arrange(draft)); setTimeout(() => flow.setViewport(START_VIEW, { duration: 200 }), 0); }} className={btn} title={T(lang, 'Tidy up', 'Ayusin')}><Wand2 size={13} /> <span className={word}>{T(lang, 'Tidy up', 'Ayusin')}</span></button>
+        <button type="button" onClick={() => setTrying({ index: 0, aloud: false })} disabled={!order.length || Boolean(trying)} className={btn} title={T(lang, 'Shows each step in order. Nothing runs and no file changes.', 'Ipinapakita ang bawat hakbang. Walang tatakbo at walang file na mababago.')}><Play size={13} /> <span className={word}>{T(lang, 'Try', 'Subukan')}</span></button>
+        <button type="button" onClick={() => setTrying({ index: 0, aloud: true })} disabled={!order.length || Boolean(trying)} className={btn} title={T(lang, 'Try aloud', 'Subukan nang malakas')}><Volume2 size={13} /> <span className={word}>{T(lang, 'Try aloud', 'Subukan nang malakas')}</span></button>
         <button type="button" onClick={save} className={primary}><Save size={13} /> {T(lang, 'Save', 'I-save')}</button>
         <button type="button" onClick={close} className={btn} title={T(lang, 'Back to the list of routines', 'Bumalik sa listahan ng mga routine')}><ArrowLeft size={13} /> {T(lang, 'My routines', 'Mga routine ko')}</button>
         <button type="button" onClick={exit} className={btn} title={T(lang, 'Back to the KaTuroDesk screen', 'Bumalik sa KaTuroDesk')}><Home size={13} /> {T(lang, 'Back to KaTuroDesk', 'Bumalik sa KaTuroDesk')}</button>
@@ -273,10 +287,12 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="w-56 flex-none overflow-y-auto border-r border-gray-200 bg-gray-50" aria-label={T(lang, 'Cards you can add', 'Mga card na puwedeng idagdag')}>
-          <Shelf lang={lang} onAdd={(t) => add(t)} />
-        </aside>
+      <div className="relative flex min-h-0 flex-1">
+        {showShelf ? (
+          <aside className={`w-56 flex-none overflow-y-auto border-r border-gray-200 bg-gray-50 ${shelfFits ? '' : 'absolute inset-y-0 left-0 z-20 shadow-xl'}`} aria-label={T(lang, 'Cards you can add', 'Mga card na puwedeng idagdag')}>
+            <Shelf lang={lang} onAdd={(t) => { add(t); if (!shelfFits) setShelfOpen(false); }} />
+          </aside>
+        ) : null}
         <main className="relative min-w-0 flex-1" onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={onDrop}>
           {view === 'cards' ? (
             <ReactFlow
@@ -313,7 +329,13 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
             </div>
           ) : null}
         </main>
-        <aside className="w-72 flex-none overflow-y-auto border-l border-gray-200" aria-label={T(lang, 'Card settings', 'Mga setting ng card')}>
+        {showSettings ? (
+        <aside className={`w-72 flex-none overflow-y-auto border-l border-gray-200 ${settingsFit ? '' : 'absolute inset-y-0 right-0 z-20 max-w-[90%] bg-white shadow-xl'}`} aria-label={T(lang, 'Card settings', 'Mga setting ng card')}>
+          {settingsFit ? null : (
+            <div className="flex justify-end border-b border-gray-100 px-2 py-1">
+              <button type="button" onClick={() => setSelectedId(null)} className={btn}><Check size={13} /> {T(lang, 'Done', 'Tapos')}</button>
+            </div>
+          )}
           <CardSettings
             card={selected}
             def={selected ? cardDef(selected.type) : null}
@@ -325,6 +347,7 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
             onRemove={() => { update(removeCard(draft, selected.id)); setSelectedId(null); }}
           />
         </aside>
+        ) : null}
       </div>
 
       <div className={`border-t px-4 py-2 text-[11px] ${problems.length ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`} role="status">

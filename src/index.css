@@ -573,6 +573,24 @@ h1, h2, h3, .doc-heading, .editorial-heading {
   -webkit-app-region: no-drag;
 }
 
+/* A full-screen layer (Routine Builder, dialogs). In the desktop window it starts below the
+   title bar strip, where Windows draws minimize / maximize / close and the window is dragged
+   (--kt-titlebar is set by KaTuroDeskPage). While one is open the top bar is only the drag area. */
+.kt-layer {
+  position: fixed;
+  top: var(--kt-titlebar, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+body:has(.kt-layer) .desk-titlebar > * {
+  pointer-events: none;
+  opacity: 0.45;
+}
+body:has(.kt-layer) .desk-titlebar :is(button, a, input, [role='button'], [title]) {
+  -webkit-app-region: drag;
+}
+
 /* Dark mode: the "Download KaTuroDesk" header button sets its colours inline. */
 [data-dark="true"] .shell-desk-dl:not(:hover) {
   color: #8FD3A9 !important;

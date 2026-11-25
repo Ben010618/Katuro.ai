@@ -3,6 +3,9 @@
 export const CANVAS_DEFAULT_WIDTH = 460;
 export const CANVAS_MIN_WIDTH = 320;
 export const CHAT_MIN_WIDTH = 380;
+// Folder tree (at most 288px) + chat + canvas + the two 16px dividers: below this the
+// folder tree and the canvas take turns beside the chat.
+export const BOTH_SIDE_PANELS_MIN_WIDTH = 288 + CHAT_MIN_WIDTH + CANVAS_MIN_WIDTH + 32;
 const STORAGE_KEY = 'kt-desk-canvas-width';
 
 /** Keeps the canvas between its minimum and what leaves the chat at least CHAT_MIN_WIDTH. */

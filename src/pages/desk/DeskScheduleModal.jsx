@@ -348,13 +348,13 @@ export default function DeskScheduleModal({ onClose, prefill = null, user, profi
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="kt-layer z-50 bg-black/40 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="desk-schedule-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full"
       >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-[#f6f8f7]">
           <h2 id="desk-schedule-title" className="text-sm font-bold text-gray-900 flex items-center gap-2">

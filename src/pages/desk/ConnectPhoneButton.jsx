@@ -6,7 +6,8 @@ import { Smartphone } from 'lucide-react';
  * dot): "Connect your phone". After that it is a quiet "Phone linked". Opens Settings → Phones.
  * Desktop app only (the phone link runs in KaTuroDesk).
  */
-export default function ConnectPhoneButton({ onOpen }) {
+// compact: icon only (a narrow window).
+export default function ConnectPhoneButton({ onOpen, compact = false }) {
   const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
   const [phones, setPhones] = useState(null); // null until KaTuroDesk answers
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function ConnectPhoneButton({ onOpen }) {
         className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
       >
         <span className="relative"><Smartphone size={14} /><span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" /></span>
-        <span className="text-[11px] font-semibold hidden sm:inline">Phone linked</span>
+        <span className={`text-[11px] font-semibold ${compact ? 'hidden' : 'hidden sm:inline'}`}>Phone linked</span>
       </button>
     );
   }
@@ -38,13 +39,14 @@ export default function ConnectPhoneButton({ onOpen }) {
       data-tour="phone"
       onClick={onOpen}
       title="Link the KaTuro App on your phone: scores, attendance, your schedule, your files and your assistant, over the same Wi-Fi."
-      className="kt-phone-cta relative flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-bold transition"
+      className={`kt-phone-cta relative flex items-center gap-1.5 rounded-full py-1 text-[11.5px] font-bold transition ${compact ? 'px-2' : 'px-3'}`}
+      aria-label="Connect your phone"
     >
       <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75 motion-reduce:hidden" />
         <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
       </span>
-      <Smartphone size={14} /> Connect your phone
+      <Smartphone size={14} />{compact ? null : ' Connect your phone'}
     </button>
   );
 }

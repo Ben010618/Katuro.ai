@@ -70,8 +70,8 @@ export default function DeskPrintDialog({ spec, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3" role="dialog" aria-modal="true" aria-label="Print">
-      <div className="w-full max-w-md space-y-3 rounded-xl bg-white p-4 text-xs text-gray-800 shadow-xl">
+    <div className="kt-layer z-50 flex items-center justify-center bg-black/30 p-3" role="dialog" aria-modal="true" aria-label="Print">
+      <div className="max-h-full w-full max-w-md space-y-3 overflow-y-auto rounded-xl bg-white p-4 text-xs text-gray-800 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-900">Print</h2>
           <button type="button" onClick={onClose} className="rounded p-1 text-gray-500 hover:bg-gray-100" aria-label="Close"><X size={14} /></button>
