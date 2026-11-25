@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   RefreshCw,
   MessageSquare,
+  Workflow,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -22,7 +23,7 @@ import DeskFolderPanel from './DeskFolderPanel';
 import DeskAgentChatPanel from './DeskAgentChatPanel';
 import DeskCanvasPanel from './DeskCanvasPanel';
 import { CANVAS_DEFAULT_WIDTH, CHAT_MIN_WIDTH, clampCanvasWidth, loadCanvasWidth, saveCanvasWidth } from './canvasResize';
-import { useDeskStore } from '../../store/deskStore';
+import { useDeskStore, workspaceIdOf } from '../../store/deskStore';
 import DeskSettingsModal from './DeskSettingsModal';
 import { KaTuroAIAvatar } from './DeskAvatar';
 import { getPersona } from '../../services/desk/personas';
@@ -40,6 +41,9 @@ import CalendarAlarms from './calendar/CalendarAlarms';
 import TeachingAssistant from './teaching/TeachingAssistant';
 import MyClassesModal from './teaching/MyClassesModal';
 import TestsModal from './bubble/TestsModal';
+import RoutinesModal from './routines/RoutinesModal';
+import { useRoutineScheduler } from './routines/routineEngine';
+import { useRoutineStore, routinesFor } from '../../store/routineStore';
 import { setTalkContext } from './talkController';
 import { startWakeController } from './wakeController';
 import { prepareVoice } from '../../services/desk/voice/piperVoice';
@@ -91,6 +95,7 @@ export default function KaTuroDeskPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [showClasses, setShowClasses] = useState(false);
   const [showTests, setShowTests] = useState(false);
+  const [showRoutines, setShowRoutines] = useState(false);
   const schoolPos = calendarPosition(manilaDate());
   const calendarLabel = schoolPos
     ? (schoolPos.term ? `Term ${schoolPos.term} · ${{ opening: 'Opening Block', instructional: 'Instructional', endOfTerm: 'End-of-Term' }[schoolPos.block]}` : { betweenTerms: 'Between terms', eosyBreak: 'EOSY break' }[schoolPos.block])
@@ -166,6 +171,8 @@ export default function KaTuroDeskPage() {
   };
 
   useDeskScheduler({ user, profile, onOpenCanvas: () => setShowRightPanel(true) });
+  // Routines (Routine Builder): start when their When card fires, while KaTuroDesk is open.
+  useRoutineScheduler({ user, profile });
   // Talking with the persona (chat, bubble, Ctrl+Space) answers as the signed-in teacher.
   useEffect(() => { setTalkContext({ user, profile, onOpenCanvas: () => setShowRightPanel(true) }); }, [user, profile]);
   // "Hello Matt": listens for the wake phrase when the teacher turned it on (desktop app only).
@@ -220,6 +227,9 @@ export default function KaTuroDeskPage() {
     window.katuroDeskApi?.setUnreadBadge?.(badgeCount, badgeDataUrl(badgeCount))?.catch?.(() => {});
   }, [badgeCount]);
   const activeTasks = scheduledTasks.filter((t) => t.enabled).length;
+  const routineState = useRoutineStore();
+  const myRoutineIds = new Set(routinesFor(routineState.routines, workspaceIdOf(workspace)).map((r) => r.id));
+  const routinesWaiting = routineState.runs.filter((r) => r.status === 'waiting' && myRoutineIds.has(r.routineId)).length;
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
@@ -259,6 +269,7 @@ export default function KaTuroDeskPage() {
       <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
       <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
       <TestsModal open={showTests} onClose={() => setShowTests(false)} onOpenCanvas={() => setShowRightPanel(true)} />
+      <RoutinesModal open={showRoutines} onClose={() => setShowRoutines(false)} user={user} profile={profile} />
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}
@@ -376,6 +387,17 @@ export default function KaTuroDeskPage() {
           >
             <ClipboardCheck size={14} />
             <span className="text-[11px] font-semibold hidden sm:inline">Tests</span>
+          </button>
+
+          <button
+            data-tour="routines"
+            onClick={() => setShowRoutines(true)}
+            title="Routines: picture cards that do your repeated work (attendance, grades, scores), asking you first before a record changes"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-[#25352a] text-[#a4baa9] hover:text-white border border-transparent hover:border-[#2d3e33] transition"
+          >
+            <Workflow size={14} />
+            <span className="text-[11px] font-semibold hidden sm:inline">Routines</span>
+            {routinesWaiting > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center" title="Waiting for your OK">{routinesWaiting}</span>}
           </button>
 
           <button

@@ -19,8 +19,22 @@ export function isSchedulerBusy() {
   return running;
 }
 
+/**
+ * The one background lock shared by scheduled tasks and routines (routines/routineEngine.js):
+ * true when the caller may start (and must call endBackgroundWork), false when something runs.
+ */
+export function beginBackgroundWork() {
+  if (running || useDeskStore.getState().isGenerating) return false;
+  running = true;
+  return true;
+}
+
+export function endBackgroundWork() {
+  running = false;
+}
+
 /** Plain-text one-liner of an agent reply for the task history and the notification. */
-function summarize(content) {
+export function summarize(content) {
   return String(content || '')
     .replace(/\*{1,3}|<\/?u>/gi, '')
     .split('\n')
@@ -31,7 +45,7 @@ function summarize(content) {
     .slice(0, 300);
 }
 
-function notify(title, body) {
+export function notify(title, body) {
   try {
     const api = typeof window !== 'undefined' ? window.katuroDeskApi : undefined;
     if (api?.notify) {

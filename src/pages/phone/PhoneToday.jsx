@@ -4,6 +4,7 @@ import { REMIND_OPTIONS, remindLabel } from '../desk/calendar/reminders';
 import { syncReminders, canNotify, allowExactReminders, classAlertMinutes, setClassAlertMinutes, CLASS_ALERT_OPTIONS } from '../../services/link/phoneReminders';
 import { monthGrid, monthRange, monthKey, monthOf, shiftMonth, dayKinds, mergeDays, loadMonths, saveMonth } from '../../services/link/phoneCalendar';
 import { isoDay, addDays, clock } from '../../utils/dates';
+import PhoneApprovals from './PhoneApprovals';
 
 const CACHE = 'katuro-phone-schedule-v1';
 const ICON = { class: BookOpen, event: CalendarDays, task: Timer, school: Flag };
@@ -182,6 +183,8 @@ export default function PhoneToday({ client, online }) {
   const monthTitle = new Date(view.year, view.month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   return (
     <div className="space-y-5 px-4 py-3 min-[400px]:px-5">
+      {/* Routines on KaTuroDesk waiting for the teacher's OK (shown only when something waits) */}
+      <PhoneApprovals client={client} online={online} />
       {/* The month */}
       <section className="nm rounded-3xl p-4" aria-label={`Calendar, ${monthTitle}`}>
         <div className="mb-3 flex items-center justify-between">

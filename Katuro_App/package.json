@@ -1,7 +1,7 @@
 {
   "name": "katuro-app",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "KaTuro phone app (Capacitor shell around ../src)",
   "scripts": {
     "build:web": "cd .. && npx vite build --mode mobile",
