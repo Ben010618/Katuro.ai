@@ -28,6 +28,11 @@ describe('the learners\' name column of a sheet', () => {
     expect(await findNameColumn(book([['List of Learners — Grade 7 Rizal'], [], ['LRN', "Learner's Name", 'Sex'], ['136512340001', 'Dela Cruz, Juan P.', 'M'], ['136512340003', 'Santos, Maria L.', 'F']]))).toBe('B');
   });
 
+  it('a parent\'s or guardian\'s name column never wins, even with more names in it', async () => {
+    expect(await findNameColumn(book([["Parent's Name", "Learner's Name", 'Score'], ['Dela Cruz, Pedro', 'Dela Cruz, Juan (Kuya)', 8], ['Santos, Rosa', 'Santos, Maria', 9], ['Reyes, Ben', 'Reyes, Ana', 7]]))).toBe('B');
+    expect(await findNameColumn(book([['No.', 'LRN', 'NAME', "FATHER'S NAME", "MOTHER'S MAIDEN NAME"], [1, '136512340001', 'DELA CRUZ, JUAN P.', 'DELA CRUZ, PEDRO', 'REYES, ANA'], [2, '136512340003', 'SANTOS, MARIA L.', 'SANTOS, JOSE', 'CRUZ, LIZA']]))).toBe('C');
+  });
+
   it('no names heading at all: the column with the most names; no names → null', async () => {
     expect(await findNameColumn(book([['#', 'Pupil', 'Q1'], [1, 'Dela Cruz, Juan', 80], [2, 'Reyes, Ana', 90]]))).toBe('B');
     expect(await findNameColumn(book([['A', 'B'], [1, 2], [3, 4]]))).toBeNull();

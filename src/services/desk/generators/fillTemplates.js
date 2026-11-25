@@ -187,9 +187,9 @@ function resolveColumn(ws, col, headerRows = 15) {
   return partial;
 }
 
-/** Sheet names + header-ish text cells from the first 15 rows. */
 const NAME_HEADING = /name|learner|pangalan|student|pupil|mag-?aaral/i;
-const NOT_LEARNERS = /school|teacher|adviser|principal|subject|section|division|region|district/i;
+// Never the learners: school/staff headings, and parents' or guardians' names (SF1 has those too).
+const NOT_LEARNERS = /school|teacher|adviser|principal|subject|section|division|region|district|parent|guardian|father|mother|magulang|\bama\b|\bina\b/i;
 
 /**
  * The column of a sheet that holds the learners' names → its letter, or null.
@@ -229,6 +229,7 @@ export async function findNameColumn(workbookBytes, sheetName) {
   return best ? numberToLetter(best.c) : null;
 }
 
+/** Sheet names + header-ish text cells from the first 15 rows. */
 export async function findWorkbookColumns(workbookBytes, sheetName) {
   const wb = await loadWorkbook(workbookBytes);
   const sheets = wb.worksheets.map((w) => w.name);
