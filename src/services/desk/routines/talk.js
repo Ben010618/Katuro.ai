@@ -38,7 +38,7 @@ ${catalogForAI()}
 
 Rules:
 1. Exactly one "when" card, first. Every other card has exactly one wire coming in from a card whose "gives" it "takes" (ask.approve, save.notify take anything; ask.approve passes on what it got).
-2. Put ask.approve directly before any card that CHANGES A RECORD. save.folder comes after a "do" card (an ask.approve may be between them); at most one save.folder per "do" card.
+2. Put ask.approve directly before any card that CHANGES A RECORD. save.folder comes directly after a "do" card (put any ask.approve before that "do" card); at most one save.folder per "do" card.
 3. File and folder settings: use ONLY exact paths from FILES / FOLDERS. If you are not sure which file the teacher means, leave the setting "" (the teacher will choose). Never invent a path.
 4. Never invent numbers the teacher did not say (passage words, questions, columns): leave them "".
 5. At most ${MAX_CARDS} cards. Keep it as short as possible.

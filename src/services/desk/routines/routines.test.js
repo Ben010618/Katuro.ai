@@ -128,11 +128,14 @@ describe('checking a routine', () => {
     expect(checkRoutine(early).map((p) => p.text)).toContain('"Type scores into my class record" changes your class record, so put a yellow "Ask me first" card right before it.');
   });
 
-  it('"Save in a folder" follows a green card (an Ask may be between), one per green card', () => {
-    const throughAsk = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['do.attendance', {}], ['ask.approve', {}], ['save.folder', { folder: 'Reports' }]]);
-    expect(checkRoutine(throughAsk)).toEqual([]);
+  it('"Save in a folder" comes right after a green card (its files are written as it runs), one per green card', () => {
+    const askFirst = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['ask.approve', {}], ['do.attendance', {}], ['save.folder', { folder: 'Reports' }]]);
+    expect(checkRoutine(askFirst)).toEqual([]);
+    // An "Ask me first" between them would ask after the files are already in the folder.
+    const askLate = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['do.attendance', {}], ['ask.approve', {}], ['save.folder', { folder: 'Reports' }]]);
+    expect(checkRoutine(askLate).map((p) => p.text)).toEqual(['"Save in a folder" saves the files a green card makes, so put it right after a green card (an "Ask me first" goes before the green card).']);
     const afterGet = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['save.folder', { folder: 'Reports' }]]);
-    expect(checkRoutine(afterGet).map((p) => p.text)).toEqual(['"Save in a folder" saves the files a green card makes, so put it after a green card.']);
+    expect(checkRoutine(afterGet).map((p) => p.text)).toEqual(['"Save in a folder" saves the files a green card makes, so put it right after a green card (an "Ask me first" goes before the green card).']);
     const two = cleanRoutine({ cards: [{ id: 'w', type: 'when.manual' }, { id: 'g', type: 'get.sheet', settings: { path: 'Records/SF2.xlsx' } }, { id: 'd', type: 'do.attendance', settings: {} }, { id: 'a', type: 'save.folder', settings: { folder: 'A' } }, { id: 'b', type: 'save.folder', settings: { folder: 'B' } }], wires: [{ from: 'w', to: 'g' }, { from: 'g', to: 'd' }, { from: 'd', to: 'a' }, { from: 'd', to: 'b' }] }).routine;
     expect(checkRoutine(two).map((p) => p.text)).toEqual(['"Find frequent absences" can have only one "Save in a folder" after it.']);
   });
@@ -282,13 +285,19 @@ describe('running a routine', () => {
     expect(runSummary(run)).toBe('"Test routine" finished: 2 file(s) made or updated.');
   });
 
-  it('"Save in a folder" after "Ask me first" really saves there, and says so', async () => {
-    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }], ['do.attendance', {}], ['ask.approve', {}], ['save.folder', { folder: 'Reports' }]]);
+  it('"Ask me first" before a green card and its folder: nothing is made until yes; then saved there', async () => {
+    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }], ['ask.approve', {}], ['do.attendance', {}], ['save.folder', { folder: 'Reports' }]]);
     const { deps, calls } = fake();
     const waiting = await advanceRun(createRun(r), deps);
-    expect(calls[0].opts.outputFolder).toBe('Reports');
+    expect(waiting.waiting.preview).toContain('Next: Find frequent absences');
+    expect(calls).toHaveLength(0); // nothing made, nothing saved yet
     const done = await advanceRun(decideRun(waiting, true), deps);
+    expect(calls[0].opts.outputFolder).toBe('Reports');
     expect(done.steps.c4).toMatchObject({ status: 'done', summary: 'Saved in Reports' });
+    const { deps: d2, calls: c2 } = fake();
+    const no = await advanceRun(decideRun(await advanceRun(createRun(r), d2), false), d2);
+    expect(no.steps.c4.status).toBe('skipped');
+    expect(c2).toHaveLength(0); // "no": nothing written anywhere
   });
 
   it('a file a card names that is gone stops the card (never a different file with the same name)', async () => {

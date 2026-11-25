@@ -71,7 +71,6 @@ export function depedFireAt(date, settings) {
   return new Date(day.y, day.mo, day.d + (Number(settings.offsetDays) || 0), Number(m[1]), Number(m[2]), 0, 0).getTime();
 }
 
-
 /** The schedule.js form of a schedule When card. */
 export function scheduleOf(settings, enabledAt) {
   return {

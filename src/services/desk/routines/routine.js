@@ -290,13 +290,6 @@ export function parentOf(routine, cardId) {
   return routine.wires.find((w) => w.to === cardId)?.from || null;
 }
 
-/** The card whose files reach this one: the card before it, past any "Ask me first" cards. */
-export function madeBy(routine, cardId) {
-  const byId = new Map(routine.cards.map((c) => [c.id, c]));
-  let id = parentOf(routine, cardId);
-  for (let hops = 0; id && byId.get(id)?.type === 'ask.approve' && hops <= MAX_CARDS; hops++) id = parentOf(routine, id);
-  return id;
-}
 
 /**
  * Every problem with a routine, in plain words (empty = ready to run).
@@ -370,14 +363,15 @@ export function checkRoutine(routine, lang = 'en') {
     if (byId.get(parentOf(graph, c.id))?.type !== 'ask.approve') add(`${name(c)} changes your class record, so put a yellow "Ask me first" card right before it.`, c.id);
   }
 
-  // "Save in a folder" saves what a green card makes (an "Ask me first" may be between them),
-  // and one green card's files go to one folder.
+  // "Save in a folder" comes RIGHT after the green card whose files it saves: the green card
+  // writes them there as it runs, so an "Ask me first" between them would ask too late (put it
+  // before the green card). One green card's files go to one folder.
   const savedFrom = new Map();
   for (const c of cards) {
     if (c.type !== 'save.folder' || !(incoming.get(c.id) || []).length) continue;
-    const from = byId.get(madeBy(graph, c.id));
+    const from = byId.get(parentOf(graph, c.id));
     if (cardDef(from?.type)?.kind !== 'do') {
-      add(`${name(c)} saves the files a green card makes, so put it after a green card.`, c.id);
+      add(`${name(c)} saves the files a green card makes, so put it right after a green card (an "Ask me first" goes before the green card).`, c.id);
       continue;
     }
     if (savedFrom.has(from.id)) add(`${name(from)} can have only one "${say(cardDef('save.folder').label, lang)}" after it.`, c.id);

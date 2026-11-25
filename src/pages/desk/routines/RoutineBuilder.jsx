@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { X, Save, Play, LayoutList, Network, Wand2, Volume2, ArrowDown, ArrowLeft, Home, Languages, Check, Plus } from 'lucide-react';
@@ -126,8 +126,9 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
     return Object.fromEntries(order.map((c, i) => [c.id, i < trying.index ? 'done' : i === trying.index ? 'running' : 'pending']));
   }, [trying, order]);
 
-  // Closing the Builder stops "Try aloud" mid-sentence.
-  useEffect(() => stopSpeaking, []);
+  // Closing the Builder stops "Try aloud" mid-sentence (only if it spoke: never another voice).
+  const spoke = useRef(false);
+  useEffect(() => () => { if (spoke.current) stopSpeaking(); }, []);
 
   // "Try": light the cards one by one and say what each will do. Nothing runs, nothing changes.
   useEffect(() => {
@@ -137,7 +138,7 @@ function Builder({ initial, files, folders, onSave, onClose, onExit, initialLang
       const t = setTimeout(() => setTrying(null), TRY_MS);
       return () => clearTimeout(t);
     }
-    if (trying.aloud) speak(cardSentence(card, lang), lang);
+    if (trying.aloud) spoke.current = speak(cardSentence(card, lang), lang) || spoke.current;
     const t = setTimeout(() => setTrying((x) => (x ? { ...x, index: x.index + 1 } : x)), TRY_MS);
     return () => clearTimeout(t);
   }, [trying, order, lang]);

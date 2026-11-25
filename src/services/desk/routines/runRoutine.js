@@ -19,7 +19,7 @@
  */
 
 import { cardDef, say } from './catalog.js';
-import { checkRoutine, cleanRoutine, clip, downstreamOf, madeBy, newId, parentOf, runOrder } from './routine.js';
+import { checkRoutine, cleanRoutine, clip, downstreamOf, newId, parentOf, runOrder } from './routine.js';
 import { withTimeout } from '../../../utils/withTimeout.js';
 
 const CARD_TIMEOUT_MS = 20 * 60 * 1000; // one card never keeps a routine busy longer
@@ -48,9 +48,9 @@ export function createRun(routine, trigger = { kind: 'manual' }, now = Date.now(
   };
 }
 
-/** The folder of the "Save in a folder" card that saves this green card's files (an "Ask me first" may be between), or ''. */
+/** The folder of the "Save in a folder" card right after this green card, or ''. */
 function saveFolderAfter(routine, cardId) {
-  const save = routine.cards.find((c) => c.type === 'save.folder' && madeBy(routine, c.id) === cardId);
+  const save = routine.cards.find((c) => c.type === 'save.folder' && parentOf(routine, c.id) === cardId);
   return save?.settings?.folder || '';
 }
 
@@ -189,7 +189,7 @@ async function runCard(card, def, input, run, deps) {
 
     case 'save': {
       if (card.type === 'save.folder') {
-        const from = madeBy(run.routine, card.id);
+        const from = parentOf(run.routine, card.id);
         const made = (from && run.steps[from]?.files) || [];
         return { status: 'done', summary: made.length ? `Saved in ${s.folder}` : 'Nothing new to save' };
       }

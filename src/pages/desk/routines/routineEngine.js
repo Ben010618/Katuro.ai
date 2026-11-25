@@ -114,6 +114,7 @@ function deskDeps({ user, profile, workspaceId }) {
       };
       // Wait for the teacher's own chat request, then take the 'busy' flag in the same moment it is
       // seen free (so a chat request can never slip in between). The chat waits while a card runs.
+      // The first wait also lets a chat request that is just starting go first.
       await waitForChat();
       // Checked again with no await in between: a chat request can start in the moment the wait
       // above resolves, so the flag is taken only when it is seen free right here.
