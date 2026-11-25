@@ -226,8 +226,8 @@ function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en',
     if (dirty && !window.confirm(T(lang, 'Close without saving your changes?', 'Isara nang hindi sine-save ang mga binago?'))) return;
     onClose();
   };
-  const save = () => {
-    const res = onSave(draft);
+  const save = async () => {
+    const res = await onSave(draft);
     if (res?.ok) setDirty(false);
     setNotice(res?.message || '');
   };

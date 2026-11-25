@@ -13,7 +13,7 @@ import { formatWhen } from '../../../services/desk/schedule/schedule';
 import { callDeskLLM } from '../../../services/desk/agent/llm';
 import { SYSTEM_DIRS } from '../../../services/desk/systemFolders';
 import { STATUS_LIGHT } from './cardStyle';
-import { answerRun, startRoutine } from './routineEngine';
+import { answerRun, filesForStart, startRoutine } from './routineEngine';
 
 // The Builder (React Flow) loads only when a routine is opened, not with KaTuroDesk.
 const RoutineBuilder = lazy(() => import('./RoutineBuilder'));
@@ -84,9 +84,10 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
   const say2 = (text, bad = false) => setNotice({ text, bad });
   const canWrite = Boolean(workspace?.handle);
 
-  const save = (draft) => {
+  const save = async (draft) => {
     try {
-      const { routine, dropped, problems } = saveRoutine(draft, { workspaceId: wsId, workspaceName: workspace?.name || '', flatFiles: flattenFileTree(workspace?.files || []) });
+      const flatFiles = await filesForStart(draft);
+      const { routine, dropped, problems } = saveRoutine(draft, { workspaceId: wsId, workspaceName: workspace?.name || '', flatFiles });
       setEditing(routine);
       const parts = [problems.length ? T(lang, 'Saved. Fix the red cards, then switch it on in the list.', 'Na-save. Ayusin ang mga pulang card, saka paandarin sa listahan.') : T(lang, 'Saved. Switch it on in the list when you are ready.', 'Na-save. Paandarin ito sa listahan kapag handa ka na.')];
       if (dropped.length) parts.push(`${T(lang, 'Changed', 'Binago')}: ${dropped.slice(0, 3).join('; ')}.`);
@@ -96,9 +97,9 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
     }
   };
 
-  const toggle = (r) => {
+  const toggle = async (r) => {
     try {
-      setEnabled(r.id, !r.enabled, { flatFiles: flattenFileTree(workspace?.files || []) });
+      setEnabled(r.id, !r.enabled, { flatFiles: r.enabled ? [] : await filesForStart(r) });
       say2(r.enabled ? T(lang, `"${r.name}" is off.`, `Naka-off ang "${r.name}".`) : T(lang, `"${r.name}" is on. It runs while KaTuroDesk is open.`, `Naka-on ang "${r.name}". Tatakbo ito habang bukas ang KaTuroDesk.`));
     } catch (err) {
       say2(err.message, true);

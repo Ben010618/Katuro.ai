@@ -64,6 +64,8 @@ describe('routines inside KaTuroDesk (the real agent and tools)', () => {
     expect(waiting.status).toBe('waiting');
     expect(waiting.steps.c3.status).toBe('pending');
     expect(useDeskStore.getState().messages.at(-1).content).toMatch(/is waiting for your OK: Check the SF2 first\./);
+    // While it waits, the routine does not start again (its answer comes first).
+    await expect(startRoutine(routine.id, { user, profile })).rejects.toThrow(/is waiting for your OK/);
     const done = await answerRun(waiting.id, true, { user, profile, by: 'KaTuroDesk' });
     expect(done.status).toBe('done');
     expect(done.steps.c2.summary).toBe('Approved (KaTuroDesk)');
@@ -85,6 +87,21 @@ describe('routines inside KaTuroDesk (the real agent and tools)', () => {
     expect(done.steps.c3.status).toBe('done');
     expect(beginBackgroundWork()).toBe(true); // the lock was given back
     endBackgroundWork();
+  });
+
+  it('a card waits for the teacher chat request, and never clears its busy flag', async () => {
+    const { routine } = setup([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }], ['ask.approve', {}], ['do.attendance', {}]]);
+    const waiting = await startRoutine(routine.id, { user, profile });
+    // The routine has the lock; the teacher starts a chat request before its next card runs.
+    const going = answerRun(waiting.id, true, { user, profile });
+    useDeskStore.setState({ isGenerating: true }); // the teacher's chat request is running
+    await new Promise((r) => { setTimeout(r, 1500); });
+    expect(useRoutineStore.getState().runs.find((r) => r.id === waiting.id).steps.c3.status).toBe('running'); // waiting for the chat
+    expect(useDeskStore.getState().isGenerating).toBe(true);
+    useDeskStore.setState({ isGenerating: false }); // the chat request ended
+    const done = await going;
+    expect(done.status).toBe('done');
+    expect(useDeskStore.getState().isGenerating).toBe(false);
   });
 
   it('one thing at a time: busy → null (tried again later); another folder open → said plainly', async () => {

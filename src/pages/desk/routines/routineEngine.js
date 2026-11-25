@@ -10,15 +10,28 @@
  */
 import { useEffect, useRef } from 'react';
 import { useDeskStore, workspaceIdOf, folderIndex } from '../../../store/deskStore';
-import { useRoutineStore, routinesFor } from '../../../store/routineStore';
+import { useRoutineStore, routinesFor, isWaiting } from '../../../store/routineStore';
 import { runDeskAgentTurn } from '../../../services/deskAgentAI';
 import { flattenFileTree, findEntryByPath, readDirectoryRecursively } from '../../../services/localFileSystem';
 import { SYSTEM_DIRS } from '../../../services/desk/systemFolders';
 import { advanceRun, createRun, decideRun, runSummary } from '../../../services/desk/routines/runRoutine';
 import { dueNow, markSeen, watchedFolder } from '../../../services/desk/routines/triggers';
 import { beginBackgroundWork, endBackgroundWork, notify, summarize } from '../deskScheduler';
+import { withTimeout } from '../../../utils/withTimeout';
 
 const TICK_MS = 30000;
+const CHAT_WAIT_MS = 10 * 60 * 1000; // a card waits this long at most for the teacher's own request
+const IDLE_MAX_MS = 5 * 60 * 1000; // after a card timed out, its work is waited for this long at most
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+/** Waits while the teacher's own chat request runs (a card never runs beside it). */
+async function waitForChat() {
+  const until = Date.now() + CHAT_WAIT_MS;
+  while (useDeskStore.getState().isGenerating) {
+    if (Date.now() > until) throw new Error('KaTuroDesk was busy with your other request for too long. Run the routine again.');
+    await sleep(1000);
+  }
+}
 
 const tree = () => useDeskStore.getState().workspace?.files || [];
 
@@ -52,7 +65,7 @@ function folderFiles(folder) {
  * a scanner are seen, not only ones KaTuroDesk made). Only that folder is read.
  * → [{ path, size, lastModified }] (paths inside the open folder)
  */
-async function listFolderNow(folder) {
+export async function listFolderNow(folder) {
   const ws = useDeskStore.getState().workspace;
   const handle = ws?.handle;
   if (handle?.kind === 'electron' && handle.rootPath) {
@@ -63,24 +76,45 @@ async function listFolderNow(folder) {
   return flattenFileTree(tree()); // a browser folder: as last read
 }
 
+/**
+ * The files a routine's watched folder has on disk now, for "Nothing before it was switched on
+ * fires it": the start list is built from the disk, not from the folder list KaTuroDesk last read.
+ * → flat files ([] when the routine watches no folder)
+ */
+export async function filesForStart(routine) {
+  const folder = watchedFolder(routine);
+  if (!folder) return [];
+  try {
+    return await listFolderNow(folder);
+  } catch {
+    return flattenFileTree(tree());
+  }
+}
+
 /** The real deps for runRoutine.js: one green card = one confirmed plan through the agent. */
 export function deskDeps({ user, profile, workspaceId }) {
-  let inflight = Promise.resolve();
-  return {
+  const inflight = new Set(); // every card's work still running (also one that timed out)
+  const deps = {
     now: () => Date.now(),
     fileExists,
     folderFiles,
     stillHere: () => workspaceIdOf(useDeskStore.getState().workspace) === workspaceId,
     notify: (title, body) => notify(title, body),
-    /** Resolves when the last card's work has really ended (also after a card timed out). */
-    idle: () => inflight.catch(() => {}),
+    /** Resolves when every card's work has really ended (also after a time-out), at most IDLE_MAX_MS. */
+    idle: () => withTimeout(Promise.allSettled([...inflight]), IDLE_MAX_MS).catch(() => {}),
     runTasks: async (tasks, { label, outputFolder }) => {
-      const store = useDeskStore.getState();
       const plan = {
         reply: '',
         tasks: tasks.map((t) => ({ id: t.id, tool: t.tool, label: t.label || label, args: { ...t.args, ...(outputFolder ? { outputFolder } : {}) }, dependsOn: t.dependsOn || [] })),
       };
-      store.setIsGenerating(true); // the chat waits while a card runs
+      // Wait for the teacher's own chat request, then take the 'busy' flag in the same moment it is
+      // seen free (so a chat request can never slip in between). The chat waits while a card runs.
+      // (A first pause lets a chat request that was just started show itself before the check.)
+      await waitForChat();
+      while (useDeskStore.getState().isGenerating) await waitForChat();
+      if (!deps.stillHere()) throw new Error('Another folder was opened on KaTuroDesk, so the routine stopped here.');
+      useDeskStore.getState().setIsGenerating(true); // set by this card, so cleared by it below
+      const store = useDeskStore.getState(); // the folder as it is now (after any wait)
       const work = runDeskAgentTurn({
         prompt: label,
         workspace: store.workspace,
@@ -97,7 +131,8 @@ export function deskDeps({ user, profile, workspaceId }) {
         confirmedPlan: plan,
         autoApprove: true,
       }).finally(() => useDeskStore.getState().setIsGenerating(false));
-      inflight = work;
+      inflight.add(work);
+      work.finally(() => inflight.delete(work)).catch(() => {});
       const result = await work;
       const s = useDeskStore.getState();
       if (result.artifacts?.length) s.addArtifacts(result.artifacts);
@@ -112,6 +147,7 @@ export function deskDeps({ user, profile, workspaceId }) {
       };
     },
   };
+  return deps;
 }
 
 const say = (content) => useDeskStore.getState().addMessage({ role: 'assistant', agentId: 'katuro_assistant', content });
@@ -152,6 +188,9 @@ export async function startRoutine(routineId, { user, profile, trigger = { kind:
   const r = routineOf(routineId);
   if (!r || !user) return null;
   if (r.workspaceId !== currentWs()) throw new Error(`Open the folder "${r.workspaceName || 'of this routine'}" first.`);
+  // One answer at a time: while a run waits for "Ask me first", the routine does not start again
+  // (new files keep waiting their turn; nothing is dropped).
+  if (isWaiting(useRoutineStore.getState().runs, r.id)) throw new Error(`"${r.name}" is waiting for your OK. Answer it first (Routines › Waiting for your OK).`);
   if (!beginBackgroundWork()) return null;
   try {
     if (meta) useRoutineStore.getState().setMeta(r.id, meta);
@@ -219,7 +258,8 @@ export function useRoutineScheduler({ user, profile }) {
       try {
         const ws = currentWs();
         for (const r of routinesFor(useRoutineStore.getState().routines, ws)) {
-          if (!r.enabled) continue;
+          // A routine waiting for the teacher's OK is not looked at (its new files wait their turn).
+          if (!r.enabled || isWaiting(useRoutineStore.getState().runs, r.id)) continue;
           const folder = watchedFolder(r);
           let files = [];
           if (folder) {

@@ -17,26 +17,18 @@ import { recoverRun } from '../services/desk/routines/runRoutine.js';
 export const MAX_RUNS = 60;
 export const MAX_ROUTINES = 50;
 
-export const MAX_WAITING_PER_ROUTINE = 3;
-
 /**
- * The runs kept: newest first; waiting runs are kept (they are the teacher's to answer), but at
- * most MAX_WAITING_PER_ROUTINE per routine: an older one not answered is closed as "not answered"
- * (nothing after its Ask card is done) so unanswered runs never pile up. Then MAX_RUNS others.
+ * The runs kept: every waiting run (the teacher's to answer; a routine never starts again while
+ * one of its runs waits, so there is at most one per routine) and the last MAX_RUNS others.
  */
 const keepRuns = (runs) => {
-  const sorted = [...runs].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
-  const perRoutine = new Map();
-  const closed = sorted.map((r) => {
-    if (r.status !== 'waiting') return r;
-    const n = (perRoutine.get(r.routineId) || 0) + 1;
-    perRoutine.set(r.routineId, n);
-    return n > MAX_WAITING_PER_ROUTINE ? { ...r, status: 'error', waiting: null, finishedAt: r.finishedAt || Date.now(), problem: 'Not answered: a newer run of this routine is waiting instead.' } : r;
-  });
-  const waiting = closed.filter((r) => r.status === 'waiting');
-  const others = closed.filter((r) => r.status !== 'waiting').slice(0, MAX_RUNS);
+  const waiting = runs.filter((r) => r.status === 'waiting');
+  const others = runs.filter((r) => r.status !== 'waiting').slice(0, MAX_RUNS);
   return [...waiting, ...others].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 };
+
+/** True when a run of this routine is waiting for the teacher's OK. */
+export const isWaiting = (runs, routineId) => runs.some((r) => r.routineId === routineId && r.status === 'waiting');
 
 export const useRoutineStore = create(
   persist(

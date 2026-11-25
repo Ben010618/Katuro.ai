@@ -201,9 +201,15 @@ describe('when a routine starts', () => {
     const edited = [old[0], { path: `${P}/b.jpg`, size: 99, lastModified: t0 + 9e6 }];
     expect(step(edited, t0 + 1e7)).toBeNull();
     expect(step(edited, t0 + 2e7)).toBeNull();
-    // A deleted file drops off the list; its name coming back later is a new file again.
-    expect(step([edited[1]], t0 + 3e7)).toBeNull();
-    expect(meta.seen).toEqual([`${P}/b.jpg`]);
+    // An empty or failed read of the folder (renamed for a moment, a sync hiccup) changes nothing:
+    // when the files are back, none of them is "new".
+    expect(step([], t0 + 3e7)).toBeNull();
+    expect(step(edited, t0 + 4e7)).toBeNull();
+    expect(step(edited, t0 + 5e7)).toBeNull();
+    expect(meta.seen).toEqual([`${P}/a.jpg`.toLowerCase(), `${P}/b.jpg`.toLowerCase()]);
+    // The same file with other capital letters on disk is the same file (Windows).
+    expect(step([{ ...edited[1], path: edited[1].path.toUpperCase() }], t0 + 6e7)).toBeNull();
+    expect(step([{ ...edited[1], path: edited[1].path.toUpperCase() }], t0 + 7e7)).toBeNull();
     // 45 at once: 40 now, 5 on the next check.
     const many = Array.from({ length: 45 }, (_, i) => ({ path: `${P}/p${i}.jpg`, size: 1, lastModified: t0 }));
     meta = { enabledAt: t0, seen: [] };
