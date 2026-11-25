@@ -8,18 +8,20 @@
  *   when.newFiles  new files in a folder (photos from the phone, scans), once each, after they
  *                  stop changing (a photo still being copied is not read half-written)
  *
- * meta (kept per routine): { enabledAt, lastFireAt, fired: [keys], seen: [file signatures] }
- * Nothing that happened before the routine was switched on fires it.
+ * meta (kept per routine): { enabledAt, lastFireAt, fired: [keys], seen: [paths], pending: { path: { sig, at } } }
+ * Nothing that happened before the routine was switched on fires it. A file is new by its NAME:
+ * a file edited in place (a class record, the routine's own output) is never "new" again. A new
+ * file is used once two checks at least SETTLE_MS apart find it unchanged (same size and time).
  */
 
 import { computeNextRun, toDateInput } from '../schedule/schedule.js';
 import { SCHOOL_ACTIVITIES } from '../knowledge/depedActivities.js';
 import { cardDef } from './catalog.js';
+import { SYSTEM_DIRS } from '../systemFolders.js';
 
 export const SETTLE_MS = 20_000; // a new file must be unchanged this long before it is used
-export const MAX_SEEN = 3000;
+export const MAX_SEEN = 20_000; // file names remembered per routine (only files still in the folder are kept)
 export const MAX_FILES_PER_RUN = 40;
-const SKIP = /(^|\/)(KaTuro Backups|KaTuro Outputs)(\/|$)/i;
 
 /** The DepEd dates a When card can follow: event key → test on the calendar entry. */
 const EVENTS = {
@@ -96,7 +98,7 @@ export function nextFireAt(routine, meta = {}, now = Date.now()) {
 export function folderEntries(flatFiles, folder, match = /./) {
   const prefix = `${String(folder || '').replace(/\/+$/, '')}/`.toLowerCase();
   return (flatFiles || [])
-    .filter((f) => f?.path && f.path.toLowerCase().startsWith(prefix) && !SKIP.test(f.path) && match.test(f.path))
+    .filter((f) => f?.path && f.path.toLowerCase().startsWith(prefix) && !SYSTEM_DIRS.test(f.path) && match.test(f.path))
     .map((f) => ({ path: f.path, lastModified: Number(f.lastModified) || 0, sig: `${f.path}|${f.size ?? ''}|${f.lastModified ?? ''}` }));
 }
 
@@ -105,7 +107,22 @@ export function initialSeen(routine, flatFiles) {
   const card = whenCard(routine);
   if (card?.type !== 'when.newFiles') return [];
   const def = cardDef(card.type);
-  return folderEntries(flatFiles, card.settings.folder, def.match[card.settings.what] || /./).map((e) => e.sig).slice(-MAX_SEEN);
+  return folderEntries(flatFiles, card.settings.folder, def.match[card.settings.what] || /./).map((e) => e.path).slice(0, MAX_SEEN);
+}
+
+/** The watched folder of a routine ("When new files arrive"), or ''. */
+export function watchedFolder(routine) {
+  const card = whenCard(routine);
+  return card?.type === 'when.newFiles' ? String(card.settings?.folder || '') : '';
+}
+
+/** meta with these paths counted as seen (files a run made or changed never start it again). */
+export function markSeen(meta = {}, paths = []) {
+  const seen = new Set(meta.seen || []);
+  for (const p of paths) seen.add(p);
+  const pending = { ...(meta.pending || {}) };
+  for (const p of paths) delete pending[p];
+  return { ...meta, seen: [...seen].slice(-MAX_SEEN), pending };
 }
 
 /**
@@ -137,13 +154,27 @@ export function dueNow(routine, meta = {}, { now = Date.now(), flatFiles = [] } 
   if (card.type === 'when.newFiles') {
     const def = cardDef(card.type);
     const seen = new Set(meta.seen || []);
+    const before = meta.pending || {};
     const entries = folderEntries(flatFiles, s.folder, def.match[s.what] || /./);
-    const fresh = entries.filter((e) => !seen.has(e.sig) && now - e.lastModified >= SETTLE_MS);
-    if (!fresh.length) return null;
-    // At most 40 files per run; the rest stay new and start the next run.
-    const batch = fresh.slice(0, MAX_FILES_PER_RUN);
-    const nextSeen = [...seen, ...batch.map((e) => e.sig)].slice(-MAX_SEEN);
-    return { trigger: { kind: 'newFiles', at: now, files: batch.map((e) => e.path) }, meta: { ...meta, lastFireAt: now, seen: nextSeen } };
+    const fresh = entries.filter((e) => !seen.has(e.path));
+    // A new file is ready when an earlier check saw it exactly the same, SETTLE_MS ago or more.
+    const ready = [];
+    const pending = {};
+    for (const e of fresh) {
+      const p = before[e.path];
+      if (p && p.sig === e.sig && now - p.at >= SETTLE_MS) ready.push(e);
+      pending[e.path] = p && p.sig === e.sig ? p : { sig: e.sig, at: now };
+    }
+    // At most 40 files per run; the rest stay ready and start the next run.
+    const batch = ready.slice(0, MAX_FILES_PER_RUN);
+    for (const e of batch) delete pending[e.path];
+    // Only names still in the folder are remembered (a deleted file drops off the list).
+    const here = new Set(entries.map((e) => e.path));
+    const nextSeen = [...[...seen].filter((p) => here.has(p)), ...batch.map((e) => e.path)].slice(0, MAX_SEEN);
+    const changed = batch.length || nextSeen.length !== seen.size || JSON.stringify(pending) !== JSON.stringify(before);
+    if (!changed) return null;
+    const nextMeta = { ...meta, seen: nextSeen, pending, ...(batch.length ? { lastFireAt: now } : {}) };
+    return { trigger: batch.length ? { kind: 'newFiles', at: now, files: batch.map((e) => e.path) } : null, meta: nextMeta };
   }
   return null;
 }

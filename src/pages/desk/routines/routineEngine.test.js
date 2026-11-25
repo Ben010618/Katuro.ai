@@ -71,6 +71,22 @@ describe('routines inside KaTuroDesk (the real agent and tools)', () => {
     await expect(answerRun(waiting.id, true, { user, profile })).rejects.toThrow(/no longer waiting/);
   });
 
+  it('approved on the phone: answered at once, KaTuroDesk goes on by itself, a second answer is refused', async () => {
+    const { routine } = setup([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }], ['ask.approve', {}], ['do.attendance', {}]]);
+    const waiting = await startRoutine(routine.id, { user, profile });
+    const { answerRunFromPhone } = await import('./routineEngine');
+    const reply = answerRunFromPhone(waiting.id, true, { user, profile, by: 'Ana\'s phone' });
+    expect(reply).toEqual({ status: 'running', summary: 'Approved. KaTuroDesk is going on.' });
+    expect(() => answerRunFromPhone(waiting.id, true, { user, profile })).toThrow(/no longer waiting/);
+    // KaTuroDesk finishes the routine by itself.
+    await vi.waitFor(() => expect(useRoutineStore.getState().runs.find((r) => r.id === waiting.id)?.status).toBe('done'), { timeout: 15000 });
+    const done = useRoutineStore.getState().runs.find((r) => r.id === waiting.id);
+    expect(done.steps.c2.summary).toBe('Approved (Ana\'s phone)');
+    expect(done.steps.c3.status).toBe('done');
+    expect(beginBackgroundWork()).toBe(true); // the lock was given back
+    endBackgroundWork();
+  });
+
   it('one thing at a time: busy → null (tried again later); another folder open → said plainly', async () => {
     const { routine } = setup([['when.manual'], ['get.sheet', { path: 'Records/SF2 October.xlsx' }]]);
     expect(beginBackgroundWork()).toBe(true);

@@ -12,6 +12,7 @@
  */
 
 import { isDesk } from '../../platform.js';
+import { withTimeout } from '../../../utils/withTimeout.js';
 
 export const OCR_LANGS = 'eng+tgl';
 export const MAX_OCR_PAGES = 8; // scanned PDF pages read per file
@@ -33,14 +34,6 @@ export function cleanOcrText(text) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-}
-
-function withTimeout(promise, ms, what) {
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} took too long`)), ms); }),
-  ]).finally(() => clearTimeout(timer));
 }
 
 function deskAssets() {
@@ -96,7 +89,7 @@ export function createOcr(deps = {}) {
       clearTimeout(idleTimer);
       const w = await getWorker();
       try {
-        const { data } = await withTimeout(w.recognize(image), jobMs, 'Reading the page');
+        const { data } = await withTimeout(w.recognize(image), jobMs, 'Reading the page took too long');
         return { text: cleanOcrText(data?.text), confidence: Math.round(Number(data?.confidence) || 0) };
       } catch (err) {
         await close();
@@ -138,7 +131,7 @@ export function createOcr(deps = {}) {
       }
       const blob = typeof Blob !== 'undefined' && !(bytes instanceof Blob) ? new Blob([bytes], { type: mimeType || 'image/png' }) : bytes;
       return { pages: [{ number: 1, ...(await readOne(blob)) }], total: 1, read: 1 };
-    })(), jobMs * (kind === 'pdf' ? MAX_OCR_PAGES + 2 : 3), 'Reading the file'); // a PDF that never renders cannot hang a search
+    })(), jobMs * (kind === 'pdf' ? MAX_OCR_PAGES + 2 : 3), 'Reading the file took too long'); // a PDF that never renders cannot hang a search
     if (key) {
       cache.set(key, run);
       run.catch(() => cache.delete(key)); // a failed read is tried again next time

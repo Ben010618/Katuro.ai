@@ -8,7 +8,7 @@ import CardNode from './CardNode';
 import CardSettings from './CardSettings';
 import { KIND_COLOR, CARD_TEXT_2, cardColors, iconColors, textColor, speak } from './cardStyle';
 import CardIcon from './CardIcon';
-import { addCard, arrange, canConnect, cardLine, cardSentence, connect, disconnect, removeCard, setSettings } from './routineLayout';
+import { addCard, arrange, canConnect, cardLine, cardSentence, connect, disconnect, removeCard, setSettings, CARD_W, CARD_H } from './routineLayout';
 
 const nodeTypes = { card: CardNode };
 const DRAG_TYPE = 'application/katuro-card';
@@ -141,6 +141,10 @@ function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en',
     id: c.id,
     type: 'card',
     position: { x: c.x, y: c.y },
+    // Cards have one fixed size: given, so React Flow does not measure every card again on each change.
+    width: CARD_W,
+    height: CARD_H,
+    measured: { width: CARD_W, height: CARD_H },
     selected: c.id === selectedId,
     data: { def: cardDef(c.type), line: cardLine(c, lang), lang, problem: problemsByCard.get(c.id)?.[0] || '', status: tryStatuses[c.id] || null },
   })), [draft.cards, selectedId, lang, problemsByCard, tryStatuses]);
@@ -170,13 +174,18 @@ function Builder({ initial, files, folders, onSave, onClose, initialLang = 'en',
   }, [draft, selectedId, update]);
 
   const onEdgesChange = useCallback((changes) => {
+    // Several wires removed at once (multi-select + Delete) are all removed: fold into one change.
+    let next = null;
     for (const ch of changes) {
       if (ch.type === 'select') setSelectedEdge(ch.selected ? ch.id : null);
       if (ch.type === 'remove') {
         const [from, to] = ch.id.split('>');
-        update(disconnect(draft, from, to));
-        setSelectedEdge(null);
+        next = disconnect(next || draft, from, to);
       }
+    }
+    if (next) {
+      update(next);
+      setSelectedEdge(null);
     }
   }, [draft, update]);
 

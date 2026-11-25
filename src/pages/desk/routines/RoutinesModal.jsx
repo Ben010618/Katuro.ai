@@ -11,6 +11,7 @@ import { talkToRoutine } from '../../../services/desk/routines/talk';
 import { pilotSummary, pilotText } from '../../../services/desk/routines/pilot';
 import { formatWhen } from '../../../services/desk/schedule/schedule';
 import { callDeskLLM } from '../../../services/desk/agent/llm';
+import { SYSTEM_DIRS } from '../../../services/desk/systemFolders';
 import { STATUS_LIGHT } from './cardStyle';
 import { answerRun, startRoutine } from './routineEngine';
 
@@ -18,19 +19,18 @@ import { answerRun, startRoutine } from './routineEngine';
 const RoutineBuilder = lazy(() => import('./RoutineBuilder'));
 const btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
 const primary = 'inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50';
-const SKIP = /(^|\/)(KaTuro Backups|KaTuro Outputs)(\/|$)/i;
 const LANG_KEY = 'katuro-routines-lang';
 const T = (lang, en, fil) => (lang === 'fil' ? fil : en);
 const readLang = () => { try { return localStorage.getItem(LANG_KEY) === 'fil' ? 'fil' : 'en'; } catch { return 'en'; } };
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY, l); } catch { /* a convenience */ } };
 
 function folderLists(tree) {
-  const files = flattenFileTree(tree).map((f) => f.path).filter((p) => !SKIP.test(p)).sort();
+  const files = flattenFileTree(tree).map((f) => f.path).filter((p) => !SYSTEM_DIRS.test(p)).sort();
   const folders = [];
   const walk = (list) => {
     for (const e of list || []) {
       if (e.kind === 'directory') {
-        if (!SKIP.test(e.path)) folders.push(e.path);
+        if (!SYSTEM_DIRS.test(e.path)) folders.push(e.path);
         walk(e.children);
       }
     }
@@ -86,7 +86,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
 
   const save = (draft) => {
     try {
-      const { routine, dropped, problems } = saveRoutine(draft, { workspaceId: wsId, workspaceName: workspace?.name || '' });
+      const { routine, dropped, problems } = saveRoutine(draft, { workspaceId: wsId, workspaceName: workspace?.name || '', flatFiles: flattenFileTree(workspace?.files || []) });
       setEditing(routine);
       const parts = [problems.length ? T(lang, 'Saved. Fix the red cards, then switch it on in the list.', 'Na-save. Ayusin ang mga pulang card, saka paandarin sa listahan.') : T(lang, 'Saved. Switch it on in the list when you are ready.', 'Na-save. Paandarin ito sa listahan kapag handa ka na.')];
       if (dropped.length) parts.push(`${T(lang, 'Changed', 'Binago')}: ${dropped.slice(0, 3).join('; ')}.`);
@@ -255,7 +255,7 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
                           <span className="sr-only">{r.enabled ? T(lang, 'On', 'Naka-on') : T(lang, 'Off', 'Naka-off')}</span>
                         </button>
                         <p className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-900">{r.name}</p>
-                        <button type="button" onClick={() => runNow(r)} disabled={Boolean(busy) || isGenerating || problems.length > 0} className={btn}><Play size={12} /> {busy === r.id ? T(lang, 'Running…', 'Tumatakbo…') : T(lang, 'Run now', 'Patakbuhin')}</button>
+                        {r.cards.some((c) => c.type === 'when.newFiles') ? null : <button type="button" onClick={() => runNow(r)} disabled={Boolean(busy) || isGenerating || problems.length > 0} className={btn}><Play size={12} /> {busy === r.id ? T(lang, 'Running…', 'Tumatakbo…') : T(lang, 'Run now', 'Patakbuhin')}</button>}
                         <button type="button" onClick={() => setEditing(r)} className={btn}><Pencil size={12} /> {T(lang, 'Edit', 'Baguhin')}</button>
                         <button type="button" onClick={() => exportOne(r)} disabled={!canWrite} className={btn} title={T(lang, 'Save a copy to share (KaTuro Routines folder)', 'Mag-save ng kopya para ibahagi (folder na KaTuro Routines)')}><Download size={12} /></button>
                         <button type="button" onClick={() => { if (window.confirm(T(lang, `Delete "${r.name}"?`, `Burahin ang "${r.name}"?`))) deleteRoutine(r.id); }} className={btn} aria-label={T(lang, 'Delete', 'Burahin')}><Trash2 size={12} /></button>
@@ -263,7 +263,9 @@ export default function RoutinesModal({ open, onClose, user, profile }) {
                       <p className="mt-1 text-[11px] text-gray-600">{describeRoutine(r, lang)}</p>
                       {problems.length ? <p className="mt-1 text-[11px] text-red-700">{T(lang, 'To fix', 'Ayusin')}: {problems[0].text}{problems.length > 1 ? ` (+${problems.length - 1})` : ''}</p> : null}
                       {r.enabled && next ? <p className="mt-1 text-[11px] text-emerald-800">{T(lang, 'Next', 'Susunod')}: {formatWhen(next)}</p> : null}
-                      {r.enabled && !next && r.cards.some((c) => c.type === 'when.newFiles') ?<p className="mt-1 text-[11px] text-emerald-800">{T(lang, 'Watching for new files', 'Nagbabantay ng bagong file')}</p> : null}
+                      {r.cards.some((c) => c.type === 'when.newFiles') ? (
+                        <p className="mt-1 text-[11px] text-emerald-800">{r.enabled ? T(lang, 'Watching for new files (it runs when they arrive)', 'Nagbabantay ng bagong file (tatakbo kapag may dumating)') : T(lang, 'Runs when new files arrive in its folder: switch it on.', 'Tatakbo kapag may bagong file sa folder nito: i-on ito.')}</p>
+                      ) : null}
                       {last ? <div className="mt-2"><RunLights run={last} lang={lang} /></div> : null}
                     </li>
                   );

@@ -20,20 +20,13 @@
 
 import { cardDef, say } from './catalog.js';
 import { checkRoutine, cleanRoutine, downstreamOf, newId, runOrder } from './routine.js';
+import { withTimeout } from '../../../utils/withTimeout.js';
 
 export const CARD_TIMEOUT_MS = 20 * 60 * 1000; // one card never keeps a routine busy longer
 const OK = new Set(['done', 'approved']);
 const STOPPED = new Set(['error', 'needs_info', 'skipped', 'rejected']);
 
 const clip = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-
-function withTimeout(promise, ms) {
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('This card took too long and was stopped.')), ms); }),
-  ]).finally(() => clearTimeout(timer));
-}
 
 /** A new run of a routine (not started yet). trigger: { kind, at?, files?, title? } */
 export function createRun(routine, trigger = { kind: 'manual' }, now = Date.now()) {
@@ -69,6 +62,16 @@ function saveFolderAfter(routine, cardId) {
   return '';
 }
 
+/** What happens after "Ask me first" if the teacher approves: "Next: <card> → <record>, column <col>". */
+function nextLines(routine, cardId) {
+  const byId = new Map(routine.cards.map((c) => [c.id, c]));
+  return routine.wires.filter((w) => w.from === cardId).map((w) => byId.get(w.to)).filter(Boolean).map((c) => {
+    const s = c.settings || {};
+    const where = [s.targetPath, s.targetColumn && `column ${s.targetColumn}`, s.folder].filter(Boolean).join(', ');
+    return clip(`Next: ${say(cardDef(c.type)?.label)}${where ? ` → ${where}` : ''}`, 200);
+  });
+}
+
 /** One card's step → the run with it updated (immutable). */
 const setStep = (run, cardId, step) => ({ ...run, steps: { ...run.steps, [cardId]: step } });
 
@@ -102,6 +105,14 @@ export async function advanceRun(input, deps, onChange = () => {}) {
       continue;
     }
     if (parent && !OK.has(parentStep.status)) continue; // still waiting (cannot happen: we stop at Ask)
+
+    // The routine's own folder must still be the one open: never run a card on another folder.
+    if (deps.stillHere && !deps.stillHere()) {
+      run = setStep(run, card.id, { status: 'error', summary: 'Another folder was opened on KaTuroDesk, so the routine stopped here. Open its folder and run it again.' });
+      for (const id of downstreamOf(routine, card.id)) if (run.steps[id]?.status === 'pending') run = setStep(run, id, { status: 'skipped', summary: 'Skipped because the card before it did not finish.' });
+      onChange(run);
+      continue;
+    }
 
     const input = parent ? run.outputs[parent] || null : null;
     run = setStep(run, card.id, { status: 'running', startedAt: now() });
@@ -156,7 +167,7 @@ async function runCard(card, def, input, run, deps) {
       if (!def.accepts.includes('start') && !input?.paths?.length && !input?.folder) return { status: 'error', summary: 'The card before it gave no file to work on.' };
       const tasks = def.toTasks(s, input).map((t, i) => ({ id: t.id || `t${i + 1}`, tool: t.tool, args: t.args, dependsOn: t.dependsOn || [], label: say(def.label) }));
       const outputFolder = saveFolderAfter(run.routine, card.id);
-      const res = await withTimeout(deps.runTasks(tasks, { label: say(def.label), outputFolder }), CARD_TIMEOUT_MS);
+      const res = await withTimeout(deps.runTasks(tasks, { label: say(def.label), outputFolder }), CARD_TIMEOUT_MS, 'This card took too long and was stopped.');
       const files = res.files || [];
       if (res.status !== 'done') return { status: res.status === 'needs_info' ? 'needs_info' : 'error', summary: res.summary, files };
       let output;
@@ -171,13 +182,18 @@ async function runCard(card, def, input, run, deps) {
       const step = before ? run.steps[before] : null;
       const preview = [
         ...(step?.summary ? [clip(step.summary, 400)] : []),
-        ...((input?.paths || []).slice(0, 8)),
+        ...((input?.paths || []).slice(0, 6)),
+        ...nextLines(run.routine, card.id),
       ];
       return { status: 'waiting', summary: 'Waiting for your OK', note: clip(s.note, 300), preview };
     }
 
     case 'save': {
-      if (card.type === 'save.folder') return { status: 'done', summary: `Saved in ${s.folder}` };
+      if (card.type === 'save.folder') {
+        const before = parentOf(run.routine, card.id);
+        const made = (before && run.steps[before]?.files) || [];
+        return { status: 'done', summary: made.length ? `Saved in ${s.folder}` : 'Nothing new to save' };
+      }
       if (card.type === 'save.notify') {
         const done = Object.values(run.steps).filter((x) => x.status === 'done' && x.summary).map((x) => x.summary);
         const body = clip(s.message || done.slice(-2).join(' · ') || 'Done', 280);

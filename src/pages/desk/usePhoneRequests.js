@@ -7,8 +7,7 @@ import { useDeskStore, workspaceIdOf } from '../../store/deskStore';
 import { useRoutineStore, routinesFor } from '../../store/routineStore';
 import { createRoutineHandler, ROUTINE_OPS } from '../../services/link/deskRoutineRequests';
 import { cardDef, say } from '../../services/desk/routines/catalog';
-import { runSummary } from '../../services/desk/routines/runRoutine';
-import { answerRun } from './routines/routineEngine';
+import { answerRunFromPhone } from './routines/routineEngine';
 
 /**
  * KaTuroDesk answers the linked phone's requests: class records and bubble quizzes
@@ -98,10 +97,8 @@ export function usePhoneRequests({ user, profile } = {}) {
             stepsForPhone: r.routine.cards.filter((c) => r.steps[c.id]).map((c) => ({ label: say(cardDef(c.type)?.label), status: r.steps[c.id].status })),
           }));
         },
-        decide: async (id, approve, deviceName) => {
-          const out = await answerRun(id, approve, { ...account.current, by: deviceName });
-          return out ? { status: out.status, summary: runSummary(out) } : null;
-        },
+        // Answered at once; KaTuroDesk then runs the rest by itself (the phone does not wait for it).
+        decide: async (id, approve, deviceName) => answerRunFromPhone(id, approve, { ...account.current, by: deviceName }),
       });
       const offRequests = api.onLinkRequest(({ op, args, device }) => (ROUTINE_OPS.has(op) ? routines(op, args, device) : ASSISTANT_OPS.has(op) ? assistant(op, args) : handler(op, args, device)));
       // A photo or file the phone sent into Records / Lessons shows up in the folder panel.

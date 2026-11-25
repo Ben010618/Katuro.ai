@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -41,9 +41,10 @@ import CalendarAlarms from './calendar/CalendarAlarms';
 import TeachingAssistant from './teaching/TeachingAssistant';
 import MyClassesModal from './teaching/MyClassesModal';
 import TestsModal from './bubble/TestsModal';
-import RoutinesModal from './routines/RoutinesModal';
 import { useRoutineScheduler } from './routines/routineEngine';
 import { useRoutineStore, routinesFor } from '../../store/routineStore';
+// The Routines window (and its Builder) loads only when the teacher opens it.
+const RoutinesModal = lazy(() => import('./routines/RoutinesModal'));
 import { setTalkContext } from './talkController';
 import { startWakeController } from './wakeController';
 import { prepareVoice } from '../../services/desk/voice/piperVoice';
@@ -227,9 +228,12 @@ export default function KaTuroDeskPage() {
     window.katuroDeskApi?.setUnreadBadge?.(badgeCount, badgeDataUrl(badgeCount))?.catch?.(() => {});
   }, [badgeCount]);
   const activeTasks = scheduledTasks.filter((t) => t.enabled).length;
-  const routineState = useRoutineStore();
-  const myRoutineIds = new Set(routinesFor(routineState.routines, workspaceIdOf(workspace)).map((r) => r.id));
-  const routinesWaiting = routineState.runs.filter((r) => r.status === 'waiting' && myRoutineIds.has(r.routineId)).length;
+  // Only the count is read, so a routine's progress does not re-draw the whole Desk.
+  const wsKey = workspaceIdOf(workspace);
+  const routinesWaiting = useRoutineStore((s) => {
+    const ids = new Set(routinesFor(s.routines, wsKey).map((r) => r.id));
+    return s.runs.filter((r) => r.status === 'waiting' && ids.has(r.routineId)).length;
+  });
 
   // Mobile tab state: 'folder' | 'chat' | 'canvas'
   const [activeMobileTab, setActiveMobileTab] = useState('chat');
@@ -269,7 +273,11 @@ export default function KaTuroDeskPage() {
       <TeachingAssistant user={user} profile={profile} onOpenClasses={() => setShowClasses(true)} />
       <MyClassesModal open={showClasses} onClose={() => setShowClasses(false)} />
       <TestsModal open={showTests} onClose={() => setShowTests(false)} onOpenCanvas={() => setShowRightPanel(true)} />
-      <RoutinesModal open={showRoutines} onClose={() => setShowRoutines(false)} user={user} profile={profile} />
+      {showRoutines && (
+        <Suspense fallback={null}>
+          <RoutinesModal open onClose={() => setShowRoutines(false)} user={user} profile={profile} />
+        </Suspense>
+      )}
       {schedule && (
         <DeskScheduleModal
           prefill={schedule.prompt !== undefined ? schedule : null}

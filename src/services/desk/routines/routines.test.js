@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CARDS, KINDS, PLUGS, MAX_CARDS, cardDef } from './catalog.js';
 import { checkRoutine, cleanPath, cleanRoutine, describeRoutine, exportRoutineText, importRoutineText, newCard, newRoutine, plugsOf, runOrder, MAX_IMPORT_BYTES } from './routine.js';
-import { depedDates, depedFireAt, dueNow, initialSeen, nextFireAt, SETTLE_MS, MAX_FILES_PER_RUN } from './triggers.js';
+import { depedDates, depedFireAt, dueNow, initialSeen, markSeen, nextFireAt, SETTLE_MS, MAX_FILES_PER_RUN } from './triggers.js';
 import { advanceRun, createRun, decideRun, recoverRun, runSummary } from './runRoutine.js';
 import { TOOLS } from '../agent/registry.js';
 
@@ -178,21 +178,49 @@ describe('when a routine starts', () => {
     expect(nextFireAt(r, due.meta, day(2026, 12, 16))).toBe(day(2027, 4, 5, 7));
   });
 
-  it('new files: only ones that came after it was switched on, after they stop changing, 40 per run', () => {
+  it('new files: only new NAMES after it was switched on, once two checks find them unchanged, 40 per run', () => {
     const r = chain([['when.newFiles', { folder: 'Lessons/Tests/G7/Quiz 1/Photos', what: 'photos' }]]);
+    const P = 'Lessons/Tests/G7/Quiz 1/Photos';
     const t0 = day(2026, 11, 25, 8);
-    const old = [{ path: 'Lessons/Tests/G7/Quiz 1/Photos/a.jpg', size: 10, lastModified: t0 - 1e6 }];
-    const meta = { enabledAt: t0, seen: initialSeen(r, old) };
+    const old = [{ path: `${P}/a.jpg`, size: 10, lastModified: t0 - 1e6 }];
+    let meta = { enabledAt: t0, seen: initialSeen(r, old) };
     expect(dueNow(r, meta, { now: t0 + 60_000, flatFiles: old })).toBeNull();
-    const fresh = [...old, { path: 'Lessons/Tests/G7/Quiz 1/Photos/b.jpg', size: 9, lastModified: t0 + 50_000 }, { path: 'Lessons/Tests/G7/Quiz 1/Photos/notes.txt', size: 1, lastModified: t0 }];
-    expect(dueNow(r, meta, { now: t0 + 50_000 + SETTLE_MS - 1, flatFiles: fresh })).toBeNull(); // still being copied
-    const due = dueNow(r, meta, { now: t0 + 50_000 + SETTLE_MS, flatFiles: fresh });
-    expect(due.trigger.files).toEqual(['Lessons/Tests/G7/Quiz 1/Photos/b.jpg']);
-    expect(dueNow(r, due.meta, { now: t0 + 200_000, flatFiles: fresh })).toBeNull();
-    const many = Array.from({ length: 45 }, (_, i) => ({ path: `Lessons/Tests/G7/Quiz 1/Photos/p${i}.jpg`, size: 1, lastModified: t0 }));
-    const first = dueNow(r, { enabledAt: t0, seen: [] }, { now: t0 + 1e6, flatFiles: many });
-    expect(first.trigger.files).toHaveLength(MAX_FILES_PER_RUN);
-    expect(dueNow(r, first.meta, { now: t0 + 1e6, flatFiles: many }).trigger.files).toHaveLength(5);
+    // b.jpg is being copied: first seen at 9 bytes, then 12 bytes, then unchanged.
+    const step = (files, now) => {
+      const due = dueNow(r, meta, { now, flatFiles: files });
+      if (due) meta = due.meta;
+      return due?.trigger || null;
+    };
+    const with9 = [...old, { path: `${P}/b.jpg`, size: 9, lastModified: t0 + 1000 }, { path: `${P}/notes.txt`, size: 1, lastModified: t0 }];
+    const with12 = [old[0], { path: `${P}/b.jpg`, size: 12, lastModified: t0 + 20_000 }, with9[2]];
+    expect(step(with9, t0 + 30_000)).toBeNull(); // first look: waits
+    expect(step(with12, t0 + 60_000)).toBeNull(); // it changed: waits again
+    expect(step(with12, t0 + 60_000 + SETTLE_MS - 1)).toBeNull(); // unchanged, but not long enough
+    expect(step(with12, t0 + 60_000 + SETTLE_MS)).toMatchObject({ kind: 'newFiles', files: [`${P}/b.jpg`] }); // notes.txt is not a photo
+    // Edited in place later (new size and time): never "new" again.
+    const edited = [old[0], { path: `${P}/b.jpg`, size: 99, lastModified: t0 + 9e6 }];
+    expect(step(edited, t0 + 1e7)).toBeNull();
+    expect(step(edited, t0 + 2e7)).toBeNull();
+    // A deleted file drops off the list; its name coming back later is a new file again.
+    expect(step([edited[1]], t0 + 3e7)).toBeNull();
+    expect(meta.seen).toEqual([`${P}/b.jpg`]);
+    // 45 at once: 40 now, 5 on the next check.
+    const many = Array.from({ length: 45 }, (_, i) => ({ path: `${P}/p${i}.jpg`, size: 1, lastModified: t0 }));
+    meta = { enabledAt: t0, seen: [] };
+    expect(step(many, t0 + 1e6)).toBeNull();
+    expect(step(many, t0 + 1e6 + SETTLE_MS).files).toHaveLength(MAX_FILES_PER_RUN);
+    expect(step(many, t0 + 1e6 + SETTLE_MS + 1).files).toHaveLength(5);
+    expect(step(many, t0 + 2e6)).toBeNull();
+    // Files the routine itself made are marked seen (markSeen) and never start it.
+    meta = markSeen(meta, [`${P}/made by the routine.jpg`]);
+    expect(step([...many, { path: `${P}/made by the routine.jpg`, size: 1, lastModified: t0 }], t0 + 3e6)).toBeNull();
+  });
+
+  it('a routine that watches a folder cannot save into it (it would start itself again)', () => {
+    const r = chain([['when.newFiles', { folder: 'Records', what: 'sheets' }], ['do.consolidate', {}], ['save.folder', { folder: 'Records/Grades' }]]);
+    expect(checkRoutine(r).map((p) => p.text)).toEqual(['"Save in a folder" cannot save into the folder this routine watches: its own files would start it again. Choose another folder.']);
+    const ok = chain([['when.newFiles', { folder: 'Records/Scores', what: 'sheets' }], ['do.consolidate', {}], ['save.folder', { folder: 'Records/Grades' }]]);
+    expect(checkRoutine(ok)).toEqual([]);
   });
 });
 
@@ -233,7 +261,7 @@ describe('running a routine', () => {
     const { deps, calls } = fake();
     const waiting = await advanceRun(createRun(r), deps);
     expect(waiting.status).toBe('waiting');
-    expect(waiting.waiting).toMatchObject({ cardId: 'c2', note: 'Check the scores first', preview: ['scores.xlsx', 'Records/scores.xlsx'] });
+    expect(waiting.waiting).toMatchObject({ cardId: 'c2', note: 'Check the scores first', preview: ['scores.xlsx', 'Records/scores.xlsx', 'Next: Type scores into my class record → Records/Grade 7 - Rizal - Science.xlsx, column WW3'] });
     expect(calls).toHaveLength(0); // nothing changed yet
     expect(runSummary(waiting)).toBe('"Test routine" is waiting for your OK: Check the scores first.');
 
@@ -296,6 +324,31 @@ describe('running a routine', () => {
     expect(no.status).toBe('error');
     expect(no.problem).toMatch(/Ask me first/);
     expect(c2).toHaveLength(0);
+  });
+
+  it('another folder opened during a run: the next card stops (never runs on the other folder)', async () => {
+    const r = chain([['when.manual'], ['get.folder', { folder: 'Lessons/Photos' }], ['do.toPdf'], ['do.submissionPack', { title: 'Pack' }]]);
+    const { deps, calls } = fake();
+    let here = true;
+    deps.stillHere = () => here;
+    deps.runTasks = vi.fn(async (tasks) => { calls.push(tasks); here = false; return { status: 'done', summary: 'ok', files: ['KaTuro Outputs/a.pdf'] }; });
+    const run = await advanceRun(createRun(r), deps);
+    expect(calls).toHaveLength(1); // only the PDF card ran
+    expect(run.steps.c3).toMatchObject({ status: 'error', summary: expect.stringMatching(/Another folder was opened/) });
+    expect(run.status).toBe('error');
+  });
+
+  it('"Save in a folder" says when there was nothing to save', async () => {
+    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/SF2.xlsx' }], ['do.attendance', {}], ['save.folder', { folder: 'Records/Notices' }]]);
+    const { deps } = fake({ check_attendance: { status: 'done', summary: 'No learner has 3 or more consecutive absences', files: [] } });
+    const run = await advanceRun(createRun(r), deps);
+    expect(run.steps.c3.summary).toBe('Nothing new to save');
+  });
+
+  it('an imported file is always a NEW routine (it can never replace one you have)', () => {
+    const r = chain([['when.manual'], ['get.sheet', { path: 'Records/a.xlsx' }]]);
+    const text = JSON.stringify({ id: r.id, name: 'x', cards: r.cards, wires: r.wires });
+    expect(importRoutineText(text).routine.id).not.toBe(r.id);
   });
 
   it('a run keeps its own copy of the routine; a run cut off by closing the app is shown stopped', async () => {

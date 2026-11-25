@@ -17,9 +17,24 @@ import { recoverRun } from '../services/desk/routines/runRoutine.js';
 export const MAX_RUNS = 60;
 export const MAX_ROUTINES = 50;
 
+export const MAX_WAITING_PER_ROUTINE = 3;
+
+/**
+ * The runs kept: newest first; waiting runs are kept (they are the teacher's to answer), but at
+ * most MAX_WAITING_PER_ROUTINE per routine: an older one not answered is closed as "not answered"
+ * (nothing after its Ask card is done) so unanswered runs never pile up. Then MAX_RUNS others.
+ */
 const keepRuns = (runs) => {
-  const waiting = runs.filter((r) => r.status === 'waiting');
-  const others = runs.filter((r) => r.status !== 'waiting').slice(0, MAX_RUNS);
+  const sorted = [...runs].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+  const perRoutine = new Map();
+  const closed = sorted.map((r) => {
+    if (r.status !== 'waiting') return r;
+    const n = (perRoutine.get(r.routineId) || 0) + 1;
+    perRoutine.set(r.routineId, n);
+    return n > MAX_WAITING_PER_ROUTINE ? { ...r, status: 'error', waiting: null, finishedAt: r.finishedAt || Date.now(), problem: 'Not answered: a newer run of this routine is waiting instead.' } : r;
+  });
+  const waiting = closed.filter((r) => r.status === 'waiting');
+  const others = closed.filter((r) => r.status !== 'waiting').slice(0, MAX_RUNS);
   return [...waiting, ...others].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 };
 
@@ -34,7 +49,7 @@ export const useRoutineStore = create(
        * Saves a routine (new or edited) for a folder. It is cleaned first; a routine with problems
        * is kept switched off. → { routine, dropped, problems }
        */
-      saveRoutine: (raw, { workspaceId, workspaceName = '' } = {}, now = Date.now()) => {
+      saveRoutine: (raw, { workspaceId, workspaceName = '', flatFiles = [] } = {}, now = Date.now()) => {
         const { routine, dropped } = cleanRoutine(raw);
         const problems = checkRoutine(routine);
         const old = get().routines.find((r) => r.id === routine.id);
@@ -48,8 +63,12 @@ export const useRoutineStore = create(
           updatedAt: now,
         };
         set((s) => ({ routines: old ? s.routines.map((r) => (r.id === saved.id ? saved : r)) : [saved, ...s.routines] }));
-        // An edited routine starts counting again (a changed folder or time).
-        if (old && saved.enabled) set((s) => ({ meta: { ...s.meta, [saved.id]: { ...(s.meta[saved.id] || {}), enabledAt: now, lastFireAt: null } } }));
+        // An edited routine that stays on starts counting again, as if switched on now: a changed
+        // time from now, and a changed watched folder (or kind of file) starts from the files in it
+        // NOW (none of them fire). DepEd dates already done stay done.
+        if (old && saved.enabled) {
+          set((s) => ({ meta: { ...s.meta, [saved.id]: { fired: s.meta[saved.id]?.fired || [], enabledAt: now, lastFireAt: null, seen: initialSeen(saved, flatFiles), pending: {} } } }));
+        }
         return { routine: saved, dropped, problems };
       },
 
@@ -63,14 +82,15 @@ export const useRoutineStore = create(
         }
         set((s) => ({
           routines: s.routines.map((x) => (x.id === id ? { ...x, enabled: Boolean(on), updatedAt: now } : x)),
-          meta: on ? { ...s.meta, [id]: { enabledAt: now, lastFireAt: null, fired: [], seen: initialSeen({ ...r, enabled: true }, flatFiles) } } : s.meta,
+          meta: on ? { ...s.meta, [id]: { enabledAt: now, lastFireAt: null, fired: [], seen: initialSeen({ ...r, enabled: true }, flatFiles), pending: {} } } : s.meta,
         }));
       },
 
+      /** Deletes a routine with its runs (waiting ones too: nothing of it is kept). */
       deleteRoutine: (id) => set((s) => {
         const meta = { ...s.meta };
         delete meta[id];
-        return { routines: s.routines.filter((r) => r.id !== id), meta };
+        return { routines: s.routines.filter((r) => r.id !== id), meta, runs: s.runs.filter((r) => r.routineId !== id) };
       }),
 
       setMeta: (id, meta) => set((s) => ({ meta: { ...s.meta, [id]: meta } })),
@@ -93,7 +113,7 @@ export const useRoutineStore = create(
           ...current,
           routines,
           meta: p.meta && typeof p.meta === 'object' && !Array.isArray(p.meta) ? p.meta : {},
-          runs: keepRuns((Array.isArray(p.runs) ? p.runs : []).filter((r) => r && r.routine && r.steps).map(recoverRun)),
+          runs: keepRuns((Array.isArray(p.runs) ? p.runs : []).filter((r) => r && r.routine && r.steps && routines.some((x) => x.id === r.routineId)).map(recoverRun)),
         };
       },
       partialize: (s) => ({ routines: s.routines, meta: s.meta, runs: s.runs }),

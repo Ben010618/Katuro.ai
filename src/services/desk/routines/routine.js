@@ -194,8 +194,9 @@ export function importRoutineText(text) {
     throw new Error('This is not a KaTuro routine file.');
   }
   if (!plainObject(raw) || !Array.isArray(raw.cards)) throw new Error('This is not a KaTuro routine file.');
-  const out = cleanRoutine({ ...raw, enabled: false }); // an imported routine always starts switched off
-  return out;
+  // An imported routine always starts switched off, as a NEW routine: a file can never replace one
+  // the teacher already has (even with the same id).
+  return cleanRoutine({ ...raw, id: undefined, enabled: false });
 }
 
 /** The routine as a file to share (no run history, switched off). */
@@ -331,6 +332,15 @@ export function checkRoutine(routine, lang = 'en') {
   const reached = new Set(order.map((c) => c?.id));
   if (whens.length === 1) {
     for (const c of cards) if (!reached.has(c.id) && cardDef(c.type)?.kind !== 'when' && (incoming.get(c.id) || []).length) add(`${name(c)} is in a loop or not reached from the "When" card.`, c.id);
+  }
+
+  // A routine that watches a folder must not save into it (its own files would start it again).
+  const watch = String(cards.find((c) => c.type === 'when.newFiles')?.settings?.folder || '').toLowerCase();
+  if (watch) {
+    for (const c of cards) {
+      const to = String(c.type === 'save.folder' ? c.settings?.folder || '' : '').toLowerCase();
+      if (to && (to === watch || to.startsWith(`${watch}/`))) add(`${name(c)} cannot save into the folder this routine watches: its own files would start it again. Choose another folder.`, c.id);
+    }
   }
 
   // A card that changes a record needs "Ask me first" before it.

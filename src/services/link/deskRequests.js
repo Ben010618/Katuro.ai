@@ -26,11 +26,12 @@ import { isInRecords, parseClassRecordFileName, classNameOfRecord } from '../des
 import { QUIZ_FILE, CHECK_FILE, parseQuiz } from '../desk/bubble/quiz.js';
 import { listTests, testSummary, checkPathOf, folderOf, photosOf, validateKey, withKey, loadTest, markTestRecorded } from '../desk/bubble/tests.js';
 import { flattenFileTree, readDirectoryRecursively, readFileBytes, saveWorkingCopy, workingCopyPath, isFileOpenError, writeFileToDirectory, fileExists, backupFile, sha256Hex } from '../localFileSystem.js';
+import { SYSTEM_DIRS } from '../desk/systemFolders.js';
 import { attendancePathFor, isAttendanceFile, newAttendanceWorkbook, readAttendance, writeAttendance, MARKS } from '../desk/records/attendance.js';
 
 const RECORD_FILE = /\.(xlsx|xlsm)$/i;
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const SKIP_DIRS = /(^|\/)(KaTuro Backups|KaTuro Outputs)(\/|$)/i;
+const SKIP_DIRS = SYSTEM_DIRS;
 const KEEP_APPLIED = 300;
 
 export class RequestError extends Error {

@@ -18,7 +18,9 @@ Picture cards that do a teacher's repeated work, n8n-style but made for teachers
 | Routines window (mine, ready-made, waiting, history) | `src/pages/desk/routines/RoutinesModal.jsx` |
 | Approvals on the KaTuro App | `src/services/link/deskRoutineRequests.js`, `src/pages/phone/PhoneApprovals.jsx` |
 
-A green card runs its KaTuroDesk tool(s) through `runDeskAgentTurn` with a **confirmed plan** (no AI planning call): the same tool code, path checks (`planner.sanitizePlan`), backups, privacy masking and records rules as a chat request. One thing runs at a time (the scheduler's lock, shared with scheduled tasks); never while the teacher's own request runs. A run keeps a copy of the routine it started with.
+A green card runs its KaTuroDesk tool(s) through `runDeskAgentTurn` with a **confirmed plan** (no AI planning call): the same tool code, path checks (`planner.sanitizePlan`), backups, privacy masking and records rules as a chat request. One thing runs at a time: the scheduler's lock is shared with scheduled tasks, a routine never starts while the teacher's own request runs, and the chat waits while a card runs. After a card times out the lock is kept until its work has really ended. A run keeps a copy of the routine it started with and belongs to the folder it started in (it stops if another folder is opened). The phone's answer is recorded at once; KaTuroDesk then runs the rest by itself.
+
+"When new files arrive": the watched folder is read from disk every 30 seconds (files copied with Windows Explorer or a scanner count). A file is new by its name (an edited file is never new again); it is used once two checks at least 20 seconds apart find it unchanged; files a run made are marked seen; a routine cannot save into the folder it watches. Unanswered waiting runs are capped at 3 per routine; deleting a routine deletes its runs.
 
 ## Security rules (why: the holes used against n8n, Node-RED, Langflow and Flowise)
 

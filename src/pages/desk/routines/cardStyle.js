@@ -3,14 +3,14 @@
  * color per kind (purple When, blue Get, green Do, yellow Ask me first, orange Save / send).
  */
 import {
-  Play, CalendarClock, CalendarDays, FolderInput, Sheet, BookOpenCheck, FolderOpen, ClipboardList,
-  UserX, BarChart3, Calculator, FileBadge, BookOpen, ScanLine, CheckCheck, BookPlus, PencilLine,
+  Play, CalendarClock, CalendarDays, FolderInput, Sheet, BookOpenCheck, FolderOpen,
+  UserX, BarChart3, Calculator, FileBadge, BookOpen, ScanLine, PencilLine,
   Combine, ShieldCheck, FileDown, Package, NotebookPen, Hand, FolderDown, BellRing, Workflow,
 } from 'lucide-react';
 
 export const ICONS = {
-  Play, CalendarClock, CalendarDays, FolderInput, Sheet, BookOpenCheck, FolderOpen, ClipboardList,
-  UserX, BarChart3, Calculator, FileBadge, BookOpen, ScanLine, CheckCheck, BookPlus, PencilLine,
+  Play, CalendarClock, CalendarDays, FolderInput, Sheet, BookOpenCheck, FolderOpen,
+  UserX, BarChart3, Calculator, FileBadge, BookOpen, ScanLine, PencilLine,
   Combine, ShieldCheck, FileDown, Package, NotebookPen, Hand, FolderDown, BellRing,
 };
 export const iconFor = (name) => ICONS[name] || Workflow;

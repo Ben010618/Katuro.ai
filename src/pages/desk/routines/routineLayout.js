@@ -137,11 +137,10 @@ export function cardLine(card, lang = 'en') {
       return `${say(ev?.label, lang) || '?'}: ${when}`;
     }
     case 'when.newFiles': return s.folder ? base(s.folder) : (fil ? 'Pumili ng folder' : 'Pick a folder');
-    case 'get.sheet': case 'get.record': case 'get.quiz': return s.path ? base(s.path) : (fil ? 'Pumili ng file' : 'Pick a file');
+    case 'get.sheet': case 'get.record': return s.path ? base(s.path) : (fil ? 'Pumili ng file' : 'Pick a file');
     case 'get.folder': return s.folder ? base(s.folder) : (fil ? 'Pumili ng folder' : 'Pick a folder');
     case 'do.attendance': return `${s.minConsecutive || 3}+ ${fil ? 'araw na sunod-sunod' : 'days in a row'}`;
     case 'do.typeScores': return `${base(s.targetPath) || '?'} · ${s.targetColumn || '?'}`;
-    case 'do.recordTest': return `${base(s.targetPath) || '?'} · ${s.column || '?'}`;
     case 'do.checkPapers': return s.answerKeyPath ? `${fil ? 'Susi' : 'Key'}: ${base(s.answerKeyPath)}` : (fil ? 'Pumili ng answer key' : 'Pick the answer key');
     case 'do.reading': return [s.passageWords && `${s.passageWords} ${fil ? 'salita' : 'words'}`, s.questions && `${s.questions} ${fil ? 'tanong' : 'questions'}`, s.test].filter(Boolean).join(' · ');
     case 'do.classGrades': return [s.subject, s.gradeSection].filter(Boolean).join(' · ');

@@ -30,7 +30,7 @@ export default function PhoneApprovals({ client, online }) {
     setNote({ text: '', bad: false });
     try {
       const r = await client.request('routineDecide', { id: item.id, approve });
-      setNote({ text: approve ? `Approved. ${r?.summary || ''}`.trim() : 'Not approved: KaTuroDesk did nothing after it.', bad: false });
+      setNote({ text: r?.summary || (approve ? 'Approved. KaTuroDesk is going on.' : 'Not approved: KaTuroDesk will do nothing after it.'), bad: false });
       setTick((t) => t + 1);
     } catch (err) {
       setNote({ text: err?.message || 'KaTuroDesk could not be reached.', bad: true });
