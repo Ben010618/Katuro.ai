@@ -1018,18 +1018,10 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       report(`Reading scores from ${sourcePath}…`);
       const { table } = await loadScoreTable(sourcePath, ctx);
       const totals = toTotals(table);
-      const { writeScoresIntoWorkbook, findWorkbookColumns } = await import('../generators/fillTemplates.js');
+      const { writeScoresIntoWorkbook, findNameColumn } = await import('../generators/fillTemplates.js');
       const targetBytes = await ctx.readBytes(targetPath);
-      let nameCol = nameColumn;
-      if (!nameCol) {
-        const cols = await findWorkbookColumns(targetBytes, sheetName);
-        // The learners' name column, never a "School name" / "Teacher's name" heading (KaTuro's own
-        // E-Class Record has "SCHOOL NAME:" in its header block before "LEARNERS' NAMES").
-        const notLearner = /school|teacher|adviser|principal|subject|section|division|region|district/i;
-        const names = cols.headers.filter((h) => /name|learner|pangalan|student|pupil|mag-?aaral/i.test(h.text) && !notLearner.test(h.text));
-        const hit = names.find((h) => /learner|pangalan|student|pupil|mag-?aaral/i.test(h.text)) || names[0];
-        nameCol = hit ? hit.letter : 'B';
-      }
+      // The learners' name column: the one with names under it (never "SCHOOL NAME:", "Student No." or an LRN column).
+      const nameCol = nameColumn || (await findNameColumn(targetBytes, sheetName)) || 'B';
       report(`Typing ${totals.learners.length} scores into ${targetPath}…`);
       const result = await writeScoresIntoWorkbook(targetBytes, {
         sheetName,
@@ -1962,14 +1954,17 @@ Target competency / least mastered skills: ${focus || '(see source files)'}${tex
       const sources = [...new Set(sourcePaths)].filter((p) => p && p !== targetPath);
       if (!sources.length) throw needsInfo('Which files should I take the data from?');
       const { matchLearningArea } = await import('../knowledge/gradingRules.js');
-      const { findWorkbookColumns, fillColumnsInWorkbook } = await import('../generators/fillTemplates.js');
+      const { findWorkbookColumns, findNameColumn, fillColumnsInWorkbook } = await import('../generators/fillTemplates.js');
       const fileName = (p) => String(p).split('/').pop();
       const stem = (p) => fileName(p).replace(/\.[^.]+$/, '');
 
       // The teacher's table: its header row (the one with the names heading) and columns.
       const targetBytes = await ctx.readBytes(targetPath);
       const { headers } = await findWorkbookColumns(targetBytes, sheetName);
-      const nameHeader = headers.find((h) => /name|learner|pangalan|student|pupil/i.test(h.text));
+      // The names heading is the one over the column that really has the names (not "SCHOOL NAME:").
+      const nameLetter = await findNameColumn(targetBytes, sheetName);
+      const isNameHeading = (h) => /name|learner|pangalan|student|pupil/i.test(h.text) && !/school|teacher|adviser|principal|subject|section|division|region|district/i.test(h.text);
+      const nameHeader = headers.find((h) => h.letter === nameLetter && isNameHeading(h)) || headers.find(isNameHeading);
       if (!nameHeader) throw needsInfo(`I could not find the names column in ${fileName(targetPath)}. Which column has the learners' names?`);
       const headerRow = headers.filter((h) => h.row === nameHeader.row && h.col !== nameHeader.col);
       const averageHeader = headerRow.find((h) => /^(average|ave\.?|avg\.?|general\s+average|gen\.?\s*ave\.?|mean)$/i.test(h.text.trim()));

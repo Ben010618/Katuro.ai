@@ -188,6 +188,47 @@ function resolveColumn(ws, col, headerRows = 15) {
 }
 
 /** Sheet names + header-ish text cells from the first 15 rows. */
+const NAME_HEADING = /name|learner|pangalan|student|pupil|mag-?aaral/i;
+const NOT_LEARNERS = /school|teacher|adviser|principal|subject|section|division|region|district/i;
+
+/**
+ * The column of a sheet that holds the learners' names → its letter, or null.
+ * Decided by what is BELOW each heading (how many cells look like a person's name), not by the
+ * heading's words alone: "SCHOOL NAME:", "Student No." or "Learner Reference No." never win over
+ * the column that really has the names. With no usable heading, the column with the most names.
+ */
+export async function findNameColumn(workbookBytes, sheetName) {
+  const wb = await loadWorkbook(workbookBytes);
+  const ws = (sheetName && wb.getWorksheet(sheetName)) || wb.worksheets[0];
+  if (!ws) return null;
+  const last = Math.min(ws.rowCount, 1000);
+  const namesIn = (col, fromRow) => {
+    let n = 0;
+    for (let r = fromRow + 1; r <= last; r++) if (looksLikePersonName(cellText(ws.getRow(r).getCell(col)))) n += 1;
+    return n;
+  };
+  const candidates = [];
+  for (let r = 1; r <= Math.min(15, ws.rowCount); r++) {
+    ws.getRow(r).eachCell({ includeEmpty: false }, (cell, c) => {
+      if (cell.isMerged && cell.master !== cell) return;
+      const text = cellText(cell).trim();
+      if (!text || !NAME_HEADING.test(text) || NOT_LEARNERS.test(text)) return;
+      // A heading that says both "name" and learner (LEARNERS' NAMES, Pangalan ng Mag-aaral) first on a tie.
+      const rank = /name|pangalan/i.test(text) && /learner|student|pupil|mag-?aaral|pangalan/i.test(text) ? 2 : /name|pangalan/i.test(text) ? 1 : 0;
+      candidates.push({ col: c, names: namesIn(c, r), rank });
+    });
+  }
+  candidates.sort((a, b) => b.names - a.names || b.rank - a.rank || a.col - b.col);
+  if (candidates[0]?.names > 0) return numberToLetter(candidates[0].col);
+  // No heading with names under it: the column with the most person names.
+  let best = null;
+  for (let c = 1; c <= Math.min(ws.columnCount, 60); c++) {
+    const n = namesIn(c, 0);
+    if (n > 0 && (!best || n > best.n)) best = { c, n };
+  }
+  return best ? numberToLetter(best.c) : null;
+}
+
 export async function findWorkbookColumns(workbookBytes, sheetName) {
   const wb = await loadWorkbook(workbookBytes);
   const sheets = wb.worksheets.map((w) => w.name);

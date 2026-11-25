@@ -233,7 +233,7 @@ export const CARDS = [
       F.file('answerKeyPath', 'Answer key file', 'File ng answer key', /\.(docx|pdf|xlsx|csv|txt|jpe?g|png)$/i, { required: true }),
       // The names on the papers are matched to this list, so the scores carry the names exactly
       // as in the class record (needed to type them in).
-      F.file('listPath', 'Class list or class record (to match the names)', 'Class list o class record (para itugma ang pangalan)', SHEET),
+      F.file('listPath', 'Class list or class record (to match the names)', 'Class list o class record (para itugma ang pangalan)', /\.(xlsx|xlsm|xls|csv|tsv|docx|pdf|jpe?g|png)$/i),
       F.text('title', 'Test name', 'Pangalan ng test'),
     ],
     toTasks: (s, input) => [{ tool: 'check_answer_sheets', args: opt({ ...folderArgs(input), answerKeyPath: clean(s.answerKeyPath), listPath: clean(s.listPath), title: clean(s.title) }) }],
@@ -255,6 +255,7 @@ export const CARDS = [
       // Names can hold full stops ("Juan P."): the list ends at "; ", at ". A backup" / ". Your original", or at the end.
       const missing = /(\d+) name\(s\) not found: (.+?)(?:…)?(?=; |\. (?:A backup|Your original)|\.?$)/.exec(summary);
       const hint = 'Check that the names match your class record (for photos, choose the class list on "Check answer sheets").';
+      if (typed && Number(typed[1]) === 0 && /already had a value/.test(summary)) return { status: 'error', summary: 'No score was typed: those cells in your class record already have scores, and KaTuro never writes over them. Choose an empty column.' };
       if (typed && Number(typed[1]) === 0) return { status: 'error', summary: `No score was typed into your class record${missing ? `: ${missing[2].trim()} not found in it` : ''}. ${hint}` };
       if (missing) return { status: 'needs_info', summary: `${typed ? typed[1] : 'Some'} score(s) typed; ${missing[1]} name(s) not found in your class record: ${missing[2].trim()}. ${hint}` };
       return null;

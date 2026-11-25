@@ -186,6 +186,7 @@ describe('every ready-made routine works end to end', () => {
   it('End of term: score sheet → grades (DO 8) → check for mistakes', async () => {
     const { run, lines } = await runTemplate('end-of-term', { 'get.sheet': { path: 'Records/Science scores.xlsx' }, 'do.classGrades': { subject: 'Science', gradeSection: 'Grade 7 - Rizal' } });
     expect(run.status, lines.join('\n')).toBe('done');
+    expect(madeFiles(run).filter((p) => /\.xlsx$/.test(p)).length, madeFiles(run).join(', ')).toBeGreaterThanOrEqual(1); // the E-Class Record
   });
 
   it('Adviser: section class records → SF9 → submission pack', async () => {
@@ -197,11 +198,14 @@ describe('every ready-made routine works end to end', () => {
   it('Phil-IRI reading levels', async () => {
     const { run, lines } = await runTemplate('phil-iri', { 'get.sheet': { path: 'Records/Reading/Phil-IRI pre-test.xlsx' }, 'do.reading': { passageWords: 150, questions: 7 } });
     expect(run.status, lines.join('\n')).toBe('done');
+    expect(madeFiles(run).some((p) => /Reading_Profile.*\.xlsx$/.test(p)), madeFiles(run).join(', ')).toBe(true);
   });
 
   it('Item analysis + remedial slips', async () => {
     const { run, lines } = await runTemplate('item-analysis', { 'get.sheet': { path: 'Records/Quiz 1 items.xlsx' } });
     expect(run.status, lines.join('\n')).toBe('done');
+    expect(madeFiles(run).some((p) => /Item_Analysis.*\.(docx|xlsx)$/i.test(p)), madeFiles(run).join(', ')).toBe(true);
+    expect(madeFiles(run).some((p) => /Remedial/i.test(p)), madeFiles(run).join(', ')).toBe(true);
   });
 
   it('Month-end attendance summary: folder → one Excel → submission pack', async () => {
